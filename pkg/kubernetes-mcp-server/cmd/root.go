@@ -22,11 +22,11 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	"github.com/manusa/kubernetes-mcp-server/pkg/config"
-	internalhttp "github.com/manusa/kubernetes-mcp-server/pkg/http"
-	"github.com/manusa/kubernetes-mcp-server/pkg/mcp"
-	"github.com/manusa/kubernetes-mcp-server/pkg/output"
-	"github.com/manusa/kubernetes-mcp-server/pkg/version"
+	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	internalhttp "github.com/containers/kubernetes-mcp-server/pkg/http"
+	"github.com/containers/kubernetes-mcp-server/pkg/mcp"
+	"github.com/containers/kubernetes-mcp-server/pkg/output"
+	"github.com/containers/kubernetes-mcp-server/pkg/version"
 )
 
 var (
@@ -225,18 +225,6 @@ func (m *MCPServerOptions) Validate() error {
 		}
 		if u.Scheme == "http" {
 			klog.Warningf("authorization-url is using http://, this is not recommended production use")
-		}
-	}
-	if m.StaticConfig.ServerURL != "" {
-		u, err := url.Parse(m.StaticConfig.ServerURL)
-		if err != nil {
-			return err
-		}
-		if u.Scheme != "https" && u.Scheme != "http" {
-			return fmt.Errorf("--server-url must be a valid URL")
-		}
-		if u.Scheme == "http" {
-			klog.Warningf("server-url is using http://, this is not recommended production use")
 		}
 	}
 	if m.StaticConfig.JwksURL != "" {

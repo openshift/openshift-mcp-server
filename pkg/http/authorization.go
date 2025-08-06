@@ -11,7 +11,7 @@ import (
 	"github.com/go-jose/go-jose/v4/jwt"
 	"k8s.io/klog/v2"
 
-	"github.com/manusa/kubernetes-mcp-server/pkg/mcp"
+	"github.com/containers/kubernetes-mcp-server/pkg/mcp"
 )
 
 const (
@@ -41,9 +41,9 @@ func AuthorizationMiddleware(requireOAuth bool, serverURL string, oidcProvider *
 				klog.V(1).Infof("Authentication failed - missing or invalid bearer token: %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
 
 				if serverURL == "" {
-					w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="Kubernetes MCP Server", audience="%s", error="invalid_token"`, audience))
+					w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="Kubernetes MCP Server", audience="%s", error="missing_token"`, audience))
 				} else {
-					w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="Kubernetes MCP Server", audience="%s"", resource_metadata="%s%s", error="invalid_token"`, audience, serverURL, oauthProtectedResourceEndpoint))
+					w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="Kubernetes MCP Server", audience="%s"", resource_metadata="%s%s", error="missing_token"`, audience, serverURL, oauthProtectedResourceEndpoint))
 				}
 				http.Error(w, "Unauthorized: Bearer token required", http.StatusUnauthorized)
 				return
@@ -88,6 +88,7 @@ func AuthorizationMiddleware(requireOAuth bool, serverURL string, oidcProvider *
 			// Scopes are likely to be used for authorization.
 			scopes := claims.GetScopes()
 			klog.V(2).Infof("JWT token validated - Scopes: %v", scopes)
+			r = r.WithContext(context.WithValue(r.Context(), mcp.TokenScopesContextKey, scopes))
 
 			// Now, there are a couple of options:
 			// 1. If there is no authorization url configured for this MCP Server,
@@ -103,7 +104,7 @@ func AuthorizationMiddleware(requireOAuth bool, serverURL string, oidcProvider *
 			// with the other token in the headers (TODO: still need to validate aud and exp of this token separately).
 			_, _, err = mcpServer.VerifyTokenAPIServer(r.Context(), token, audience)
 			if err != nil {
-				klog.V(1).Infof("Authentication failed - token validation error: %s %s from %s, error: %v", r.Method, r.URL.Path, r.RemoteAddr, err)
+				klog.V(1).Infof("Authentication failed - API Server token validation error: %s %s from %s, error: %v", r.Method, r.URL.Path, r.RemoteAddr, err)
 
 				if serverURL == "" {
 					w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="Kubernetes MCP Server", audience="%s", error="invalid_token"`, audience))

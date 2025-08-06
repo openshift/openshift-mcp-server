@@ -4,17 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/coreos/go-oidc/v3/oidc"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
+
 	"k8s.io/klog/v2"
 
-	"github.com/manusa/kubernetes-mcp-server/pkg/config"
-	"github.com/manusa/kubernetes-mcp-server/pkg/mcp"
+	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/containers/kubernetes-mcp-server/pkg/mcp"
 )
 
 const (
@@ -61,7 +62,7 @@ func Serve(ctx context.Context, mcpServer *mcp.Server, staticConfig *config.Stat
 		response := map[string]interface{}{
 			"authorization_servers":    authServers,
 			"authorization_server":     authServers[0],
-			"scopes_supported":         []string{},
+			"scopes_supported":         mcpServer.GetEnabledTools(),
 			"bearer_methods_supported": []string{"header"},
 		}
 
