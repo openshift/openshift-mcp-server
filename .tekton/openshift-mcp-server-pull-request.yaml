@@ -19,6 +19,10 @@ metadata:
   namespace: crt-nshift-lightspeed-tenant
 spec:
   params:
+  - name: build-source-image
+    value: "true"
+  - name: prefetch-input
+    value: '{"type": "gomod", "path": "."}'
   - name: git-url
     value: '{{source_url}}'
   - name: revision
@@ -28,9 +32,15 @@ spec:
   - name: image-expires-after
     value: 5d
   - name: dockerfile
-    value: Dockerfile
+    value: Dockerfile.ocp
   - name: path-context
     value: .
+  - name: build-platforms
+    value:
+    - linux/x86_64
+    - linux/arm64
+  - name: hermetic
+    value: "true"
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
@@ -585,7 +595,7 @@ spec:
         - name: name
           value: rpms-signature-scan
         - name: bundle
-          value: quay.io/konflux-ci/konflux-vanguard/task-rpms-signature-scan:0.2@sha256:7d1c087d7d33dd97effb3b4c9f3788e4c3138da2032040d69da6929e9a3aaceb
+          value: quay.io/konflux-ci/tekton-catalog/task-rpms-signature-scan:0.2@sha256:1b6c20ab3dbfb0972803d3ebcb2fa72642e59400c77bd66dfd82028bdd09e120
         - name: kind
           value: task
         resolver: bundles

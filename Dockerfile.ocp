@@ -1,0 +1,49 @@
+FROM registry.redhat.io/ubi9/go-toolset:1.24.4-1754467841 AS builder
+ARG TARGETOS
+ARG TARGETARCH
+
+WORKDIR /workspace
+USER 0
+# Copy the Go Modules manifests
+COPY go.mod go.mod
+COPY go.sum go.sum
+# cache deps before building and copying source so that we don't need to re-download as much
+# and so that source changes don't invalidate our downloaded layer
+RUN go mod download
+
+COPY cmd/ cmd/
+COPY pkg/ pkg/
+
+# this directory is checked by ecosystem-cert-preflight-checks task in Konflux
+COPY LICENSE /licenses/
+
+# Build
+# the GOARCH has not a default value to allow the binary be built according to the host where the command
+# was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO
+# the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
+# by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
+RUN CGO_ENABLED=1 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -tags strictfipsruntime -o openshift-mcp-server ./cmd/kubernetes-mcp-server
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+WORKDIR /app
+COPY --from=builder /workspace/openshift-mcp-server /app/openshift-mcp-server
+COPY --from=builder /licenses /licenses
+ENTRYPOINT ["/app/openshift-mcp-server", "--port", "8080"]
+
+EXPOSE 8080
+
+# Labels for enterprise contract
+LABEL com.redhat.component=openshift-mcp-server
+LABEL description="Red Hat OpenShift MCP Server"
+LABEL distribution-scope=private
+LABEL io.k8s.description="Red Hat OpenShift MCP Server"
+LABEL io.k8s.display-name="Openshift Lightspeed RAG content"
+LABEL io.openshift.tags="openshift,lightspeed,mcp,assistant,rag"
+LABEL name=openshift-mcp-server
+LABEL release=0.0.1
+LABEL url="https://github.com/openshift/openshift-mcp-server"
+LABEL vendor="Red Hat, Inc."
+LABEL version=0.0.1
+LABEL summary="Red Hat OpenShift MCP Server"
+
+USER 65532:65532
