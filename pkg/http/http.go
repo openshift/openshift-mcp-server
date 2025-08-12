@@ -2,7 +2,6 @@ package http
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
@@ -19,18 +18,17 @@ import (
 )
 
 const (
-	oauthProtectedResourceEndpoint = "/.well-known/oauth-protected-resource"
-	healthEndpoint                 = "/healthz"
-	mcpEndpoint                    = "/mcp"
-	sseEndpoint                    = "/sse"
-	sseMessageEndpoint             = "/message"
+	healthEndpoint     = "/healthz"
+	mcpEndpoint        = "/mcp"
+	sseEndpoint        = "/sse"
+	sseMessageEndpoint = "/message"
 )
 
 func Serve(ctx context.Context, mcpServer *mcp.Server, staticConfig *config.StaticConfig, oidcProvider *oidc.Provider) error {
 	mux := http.NewServeMux()
 
 	wrappedMux := RequestMiddleware(
-		AuthorizationMiddleware(staticConfig.RequireOAuth, staticConfig.ServerURL, oidcProvider, mcpServer)(mux),
+		AuthorizationMiddleware(staticConfig, oidcProvider, mcpServer)(mux),
 	)
 
 	httpServer := &http.Server{
@@ -46,39 +44,7 @@ func Serve(ctx context.Context, mcpServer *mcp.Server, staticConfig *config.Stat
 	mux.HandleFunc(healthEndpoint, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	mux.HandleFunc(oauthProtectedResourceEndpoint, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-
-		var authServers []string
-		if staticConfig.AuthorizationURL != "" {
-			authServers = []string{staticConfig.AuthorizationURL}
-		} else {
-			// Fallback to Kubernetes API server host if authorization_server is not configured
-			if apiServerHost := mcpServer.GetKubernetesAPIServerHost(); apiServerHost != "" {
-				authServers = []string{apiServerHost}
-			}
-		}
-
-		response := map[string]interface{}{
-			"authorization_servers":    authServers,
-			"authorization_server":     authServers[0],
-			"scopes_supported":         mcpServer.GetEnabledTools(),
-			"bearer_methods_supported": []string{"header"},
-		}
-
-		if staticConfig.ServerURL != "" {
-			response["resource"] = staticConfig.ServerURL
-		}
-
-		if staticConfig.JwksURL != "" {
-			response["jwks_uri"] = staticConfig.JwksURL
-		}
-
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	})
+	mux.Handle("/.well-known/", WellKnownHandler(staticConfig))
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()

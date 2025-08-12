@@ -1,9 +1,12 @@
-package mcp
+package test
 
 import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net/http"
+	"net/http/httptest"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -11,8 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	"k8s.io/client-go/rest"
-	"net/http"
-	"net/http/httptest"
+	"k8s.io/client-go/tools/clientcmd/api"
 )
 
 type MockServer struct {
@@ -51,7 +53,26 @@ func (m *MockServer) Handle(handler http.Handler) {
 	m.restHandlers = append(m.restHandlers, handler.ServeHTTP)
 }
 
-func writeObject(w http.ResponseWriter, obj runtime.Object) {
+func (m *MockServer) Config() *rest.Config {
+	return m.config
+}
+
+func (m *MockServer) KubeConfig() *api.Config {
+	fakeConfig := api.NewConfig()
+	fakeConfig.Clusters["fake"] = api.NewCluster()
+	fakeConfig.Clusters["fake"].Server = m.config.Host
+	fakeConfig.Clusters["fake"].CertificateAuthorityData = m.config.CAData
+	fakeConfig.AuthInfos["fake"] = api.NewAuthInfo()
+	fakeConfig.AuthInfos["fake"].ClientKeyData = m.config.KeyData
+	fakeConfig.AuthInfos["fake"].ClientCertificateData = m.config.CertData
+	fakeConfig.Contexts["fake-context"] = api.NewContext()
+	fakeConfig.Contexts["fake-context"].Cluster = "fake"
+	fakeConfig.Contexts["fake-context"].AuthInfo = "fake"
+	fakeConfig.CurrentContext = "fake-context"
+	return fakeConfig
+}
+
+func WriteObject(w http.ResponseWriter, obj runtime.Object) {
 	w.Header().Set("Content-Type", runtime.ContentTypeJSON)
 	if err := json.NewEncoder(w).Encode(obj); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -63,11 +84,11 @@ type streamAndReply struct {
 	replySent <-chan struct{}
 }
 
-type streamContext struct {
-	conn         io.Closer
-	stdinStream  io.ReadCloser
-	stdoutStream io.WriteCloser
-	stderrStream io.WriteCloser
+type StreamContext struct {
+	Closer       io.Closer
+	StdinStream  io.ReadCloser
+	StdoutStream io.WriteCloser
+	StderrStream io.WriteCloser
 	writeStatus  func(status *apierrors.StatusError) error
 }
 
@@ -87,7 +108,7 @@ func v4WriteStatusFunc(stream io.Writer) func(status *apierrors.StatusError) err
 		return err
 	}
 }
-func createHTTPStreams(w http.ResponseWriter, req *http.Request, opts *StreamOptions) (*streamContext, error) {
+func CreateHTTPStreams(w http.ResponseWriter, req *http.Request, opts *StreamOptions) (*StreamContext, error) {
 	_, err := httpstream.Handshake(req, w, []string{"v4.channel.k8s.io"})
 	if err != nil {
 		return nil, err
@@ -95,12 +116,12 @@ func createHTTPStreams(w http.ResponseWriter, req *http.Request, opts *StreamOpt
 
 	upgrader := spdy.NewResponseUpgrader()
 	streamCh := make(chan streamAndReply)
-	conn := upgrader.UpgradeResponse(w, req, func(stream httpstream.Stream, replySent <-chan struct{}) error {
+	connection := upgrader.UpgradeResponse(w, req, func(stream httpstream.Stream, replySent <-chan struct{}) error {
 		streamCh <- streamAndReply{Stream: stream, replySent: replySent}
 		return nil
 	})
-	ctx := &streamContext{
-		conn: conn,
+	ctx := &StreamContext{
+		Closer: connection,
 	}
 
 	// wait for stream
@@ -128,13 +149,13 @@ WaitForStreams:
 				ctx.writeStatus = v4WriteStatusFunc(stream)
 			case v1.StreamTypeStdout:
 				replyChan <- struct{}{}
-				ctx.stdoutStream = stream
+				ctx.StdoutStream = stream
 			case v1.StreamTypeStdin:
 				replyChan <- struct{}{}
-				ctx.stdinStream = stream
+				ctx.StdinStream = stream
 			case v1.StreamTypeStderr:
 				replyChan <- struct{}{}
-				ctx.stderrStream = stream
+				ctx.StderrStream = stream
 			default:
 				// add other stream ...
 				return nil, errors.New("unimplemented stream type")
