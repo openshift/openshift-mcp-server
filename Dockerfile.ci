@@ -28,7 +28,6 @@ ENV CONFIG_PATH=/mcp_config.toml
 # Labels for enterprise contract
 LABEL com.redhat.component=openshift-mcp-server
 LABEL description="Red Hat OpenShift MCP Server"
-LABEL distribution-scope=private
 LABEL io.k8s.description="Red Hat OpenShift MCP Server"
 LABEL io.k8s.display-name="Red Hat OpenShift MCP Server"
 LABEL io.openshift.tags="openshift,mcp"
