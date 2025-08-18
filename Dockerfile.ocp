@@ -13,7 +13,7 @@ WORKDIR /workspace
 COPY . .
 
 ENV GOEXPERIMENT=strictfipsruntime
-RUN make -f Makefile-ocp.mk build-ocp GOFLAGS='-tags=strictfipsruntime -mod=vendor -a' GO_BUILD_ENV='CGO_ENABLED=1 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH}' BINARY_NAME=openshift-mcp-server
+RUN make -f Makefile-ocp.mk build-ocp GO_BUILD_ENV='GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH}'
 
 FROM --platform=$TARGETPLATFORM ${BASE_IMAGE}
 WORKDIR /
@@ -28,7 +28,6 @@ ENV CONFIG_PATH=/mcp_config.toml
 # Labels for enterprise contract
 LABEL com.redhat.component=openshift-mcp-server
 LABEL description="Red Hat OpenShift MCP Server"
-LABEL io.k8s.description="Red Hat OpenShift MCP Server"
 LABEL io.openshift.tags="openshift,mcp"
 LABEL name=openshift-mcp-server
 LABEL release=0.0.1
