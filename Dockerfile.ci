@@ -1,5 +1,5 @@
-ARG BUILDER_IMAGE=registry.redhat.io/ubi9/go-toolset:1.24.4-1754467841
-ARG BASE_IMAGE=registry.redhat.io/rhel9-4-els/rhel-minimal:9.4
+ARG BUILDER_IMAGE=registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+ARG BASE_IMAGE=registry.ci.openshift.org/ocp/4.20:base-rhel9
 
 # Build the manager binary
 FROM ${BUILDER_IMAGE} AS builder
@@ -38,4 +38,3 @@ LABEL version=0.0.1
 LABEL summary="Red Hat OpenShift MCP Server"
 
 ENTRYPOINT ["/openshift-mcp-server", "--config", "$CONFIG_PATH"]
-
