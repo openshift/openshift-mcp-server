@@ -39,4 +39,3 @@ LABEL version=0.0.1
 LABEL summary="Red Hat OpenShift MCP Server"
 
 ENTRYPOINT ["/openshift-mcp-server", "--config", "$CONFIG_PATH"]
-
