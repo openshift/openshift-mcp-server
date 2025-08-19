@@ -1,18 +1,19 @@
 package mcp
 
 import (
-	"github.com/mark3labs/mcp-go/client/transport"
-	"github.com/mark3labs/mcp-go/mcp"
-	"k8s.io/utils/ptr"
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/mark3labs/mcp-go/client/transport"
+	"github.com/mark3labs/mcp-go/mcp"
+	"k8s.io/utils/ptr"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 )
 
 func TestUnrestricted(t *testing.T) {
-	testCase(t, func(c *mcpContext) {
+	testCase(t, false, false, nil, func(c *mcpContext) {
 		tools, err := c.mcpClient.ListTools(c.ctx, mcp.ListToolsRequest{})
 		t.Run("ListTools returns tools", func(t *testing.T) {
 			if err != nil {
@@ -32,7 +33,12 @@ func TestUnrestricted(t *testing.T) {
 }
 
 func TestReadOnly(t *testing.T) {
-	readOnlyServer := func(c *mcpContext) { c.staticConfig = &config.StaticConfig{ReadOnly: true} }
+	readOnlyServer := func(c *mcpContext) {
+		c.staticConfig = &config.StaticConfig{
+			ReadOnly:   true,
+			KubeConfig: c.staticConfig.KubeConfig,
+		}
+	}
 	testCaseWithContext(t, &mcpContext{before: readOnlyServer}, func(c *mcpContext) {
 		tools, err := c.mcpClient.ListTools(c.ctx, mcp.ListToolsRequest{})
 		t.Run("ListTools returns tools", func(t *testing.T) {
@@ -54,7 +60,12 @@ func TestReadOnly(t *testing.T) {
 }
 
 func TestDisableDestructive(t *testing.T) {
-	disableDestructiveServer := func(c *mcpContext) { c.staticConfig = &config.StaticConfig{DisableDestructive: true} }
+	disableDestructiveServer := func(c *mcpContext) {
+		c.staticConfig = &config.StaticConfig{
+			DisableDestructive: true,
+			KubeConfig:         c.staticConfig.KubeConfig,
+		}
+	}
 	testCaseWithContext(t, &mcpContext{before: disableDestructiveServer}, func(c *mcpContext) {
 		tools, err := c.mcpClient.ListTools(c.ctx, mcp.ListToolsRequest{})
 		t.Run("ListTools returns tools", func(t *testing.T) {

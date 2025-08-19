@@ -104,25 +104,38 @@ type mcpContext struct {
 	listOutput output.Output
 	logLevel   int
 
-	staticConfig  *config.StaticConfig
-	clientOptions []transport.ClientOption
-	before        func(*mcpContext)
-	after         func(*mcpContext)
-	ctx           context.Context
-	tempDir       string
-	cancel        context.CancelFunc
-	mcpServer     *Server
-	mcpHttpServer *httptest.Server
-	mcpClient     *client.Client
-	klogState     klog.State
-	logBuffer     bytes.Buffer
+	staticConfig           *config.StaticConfig
+	clientOptions          []transport.ClientOption
+	before                 func(*mcpContext)
+	after                  func(*mcpContext)
+	ctx                    context.Context
+	tempDir                string
+	cancel                 context.CancelFunc
+	mcpServer              *Server
+	mcpHttpServer          *httptest.Server
+	mcpClient              *client.Client
+	klogState              klog.State
+	logBuffer              bytes.Buffer
+	useEnvTestKubeConfig   bool
+	useInClusterKubeConfig bool
+	customKubeConfig       *rest.Config
 }
 
 func (c *mcpContext) beforeEach(t *testing.T) {
 	var err error
 	c.ctx, c.cancel = context.WithCancel(t.Context())
 	c.tempDir = t.TempDir()
-	c.withKubeConfig(nil)
+	var kubeConfig string
+	if c.useEnvTestKubeConfig {
+		if envTestRestConfig == nil {
+			panic("shouldn't be empty")
+		}
+		_, kubeConfig = c.withKubeConfig(envTestRestConfig)
+	} else if c.customKubeConfig != nil {
+		_, kubeConfig = c.withKubeConfig(c.customKubeConfig)
+	} else if !c.useInClusterKubeConfig {
+		_, kubeConfig = c.withKubeConfig(nil)
+	}
 	if c.profile == nil {
 		c.profile = &FullProfile{}
 	}
@@ -135,6 +148,7 @@ func (c *mcpContext) beforeEach(t *testing.T) {
 			DisableDestructive: false,
 		}
 	}
+	c.staticConfig.KubeConfig = kubeConfig
 	if c.before != nil {
 		c.before(c)
 	}
@@ -184,8 +198,13 @@ func (c *mcpContext) afterEach() {
 	c.klogState.Restore()
 }
 
-func testCase(t *testing.T, test func(c *mcpContext)) {
-	testCaseWithContext(t, &mcpContext{profile: &FullProfile{}}, test)
+func testCase(t *testing.T, envTestKubeConfig bool, inClusterKubeConfig bool, customKubeConfig *rest.Config, test func(c *mcpContext)) {
+	testCaseWithContext(t, &mcpContext{
+		profile:                &FullProfile{},
+		useEnvTestKubeConfig:   envTestKubeConfig,
+		useInClusterKubeConfig: inClusterKubeConfig,
+		customKubeConfig:       customKubeConfig,
+	}, test)
 }
 
 func testCaseWithContext(t *testing.T, mcpCtx *mcpContext, test func(c *mcpContext)) {
@@ -195,7 +214,7 @@ func testCaseWithContext(t *testing.T, mcpCtx *mcpContext, test func(c *mcpConte
 }
 
 // withKubeConfig sets up a fake kubeconfig in the temp directory based on the provided rest.Config
-func (c *mcpContext) withKubeConfig(rc *rest.Config) *api.Config {
+func (c *mcpContext) withKubeConfig(rc *rest.Config) (*api.Config, string) {
 	fakeConfig := api.NewConfig()
 	fakeConfig.Clusters["fake"] = api.NewCluster()
 	fakeConfig.Clusters["fake"].Server = "https://127.0.0.1:6443"
@@ -217,23 +236,17 @@ func (c *mcpContext) withKubeConfig(rc *rest.Config) *api.Config {
 	fakeConfig.CurrentContext = "fake-context"
 	kubeConfig := filepath.Join(c.tempDir, "config")
 	_ = clientcmd.WriteToFile(*fakeConfig, kubeConfig)
-	_ = os.Setenv("KUBECONFIG", kubeConfig)
 	if c.mcpServer != nil {
+		c.mcpServer.configuration.StaticConfig.KubeConfig = kubeConfig
 		if err := c.mcpServer.reloadKubernetesClient(); err != nil {
 			panic(err)
 		}
 	}
-	return fakeConfig
-}
-
-// withEnvTest sets up the environment for kubeconfig to be used with envTest
-func (c *mcpContext) withEnvTest() {
-	c.withKubeConfig(envTestRestConfig)
+	return fakeConfig, kubeConfig
 }
 
 // inOpenShift sets up the kubernetes environment to seem to be running OpenShift
 func inOpenShift(c *mcpContext) {
-	c.withEnvTest()
 	crdTemplate := `
           {
             "apiVersion": "apiextensions.k8s.io/v1",

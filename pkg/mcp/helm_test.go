@@ -3,33 +3,40 @@ package mcp
 import (
 	"context"
 	"encoding/base64"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/mark3labs/mcp-go/mcp"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"path/filepath"
-	"runtime"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/yaml"
-	"strings"
-	"testing"
 )
 
 func TestHelmInstall(t *testing.T) {
-	testCase(t, func(c *mcpContext) {
-		c.withEnvTest()
-		_, file, _, _ := runtime.Caller(0)
+	testCase(t, true, false, nil, func(c *mcpContext) {
+		_, file, _, ok := runtime.Caller(0)
+		if !ok {
+			t.Fatalf("could not get caller info")
+		}
+		ns := c.mcpServer.k.NamespaceOrDefault("default")
+		klog.Infof("namespace: %s will be used for helm chart installation", ns)
 		chartPath := filepath.Join(filepath.Dir(file), "testdata", "helm-chart-no-op")
 		toolResult, err := c.callTool("helm_install", map[string]interface{}{
-			"chart": chartPath,
+			"chart":     chartPath,
+			"namespace": ns,
 		})
 		t.Run("helm_install with local chart and no release name, returns installed chart", func(t *testing.T) {
 			if err != nil {
 				t.Fatalf("call tool failed %v", err)
 			}
 			if toolResult.IsError {
-				t.Fatalf("call tool failed")
+				t.Fatalf("call tool failed %s", toolResult.Content)
 			}
 			var decoded []map[string]interface{}
 			err = yaml.Unmarshal([]byte(toolResult.Content[0].(mcp.TextContent).Text), &decoded)
@@ -60,12 +67,16 @@ func TestHelmInstall(t *testing.T) {
 
 func TestHelmInstallDenied(t *testing.T) {
 	deniedResourcesServer := &config.StaticConfig{DeniedResources: []config.GroupVersionKind{{Version: "v1", Kind: "Secret"}}}
-	testCaseWithContext(t, &mcpContext{staticConfig: deniedResourcesServer}, func(c *mcpContext) {
-		c.withEnvTest()
+	testCaseWithContext(t, &mcpContext{staticConfig: deniedResourcesServer, useEnvTestKubeConfig: true}, func(c *mcpContext) {
 		_, file, _, _ := runtime.Caller(0)
 		chartPath := filepath.Join(filepath.Dir(file), "testdata", "helm-chart-secret")
+
+		ns := c.mcpServer.k.NamespaceOrDefault("default")
+		klog.Infof("namespace: %s will be used for helm chart installation", ns)
+
 		helmInstall, _ := c.callTool("helm_install", map[string]interface{}{
-			"chart": chartPath,
+			"chart":     chartPath,
+			"namespace": ns,
 		})
 		t.Run("helm_install has error", func(t *testing.T) {
 			if !helmInstall.IsError {
@@ -83,11 +94,16 @@ func TestHelmInstallDenied(t *testing.T) {
 }
 
 func TestHelmList(t *testing.T) {
-	testCase(t, func(c *mcpContext) {
-		c.withEnvTest()
+	testCase(t, true, false, nil, func(c *mcpContext) {
 		kc := c.newKubernetesClient()
 		clearHelmReleases(c.ctx, kc)
-		toolResult, err := c.callTool("helm_list", map[string]interface{}{})
+
+		ns := c.mcpServer.k.NamespaceOrDefault("default")
+		klog.Infof("namespace: %s will be used for helm chart installation", ns)
+
+		toolResult, err := c.callTool("helm_list", map[string]interface{}{
+			"namespace": ns,
+		})
 		t.Run("helm_list with no releases, returns not found", func(t *testing.T) {
 			if err != nil {
 				t.Fatalf("call tool failed %v", err)
@@ -99,7 +115,7 @@ func TestHelmList(t *testing.T) {
 				t.Fatalf("unexpected result %v", toolResult.Content[0].(mcp.TextContent).Text)
 			}
 		})
-		_, _ = kc.CoreV1().Secrets("default").Create(c.ctx, &corev1.Secret{
+		_, _ = kc.CoreV1().Secrets(ns).Create(c.ctx, &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "sh.helm.release.v1.release-to-list",
 				Labels: map[string]string{"owner": "helm", "name": "release-to-list"},
@@ -111,7 +127,9 @@ func TestHelmList(t *testing.T) {
 					"}"))),
 			},
 		}, metav1.CreateOptions{})
-		toolResult, err = c.callTool("helm_list", map[string]interface{}{})
+		toolResult, err = c.callTool("helm_list", map[string]interface{}{
+			"namespace": ns,
+		})
 		t.Run("helm_list with deployed release, returns release", func(t *testing.T) {
 			if err != nil {
 				t.Fatalf("call tool failed %v", err)
@@ -173,12 +191,12 @@ func TestHelmList(t *testing.T) {
 }
 
 func TestHelmUninstall(t *testing.T) {
-	testCase(t, func(c *mcpContext) {
-		c.withEnvTest()
+	testCase(t, true, false, nil, func(c *mcpContext) {
 		kc := c.newKubernetesClient()
 		clearHelmReleases(c.ctx, kc)
 		toolResult, err := c.callTool("helm_uninstall", map[string]interface{}{
-			"name": "release-to-uninstall",
+			"name":      "release-to-uninstall",
+			"namespace": "default",
 		})
 		t.Run("helm_uninstall with no releases, returns not found", func(t *testing.T) {
 			if err != nil {
@@ -204,7 +222,8 @@ func TestHelmUninstall(t *testing.T) {
 			},
 		}, metav1.CreateOptions{})
 		toolResult, err = c.callTool("helm_uninstall", map[string]interface{}{
-			"name": "existent-release-to-uninstall",
+			"name":      "existent-release-to-uninstall",
+			"namespace": "default",
 		})
 		t.Run("helm_uninstall with deployed release, returns uninstalled", func(t *testing.T) {
 			if err != nil {
@@ -226,8 +245,7 @@ func TestHelmUninstall(t *testing.T) {
 
 func TestHelmUninstallDenied(t *testing.T) {
 	deniedResourcesServer := &config.StaticConfig{DeniedResources: []config.GroupVersionKind{{Version: "v1", Kind: "Secret"}}}
-	testCaseWithContext(t, &mcpContext{staticConfig: deniedResourcesServer}, func(c *mcpContext) {
-		c.withEnvTest()
+	testCaseWithContext(t, &mcpContext{staticConfig: deniedResourcesServer, useEnvTestKubeConfig: true}, func(c *mcpContext) {
 		kc := c.newKubernetesClient()
 		clearHelmReleases(c.ctx, kc)
 		_, _ = kc.CoreV1().Secrets("default").Create(c.ctx, &corev1.Secret{
@@ -244,7 +262,8 @@ func TestHelmUninstallDenied(t *testing.T) {
 			},
 		}, metav1.CreateOptions{})
 		helmUninstall, _ := c.callTool("helm_uninstall", map[string]interface{}{
-			"name": "existent-release-to-uninstall",
+			"name":      "existent-release-to-uninstall",
+			"namespace": "default",
 		})
 		t.Run("helm_uninstall has error", func(t *testing.T) {
 			if !helmUninstall.IsError {

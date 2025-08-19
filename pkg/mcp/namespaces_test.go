@@ -1,6 +1,10 @@
 package mcp
 
 import (
+	"regexp"
+	"slices"
+	"testing"
+
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -8,15 +12,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"regexp"
 	"sigs.k8s.io/yaml"
-	"slices"
-	"testing"
 )
 
 func TestNamespacesList(t *testing.T) {
-	testCase(t, func(c *mcpContext) {
-		c.withEnvTest()
+	testCase(t, true, false, nil, func(c *mcpContext) {
 		toolResult, err := c.callTool("namespaces_list", map[string]interface{}{})
 		t.Run("namespaces_list returns namespace list", func(t *testing.T) {
 			if err != nil {
@@ -51,8 +51,7 @@ func TestNamespacesList(t *testing.T) {
 
 func TestNamespacesListDenied(t *testing.T) {
 	deniedResourcesServer := &config.StaticConfig{DeniedResources: []config.GroupVersionKind{{Version: "v1", Kind: "Namespace"}}}
-	testCaseWithContext(t, &mcpContext{staticConfig: deniedResourcesServer}, func(c *mcpContext) {
-		c.withEnvTest()
+	testCaseWithContext(t, &mcpContext{staticConfig: deniedResourcesServer, useEnvTestKubeConfig: true}, func(c *mcpContext) {
 		namespacesList, _ := c.callTool("namespaces_list", map[string]interface{}{})
 		t.Run("namespaces_list has error", func(t *testing.T) {
 			if !namespacesList.IsError {
@@ -69,8 +68,7 @@ func TestNamespacesListDenied(t *testing.T) {
 }
 
 func TestNamespacesListAsTable(t *testing.T) {
-	testCaseWithContext(t, &mcpContext{listOutput: output.Table}, func(c *mcpContext) {
-		c.withEnvTest()
+	testCaseWithContext(t, &mcpContext{listOutput: output.Table, useEnvTestKubeConfig: true}, func(c *mcpContext) {
 		toolResult, err := c.callTool("namespaces_list", map[string]interface{}{})
 		t.Run("namespaces_list returns namespace list", func(t *testing.T) {
 			if err != nil {
@@ -114,7 +112,7 @@ func TestNamespacesListAsTable(t *testing.T) {
 }
 
 func TestProjectsListInOpenShift(t *testing.T) {
-	testCaseWithContext(t, &mcpContext{before: inOpenShift, after: inOpenShiftClear}, func(c *mcpContext) {
+	testCaseWithContext(t, &mcpContext{before: inOpenShift, after: inOpenShiftClear, useEnvTestKubeConfig: true}, func(c *mcpContext) {
 		dynamicClient := dynamic.NewForConfigOrDie(envTestRestConfig)
 		_, _ = dynamicClient.Resource(schema.GroupVersionResource{Group: "project.openshift.io", Version: "v1", Resource: "projects"}).
 			Create(c.ctx, &unstructured.Unstructured{Object: map[string]interface{}{
@@ -156,8 +154,7 @@ func TestProjectsListInOpenShift(t *testing.T) {
 
 func TestProjectsListInOpenShiftDenied(t *testing.T) {
 	deniedResourcesServer := &config.StaticConfig{DeniedResources: []config.GroupVersionKind{{Group: "project.openshift.io", Version: "v1"}}}
-	testCaseWithContext(t, &mcpContext{staticConfig: deniedResourcesServer, before: inOpenShift, after: inOpenShiftClear}, func(c *mcpContext) {
-		c.withEnvTest()
+	testCaseWithContext(t, &mcpContext{staticConfig: deniedResourcesServer, before: inOpenShift, after: inOpenShiftClear, useEnvTestKubeConfig: true}, func(c *mcpContext) {
 		projectsList, _ := c.callTool("projects_list", map[string]interface{}{})
 		t.Run("projects_list has error", func(t *testing.T) {
 			if !projectsList.IsError {

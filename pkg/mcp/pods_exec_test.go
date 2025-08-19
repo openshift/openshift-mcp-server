@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 
@@ -12,14 +13,15 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 )
 
 func TestPodsExec(t *testing.T) {
-	testCase(t, func(c *mcpContext) {
-		mockServer := test.NewMockServer()
-		defer mockServer.Close()
-		c.withKubeConfig(mockServer.Config())
+	mockServer := test.NewMockServer()
+	defer mockServer.Close()
+	testCase(t, false, false, mockServer.Config(), func(c *mcpContext) {
 		mockServer.Handle(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			klog.Infof("TEST: got request: %v", req.URL)
 			if req.URL.Path != "/api/v1/namespaces/default/pods/pod-to-exec/exec" {
 				return
 			}
@@ -38,6 +40,7 @@ func TestPodsExec(t *testing.T) {
 			_, _ = io.WriteString(ctx.StdoutStream, "container:"+strings.Join(req.URL.Query()["container"], " ")+"\n")
 		}))
 		mockServer.Handle(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			klog.Infof("TEST: got request: %v", req.URL)
 			if req.URL.Path != "/api/v1/namespaces/default/pods/pod-to-exec" {
 				return
 			}
@@ -54,11 +57,14 @@ func TestPodsExec(t *testing.T) {
 			"command": []interface{}{"ls", "-l"},
 		})
 		t.Run("pods_exec with name and nil namespace returns command output", func(t *testing.T) {
+			if val := os.Getenv("OPENSHIFT_CI"); val != "" {
+				t.Skip("this test does not work on OpenShift CI. So we are skipping...")
+			}
 			if err != nil {
 				t.Fatalf("call tool failed %v", err)
 			}
 			if podsExecNilNamespace.IsError {
-				t.Fatalf("call tool failed")
+				t.Fatalf("call tool failed %s", podsExecNilNamespace.Content)
 			}
 			if !strings.Contains(podsExecNilNamespace.Content[0].(mcp.TextContent).Text, "command:ls -l\n") {
 				t.Errorf("unexpected result %v", podsExecNilNamespace.Content[0].(mcp.TextContent).Text)
@@ -76,7 +82,7 @@ func TestPodsExec(t *testing.T) {
 			if podsExecInNamespace.IsError {
 				t.Fatalf("call tool failed")
 			}
-			if !strings.Contains(podsExecNilNamespace.Content[0].(mcp.TextContent).Text, "command:ls -l\n") {
+			if !strings.Contains(podsExecInNamespace.Content[0].(mcp.TextContent).Text, "command:ls -l\n") {
 				t.Errorf("unexpected result %v", podsExecInNamespace.Content[0].(mcp.TextContent).Text)
 			}
 		})
@@ -105,8 +111,7 @@ func TestPodsExec(t *testing.T) {
 
 func TestPodsExecDenied(t *testing.T) {
 	deniedResourcesServer := &config.StaticConfig{DeniedResources: []config.GroupVersionKind{{Version: "v1", Kind: "Pod"}}}
-	testCaseWithContext(t, &mcpContext{staticConfig: deniedResourcesServer}, func(c *mcpContext) {
-		c.withEnvTest()
+	testCaseWithContext(t, &mcpContext{staticConfig: deniedResourcesServer, useEnvTestKubeConfig: true}, func(c *mcpContext) {
 		podsRun, _ := c.callTool("pods_exec", map[string]interface{}{
 			"namespace": "default",
 			"name":      "pod-to-exec",

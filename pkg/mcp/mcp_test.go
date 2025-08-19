@@ -18,7 +18,7 @@ func TestWatchKubeConfig(t *testing.T) {
 	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 		t.Skip("Skipping test on non-Unix-like platforms")
 	}
-	testCase(t, func(c *mcpContext) {
+	testCase(t, false, false, nil, func(c *mcpContext) {
 		// Given
 		withTimeout, cancel := context.WithTimeout(c.ctx, 5*time.Second)
 		defer cancel()

@@ -1,10 +1,11 @@
 package mcp
 
 import (
-	"github.com/mark3labs/mcp-go/mcp"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/mark3labs/mcp-go/mcp"
 )
 
 func TestFullProfileTools(t *testing.T) {
@@ -54,9 +55,10 @@ func TestFullProfileTools(t *testing.T) {
 
 func TestFullProfileToolsInOpenShift(t *testing.T) {
 	mcpCtx := &mcpContext{
-		profile: &FullProfile{},
-		before:  inOpenShift,
-		after:   inOpenShiftClear,
+		profile:              &FullProfile{},
+		before:               inOpenShift,
+		after:                inOpenShiftClear,
+		useEnvTestKubeConfig: true,
 	}
 	testCaseWithContext(t, mcpCtx, func(c *mcpContext) {
 		tools, err := c.mcpClient.ListTools(c.ctx, mcp.ListToolsRequest{})

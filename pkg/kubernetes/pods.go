@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/klog/v2"
 	"k8s.io/metrics/pkg/apis/metrics"
 	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 
@@ -208,7 +209,9 @@ func (k *Kubernetes) PodsTop(ctx context.Context, options PodsTopOptions) (*metr
 }
 
 func (k *Kubernetes) PodsExec(ctx context.Context, namespace, name, container string, command []string) (string, error) {
+	klog.Infof("TEST: namespace: %s", namespace)
 	namespace = k.NamespaceOrDefault(namespace)
+	klog.Infof("TEST: extracted namespace: %s", namespace)
 	pods, err := k.manager.accessControlClientSet.Pods(namespace)
 	if err != nil {
 		return "", err
