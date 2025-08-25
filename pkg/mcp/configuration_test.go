@@ -10,7 +10,7 @@ import (
 )
 
 func TestConfigurationView(t *testing.T) {
-	testCase(t, func(c *mcpContext) {
+	testCase(t, false, false, nil, func(c *mcpContext) {
 		toolResult, err := c.callTool("configuration_view", map[string]interface{}{})
 		t.Run("configuration_view returns configuration", func(t *testing.T) {
 			if err != nil {
@@ -122,7 +122,7 @@ func TestConfigurationViewInCluster(t *testing.T) {
 	defer func() {
 		kubernetes.InClusterConfig = rest.InClusterConfig
 	}()
-	testCase(t, func(c *mcpContext) {
+	testCase(t, false, true, nil, func(c *mcpContext) {
 		toolResult, err := c.callTool("configuration_view", map[string]interface{}{})
 		t.Run("configuration_view returns configuration", func(t *testing.T) {
 			if err != nil {

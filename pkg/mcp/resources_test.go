@@ -19,8 +19,7 @@ import (
 )
 
 func TestResourcesList(t *testing.T) {
-	testCase(t, func(c *mcpContext) {
-		c.withEnvTest()
+	testCase(t, true, false, nil, func(c *mcpContext) {
 		t.Run("resources_list with missing apiVersion returns error", func(t *testing.T) {
 			toolResult, _ := c.callTool("resources_list", map[string]interface{}{})
 			if !toolResult.IsError {
@@ -158,8 +157,7 @@ func TestResourcesListDenied(t *testing.T) {
 			{Group: "rbac.authorization.k8s.io", Version: "v1"},
 		},
 	}
-	testCaseWithContext(t, &mcpContext{staticConfig: deniedResourcesServer}, func(c *mcpContext) {
-		c.withEnvTest()
+	testCaseWithContext(t, &mcpContext{staticConfig: deniedResourcesServer, useEnvTestKubeConfig: true}, func(c *mcpContext) {
 		deniedByKind, _ := c.callTool("resources_list", map[string]interface{}{"apiVersion": "v1", "kind": "Secret"})
 		t.Run("resources_list (denied by kind) has error", func(t *testing.T) {
 			if !deniedByKind.IsError {
@@ -194,8 +192,7 @@ func TestResourcesListDenied(t *testing.T) {
 }
 
 func TestResourcesListAsTable(t *testing.T) {
-	testCaseWithContext(t, &mcpContext{listOutput: output.Table, before: inOpenShift, after: inOpenShiftClear}, func(c *mcpContext) {
-		c.withEnvTest()
+	testCaseWithContext(t, &mcpContext{listOutput: output.Table, before: inOpenShift, after: inOpenShiftClear, useEnvTestKubeConfig: true}, func(c *mcpContext) {
 		kc := c.newKubernetesClient()
 		_, _ = kc.CoreV1().ConfigMaps("default").Create(t.Context(), &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Name: "a-configmap-to-list-as-table", Labels: map[string]string{"resource": "config-map"}},
@@ -271,8 +268,7 @@ func TestResourcesListAsTable(t *testing.T) {
 }
 
 func TestResourcesGet(t *testing.T) {
-	testCase(t, func(c *mcpContext) {
-		c.withEnvTest()
+	testCase(t, true, false, nil, func(c *mcpContext) {
 		t.Run("resources_get with missing apiVersion returns error", func(t *testing.T) {
 			toolResult, _ := c.callTool("resources_get", map[string]interface{}{})
 			if !toolResult.IsError {
@@ -363,8 +359,7 @@ func TestResourcesGetDenied(t *testing.T) {
 			{Group: "rbac.authorization.k8s.io", Version: "v1"},
 		},
 	}
-	testCaseWithContext(t, &mcpContext{staticConfig: deniedResourcesServer}, func(c *mcpContext) {
-		c.withEnvTest()
+	testCaseWithContext(t, &mcpContext{staticConfig: deniedResourcesServer, useEnvTestKubeConfig: true}, func(c *mcpContext) {
 		kc := c.newKubernetesClient()
 		_, _ = kc.CoreV1().Secrets("default").Create(c.ctx, &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{Name: "denied-secret"},
@@ -406,8 +401,7 @@ func TestResourcesGetDenied(t *testing.T) {
 }
 
 func TestResourcesCreateOrUpdate(t *testing.T) {
-	testCase(t, func(c *mcpContext) {
-		c.withEnvTest()
+	testCase(t, true, false, nil, func(c *mcpContext) {
 		t.Run("resources_create_or_update with nil resource returns error", func(t *testing.T) {
 			toolResult, _ := c.callTool("resources_create_or_update", map[string]interface{}{})
 			if toolResult.IsError != true {
@@ -528,7 +522,7 @@ func TestResourcesCreateOrUpdate(t *testing.T) {
 			}
 		})
 		c.crdWaitUntilReady("customs.example.com")
-		customJson := "{\"apiVersion\": \"example.com/v1\", \"kind\": \"Custom\", \"metadata\": {\"name\": \"a-custom-resource\"}}"
+		customJson := "{\"apiVersion\": \"example.com/v1\", \"kind\": \"Custom\", \"metadata\": {\"name\": \"a-custom-resource\", \"namespace\": \"default\"}}"
 		resourcesCreateOrUpdateCustom, err := c.callTool("resources_create_or_update", map[string]interface{}{"resource": customJson})
 		t.Run("resources_create_or_update with valid namespaced json resource returns success", func(t *testing.T) {
 			if err != nil {
@@ -551,7 +545,7 @@ func TestResourcesCreateOrUpdate(t *testing.T) {
 				return
 			}
 		})
-		customJsonUpdated := "{\"apiVersion\": \"example.com/v1\", \"kind\": \"Custom\", \"metadata\": {\"name\": \"a-custom-resource\",\"annotations\": {\"updated\": \"true\"}}}"
+		customJsonUpdated := "{\"apiVersion\": \"example.com/v1\", \"kind\": \"Custom\", \"metadata\": {\"name\": \"a-custom-resource\", \"namespace\": \"default\", \"annotations\": {\"updated\": \"true\"}}}"
 		resourcesCreateOrUpdateCustomUpdated, err := c.callTool("resources_create_or_update", map[string]interface{}{"resource": customJsonUpdated})
 		t.Run("resources_create_or_update with valid namespaced json resource updates custom resource", func(t *testing.T) {
 			if err != nil {
@@ -589,8 +583,7 @@ func TestResourcesCreateOrUpdateDenied(t *testing.T) {
 			{Group: "rbac.authorization.k8s.io", Version: "v1"},
 		},
 	}
-	testCaseWithContext(t, &mcpContext{staticConfig: deniedResourcesServer}, func(c *mcpContext) {
-		c.withEnvTest()
+	testCaseWithContext(t, &mcpContext{staticConfig: deniedResourcesServer, useEnvTestKubeConfig: true}, func(c *mcpContext) {
 		secretYaml := "apiVersion: v1\nkind: Secret\nmetadata:\n  name: a-denied-secret\n  namespace: default\n"
 		deniedByKind, _ := c.callTool("resources_create_or_update", map[string]interface{}{"resource": secretYaml})
 		t.Run("resources_create_or_update (denied by kind) has error", func(t *testing.T) {
@@ -628,8 +621,7 @@ func TestResourcesCreateOrUpdateDenied(t *testing.T) {
 }
 
 func TestResourcesDelete(t *testing.T) {
-	testCase(t, func(c *mcpContext) {
-		c.withEnvTest()
+	testCase(t, true, false, nil, func(c *mcpContext) {
 		t.Run("resources_delete with missing apiVersion returns error", func(t *testing.T) {
 			toolResult, _ := c.callTool("resources_delete", map[string]interface{}{})
 			if !toolResult.IsError {
@@ -696,7 +688,7 @@ func TestResourcesDelete(t *testing.T) {
 				return
 			}
 		})
-		resourcesDeleteCm, err := c.callTool("resources_delete", map[string]interface{}{"apiVersion": "v1", "kind": "ConfigMap", "name": "a-configmap-to-delete"})
+		resourcesDeleteCm, err := c.callTool("resources_delete", map[string]interface{}{"apiVersion": "v1", "kind": "ConfigMap", "name": "a-configmap-to-delete", "namespace": "default"})
 		t.Run("resources_delete with valid namespaced resource returns success", func(t *testing.T) {
 			if err != nil {
 				t.Fatalf("call tool failed %v", err)
@@ -751,8 +743,7 @@ func TestResourcesDeleteDenied(t *testing.T) {
 			{Group: "rbac.authorization.k8s.io", Version: "v1"},
 		},
 	}
-	testCaseWithContext(t, &mcpContext{staticConfig: deniedResourcesServer}, func(c *mcpContext) {
-		c.withEnvTest()
+	testCaseWithContext(t, &mcpContext{staticConfig: deniedResourcesServer, useEnvTestKubeConfig: true}, func(c *mcpContext) {
 		kc := c.newKubernetesClient()
 		_, _ = kc.CoreV1().ConfigMaps("default").Create(c.ctx, &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Name: "allowed-configmap-to-delete"},
@@ -781,7 +772,7 @@ func TestResourcesDeleteDenied(t *testing.T) {
 				t.Fatalf("expected descriptive error '%s', got %v", expectedMessage, deniedByKind.Content[0].(mcp.TextContent).Text)
 			}
 		})
-		allowedResource, _ := c.callTool("resources_delete", map[string]interface{}{"apiVersion": "v1", "kind": "ConfigMap", "name": "allowed-configmap-to-delete"})
+		allowedResource, _ := c.callTool("resources_delete", map[string]interface{}{"apiVersion": "v1", "kind": "ConfigMap", "name": "allowed-configmap-to-delete", "namespace": "default"})
 		t.Run("resources_delete (not denied) deletes resource", func(t *testing.T) {
 			if allowedResource.IsError {
 				t.Fatalf("call tool should not fail")

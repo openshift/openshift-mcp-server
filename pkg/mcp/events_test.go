@@ -9,8 +9,7 @@ import (
 )
 
 func TestEventsList(t *testing.T) {
-	testCase(t, func(c *mcpContext) {
-		c.withEnvTest()
+	testCase(t, true, false, nil, func(c *mcpContext) {
 		toolResult, err := c.callTool("events_list", map[string]interface{}{})
 		t.Run("events_list with no events returns OK", func(t *testing.T) {
 			if err != nil {
@@ -97,8 +96,7 @@ func TestEventsList(t *testing.T) {
 
 func TestEventsListDenied(t *testing.T) {
 	deniedResourcesServer := &config.StaticConfig{DeniedResources: []config.GroupVersionKind{{Version: "v1", Kind: "Event"}}}
-	testCaseWithContext(t, &mcpContext{staticConfig: deniedResourcesServer}, func(c *mcpContext) {
-		c.withEnvTest()
+	testCaseWithContext(t, &mcpContext{staticConfig: deniedResourcesServer, useEnvTestKubeConfig: true}, func(c *mcpContext) {
 		eventList, _ := c.callTool("events_list", map[string]interface{}{})
 		t.Run("events_list has error", func(t *testing.T) {
 			if !eventList.IsError {

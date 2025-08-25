@@ -69,7 +69,6 @@ func (c *httpContext) beforeEach(t *testing.T) {
 	mockKubeConfig := c.mockServer.KubeConfig()
 	kubeConfig := filepath.Join(t.TempDir(), "config")
 	_ = clientcmd.WriteToFile(*mockKubeConfig, kubeConfig)
-	_ = os.Setenv("KUBECONFIG", kubeConfig)
 	// Capture logging
 	c.klogState = klog.CaptureState()
 	flags := flag.NewFlagSet("test", flag.ContinueOnError)
@@ -86,6 +85,7 @@ func (c *httpContext) beforeEach(t *testing.T) {
 		t.Fatalf("Failed to close random port listener: %v", randomPortErr)
 	}
 	c.StaticConfig.Port = fmt.Sprintf("%d", ln.Addr().(*net.TCPAddr).Port)
+	c.StaticConfig.KubeConfig = kubeConfig
 	mcpServer, err := mcp.NewServer(mcp.Configuration{
 		Profile:      mcp.Profiles[0],
 		StaticConfig: c.StaticConfig,
