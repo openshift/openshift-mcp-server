@@ -1,7 +1,50 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "schedule": ["on Tuesday"],
+  "extends": [
+    "https://github.com/konflux-ci/mintmaker/blob/main/config/renovate/renovate.json?raw=true"
+  ],
+  "assigneesFromCodeOwners": true,
+  "automergeStrategy": "auto",
+  "automergeType": "pr",
+  "prConcurrentLimit": 5,
+  "ignoreTests": false,
+  "rebaseLabel": "needs-rebase",
+  "rebaseWhen": "behind-base-branch",
+  "recreateWhen": "always",
+  "commitMessageSuffix": "{{baseBranch}}",
+  "ignorePaths": ["Dockerfile", "/npm/**", "/docs/**", "/python/**"],
+  "tekton": {
+    "enabled": true,
+    "packageRules": [
+      {
+        "matchUpdateTypes": [
+          "minor",
+          "patch",
+          "pin",
+          "digest"
+        ],
+        "automerge": true,
+        "addLabels": ["jira/valid-reference", "lgtm", "approved"]
+      }
+    ]
+  },
+  "dockerfile": {
+    "enabled": true,
+    "packageRules": [
+      {
+        "matchFileNames": [
+          "Dockerfile.ci",
+          "Dockerfile.ocp"
+        ],
+        "automerge": true,
+        "addLabels": ["jira/valid-reference", "lgtm", "approved"]
+      }
+    ]
+  },
   "gomod": {
     "enabled": false
+  },
+  "vulnerabilityAlerts": {
+    "enabled": true
   }
 }
