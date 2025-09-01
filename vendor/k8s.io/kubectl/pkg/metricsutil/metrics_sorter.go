@@ -82,11 +82,11 @@ func (p *PodMetricsSorter) Less(i, j int) bool {
 	}
 }
 
-func NewPodMetricsSorter(metrics []metricsapi.PodMetrics, withNamespace bool, sortBy string, measuredResources []v1.ResourceName) *PodMetricsSorter {
+func NewPodMetricsSorter(metrics []metricsapi.PodMetrics, withNamespace bool, sortBy string) *PodMetricsSorter {
 	var podMetrics = make([]v1.ResourceList, len(metrics))
 	if len(sortBy) > 0 {
 		for i, v := range metrics {
-			podMetrics[i] = getPodMetrics(&v, measuredResources)
+			podMetrics[i] = getPodMetrics(&v)
 		}
 	}
 

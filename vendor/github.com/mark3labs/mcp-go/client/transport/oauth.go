@@ -14,9 +14,6 @@ import (
 	"time"
 )
 
-// ErrNoToken is returned when no token is available in the token store
-var ErrNoToken = errors.New("no token available")
-
 // OAuthConfig holds the OAuth configuration for the client
 type OAuthConfig struct {
 	// ClientID is the OAuth client ID
@@ -34,31 +31,14 @@ type OAuthConfig struct {
 	AuthServerMetadataURL string
 	// PKCEEnabled enables PKCE for the OAuth flow (recommended for public clients)
 	PKCEEnabled bool
-	// HTTPClient is an optional HTTP client to use for requests.
-	// If nil, a default HTTP client with a 30 second timeout will be used.
-	HTTPClient *http.Client
 }
 
-// TokenStore is an interface for storing and retrieving OAuth tokens.
-//
-// Implementations must:
-//   - Honor context cancellation and deadlines, returning context.Canceled
-//     or context.DeadlineExceeded as appropriate
-//   - Return ErrNoToken (or a sentinel error that wraps it) when no token
-//     is available, rather than conflating this with other operational errors
-//   - Properly propagate all other errors (database failures, I/O errors, etc.)
-//   - Check ctx.Done() before performing operations and return ctx.Err() if cancelled
+// TokenStore is an interface for storing and retrieving OAuth tokens
 type TokenStore interface {
-	// GetToken returns the current token.
-	// Returns ErrNoToken if no token is available.
-	// Returns context.Canceled or context.DeadlineExceeded if ctx is cancelled.
-	// Returns other errors for operational failures (I/O, database, etc.).
-	GetToken(ctx context.Context) (*Token, error)
-
-	// SaveToken saves a token.
-	// Returns context.Canceled or context.DeadlineExceeded if ctx is cancelled.
-	// Returns other errors for operational failures (I/O, database, etc.).
-	SaveToken(ctx context.Context, token *Token) error
+	// GetToken returns the current token
+	GetToken() (*Token, error)
+	// SaveToken saves a token
+	SaveToken(token *Token) error
 }
 
 // Token represents an OAuth token
@@ -96,27 +76,18 @@ func NewMemoryTokenStore() *MemoryTokenStore {
 	return &MemoryTokenStore{}
 }
 
-// GetToken returns the current token.
-// Returns ErrNoToken if no token is available.
-// Returns context.Canceled or context.DeadlineExceeded if ctx is cancelled.
-func (s *MemoryTokenStore) GetToken(ctx context.Context) (*Token, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
+// GetToken returns the current token
+func (s *MemoryTokenStore) GetToken() (*Token, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if s.token == nil {
-		return nil, ErrNoToken
+		return nil, errors.New("no token available")
 	}
 	return s.token, nil
 }
 
-// SaveToken saves a token.
-// Returns context.Canceled or context.DeadlineExceeded if ctx is cancelled.
-func (s *MemoryTokenStore) SaveToken(ctx context.Context, token *Token) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
+// SaveToken saves a token
+func (s *MemoryTokenStore) SaveToken(token *Token) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.token = token
@@ -154,13 +125,10 @@ func NewOAuthHandler(config OAuthConfig) *OAuthHandler {
 	if config.TokenStore == nil {
 		config.TokenStore = NewMemoryTokenStore()
 	}
-	if config.HTTPClient == nil {
-		config.HTTPClient = &http.Client{Timeout: 30 * time.Second}
-	}
 
 	return &OAuthHandler{
 		config:     config,
-		httpClient: config.HTTPClient,
+		httpClient: &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
@@ -182,10 +150,7 @@ func (h *OAuthHandler) GetAuthorizationHeader(ctx context.Context) (string, erro
 
 // getValidToken returns a valid token, refreshing if necessary
 func (h *OAuthHandler) getValidToken(ctx context.Context) (*Token, error) {
-	token, err := h.config.TokenStore.GetToken(ctx)
-	if err != nil && !errors.Is(err, ErrNoToken) {
-		return nil, err
-	}
+	token, err := h.config.TokenStore.GetToken()
 	if err == nil && !token.IsExpired() && token.AccessToken != "" {
 		return token, nil
 	}
@@ -253,12 +218,13 @@ func (h *OAuthHandler) refreshToken(ctx context.Context, refreshToken string) (*
 	}
 
 	// If no new refresh token is provided, keep the old one
-	if tokenResp.RefreshToken == "" {
-		tokenResp.RefreshToken = refreshToken
+	oldToken, _ := h.config.TokenStore.GetToken()
+	if tokenResp.RefreshToken == "" && oldToken != nil {
+		tokenResp.RefreshToken = oldToken.RefreshToken
 	}
 
 	// Save the token
-	if err := h.config.TokenStore.SaveToken(ctx, &tokenResp); err != nil {
+	if err := h.config.TokenStore.SaveToken(&tokenResp); err != nil {
 		return nil, fmt.Errorf("failed to save token: %w", err)
 	}
 
@@ -377,13 +343,8 @@ func (h *OAuthHandler) getServerMetadata(ctx context.Context) (*AuthServerMetada
 		}
 		defer resp.Body.Close()
 
-		// If we can't get the protected resource metadata, try OAuth Authorization Server discovery
+		// If we can't get the protected resource metadata, fall back to default endpoints
 		if resp.StatusCode != http.StatusOK {
-			h.fetchMetadataFromURL(ctx, baseURL+"/.well-known/oauth-authorization-server")
-			if h.serverMetadata != nil {
-				return
-			}
-			// If that also fails, fall back to default endpoints
 			metadata, err := h.getDefaultEndpoints(baseURL)
 			if err != nil {
 				h.metadataFetchErr = fmt.Errorf("failed to get default endpoints: %w", err)
@@ -676,7 +637,7 @@ func (h *OAuthHandler) ProcessAuthorizationResponse(ctx context.Context, code, s
 	}
 
 	// Save the token
-	if err := h.config.TokenStore.SaveToken(ctx, &tokenResp); err != nil {
+	if err := h.config.TokenStore.SaveToken(&tokenResp); err != nil {
 		return fmt.Errorf("failed to save token: %w", err)
 	}
 

@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/url"
 	"os"
 	"path"
@@ -751,12 +750,6 @@ func (c *ChartPathOptions) LocateChart(name string, settings *cli.EnvSettings) (
 	version := strings.TrimSpace(c.Version)
 
 	if _, err := os.Stat(name); err == nil {
-		// Issue #7862: Helm prioritizes local charts over repository URL.
-		// This behavior is maintained for backwards compatibility but with a warning.
-		if c.RepoURL != "" {
-			slog.Warn("local chart found in current working directory. repository url ignored", "chart", name, "repository", c.RepoURL)
-		}
-
 		abs, err := filepath.Abs(name)
 		if err != nil {
 			return abs, err

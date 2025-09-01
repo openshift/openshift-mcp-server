@@ -565,8 +565,6 @@ type Tool struct {
 	InputSchema ToolInputSchema `json:"inputSchema"`
 	// Alternative to InputSchema - allows arbitrary JSON Schema to be provided
 	RawInputSchema json.RawMessage `json:"-"` // Hide this from JSON marshaling
-	// A JSON Schema object defining the expected output returned by the tool .
-	OutputSchema ToolOutputSchema `json:"outputSchema,omitempty"`
 	// Optional JSON Schema defining expected output structure
 	RawOutputSchema json.RawMessage `json:"-"` // Hide this from JSON marshaling
 	// Optional properties describing tool behavior
@@ -603,37 +601,23 @@ func (t Tool) MarshalJSON() ([]byte, error) {
 
 	// Add output schema if present
 	if t.RawOutputSchema != nil {
-		if t.OutputSchema.Type != "" {
-			return nil, fmt.Errorf("tool %s has both OutputSchema and RawOutputSchema set: %w", t.Name, errToolSchemaConflict)
-		}
 		m["outputSchema"] = t.RawOutputSchema
-	} else if t.OutputSchema.Type != "" { // If no output schema is specified, do not return anything
-		m["outputSchema"] = t.OutputSchema
 	}
 
 	m["annotations"] = t.Annotations
 
-	// Marshal Meta if present
-	if t.Meta != nil {
-		m["_meta"] = t.Meta
-	}
-
 	return json.Marshal(m)
 }
 
-// ToolArgumentsSchema represents a JSON Schema for tool arguments.
-type ToolArgumentsSchema struct {
+type ToolInputSchema struct {
 	Defs       map[string]any `json:"$defs,omitempty"`
 	Type       string         `json:"type"`
 	Properties map[string]any `json:"properties,omitempty"`
 	Required   []string       `json:"required,omitempty"`
 }
 
-type ToolInputSchema ToolArgumentsSchema // For retro-compatibility
-type ToolOutputSchema ToolArgumentsSchema
-
 // MarshalJSON implements the json.Marshaler interface for ToolInputSchema.
-func (tis ToolArgumentsSchema) MarshalJSON() ([]byte, error) {
+func (tis ToolInputSchema) MarshalJSON() ([]byte, error) {
 	m := make(map[string]any)
 	m["type"] = tis.Type
 
@@ -796,15 +780,7 @@ func WithOutputSchema[T any]() ToolOption {
 			return
 		}
 
-		// Retrieve the schema from raw JSON
-		if err := json.Unmarshal(mcpSchema, &t.OutputSchema); err != nil {
-			// Skip and maintain backward compatibility
-			return
-		}
-
-		// Always set the type to "object" as of the current MCP spec
-		// https://modelcontextprotocol.io/specification/2025-06-18/server/tools#output-schema
-		t.OutputSchema.Type = "object"
+		t.RawOutputSchema = json.RawMessage(mcpSchema)
 	}
 }
 
@@ -1091,10 +1067,8 @@ func WithObject(name string, opts ...PropertyOption) ToolOption {
 	}
 }
 
-// WithArray returns a ToolOption that adds an array-typed property with the given name to a Tool's input schema.
-// It applies provided PropertyOption functions to configure the property's schema, moves a `required` flag
-// from the property schema into the Tool's InputSchema.Required slice when present, and registers the resulting
-// schema under InputSchema.Properties[name].
+// WithArray adds an array property to the tool schema.
+// It accepts property options to configure the array property's behavior and constraints.
 func WithArray(name string, opts ...PropertyOption) ToolOption {
 	return func(t *Tool) {
 		schema := map[string]any{
@@ -1115,29 +1089,7 @@ func WithArray(name string, opts ...PropertyOption) ToolOption {
 	}
 }
 
-// WithAny adds an input property named name with no predefined JSON Schema type to the Tool's input schema.
-// The returned ToolOption applies the provided PropertyOption functions to the property's schema, moves a property-level
-// `required` flag into the Tool's InputSchema.Required list if present, and stores the resulting schema under InputSchema.Properties[name].
-func WithAny(name string, opts ...PropertyOption) ToolOption {
-	return func(t *Tool) {
-		schema := map[string]any{}
-
-		for _, opt := range opts {
-			opt(schema)
-		}
-
-		// Remove required from property schema and add to InputSchema.required
-		if required, ok := schema["required"].(bool); ok && required {
-			delete(schema, "required")
-			t.InputSchema.Required = append(t.InputSchema.Required, name)
-		}
-
-		t.InputSchema.Properties[name] = schema
-	}
-}
-
-// Properties sets the "properties" map for an object schema.
-// The returned PropertyOption stores the provided map under the schema's "properties" key.
+// Properties defines the properties for an object schema
 func Properties(props map[string]any) PropertyOption {
 	return func(schema map[string]any) {
 		schema["properties"] = props
