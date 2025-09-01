@@ -1,14 +1,6 @@
-# Kubernetes MCP Server
+# OpenShift MCP Server
 
-[![GitHub License](https://img.shields.io/github/license/containers/kubernetes-mcp-server)](https://github.com/containers/kubernetes-mcp-server/blob/main/LICENSE)
-[![npm](https://img.shields.io/npm/v/kubernetes-mcp-server)](https://www.npmjs.com/package/kubernetes-mcp-server)
-[![PyPI - Version](https://img.shields.io/pypi/v/kubernetes-mcp-server)](https://pypi.org/project/kubernetes-mcp-server/)
-[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/containers/kubernetes-mcp-server?sort=semver)](https://github.com/containers/kubernetes-mcp-server/releases/latest)
-[![Build](https://github.com/containers/kubernetes-mcp-server/actions/workflows/build.yaml/badge.svg)](https://github.com/containers/kubernetes-mcp-server/actions/workflows/build.yaml)
-
-[✨ Features](#features) | [🚀 Getting Started](#getting-started) | [🎥 Demos](#demos) | [⚙️ Configuration](#configuration) | [🛠️ Tools](#tools) | [🧑‍💻 Development](#development)
-
-https://github.com/user-attachments/assets/be2b67b3-fc1c-4d11-ae46-93deba8ed98e
+OpenShift MCP Server is currently under development.
 
 ## ✨ Features <a id="features"></a>
 
@@ -127,30 +119,6 @@ extensions:
       - kubernetes-mcp-server@latest
 
 ```
-
-## 🎥 Demos <a id="demos"></a>
-
-### Diagnosing and automatically fixing an OpenShift Deployment
-
-Demo showcasing how Kubernetes MCP server is leveraged by Claude Desktop to automatically diagnose and fix a deployment in OpenShift without any user assistance.
-
-https://github.com/user-attachments/assets/a576176d-a142-4c19-b9aa-a83dc4b8d941
-
-### _Vibe Coding_ a simple game and deploying it to OpenShift
-
-In this demo, I walk you through the process of _Vibe Coding_ a simple game using VS Code and how to leverage [Podman MCP server](https://github.com/manusa/podman-mcp-server) and Kubernetes MCP server to deploy it to OpenShift.
-
-<a href="https://www.youtube.com/watch?v=l05jQDSrzVI" target="_blank">
- <img src="docs/images/vibe-coding.jpg" alt="Vibe Coding: Build & Deploy a Game on Kubernetes" width="240"  />
-</a>
-
-### Supercharge GitHub Copilot with Kubernetes MCP Server in VS Code - One-Click Setup!
-
-In this demo, I'll show you how to set up Kubernetes MCP server in VS code just by clicking a link.
-
-<a href="https://youtu.be/AI4ljYMkgtA" target="_blank">
- <img src="docs/images/kubernetes-mcp-server-github-copilot.jpg" alt="Supercharge GitHub Copilot with Kubernetes MCP Server in VS Code - One-Click Setup!" width="240"  />
-</a>
 
 ## ⚙️ Configuration <a id="configuration"></a>
 
