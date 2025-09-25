@@ -756,6 +756,41 @@ func TestPodsLog(t *testing.T) {
 				return
 			}
 		})
+
+		// Test with tail parameter
+		podsTailLines, err := c.callTool("pods_log", map[string]interface{}{
+			"namespace": "ns-1",
+			"name":      "a-pod-in-ns-1",
+			"tail":      50,
+		})
+		t.Run("pods_log with tail=50 returns pod log", func(t *testing.T) {
+			if err != nil {
+				t.Fatalf("call tool failed %v", err)
+				return
+			}
+			if podsTailLines.IsError {
+				t.Fatalf("call tool failed")
+				return
+			}
+		})
+
+		// Test with invalid tail parameter
+		podsInvalidTailLines, _ := c.callTool("pods_log", map[string]interface{}{
+			"namespace": "ns-1",
+			"name":      "a-pod-in-ns-1",
+			"tail":      "invalid",
+		})
+		t.Run("pods_log with invalid tail returns error", func(t *testing.T) {
+			if !podsInvalidTailLines.IsError {
+				t.Fatalf("call tool should fail")
+				return
+			}
+			expectedErrorMsg := "failed to parse tail parameter: expected integer"
+			if errMsg := podsInvalidTailLines.Content[0].(mcp.TextContent).Text; !strings.Contains(errMsg, expectedErrorMsg) {
+				t.Fatalf("unexpected error message, expected to contain '%s', got '%s'", expectedErrorMsg, errMsg)
+				return
+			}
+		})
 	})
 }
 
