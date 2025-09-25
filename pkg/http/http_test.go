@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -24,7 +23,6 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/coreos/go-oidc/v3/oidc/oidctest"
 	"golang.org/x/sync/errgroup"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/textlogger"
 
@@ -62,14 +60,11 @@ func (c *httpContext) beforeEach(t *testing.T) {
 	t.Helper()
 	http.DefaultClient.Timeout = 10 * time.Second
 	if c.StaticConfig == nil {
-		c.StaticConfig = &config.StaticConfig{}
+		c.StaticConfig = config.Default()
 	}
 	c.mockServer = test.NewMockServer()
 	// Fake Kubernetes configuration
-	mockKubeConfig := c.mockServer.KubeConfig()
-	kubeConfig := filepath.Join(t.TempDir(), "config")
-	_ = clientcmd.WriteToFile(*mockKubeConfig, kubeConfig)
-	c.StaticConfig.KubeConfig = kubeConfig
+	c.StaticConfig.KubeConfig = c.mockServer.KubeconfigFile(t)
 	// Capture logging
 	c.klogState = klog.CaptureState()
 	flags := flag.NewFlagSet("test", flag.ContinueOnError)
@@ -86,10 +81,7 @@ func (c *httpContext) beforeEach(t *testing.T) {
 		t.Fatalf("Failed to close random port listener: %v", randomPortErr)
 	}
 	c.StaticConfig.Port = fmt.Sprintf("%d", ln.Addr().(*net.TCPAddr).Port)
-	mcpServer, err := mcp.NewServer(mcp.Configuration{
-		Profile:      mcp.Profiles[0],
-		StaticConfig: c.StaticConfig,
-	})
+	mcpServer, err := mcp.NewServer(mcp.Configuration{StaticConfig: c.StaticConfig})
 	if err != nil {
 		t.Fatalf("Failed to create MCP server: %v", err)
 	}

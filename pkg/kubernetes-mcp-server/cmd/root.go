@@ -26,6 +26,7 @@ import (
 	internalhttp "github.com/containers/kubernetes-mcp-server/pkg/http"
 	"github.com/containers/kubernetes-mcp-server/pkg/mcp"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
 	"github.com/containers/kubernetes-mcp-server/pkg/version"
 )
 
@@ -57,7 +58,7 @@ type MCPServerOptions struct {
 	HttpPort             int
 	SSEBaseUrl           string
 	Kubeconfig           string
-	Profile              string
+	Toolsets             []string
 	ListOutput           string
 	ReadOnly             bool
 	DisableDestructive   bool
@@ -77,9 +78,7 @@ type MCPServerOptions struct {
 func NewMCPServerOptions(streams genericiooptions.IOStreams) *MCPServerOptions {
 	return &MCPServerOptions{
 		IOStreams:    streams,
-		Profile:      "full",
-		ListOutput:   "table",
-		StaticConfig: &config.StaticConfig{},
+		StaticConfig: config.Default(),
 	}
 }
 
@@ -107,7 +106,7 @@ func NewMCPServer(streams genericiooptions.IOStreams) *cobra.Command {
 
 	cmd.Flags().BoolVar(&o.Version, "version", o.Version, "Print version information and quit")
 	cmd.Flags().IntVar(&o.LogLevel, "log-level", o.LogLevel, "Set the log level (from 0 to 9)")
-	cmd.Flags().StringVar(&o.ConfigPath, "config", o.ConfigPath, "Path of the config file. Each profile has its set of defaults.")
+	cmd.Flags().StringVar(&o.ConfigPath, "config", o.ConfigPath, "Path of the config file.")
 	cmd.Flags().IntVar(&o.SSEPort, "sse-port", o.SSEPort, "Start a SSE server on the specified port")
 	cmd.Flag("sse-port").Deprecated = "Use --port instead"
 	cmd.Flags().IntVar(&o.HttpPort, "http-port", o.HttpPort, "Start a streamable HTTP server on the specified port")
@@ -115,8 +114,8 @@ func NewMCPServer(streams genericiooptions.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.Port, "port", o.Port, "Start a streamable HTTP and SSE HTTP server on the specified port (e.g. 8080)")
 	cmd.Flags().StringVar(&o.SSEBaseUrl, "sse-base-url", o.SSEBaseUrl, "SSE public base URL to use when sending the endpoint message (e.g. https://example.com)")
 	cmd.Flags().StringVar(&o.Kubeconfig, "kubeconfig", o.Kubeconfig, "Path to the kubeconfig file to use for authentication")
-	cmd.Flags().StringVar(&o.Profile, "profile", o.Profile, "MCP profile to use (one of: "+strings.Join(mcp.ProfileNames, ", ")+")")
-	cmd.Flags().StringVar(&o.ListOutput, "list-output", o.ListOutput, "Output format for resource list operations (one of: "+strings.Join(output.Names, ", ")+"). Defaults to table.")
+	cmd.Flags().StringSliceVar(&o.Toolsets, "toolsets", o.Toolsets, "Comma-separated list of MCP toolsets to use (available toolsets: "+strings.Join(toolsets.ToolsetNames(), ", ")+"). Defaults to "+strings.Join(o.StaticConfig.Toolsets, ", ")+".")
+	cmd.Flags().StringVar(&o.ListOutput, "list-output", o.ListOutput, "Output format for resource list operations (one of: "+strings.Join(output.Names, ", ")+"). Defaults to "+o.StaticConfig.ListOutput+".")
 	cmd.Flags().BoolVar(&o.ReadOnly, "read-only", o.ReadOnly, "If true, only tools annotated with readOnlyHint=true are exposed")
 	cmd.Flags().BoolVar(&o.DisableDestructive, "disable-destructive", o.DisableDestructive, "If true, tools annotated with destructiveHint=true are disabled")
 	cmd.Flags().BoolVar(&o.RequireOAuth, "require-oauth", o.RequireOAuth, "If true, requires OAuth authorization as defined in the Model Context Protocol (MCP) specification. This flag is ignored if transport type is stdio")
@@ -137,7 +136,7 @@ func NewMCPServer(streams genericiooptions.IOStreams) *cobra.Command {
 
 func (m *MCPServerOptions) Complete(cmd *cobra.Command) error {
 	if m.ConfigPath != "" {
-		cnf, err := config.ReadConfig(m.ConfigPath)
+		cnf, err := config.Read(m.ConfigPath)
 		if err != nil {
 			return err
 		}
@@ -173,7 +172,7 @@ func (m *MCPServerOptions) loadFlags(cmd *cobra.Command) {
 	if cmd.Flag("kubeconfig").Changed {
 		m.StaticConfig.KubeConfig = m.Kubeconfig
 	}
-	if cmd.Flag("list-output").Changed || m.StaticConfig.ListOutput == "" {
+	if cmd.Flag("list-output").Changed {
 		m.StaticConfig.ListOutput = m.ListOutput
 	}
 	if cmd.Flag("read-only").Changed {
@@ -181,6 +180,9 @@ func (m *MCPServerOptions) loadFlags(cmd *cobra.Command) {
 	}
 	if cmd.Flag("disable-destructive").Changed {
 		m.StaticConfig.DisableDestructive = m.DisableDestructive
+	}
+	if cmd.Flag("toolsets").Changed {
+		m.StaticConfig.Toolsets = m.Toolsets
 	}
 	if cmd.Flag("require-oauth").Changed {
 		m.StaticConfig.RequireOAuth = m.RequireOAuth
@@ -205,6 +207,12 @@ func (m *MCPServerOptions) loadFlags(cmd *cobra.Command) {
 func (m *MCPServerOptions) initializeLogging() {
 	flagSet := flag.NewFlagSet("klog", flag.ContinueOnError)
 	klog.InitFlags(flagSet)
+	if m.StaticConfig.Port == "" {
+		// disable klog output for stdio mode
+		// this is needed to avoid klog writing to stderr and breaking the protocol
+		_ = flagSet.Parse([]string{"-logtostderr=false", "-alsologtostderr=false", "-stderrthreshold=FATAL"})
+		return
+	}
 	loggerOptions := []textlogger.ConfigOption{textlogger.Output(m.Out)}
 	if m.StaticConfig.LogLevel >= 0 {
 		loggerOptions = append(loggerOptions, textlogger.Verbosity(m.StaticConfig.LogLevel))
@@ -217,6 +225,12 @@ func (m *MCPServerOptions) initializeLogging() {
 func (m *MCPServerOptions) Validate() error {
 	if m.Port != "" && (m.SSEPort > 0 || m.HttpPort > 0) {
 		return fmt.Errorf("--port is mutually exclusive with deprecated --http-port and --sse-port flags")
+	}
+	if output.FromString(m.StaticConfig.ListOutput) == nil {
+		return fmt.Errorf("invalid output name: %s, valid names are: %s", m.StaticConfig.ListOutput, strings.Join(output.Names, ", "))
+	}
+	if err := toolsets.Validate(m.StaticConfig.Toolsets); err != nil {
+		return err
 	}
 	if !m.StaticConfig.RequireOAuth && (m.StaticConfig.ValidateToken || m.StaticConfig.OAuthAudience != "" || m.StaticConfig.AuthorizationURL != "" || m.StaticConfig.ServerURL != "" || m.StaticConfig.CertificateAuthority != "") {
 		return fmt.Errorf("validate-token, oauth-audience, authorization-url, server-url and certificate-authority are only valid if require-oauth is enabled. Missing --port may implicitly set require-oauth to false")
@@ -237,18 +251,10 @@ func (m *MCPServerOptions) Validate() error {
 }
 
 func (m *MCPServerOptions) Run() error {
-	profile := mcp.ProfileFromString(m.Profile)
-	if profile == nil {
-		return fmt.Errorf("invalid profile name: %s, valid names are: %s", m.Profile, strings.Join(mcp.ProfileNames, ", "))
-	}
-	listOutput := output.FromString(m.StaticConfig.ListOutput)
-	if listOutput == nil {
-		return fmt.Errorf("invalid output name: %s, valid names are: %s", m.StaticConfig.ListOutput, strings.Join(output.Names, ", "))
-	}
 	klog.V(1).Info("Starting kubernetes-mcp-server")
 	klog.V(1).Infof(" - Config: %s", m.ConfigPath)
-	klog.V(1).Infof(" - Profile: %s", profile.GetName())
-	klog.V(1).Infof(" - ListOutput: %s", listOutput.GetName())
+	klog.V(1).Infof(" - Toolsets: %s", strings.Join(m.StaticConfig.Toolsets, ", "))
+	klog.V(1).Infof(" - ListOutput: %s", m.StaticConfig.ListOutput)
 	klog.V(1).Infof(" - Read-only mode: %t", m.StaticConfig.ReadOnly)
 	klog.V(1).Infof(" - Disable destructive tools: %t", m.StaticConfig.DisableDestructive)
 
@@ -290,11 +296,7 @@ func (m *MCPServerOptions) Run() error {
 		oidcProvider = provider
 	}
 
-	mcpServer, err := mcp.NewServer(mcp.Configuration{
-		Profile:      profile,
-		ListOutput:   listOutput,
-		StaticConfig: m.StaticConfig,
-	})
+	mcpServer, err := mcp.NewServer(mcp.Configuration{StaticConfig: m.StaticConfig})
 	if err != nil {
 		return fmt.Errorf("failed to initialize MCP server: %w", err)
 	}

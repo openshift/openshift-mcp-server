@@ -13,9 +13,11 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 
+	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	internalk8s "github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
 	"github.com/containers/kubernetes-mcp-server/pkg/version"
 )
 
@@ -24,13 +26,28 @@ type ContextKey string
 const TokenScopesContextKey = ContextKey("TokenScopesContextKey")
 
 type Configuration struct {
-	Profile    Profile
-	ListOutput output.Output
-
-	StaticConfig *config.StaticConfig
+	*config.StaticConfig
+	listOutput output.Output
+	toolsets   []api.Toolset
 }
 
-func (c *Configuration) isToolApplicable(tool server.ServerTool) bool {
+func (c *Configuration) Toolsets() []api.Toolset {
+	if c.toolsets == nil {
+		for _, toolset := range c.StaticConfig.Toolsets {
+			c.toolsets = append(c.toolsets, toolsets.ToolsetFromString(toolset))
+		}
+	}
+	return c.toolsets
+}
+
+func (c *Configuration) ListOutput() output.Output {
+	if c.listOutput == nil {
+		c.listOutput = output.FromString(c.StaticConfig.ListOutput)
+	}
+	return c.listOutput
+}
+
+func (c *Configuration) isToolApplicable(tool api.ServerTool) bool {
 	if c.StaticConfig.ReadOnly && !ptr.Deref(tool.Tool.Annotations.ReadOnlyHint, false) {
 		return false
 	}
@@ -88,15 +105,21 @@ func (s *Server) reloadKubernetesClient() error {
 		return err
 	}
 	s.k = k
-	applicableTools := make([]server.ServerTool, 0)
-	for _, tool := range s.configuration.Profile.GetTools(s) {
-		if !s.configuration.isToolApplicable(tool) {
-			continue
+	applicableTools := make([]api.ServerTool, 0)
+	for _, toolset := range s.configuration.Toolsets() {
+		for _, tool := range toolset.GetTools(s.k) {
+			if !s.configuration.isToolApplicable(tool) {
+				continue
+			}
+			applicableTools = append(applicableTools, tool)
+			s.enabledTools = append(s.enabledTools, tool.Tool.Name)
 		}
-		applicableTools = append(applicableTools, tool)
-		s.enabledTools = append(s.enabledTools, tool.Tool.Name)
 	}
-	s.server.SetTools(applicableTools...)
+	m3labsServerTools, err := ServerToolToM3LabsServerTool(s, applicableTools)
+	if err != nil {
+		return fmt.Errorf("failed to convert tools: %v", err)
+	}
+	s.server.SetTools(m3labsServerTools...)
 	return nil
 }
 

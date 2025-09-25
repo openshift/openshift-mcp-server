@@ -9,6 +9,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"k8s.io/utils/ptr"
 
+	"github.com/containers/kubernetes-mcp-server/internal/test"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 )
 
@@ -74,11 +75,10 @@ func TestDisableDestructive(t *testing.T) {
 }
 
 func TestEnabledTools(t *testing.T) {
-	testCaseWithContext(t, &mcpContext{
-		staticConfig: &config.StaticConfig{
-			EnabledTools: []string{"namespaces_list", "events_list"},
-		},
-	}, func(c *mcpContext) {
+	enabledToolsServer := test.Must(config.ReadToml([]byte(`
+		enabled_tools = [ "namespaces_list", "events_list" ]
+	`)))
+	testCaseWithContext(t, &mcpContext{staticConfig: enabledToolsServer}, func(c *mcpContext) {
 		tools, err := c.mcpClient.ListTools(c.ctx, mcp.ListToolsRequest{})
 		t.Run("ListTools returns tools", func(t *testing.T) {
 			if err != nil {
@@ -161,7 +161,7 @@ func TestToolCallLogging(t *testing.T) {
 			}
 		})
 		sensitiveHeaders := []string{
-			"Authorization",
+			"Authorization:",
 			// TODO: Add more sensitive headers as needed
 		}
 		t.Run("Does not log sensitive headers", func(t *testing.T) {

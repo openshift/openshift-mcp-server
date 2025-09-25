@@ -14,14 +14,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/config"
-	"github.com/containers/kubernetes-mcp-server/pkg/output"
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/client/transport"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
+	"github.com/stretchr/testify/suite"
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -32,7 +31,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/tools/clientcmd/api"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	toolswatch "k8s.io/client-go/tools/watch"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/textlogger"
@@ -43,6 +42,10 @@ import (
 	"sigs.k8s.io/controller-runtime/tools/setup-envtest/store"
 	"sigs.k8s.io/controller-runtime/tools/setup-envtest/versions"
 	"sigs.k8s.io/controller-runtime/tools/setup-envtest/workflows"
+
+	"github.com/containers/kubernetes-mcp-server/internal/test"
+	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/containers/kubernetes-mcp-server/pkg/output"
 )
 
 // envTest has an expensive setup, so we only want to do it once per entire test run.
@@ -81,11 +84,9 @@ func TestMain(m *testing.M) {
 		BinaryAssetsDirectory: filepath.Join(envTestDir, "k8s", versionDir),
 	}
 	adminSystemMasterBaseConfig, _ := envTest.Start()
-	au, err := envTest.AddUser(envTestUser, adminSystemMasterBaseConfig)
-	if err != nil {
-		panic(err)
-	}
+	au := test.Must(envTest.AddUser(envTestUser, adminSystemMasterBaseConfig))
 	envTestRestConfig = au.Config()
+	envTest.KubeConfig = test.Must(au.KubeConfig())
 
 	//Create test data as administrator
 	ctx := context.Background()
@@ -103,7 +104,7 @@ func TestMain(m *testing.M) {
 }
 
 type mcpContext struct {
-	profile    Profile
+	toolsets   []string
 	listOutput output.Output
 	logLevel   int
 
@@ -126,17 +127,17 @@ func (c *mcpContext) beforeEach(t *testing.T) {
 	c.ctx, c.cancel = context.WithCancel(t.Context())
 	c.tempDir = t.TempDir()
 	c.withKubeConfig(nil)
-	if c.profile == nil {
-		c.profile = &FullProfile{}
-	}
-	if c.listOutput == nil {
-		c.listOutput = output.Yaml
-	}
 	if c.staticConfig == nil {
-		c.staticConfig = &config.StaticConfig{
-			ReadOnly:           false,
-			DisableDestructive: false,
-		}
+		c.staticConfig = config.Default()
+		// Default to use YAML output for lists (previously the default)
+		c.staticConfig.ListOutput = "yaml"
+	}
+	if c.toolsets != nil {
+		c.staticConfig.Toolsets = c.toolsets
+
+	}
+	if c.listOutput != nil {
+		c.staticConfig.ListOutput = c.listOutput.GetName()
 	}
 	if c.before != nil {
 		c.before(c)
@@ -148,11 +149,7 @@ func (c *mcpContext) beforeEach(t *testing.T) {
 	_ = flags.Set("v", strconv.Itoa(c.logLevel))
 	klog.SetLogger(textlogger.NewLogger(textlogger.NewConfig(textlogger.Verbosity(c.logLevel), textlogger.Output(&c.logBuffer))))
 	// MCP Server
-	if c.mcpServer, err = NewServer(Configuration{
-		Profile:      c.profile,
-		ListOutput:   c.listOutput,
-		StaticConfig: c.staticConfig,
-	}); err != nil {
+	if c.mcpServer, err = NewServer(Configuration{StaticConfig: c.staticConfig}); err != nil {
 		t.Fatal(err)
 		return
 	}
@@ -188,7 +185,7 @@ func (c *mcpContext) afterEach() {
 }
 
 func testCase(t *testing.T, test func(c *mcpContext)) {
-	testCaseWithContext(t, &mcpContext{profile: &FullProfile{}}, test)
+	testCaseWithContext(t, &mcpContext{}, test)
 }
 
 func testCaseWithContext(t *testing.T, mcpCtx *mcpContext, test func(c *mcpContext)) {
@@ -198,23 +195,23 @@ func testCaseWithContext(t *testing.T, mcpCtx *mcpContext, test func(c *mcpConte
 }
 
 // withKubeConfig sets up a fake kubeconfig in the temp directory based on the provided rest.Config
-func (c *mcpContext) withKubeConfig(rc *rest.Config) *api.Config {
-	fakeConfig := api.NewConfig()
-	fakeConfig.Clusters["fake"] = api.NewCluster()
+func (c *mcpContext) withKubeConfig(rc *rest.Config) *clientcmdapi.Config {
+	fakeConfig := clientcmdapi.NewConfig()
+	fakeConfig.Clusters["fake"] = clientcmdapi.NewCluster()
 	fakeConfig.Clusters["fake"].Server = "https://127.0.0.1:6443"
-	fakeConfig.Clusters["additional-cluster"] = api.NewCluster()
-	fakeConfig.AuthInfos["fake"] = api.NewAuthInfo()
-	fakeConfig.AuthInfos["additional-auth"] = api.NewAuthInfo()
+	fakeConfig.Clusters["additional-cluster"] = clientcmdapi.NewCluster()
+	fakeConfig.AuthInfos["fake"] = clientcmdapi.NewAuthInfo()
+	fakeConfig.AuthInfos["additional-auth"] = clientcmdapi.NewAuthInfo()
 	if rc != nil {
 		fakeConfig.Clusters["fake"].Server = rc.Host
 		fakeConfig.Clusters["fake"].CertificateAuthorityData = rc.CAData
 		fakeConfig.AuthInfos["fake"].ClientKeyData = rc.KeyData
 		fakeConfig.AuthInfos["fake"].ClientCertificateData = rc.CertData
 	}
-	fakeConfig.Contexts["fake-context"] = api.NewContext()
+	fakeConfig.Contexts["fake-context"] = clientcmdapi.NewContext()
 	fakeConfig.Contexts["fake-context"].Cluster = "fake"
 	fakeConfig.Contexts["fake-context"].AuthInfo = "fake"
-	fakeConfig.Contexts["additional-context"] = api.NewContext()
+	fakeConfig.Contexts["additional-context"] = clientcmdapi.NewContext()
 	fakeConfig.Contexts["additional-context"].Cluster = "additional-cluster"
 	fakeConfig.Contexts["additional-context"].AuthInfo = "additional-auth"
 	fakeConfig.CurrentContext = "fake-context"
@@ -421,4 +418,34 @@ func createTestData(ctx context.Context) {
 	}, metav1.CreateOptions{})
 	_, _ = kubernetesAdmin.CoreV1().ConfigMaps("default").
 		Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "a-configmap-to-delete"}}, metav1.CreateOptions{})
+}
+
+type BaseMcpSuite struct {
+	suite.Suite
+	*test.McpClient
+	mcpServer *Server
+	Cfg       *config.StaticConfig
+}
+
+func (s *BaseMcpSuite) SetupTest() {
+	s.Cfg = config.Default()
+	s.Cfg.ListOutput = "yaml"
+	s.Cfg.KubeConfig = filepath.Join(s.T().TempDir(), "config")
+	s.Require().NoError(os.WriteFile(s.Cfg.KubeConfig, envTest.KubeConfig, 0600), "Expected to write kubeconfig")
+}
+
+func (s *BaseMcpSuite) TearDownTest() {
+	if s.McpClient != nil {
+		s.McpClient.Close()
+	}
+	if s.mcpServer != nil {
+		s.mcpServer.Close()
+	}
+}
+
+func (s *BaseMcpSuite) InitMcpClient() {
+	var err error
+	s.mcpServer, err = NewServer(Configuration{StaticConfig: s.Cfg})
+	s.Require().NoError(err, "Expected no error creating MCP server")
+	s.McpClient = test.NewMcpClient(s.T(), s.mcpServer.ServeHTTP(nil))
 }
