@@ -14,8 +14,8 @@ import (
 	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/yaml"
 
-	"github.com/containers/kubernetes-mcp-server/internal/test"
-	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/kiali/kiali-mcp-server/internal/test"
+	"github.com/kiali/kiali-mcp-server/pkg/config"
 )
 
 type NamespacesSuite struct {

@@ -8,6 +8,6 @@ startCommand:
     (config) => ({
       "command": "npx",
       "args": [
-        "-y", "kubernetes-mcp-server@latest"
+        "-y", "kiali-mcp-server@latest"
       ]
     })

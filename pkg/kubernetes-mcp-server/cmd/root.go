@@ -22,12 +22,12 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/config"
-	internalhttp "github.com/containers/kubernetes-mcp-server/pkg/http"
-	"github.com/containers/kubernetes-mcp-server/pkg/mcp"
-	"github.com/containers/kubernetes-mcp-server/pkg/output"
-	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
-	"github.com/containers/kubernetes-mcp-server/pkg/version"
+	"github.com/kiali/kiali-mcp-server/pkg/config"
+	internalhttp "github.com/kiali/kiali-mcp-server/pkg/http"
+	"github.com/kiali/kiali-mcp-server/pkg/mcp"
+	"github.com/kiali/kiali-mcp-server/pkg/output"
+	"github.com/kiali/kiali-mcp-server/pkg/toolsets"
+	"github.com/kiali/kiali-mcp-server/pkg/version"
 )
 
 var (

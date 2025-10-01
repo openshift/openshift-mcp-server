@@ -43,9 +43,9 @@ import (
 	"sigs.k8s.io/controller-runtime/tools/setup-envtest/versions"
 	"sigs.k8s.io/controller-runtime/tools/setup-envtest/workflows"
 
-	"github.com/containers/kubernetes-mcp-server/internal/test"
-	"github.com/containers/kubernetes-mcp-server/pkg/config"
-	"github.com/containers/kubernetes-mcp-server/pkg/output"
+	"github.com/kiali/kiali-mcp-server/internal/test"
+	"github.com/kiali/kiali-mcp-server/pkg/config"
+	"github.com/kiali/kiali-mcp-server/pkg/output"
 )
 
 // envTest has an expensive setup, so we only want to do it once per entire test run.

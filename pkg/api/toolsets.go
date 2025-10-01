@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 
-	internalKiali "github.com/containers/kubernetes-mcp-server/pkg/kiali"
-	internalk8s "github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
-	"github.com/containers/kubernetes-mcp-server/pkg/output"
 	"github.com/google/jsonschema-go/jsonschema"
+	internalKiali "github.com/kiali/kiali-mcp-server/pkg/kiali"
+	internalk8s "github.com/kiali/kiali-mcp-server/pkg/kubernetes"
+	"github.com/kiali/kiali-mcp-server/pkg/output"
 )
 
 type ServerTool struct {

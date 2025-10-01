@@ -6,7 +6,7 @@ import (
 	"path"
 	"testing"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/kiali/kiali-mcp-server/pkg/config"
 )
 
 func TestManager_Derived(t *testing.T) {

@@ -13,7 +13,7 @@ import (
 	"github.com/mark3labs/mcp-go/client/transport"
 	"github.com/mark3labs/mcp-go/mcp"
 
-	"github.com/containers/kubernetes-mcp-server/cmd/kiali-mcp-client/output"
+	"github.com/kiali/kiali-mcp-server/cmd/kiali-mcp-client/output"
 )
 
 func main() {

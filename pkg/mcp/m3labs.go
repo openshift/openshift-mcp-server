@@ -8,7 +8,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/kiali/kiali-mcp-server/pkg/api"
 )
 
 func ServerToolToM3LabsServerTool(s *Server, tools []api.ServerTool) ([]server.ServerTool, error) {
@@ -32,7 +32,7 @@ func ServerToolToM3LabsServerTool(s *Server, tools []api.ServerTool) ([]server.S
 			}
 			// TODO: temporary fix to append an empty properties object (some client have trouble parsing a schema without properties)
 			// As opposed, Gemini had trouble for a while when properties was present but empty.
-			// https://github.com/containers/kubernetes-mcp-server/issues/340
+			// https://github.com/kiali/kiali-mcp-server/issues/340
 			if string(schema) == `{"type":"object"}` {
 				schema = []byte(`{"type":"object","properties":{}}`)
 			}

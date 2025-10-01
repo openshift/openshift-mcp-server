@@ -13,13 +13,13 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/api"
-	"github.com/containers/kubernetes-mcp-server/pkg/config"
-	internalkiali "github.com/containers/kubernetes-mcp-server/pkg/kiali"
-	internalk8s "github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
-	"github.com/containers/kubernetes-mcp-server/pkg/output"
-	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
-	"github.com/containers/kubernetes-mcp-server/pkg/version"
+	"github.com/kiali/kiali-mcp-server/pkg/api"
+	"github.com/kiali/kiali-mcp-server/pkg/config"
+	internalkiali "github.com/kiali/kiali-mcp-server/pkg/kiali"
+	internalk8s "github.com/kiali/kiali-mcp-server/pkg/kubernetes"
+	"github.com/kiali/kiali-mcp-server/pkg/output"
+	"github.com/kiali/kiali-mcp-server/pkg/toolsets"
+	"github.com/kiali/kiali-mcp-server/pkg/version"
 )
 
 type ContextKey string

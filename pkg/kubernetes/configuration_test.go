@@ -10,7 +10,7 @@ import (
 
 	"k8s.io/client-go/rest"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/kiali/kiali-mcp-server/pkg/config"
 )
 
 func TestKubernetes_IsInCluster(t *testing.T) {

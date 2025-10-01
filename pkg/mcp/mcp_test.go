@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containers/kubernetes-mcp-server/internal/test"
+	"github.com/kiali/kiali-mcp-server/internal/test"
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/mcp"
 )

@@ -13,8 +13,8 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/config"
-	"github.com/containers/kubernetes-mcp-server/pkg/mcp"
+	"github.com/kiali/kiali-mcp-server/pkg/config"
+	"github.com/kiali/kiali-mcp-server/pkg/mcp"
 )
 
 const (

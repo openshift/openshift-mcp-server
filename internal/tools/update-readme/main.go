@@ -8,12 +8,12 @@ import (
 	"slices"
 	"strings"
 
-	internalk8s "github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
-	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
+	internalk8s "github.com/kiali/kiali-mcp-server/pkg/kubernetes"
+	"github.com/kiali/kiali-mcp-server/pkg/toolsets"
 
-	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/config"
-	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/core"
-	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/helm"
+	_ "github.com/kiali/kiali-mcp-server/pkg/toolsets/config"
+	_ "github.com/kiali/kiali-mcp-server/pkg/toolsets/core"
+	_ "github.com/kiali/kiali-mcp-server/pkg/toolsets/helm"
 )
 
 type OpenShift struct{}

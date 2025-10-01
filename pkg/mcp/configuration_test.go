@@ -9,8 +9,8 @@ import (
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	"sigs.k8s.io/yaml"
 
-	"github.com/containers/kubernetes-mcp-server/internal/test"
-	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
+	"github.com/kiali/kiali-mcp-server/internal/test"
+	"github.com/kiali/kiali-mcp-server/pkg/kubernetes"
 )
 
 type ConfigurationSuite struct {

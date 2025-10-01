@@ -9,11 +9,12 @@ This MCP server enables AI assistants (like Claude, Gemini, Cursor, and others) 
 ## Project Structure and Repository layout
 
 - Go package layout follows the standard Go conventions:
-  - `cmd/kubernetes-mcp-server/` – main application entry point using Cobra CLI framework.
+  - `cmd/kiali-mcp-server/` – main application entry point using Cobra CLI framework.
   - `pkg/` – libraries grouped by domain.
     - `config/` – configuration management.
     - `helm/` - Helm chart operations integration.
     - `http/` - HTTP server and authorization middleware.
+    - `kiali/` - Kiali client management.
     - `kubernetes/` - Kubernetes client management, authentication, and access control.
     - `mcp/` - Model Context Protocol (MCP) server implementation with tool registration and STDIO/HTTP support.
     - `output/` - output formatting and rendering.
@@ -52,20 +53,20 @@ The README demonstrates running the server via
 
 ```bash
 make build
-npx @modelcontextprotocol/inspector@latest $(pwd)/kubernetes-mcp-server
+npx @modelcontextprotocol/inspector@latest $(pwd)/kiali-mcp-server
 ```
 
 To run the server locally, you can use `npx`, `uvx` or execute the binary directly:
 
 ```bash
 # Using npx (Node.js package runner)
-npx -y kubernetes-mcp-server@latest
+npx -y kiali-mcp-server@latest
 
 # Using uvx (Python package runner)
-uvx kubernetes-mcp-server@latest
+uvx kiali-mcp-server@latest
 
 # Binary execution
-./kubernetes-mcp-server
+./kiali-mcp-server
 ```
 
 This MCP server is designed to run both locally and remotely.
@@ -75,7 +76,7 @@ This MCP server is designed to run both locally and remotely.
 When running locally, the server connects to a Kubernetes or OpenShift cluster using the kubeconfig file.
 It reads the kubeconfig from the `--kubeconfig` flag, the `KUBECONFIG` environment variable, or defaults to `~/.kube/config`.
 
-This means that `npx -y kubernetes-mcp-server@latest` on a workstation will talk to whatever cluster your current kubeconfig points to (e.g. a local Kind cluster).
+This means that `npx -y kiali-mcp-server@latest` on a workstation will talk to whatever cluster your current kubeconfig points to (e.g. a local Kind cluster).
 
 ### Remote Execution
 
@@ -120,8 +121,8 @@ When introducing new modules run `make tidy` so that `go.mod` and `go.sum` remai
 The server is distributed as a binary executable, a Docker image, an npm package, and a Python package.
 
 - **Native binaries** for Linux, macOS, and Windows are available in the GitHub releases.
-- A **container image** (Docker) is built and pushed to the `quay.io/manusa/kubernetes_mcp_server` repository.
-- An **npm** package is available at [npmjs.com](https://www.npmjs.com/package/kubernetes-mcp-server).
+- A **container image** (Docker) is built and pushed to the `quay.io/aljesusg/kiali_mcp_server` repository.
+- An **npm** package is available at [npmjs.com](https://www.npmjs.com/package/kiali-mcp-server).
   It wraps the platform-specific binary and provides a convenient way to run the server using `npx`.
 - A **Python** package is available at [pypi.org](https://pypi.org/project/kubernetes-mcp-server/).
   It provides a script that downloads the correct platform binary from the GitHub releases page and runs it.

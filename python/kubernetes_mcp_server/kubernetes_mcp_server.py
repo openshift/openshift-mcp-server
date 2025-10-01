@@ -12,7 +12,7 @@ if sys.version_info >= (3, 8):
 else:
     from importlib_metadata import version
 
-__version__ = version("kubernetes-mcp-server")
+__version__ = version("kiali-mcp-server")
 
 def get_platform_binary():
     """Determine the correct binary for the current platform."""
@@ -28,11 +28,11 @@ def get_platform_binary():
         raise RuntimeError(f"Unsupported architecture: {arch}")
 
     if system == "darwin":
-        return f"kubernetes-mcp-server-darwin-{arch}"
+        return f"kiali-mcp-server-darwin-{arch}"
     elif system == "linux":
-        return f"kubernetes-mcp-server-linux-{arch}"
+        return f"kiali-mcp-server-linux-{arch}"
     elif system == "windows":
-        return f"kubernetes-mcp-server-windows-{arch}.exe"
+        return f"kiali-mcp-server-windows-{arch}.exe"
     else:
         raise RuntimeError(f"Unsupported operating system: {system}")
 
@@ -40,7 +40,7 @@ def download_binary(binary_version="latest", destination=None):
     """Download the correct binary for the current platform."""
     binary_name = get_platform_binary()
     if destination is None:
-        destination = Path.home() / ".kubernetes-mcp-server" / "bin" / binary_version
+        destination = Path.home() / ".kiali-mcp-server" / "bin" / binary_version
 
     destination = Path(destination)
     destination.mkdir(parents=True, exist_ok=True)
@@ -49,7 +49,7 @@ def download_binary(binary_version="latest", destination=None):
     if binary_path.exists():
         return binary_path
 
-    base_url = "https://github.com/containers/kubernetes-mcp-server/releases"
+    base_url = "https://github.com/kiali/kiali-mcp-server/releases"
     if binary_version == "latest":
         release_url = f"{base_url}/latest/download/{binary_name}"
     else:
@@ -73,7 +73,7 @@ def download_binary(binary_version="latest", destination=None):
             raise RuntimeError(f"Failed to download binary: {e}")
 
 def execute(args=None):
-    """Download and execute the kubernetes-mcp-server binary."""
+    """Download and execute the kiali-mcp-server binary."""
     if args is None:
         args = []
 
@@ -85,7 +85,7 @@ def execute(args=None):
         process = subprocess.run(cmd)
         return process.returncode
     except Exception as e:
-        print(f"Error executing kubernetes-mcp-server: {e}", file=sys.stderr)
+        print(f"Error executing kiali-mcp-server: {e}", file=sys.stderr)
         return 1
 
 if __name__ == "__main__":
@@ -93,6 +93,6 @@ if __name__ == "__main__":
 
 
 def main():
-    """Main function to execute the kubernetes-mcp-server binary."""
+    """Main function to execute the kiali-mcp-server binary."""
     args = sys.argv[1:] if len(sys.argv) > 1 else []
     return execute(args)

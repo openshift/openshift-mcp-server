@@ -19,7 +19,7 @@ import (
 	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	"k8s.io/utils/ptr"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/version"
+	"github.com/kiali/kiali-mcp-server/pkg/version"
 )
 
 // Default number of lines to retrieve from the end of the logs

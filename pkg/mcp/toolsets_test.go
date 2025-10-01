@@ -7,13 +7,13 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/containers/kubernetes-mcp-server/internal/test"
-	"github.com/containers/kubernetes-mcp-server/pkg/api"
-	configuration "github.com/containers/kubernetes-mcp-server/pkg/config"
-	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
-	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/config"
-	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/core"
-	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/helm"
+	"github.com/kiali/kiali-mcp-server/internal/test"
+	"github.com/kiali/kiali-mcp-server/pkg/api"
+	configuration "github.com/kiali/kiali-mcp-server/pkg/config"
+	"github.com/kiali/kiali-mcp-server/pkg/toolsets"
+	"github.com/kiali/kiali-mcp-server/pkg/toolsets/config"
+	"github.com/kiali/kiali-mcp-server/pkg/toolsets/core"
+	"github.com/kiali/kiali-mcp-server/pkg/toolsets/helm"
 )
 
 type ToolsetsSuite struct {
@@ -126,7 +126,7 @@ func (s *ToolsetsSuite) TestGranularToolsetsTools() {
 }
 
 func (s *ToolsetsSuite) TestInputSchemaEdgeCases() {
-	//https://github.com/containers/kubernetes-mcp-server/issues/340
+	//https://github.com/kiali/kiali-mcp-server/issues/340
 	s.Run("InputSchema for no-arg tool is object with empty properties", func() {
 		s.InitMcpClient()
 		tools, err := s.ListTools(s.T().Context(), mcp.ListToolsRequest{})

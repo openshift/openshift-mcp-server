@@ -19,15 +19,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containers/kubernetes-mcp-server/internal/test"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/coreos/go-oidc/v3/oidc/oidctest"
+	"github.com/kiali/kiali-mcp-server/internal/test"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/textlogger"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/config"
-	"github.com/containers/kubernetes-mcp-server/pkg/mcp"
+	"github.com/kiali/kiali-mcp-server/pkg/config"
+	"github.com/kiali/kiali-mcp-server/pkg/mcp"
 )
 
 type httpContext struct {

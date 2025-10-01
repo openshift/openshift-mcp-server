@@ -7,9 +7,9 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"k8s.io/utils/ptr"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/api"
-	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
-	internalk8s "github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
+	"github.com/kiali/kiali-mcp-server/pkg/api"
+	"github.com/kiali/kiali-mcp-server/pkg/kubernetes"
+	internalk8s "github.com/kiali/kiali-mcp-server/pkg/kubernetes"
 )
 
 func initNamespaces(o internalk8s.Openshift) []api.ServerTool {

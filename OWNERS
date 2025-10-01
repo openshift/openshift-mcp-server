@@ -1,5 +1,5 @@
 reviewers:
-  - ardaguclu
+  - aljesusg
 approvers:
-  - ardaguclu
-component: "openshift-mcp-server"
+  - aljesusg
+component: "kiali-mcp-server"

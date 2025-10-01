@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/containers/kubernetes-mcp-server/internal/test"
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/kiali/kiali-mcp-server/internal/test"
 	"golang.org/x/oauth2"
 )
 

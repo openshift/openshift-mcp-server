@@ -3,9 +3,9 @@ package kiali
 import (
 	"slices"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/api"
-	internalk8s "github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
-	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
+	"github.com/kiali/kiali-mcp-server/pkg/api"
+	internalk8s "github.com/kiali/kiali-mcp-server/pkg/kubernetes"
+	"github.com/kiali/kiali-mcp-server/pkg/toolsets"
 )
 
 type Toolset struct{}

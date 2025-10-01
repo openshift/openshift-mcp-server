@@ -3,11 +3,12 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/runtime"
 	"regexp"
 	"strings"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/version"
+	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/kiali/kiali-mcp-server/pkg/version"
 	authv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

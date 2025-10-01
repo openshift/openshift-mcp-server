@@ -6,7 +6,7 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"k8s.io/utils/ptr"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/kiali/kiali-mcp-server/pkg/api"
 )
 
 func initHelm() []api.ServerTool {

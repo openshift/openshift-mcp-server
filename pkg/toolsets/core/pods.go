@@ -9,9 +9,9 @@ import (
 	"k8s.io/kubectl/pkg/metricsutil"
 	"k8s.io/utils/ptr"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/api"
-	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
-	"github.com/containers/kubernetes-mcp-server/pkg/output"
+	"github.com/kiali/kiali-mcp-server/pkg/api"
+	"github.com/kiali/kiali-mcp-server/pkg/kubernetes"
+	"github.com/kiali/kiali-mcp-server/pkg/output"
 )
 
 func initPods() []api.ServerTool {

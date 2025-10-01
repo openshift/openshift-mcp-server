@@ -7,9 +7,9 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"k8s.io/utils/ptr"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/api"
-	internalkiali "github.com/containers/kubernetes-mcp-server/pkg/kiali"
-	internalk8s "github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
+	"github.com/kiali/kiali-mcp-server/pkg/api"
+	internalkiali "github.com/kiali/kiali-mcp-server/pkg/kiali"
+	internalk8s "github.com/kiali/kiali-mcp-server/pkg/kubernetes"
 )
 
 func initValidations() []api.ServerTool {

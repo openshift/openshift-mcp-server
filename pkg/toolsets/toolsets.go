@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/kiali/kiali-mcp-server/pkg/api"
 )
 
 var toolsets []api.Toolset

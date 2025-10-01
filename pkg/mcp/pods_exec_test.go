@@ -11,8 +11,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/containers/kubernetes-mcp-server/internal/test"
-	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/kiali/kiali-mcp-server/internal/test"
+	"github.com/kiali/kiali-mcp-server/pkg/config"
 )
 
 func TestPodsExec(t *testing.T) {

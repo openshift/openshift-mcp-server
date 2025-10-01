@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/config"
-	internalk8s "github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
+	"github.com/kiali/kiali-mcp-server/pkg/config"
+	internalk8s "github.com/kiali/kiali-mcp-server/pkg/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 )
