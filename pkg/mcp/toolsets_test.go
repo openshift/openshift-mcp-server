@@ -14,6 +14,7 @@ import (
 	"github.com/kiali/kiali-mcp-server/pkg/toolsets/config"
 	"github.com/kiali/kiali-mcp-server/pkg/toolsets/core"
 	"github.com/kiali/kiali-mcp-server/pkg/toolsets/helm"
+	"github.com/kiali/kiali-mcp-server/pkg/toolsets/kiali"
 )
 
 type ToolsetsSuite struct {
@@ -103,6 +104,7 @@ func (s *ToolsetsSuite) TestGranularToolsetsTools() {
 		&core.Toolset{},
 		&config.Toolset{},
 		&helm.Toolset{},
+		&kiali.Toolset{},
 	}
 	for _, testCase := range testCases {
 		s.Run("Toolset "+testCase.GetName(), func() {
