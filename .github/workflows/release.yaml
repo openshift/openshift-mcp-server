@@ -38,7 +38,7 @@ jobs:
           make_latest: true
           files: |
             LICENSE
-            kubernetes-mcp-server-*
+            kiali-mcp-server-*
       - name: Publish npm
         run:
           make npm-publish

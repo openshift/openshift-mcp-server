@@ -1,0 +1,37 @@
+{
+  "name": "kiali-mcp-server",
+  "version": "0.0.0",
+  "description": "Model Context Protocol (MCP) server for Kiali",
+  "main": "./bin/index.js",
+  "bin": {
+    "kiali-mcp-server": "bin/index.js"
+  },
+  "optionalDependencies": {
+    "kiali-mcp-server-darwin-amd64": "0.0.0",
+    "kiali-mcp-server-darwin-arm64": "0.0.0",
+    "kiali-mcp-server-linux-amd64": "0.0.0",
+    "kiali-mcp-server-linux-arm64": "0.0.0",
+    "kiali-mcp-server-windows-amd64": "0.0.0",
+    "kiali-mcp-server-windows-arm64": "0.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kiali/kiali-mcp-server.git"
+  },
+  "keywords": [
+    "mcp",
+    "kubernetes",
+    "kiali",
+    "istio",
+    "openshift",
+    "model context protocol",
+    "model",
+    "context",
+    "protocol"
+  ],
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/kiali/kiali-mcp-server/issues"
+  },
+  "homepage": "https://github.com/kiali/kiali-mcp-server#readme"
+}

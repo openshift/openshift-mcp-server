@@ -68,6 +68,8 @@ type MCPServerOptions struct {
 	AuthorizationURL     string
 	CertificateAuthority string
 	ServerURL            string
+	KialiServerURL       string
+	KialiInsecure        bool
 
 	ConfigPath   string
 	StaticConfig *config.StaticConfig
@@ -130,6 +132,8 @@ func NewMCPServer(streams genericiooptions.IOStreams) *cobra.Command {
 	_ = cmd.Flags().MarkHidden("server-url")
 	cmd.Flags().StringVar(&o.CertificateAuthority, "certificate-authority", o.CertificateAuthority, "Certificate authority path to verify certificates. Optional. Only valid if require-oauth is enabled.")
 	_ = cmd.Flags().MarkHidden("certificate-authority")
+	cmd.Flags().StringVar(&o.KialiServerURL, "kiali-server-url", o.KialiServerURL, "Kiali server URL for protected resource endpoint. If not provided, the Kiali server will not be used. Only valid if require-oauth is enabled.")
+	cmd.Flags().BoolVar(&o.KialiInsecure, "kiali-insecure", o.KialiInsecure, "If true, uses insecure TLS for the Kiali server. Optional. Only valid if require-oauth is enabled.")
 
 	return cmd
 }
@@ -201,6 +205,12 @@ func (m *MCPServerOptions) loadFlags(cmd *cobra.Command) {
 	}
 	if cmd.Flag("certificate-authority").Changed {
 		m.StaticConfig.CertificateAuthority = m.CertificateAuthority
+	}
+	if cmd.Flag("kiali-server-url").Changed {
+		m.StaticConfig.KialiServerURL = m.KialiServerURL
+	}
+	if cmd.Flag("kiali-insecure").Changed {
+		m.StaticConfig.KialiInsecure = m.KialiInsecure
 	}
 }
 

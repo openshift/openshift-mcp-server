@@ -15,6 +15,7 @@ import (
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	internalkiali "github.com/containers/kubernetes-mcp-server/pkg/kiali"
 	internalk8s "github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
@@ -68,6 +69,7 @@ type Server struct {
 	server        *server.MCPServer
 	enabledTools  []string
 	k             *internalk8s.Manager
+	kiali         *internalkiali.Manager
 }
 
 func NewServer(configuration Configuration) (*Server, error) {

@@ -1,0 +1,11 @@
+{
+  "name": "kiali-mcp-server-windows-amd64",
+  "version": "0.0.0",
+  "description": "Model Context Protocol (MCP) server for Kiali",
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ]
+}

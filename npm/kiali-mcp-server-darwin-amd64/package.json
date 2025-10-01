@@ -1,0 +1,11 @@
+{
+  "name": "kiali-mcp-server-darwin-amd64",
+  "version": "0.0.0",
+  "description": "Model Context Protocol (MCP) server for Kiali",
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "x64"
+  ]
+}

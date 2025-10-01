@@ -31,6 +31,10 @@ type StaticConfig struct {
 	OAuthAudience string `toml:"oauth_audience,omitempty"`
 	// ValidateToken indicates whether the server should validate the token against the Kubernetes API Server using TokenReview.
 	ValidateToken bool `toml:"validate_token,omitempty"`
+	// KialiServerURL is the URL of the Kiali server.
+	KialiServerURL string `toml:"kiali_server_url,omitempty"`
+	// KialiInsecure indicates whether the server should use insecure TLS for the Kiali server.
+	KialiInsecure bool `toml:"kiali_insecure,omitempty"`
 	// AuthorizationURL is the URL of the OIDC authorization server.
 	// It is used for token validation and for STS token exchange.
 	AuthorizationURL string `toml:"authorization_url,omitempty"`
@@ -54,7 +58,7 @@ type StaticConfig struct {
 func Default() *StaticConfig {
 	return &StaticConfig{
 		ListOutput: "table",
-		Toolsets:   []string{"core", "config", "helm"},
+		Toolsets:   []string{"core", "config", "helm", "kiali"},
 	}
 }
 

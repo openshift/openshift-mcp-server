@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	internalKiali "github.com/containers/kubernetes-mcp-server/pkg/kiali"
 	internalk8s "github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
 	"github.com/google/jsonschema-go/jsonschema"
@@ -44,6 +45,7 @@ func NewToolCallResult(content string, err error) *ToolCallResult {
 type ToolHandlerParams struct {
 	context.Context
 	*internalk8s.Kubernetes
+	*internalKiali.Kiali
 	ToolCallRequest
 	ListOutput output.Output
 }

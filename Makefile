@@ -7,7 +7,8 @@ PACKAGE = $(shell go list -m)
 GIT_COMMIT_HASH = $(shell git rev-parse HEAD)
 GIT_VERSION = $(shell git describe --tags --always --dirty)
 BUILD_TIME = $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
-BINARY_NAME = kubernetes-mcp-server
+BINARY_NAME = kiali-mcp-server
+CLIENT_BINARY_NAME = kiali-mcp-client
 LD_FLAGS = -s -w \
 	-X '$(PACKAGE)/pkg/version.CommitHash=$(GIT_COMMIT_HASH)' \
 	-X '$(PACKAGE)/pkg/version.Version=$(GIT_VERSION)' \
@@ -27,7 +28,7 @@ CLEAN_TARGETS :=
 CLEAN_TARGETS += '$(BINARY_NAME)'
 CLEAN_TARGETS += $(foreach os,$(OSES),$(foreach arch,$(ARCHS),$(BINARY_NAME)-$(os)-$(arch)$(if $(findstring windows,$(os)),.exe,)))
 CLEAN_TARGETS += $(foreach os,$(OSES),$(foreach arch,$(ARCHS),./npm/$(BINARY_NAME)-$(os)-$(arch)/bin/))
-CLEAN_TARGETS += ./npm/kubernetes-mcp-server/.npmrc ./npm/kubernetes-mcp-server/LICENSE ./npm/kubernetes-mcp-server/README.md
+CLEAN_TARGETS += ./npm/kiali-mcp-server/.npmrc ./npm/kiali-mcp-server/LICENSE ./npm/kiali-mcp-server/README.md
 CLEAN_TARGETS += $(foreach os,$(OSES),$(foreach arch,$(ARCHS),./npm/$(BINARY_NAME)-$(os)-$(arch)/.npmrc))
 
 # The help will print out all targets with their descriptions organized bellow their categories. The categories are represented by `##@` and the target descriptions by `##`.
@@ -48,13 +49,15 @@ clean: ## Clean up all build artifacts
 
 .PHONY: build
 build: clean tidy format ## Build the project
-	go build $(COMMON_BUILD_ARGS) -o $(BINARY_NAME) ./cmd/kubernetes-mcp-server
+	go build $(COMMON_BUILD_ARGS) -o $(BINARY_NAME) ./cmd/kiali-mcp-server
+	go build $(COMMON_BUILD_ARGS) -o $(CLIENT_BINARY_NAME) ./cmd/kiali-mcp-client
 
 
 .PHONY: build-all-platforms
 build-all-platforms: clean tidy format ## Build the project for all platforms
 	$(foreach os,$(OSES),$(foreach arch,$(ARCHS), \
-		GOOS=$(os) GOARCH=$(arch) go build $(COMMON_BUILD_ARGS) -o $(BINARY_NAME)-$(os)-$(arch)$(if $(findstring windows,$(os)),.exe,) ./cmd/kubernetes-mcp-server; \
+		GOOS=$(os) GOARCH=$(arch) go build $(COMMON_BUILD_ARGS) -o $(BINARY_NAME)-$(os)-$(arch)$(if $(findstring windows,$(os)),.exe,) ./cmd/kiali-mcp-server; \
+		GOOS=$(os) GOARCH=$(arch) go build $(COMMON_BUILD_ARGS) -o $(CLIENT_BINARY_NAME)-$(os)-$(arch)$(if $(findstring windows,$(os)),.exe,) ./cmd/kiali-mcp-client; \
 	))
 
 .PHONY: npm-copy-binaries
@@ -76,11 +79,11 @@ npm-publish: npm-copy-binaries ## Publish the npm packages
 		npm publish; \
 		cd ../..; \
 	))
-	cp README.md LICENSE ./npm/kubernetes-mcp-server/
-	echo '//registry.npmjs.org/:_authToken=$(NPM_TOKEN)' >> ./npm/kubernetes-mcp-server/.npmrc
-	jq '.version = "$(NPM_VERSION)"' ./npm/kubernetes-mcp-server/package.json > tmp.json && mv tmp.json ./npm/kubernetes-mcp-server/package.json; \
-	jq '.optionalDependencies |= with_entries(.value = "$(NPM_VERSION)")' ./npm/kubernetes-mcp-server/package.json > tmp.json && mv tmp.json ./npm/kubernetes-mcp-server/package.json; \
-	cd npm/kubernetes-mcp-server && npm publish
+	cp README.md LICENSE ./npm/kiali-mcp-server/
+	echo '//registry.npmjs.org/:_authToken=$(NPM_TOKEN)' >> ./npm/kiali-mcp-server/.npmrc
+	jq '.version = "$(NPM_VERSION)"' ./npm/kiali-mcp-server/package.json > tmp.json && mv tmp.json ./npm/kiali-mcp-server/package.json; \
+	jq '.optionalDependencies |= with_entries(.value = "$(NPM_VERSION)")' ./npm/kiali-mcp-server/package.json > tmp.json && mv tmp.json ./npm/kiali-mcp-server/package.json; \
+	cd npm/kiali-mcp-server && npm publish
 
 .PHONY: python-publish
 python-publish: ## Publish the python packages

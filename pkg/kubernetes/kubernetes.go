@@ -129,6 +129,28 @@ func (m *Manager) Close() {
 	}
 }
 
+// StaticConfig returns the static server configuration used to build this Kubernetes client.
+func (k *Kubernetes) StaticConfig() *config.StaticConfig {
+	if k == nil || k.manager == nil {
+		return nil
+	}
+	return k.manager.staticConfig
+}
+
+// CurrentAuthorizationHeader returns the Authorization header value that the
+// Kubernetes client is currently configured to use (Bearer <token>), or empty
+// if no bearer token is configured.
+func (k *Kubernetes) CurrentAuthorizationHeader() string {
+	if k == nil || k.manager == nil || k.manager.cfg == nil {
+		return ""
+	}
+	token := strings.TrimSpace(k.manager.cfg.BearerToken)
+	if token == "" {
+		return ""
+	}
+	return "Bearer " + token
+}
+
 func (m *Manager) GetAPIServerHost() string {
 	if m.cfg == nil {
 		return ""
