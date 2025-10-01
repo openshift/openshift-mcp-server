@@ -19,6 +19,7 @@ A powerful and flexible Kubernetes [Model Context Protocol (MCP)](https://blog.m
     - **Top** gets resource usage metrics for all pods or a specific pod in the specified namespace.
     - **Exec** into a pod and run a command.
     - **Run** a container image in a pod and optionally expose it.
+    - **Node debug** run privileged commands directly on cluster nodes via a managed debug pod.
 - **✅ Namespaces**: List Kubernetes Namespaces.
 - **✅ Events**: View Kubernetes events in all namespaces or in a specific namespace.
 - **✅ Projects**: List OpenShift Projects.
@@ -219,6 +220,24 @@ Uninstall a Helm release in the current or provided namespace with the provided 
 List all the Kubernetes namespaces in the current cluster
 
 **Parameters:** None
+
+### `nodes_debug_exec`
+
+Run commands on an OpenShift node by creating a short-lived privileged debug pod that automatically chroots into the host filesystem. Output is limited to the latest 100 log lines, so use filtering (e.g., `grep`, `journalctl --since`, etc.) for high-volume commands.
+
+**Parameters:**
+- `node` (`string`, required)
+    - Name of the node to target (for example `worker-0`)
+- `command` (`string[]`, required)
+    - Command and arguments to run inside the node's host filesystem
+    - Example: `["systemctl", "status", "kubelet"]`
+- `namespace` (`string`, optional)
+    - Namespace used for the temporary debug pod
+    - Defaults to the configured namespace or `default`
+- `image` (`string`, optional)
+    - Override the container image used for the debug pod
+- `timeout_seconds` (`integer`, optional)
+    - Maximum time to wait for the command to finish (defaults to 300 seconds)
 
 ### `pods_delete`
 
