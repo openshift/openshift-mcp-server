@@ -23,7 +23,7 @@ func initValidations() []api.ServerTool {
 				Properties: map[string]*jsonschema.Schema{
 					"namespace": {
 						Type:        "string",
-						Description: "Optional Namespace to retrieve the namespaced resource from (ignored in case of cluster scoped resources). If not provided, will get resource from configured namespace",
+						Description: "Optional Namespace to retrieve the namespaced resources from (ignored in case of cluster scoped resources). If not provided, will list resources from all namespaces",
 					},
 				},
 				Required: []string{},

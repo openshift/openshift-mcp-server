@@ -524,5 +524,25 @@
       ]
     },
     "name": "resources_list"
+  },
+  {
+    "annotations": {
+      "title": "Validations: List",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "description": "List all the validations in the current cluster from all namespaces",
+    "inputSchema": {
+      "type": "object",
+      "properties": {        
+        "namespace": {
+          "description": "Optional Namespace to retrieve the namespaced resources from (ignored in case of cluster scoped resources). If not provided, will list resources from all namespaces",
+          "type": "string"
+        }
+      }
+    },
+    "name": "validations_list"
   }
 ]

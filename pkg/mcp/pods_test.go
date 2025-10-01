@@ -525,7 +525,7 @@ func TestPodsDelete(t *testing.T) {
 		})
 		// Managed Pod
 		managedLabels := map[string]string{
-			"app.kubernetes.io/managed-by": "kubernetes-mcp-server",
+			"app.kubernetes.io/managed-by": "kiali-mcp-server",
 			"app.kubernetes.io/name":       "a-manged-pod-to-delete",
 		}
 		_, _ = kc.CoreV1().Pods("default").Create(c.ctx, &corev1.Pod{
@@ -592,7 +592,7 @@ func TestPodsDeleteDenied(t *testing.T) {
 func TestPodsDeleteInOpenShift(t *testing.T) {
 	testCaseWithContext(t, &mcpContext{before: inOpenShift, after: inOpenShiftClear}, func(c *mcpContext) {
 		managedLabels := map[string]string{
-			"app.kubernetes.io/managed-by": "kubernetes-mcp-server",
+			"app.kubernetes.io/managed-by": "kiali-mcp-server",
 			"app.kubernetes.io/name":       "a-manged-pod-to-delete",
 		}
 		kc := c.newKubernetesClient()
@@ -865,7 +865,7 @@ func TestPodsRun(t *testing.T) {
 			}
 		})
 		t.Run("pods_run with image and nil namespace returns pod with random name", func(t *testing.T) {
-			if !strings.HasPrefix(decodedNilNamespace[0].GetName(), "kubernetes-mcp-server-run-") {
+			if !strings.HasPrefix(decodedNilNamespace[0].GetName(), "kiali-mcp-server-run-") {
 				t.Errorf("invalid pod name, expected random, got %v", decodedNilNamespace[0].GetName())
 				return
 			}
@@ -880,11 +880,11 @@ func TestPodsRun(t *testing.T) {
 				t.Errorf("invalid labels, expected app.kubernetes.io/component, got %v", labels)
 				return
 			}
-			if labels["app.kubernetes.io/managed-by"] != "kubernetes-mcp-server" {
+			if labels["app.kubernetes.io/managed-by"] != "kiali-mcp-server" {
 				t.Errorf("invalid labels, expected app.kubernetes.io/managed-by, got %v", labels)
 				return
 			}
-			if labels["app.kubernetes.io/part-of"] != "kubernetes-mcp-server-run-sandbox" {
+			if labels["app.kubernetes.io/part-of"] != "kiali-mcp-server-run-sandbox" {
 				t.Errorf("invalid labels, expected app.kubernetes.io/part-of, got %v", labels)
 				return
 			}
@@ -953,11 +953,11 @@ func TestPodsRun(t *testing.T) {
 				t.Errorf("invalid service selector, expected app.kubernetes.io/name, got %v", selector)
 				return
 			}
-			if selector["app.kubernetes.io/managed-by"] != "kubernetes-mcp-server" {
+			if selector["app.kubernetes.io/managed-by"] != "kiali-mcp-server" {
 				t.Errorf("invalid service selector, expected app.kubernetes.io/managed-by, got %v", selector)
 				return
 			}
-			if selector["app.kubernetes.io/part-of"] != "kubernetes-mcp-server-run-sandbox" {
+			if selector["app.kubernetes.io/part-of"] != "kiali-mcp-server-run-sandbox" {
 				t.Errorf("invalid service selector, expected app.kubernetes.io/part-of, got %v", selector)
 				return
 			}
