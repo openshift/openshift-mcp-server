@@ -1,5 +1,5 @@
 {
-  "name": "@kiali/kiali-mcp-server-linux-amd64",
+  "name": "kiali-mcp-server-linux-amd64",
   "version": "0.0.0",
   "description": "Model Context Protocol (MCP) server for Kiali",
   "os": [

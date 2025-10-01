@@ -1,5 +1,5 @@
 {
-  "name": "@kiali/kiali-mcp-server",
+  "name": "kiali-mcp-server",
   "version": "0.0.0",
   "description": "Model Context Protocol (MCP) server for Kiali",
   "main": "./bin/index.js",
