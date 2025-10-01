@@ -57,8 +57,15 @@ build: clean tidy format ## Build the project
 build-all-platforms: clean tidy format ## Build the project for all platforms
 	$(foreach os,$(OSES),$(foreach arch,$(ARCHS), \
 		GOOS=$(os) GOARCH=$(arch) go build $(COMMON_BUILD_ARGS) -o $(BINARY_NAME)-$(os)-$(arch)$(if $(findstring windows,$(os)),.exe,) ./cmd/kiali-mcp-server; \
+	))
+
+	
+.PHONY: build-all-platforms-client
+build-all-platforms-client: clean tidy format ## Build the project for all platforms
+	$(foreach os,$(OSES),$(foreach arch,$(ARCHS), \
 		GOOS=$(os) GOARCH=$(arch) go build $(COMMON_BUILD_ARGS) -o $(CLIENT_BINARY_NAME)-$(os)-$(arch)$(if $(findstring windows,$(os)),.exe,) ./cmd/kiali-mcp-client; \
 	))
+	
 
 .PHONY: npm-copy-binaries
 npm-copy-binaries: build-all-platforms ## Copy the binaries to each npm package
