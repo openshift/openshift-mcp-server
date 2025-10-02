@@ -1,7 +1,7 @@
 # Kiali MCP Server
 
 [![GitHub License](https://img.shields.io/github/license/kiali/kiali-mcp-server)](https://github.com/kiali/kiali-mcp-server/blob/main/LICENSE)
-[![npm](https://img.shields.io/npm/v/kubernetes-mcp-server)](https://www.npmjs.com/package/kubernetes-mcp-server)
+[![npm](https://img.shields.io/npm/v/kiali-mcp-server)](https://www.npmjs.com/package/kiali-mcp-server)
 [![PyPI - Version](https://img.shields.io/pypi/v/kiali-mcp-server)](https://pypi.org/project/kiali-mcp-server/)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/kiali/kiali-mcp-server?sort=semver)](https://github.com/kiali/kiali-mcp-server/releases/latest)
 [![Build](https://github.com/kiali/kiali-mcp-server/actions/workflows/build.yaml/badge.svg)](https://github.com/kiali/kiali-mcp-server/actions/workflows/build.yaml)
