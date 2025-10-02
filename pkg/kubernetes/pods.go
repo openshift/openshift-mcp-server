@@ -97,7 +97,7 @@ func (k *Kubernetes) PodsDelete(ctx context.Context, namespace, name string) (st
 }
 
 func (k *Kubernetes) PodsLog(ctx context.Context, namespace, name, container string, previous bool, tail int64) (string, error) {
-	pods, err := k.manager.accessControlClientSet.Pods(k.NamespaceOrDefault(namespace))
+	pods, err := k.podsClient(k.NamespaceOrDefault(namespace))
 	if err != nil {
 		return "", err
 	}

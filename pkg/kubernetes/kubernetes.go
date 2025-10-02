@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	"github.com/fsnotify/fsnotify"
 
@@ -38,7 +39,8 @@ const (
 type CloseWatchKubeConfig func() error
 
 type Kubernetes struct {
-	manager *Manager
+	manager          *Manager
+	podClientFactory func(namespace string) (corev1client.PodInterface, error)
 }
 
 type Manager struct {
@@ -207,6 +209,16 @@ func (m *Manager) Derived(ctx context.Context) (*Kubernetes, error) {
 		return &Kubernetes{manager: m}, nil
 	}
 	return derived, nil
+}
+
+func (k *Kubernetes) podsClient(namespace string) (corev1client.PodInterface, error) {
+	if k.podClientFactory != nil {
+		return k.podClientFactory(namespace)
+	}
+	if k.manager == nil || k.manager.accessControlClientSet == nil {
+		return nil, errors.New("kubernetes manager is not initialized")
+	}
+	return k.manager.accessControlClientSet.Pods(namespace)
 }
 
 func (k *Kubernetes) NewHelm() *helm.Helm {

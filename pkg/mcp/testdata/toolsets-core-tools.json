@@ -35,6 +35,50 @@
   },
   {
     "annotations": {
+      "title": "Nodes: Debug Exec",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "description": "Run commands on an OpenShift node using a privileged debug pod (output is truncated to the most recent 100 lines, so prefer filters like grep when expecting large logs).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "node": {
+          "description": "Name of the node to debug (e.g. worker-0).",
+          "type": "string"
+        },
+        "command": {
+          "description": "Command to execute on the node via chroot. Provide each argument as a separate array item (e.g. ['systemctl', 'status', 'kubelet']).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "namespace": {
+          "description": "Namespace to create the temporary debug pod in (optional, defaults to the current namespace or 'default').",
+          "type": "string"
+        },
+        "image": {
+          "description": "Container image to use for the debug pod (optional). Defaults to a Fedora-based utility image that includes chroot.",
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "description": "Maximum time to wait for the command to complete before timing out (optional, defaults to 300 seconds).",
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "node",
+        "command"
+      ]
+    },
+    "name": "nodes_debug_exec"
+  },
+  {
+    "annotations": {
       "title": "Pods: Delete",
       "readOnlyHint": false,
       "destructiveHint": true,
