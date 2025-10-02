@@ -6,6 +6,8 @@
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/kiali/kiali-mcp-server?sort=semver)](https://github.com/kiali/kiali-mcp-server/releases/latest)
 [![Build](https://github.com/kiali/kiali-mcp-server/actions/workflows/build.yaml/badge.svg)](https://github.com/kiali/kiali-mcp-server/actions/workflows/build.yaml)
 
+https://github.com/user-attachments/assets/d88a3b72-980c-43db-a69a-a19ad564cf49
+
 Kiali MCP Server is a thin extension of the upstream Kubernetes MCP Server. It adds Kiali-specific tooling while keeping the same core behavior and configuration.
 
 - Based on `kubernetes-mcp-server` (native Go MCP server for Kubernetes/OpenShift)
@@ -69,9 +71,9 @@ Kiali MCP Server reuses the same configuration and flags as the upstream Kuberne
 - `--kiali-server-url` string: URL of the Kiali server (e.g. "https://kiali-istio-system.apps-crc.testing/")
 - `--kiali-insecure`: Skip TLS verification when connecting to the Kiali server
 
-*By default, only Kiali tools are exposed. If you want to see all of them, including the Kubernetes ones, use this configuration*
+*By default, Kubernetes and Kiali tools are exposed. If you want to only Kiali use this configuration*
 
-- `--toolsets`:  core,config,helm,kiali
+- `--toolsets`:  kiali
 
 You can run the server via npx, uvx, or the compiled binary. Example using npx:
 
