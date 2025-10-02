@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -25,7 +26,12 @@ func (o *OpenShift) IsOpenShift(ctx context.Context) bool {
 var _ internalk8s.Openshift = (*OpenShift)(nil)
 
 func main() {
-	readme, err := os.ReadFile(os.Args[1])
+	readmePath, err := resolveReadmePath(os.Args[1:])
+	if err != nil {
+		panic(err)
+	}
+
+	readme, err := os.ReadFile(readmePath)
 	if err != nil {
 		panic(err)
 	}
@@ -81,9 +87,38 @@ func main() {
 		toolsetTools.String(),
 	)
 
-	if err := os.WriteFile(os.Args[1], []byte(updated), 0o644); err != nil {
+	if err := os.WriteFile(readmePath, []byte(updated), 0o644); err != nil {
 		panic(err)
 	}
+}
+
+func resolveReadmePath(args []string) (string, error) {
+	var requested string
+	switch len(args) {
+	case 0:
+		requested = "README.md"
+	case 1:
+		requested = args[0]
+	default:
+		return "", fmt.Errorf("Error: Provide at most one README.md argument")
+	}
+
+	cleanPath := filepath.Clean(requested)
+	if cleanPath != "README.md" {
+		return "", fmt.Errorf("Error: This tool can only update the repository root README.md")
+	}
+
+	repoRoot, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("determine working directory: %w", err)
+	}
+
+	absoluteRepoRoot, err := filepath.Abs(repoRoot)
+	if err != nil {
+		return "", fmt.Errorf("resolve working directory: %w", err)
+	}
+
+	return filepath.Join(absoluteRepoRoot, "README.md"), nil
 }
 
 func replaceBetweenMarkers(content, startMarker, endMarker, replacement string) string {
