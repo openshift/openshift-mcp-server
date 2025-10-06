@@ -58,7 +58,7 @@ type StaticConfig struct {
 func Default() *StaticConfig {
 	return &StaticConfig{
 		ListOutput: "table",
-        Toolsets:   []string{"core", "config", "helm", "kiali"},
+		Toolsets:   []string{"core", "config", "helm", "kiali"},
 	}
 }
 

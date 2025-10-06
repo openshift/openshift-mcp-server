@@ -3,6 +3,8 @@ package cmd
 import (
 	"bytes"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -86,7 +88,7 @@ func TestConfig(t *testing.T) {
 		rootCmd := NewMCPServer(ioStreams)
 		_, file, _, _ := runtime.Caller(0)
 		validConfigPath := filepath.Join(filepath.Dir(file), "testdata", "valid-config.toml")
-		rootCmd.SetArgs([]string{"--version", "--config", validConfigPath})
+		rootCmd.SetArgs([]string{"--version", "--config", validConfigPath, "--toolsets", "core,config,helm"})
 		_ = rootCmd.Execute()
 		expectedConfig := `(?m)\" - Config\:[^\"]+valid-config\.toml\"`
 		if m, err := regexp.MatchString(expectedConfig, out.String()); !m || err != nil {
@@ -110,7 +112,7 @@ func TestConfig(t *testing.T) {
 		rootCmd := NewMCPServer(ioStreams)
 		_, file, _, _ := runtime.Caller(0)
 		validConfigPath := filepath.Join(filepath.Dir(file), "testdata", "valid-config.toml")
-		rootCmd.SetArgs([]string{"--version", "--list-output=table", "--disable-destructive=false", "--read-only=false", "--config", validConfigPath})
+		rootCmd.SetArgs([]string{"--version", "--list-output=table", "--disable-destructive=false", "--read-only=false", "--config", validConfigPath, "--toolsets", "core,config,helm"})
 		_ = rootCmd.Execute()
 		expected := `(?m)\" - Config\:[^\"]+valid-config\.toml\"`
 		if m, err := regexp.MatchString(expected, out.String()); !m || err != nil {
@@ -275,4 +277,45 @@ func TestStdioLogging(t *testing.T) {
 		require.NoErrorf(t, err, "Expected no error executing command, got %v", err)
 		assert.Containsf(t, out.String(), "Starting kiali-mcp-server", "Expected klog output, got %s", out.String())
 	})
+}
+
+func TestKialiURLReachability_HTTP(t *testing.T) {
+	ioStreams, out := testStream()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	rootCmd := NewMCPServer(ioStreams)
+	rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=0", "--toolsets", "kiali", "--kiali-server-url", srv.URL})
+	err := rootCmd.Execute()
+	require.NoErrorf(t, err, "Expected no error executing command, got %v", err)
+	assert.Containsf(t, out.String(), "Kiali URL reachable (http): HTTP 200", "Expected HTTP reachability log, got %s", out.String())
+}
+
+func TestKialiURLReachability_TLSFallbackToInsecure(t *testing.T) {
+	ioStreams, out := testStream()
+	tlsSrv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer tlsSrv.Close()
+
+	rootCmd := NewMCPServer(ioStreams)
+	rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=0", "--toolsets", "kiali", "--kiali-server-url", tlsSrv.URL})
+	err := rootCmd.Execute()
+	require.NoErrorf(t, err, "Expected no error executing command, got %v", err)
+	// Expect a notice about proceeding with insecure and a success log
+	assert.Containsf(t, out.String(), "Proceeding with insecure TLS (kiali_insecure=true)", "Expected insecure notice, got %s", out.String())
+	assert.Regexpf(t, regexp.MustCompile(`Kiali URL reachable \(https, insecure\): HTTP 200`), out.String(), "Expected HTTPS insecure reachability log, got %s", out.String())
+}
+
+func TestKialiURLMissingErrors(t *testing.T) {
+	ioStreams, _ := testStream()
+	rootCmd := NewMCPServer(ioStreams)
+	rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=0", "--toolsets", "kiali", "--kubeconfig", "this-file-should-not-exist"})
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Fatal("Expected error when kiali toolset enabled without kiali_server_url, got nil")
+	}
+	assert.Contains(t, err.Error(), "kiali_server_url must be set when 'kiali' toolset is enabled and auto-discovery failed")
 }
