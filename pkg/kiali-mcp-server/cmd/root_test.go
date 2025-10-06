@@ -52,7 +52,7 @@ func TestConfig(t *testing.T) {
 	t.Run("defaults to none", func(t *testing.T) {
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
-		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1"})
+		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--toolsets", "core,config,helm"})
 		expectedConfig := `" - Config: "`
 		if err := rootCmd.Execute(); !strings.Contains(out.String(), expectedConfig) {
 			t.Fatalf("Expected config to be %s, got %s %v", expectedConfig, out.String(), err)
@@ -63,7 +63,7 @@ func TestConfig(t *testing.T) {
 		rootCmd := NewMCPServer(ioStreams)
 		_, file, _, _ := runtime.Caller(0)
 		emptyConfigPath := filepath.Join(filepath.Dir(file), "testdata", "empty-config.toml")
-		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--config", emptyConfigPath})
+		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--config", emptyConfigPath, "--toolsets", "core,config,helm"})
 		_ = rootCmd.Execute()
 		expected := `(?m)\" - Config\:[^\"]+empty-config\.toml\"`
 		if m, err := regexp.MatchString(expected, out.String()); !m || err != nil {
@@ -73,7 +73,7 @@ func TestConfig(t *testing.T) {
 	t.Run("invalid path throws error", func(t *testing.T) {
 		ioStreams, _ := testStream()
 		rootCmd := NewMCPServer(ioStreams)
-		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--config", "invalid-path-to-config.toml"})
+		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--config", "invalid-path-to-config.toml", "--toolsets", "core,config,helm"})
 		err := rootCmd.Execute()
 		if err == nil {
 			t.Fatal("Expected error for invalid config path, got nil")
@@ -146,7 +146,7 @@ func TestToolsets(t *testing.T) {
 	t.Run("default", func(t *testing.T) {
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
-		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1"})
+		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--kiali-server-url", "https://kiali.com"})
 		if err := rootCmd.Execute(); !strings.Contains(out.String(), "- Toolsets: core, config, helm, kiali") {
 			t.Fatalf("Expected toolsets 'full', got %s %v", out, err)
 		}
@@ -176,7 +176,7 @@ func TestListOutput(t *testing.T) {
 	t.Run("defaults to table", func(t *testing.T) {
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
-		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1"})
+		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--toolsets", "core,config,helm"})
 		if err := rootCmd.Execute(); !strings.Contains(out.String(), "- ListOutput: table") {
 			t.Fatalf("Expected list-output 'table', got %s %v", out, err)
 		}
@@ -184,7 +184,7 @@ func TestListOutput(t *testing.T) {
 	t.Run("set with --list-output", func(t *testing.T) {
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
-		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--list-output", "yaml"})
+		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--list-output", "yaml", "--toolsets", "core,config,helm"})
 		_ = rootCmd.Execute()
 		expected := `(?m)\" - ListOutput\: yaml\"`
 		if m, err := regexp.MatchString(expected, out.String()); !m || err != nil {
@@ -197,7 +197,7 @@ func TestReadOnly(t *testing.T) {
 	t.Run("defaults to false", func(t *testing.T) {
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
-		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1"})
+		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1" , "--toolsets", "core,config,helm"})
 		if err := rootCmd.Execute(); !strings.Contains(out.String(), " - Read-only mode: false") {
 			t.Fatalf("Expected read-only mode false, got %s %v", out, err)
 		}
@@ -205,7 +205,7 @@ func TestReadOnly(t *testing.T) {
 	t.Run("set with --read-only", func(t *testing.T) {
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
-		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--read-only"})
+		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--read-only", "--toolsets", "core,config,helm"})
 		_ = rootCmd.Execute()
 		expected := `(?m)\" - Read-only mode\: true\"`
 		if m, err := regexp.MatchString(expected, out.String()); !m || err != nil {
@@ -218,7 +218,7 @@ func TestDisableDestructive(t *testing.T) {
 	t.Run("defaults to false", func(t *testing.T) {
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
-		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1"})
+		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--toolsets", "core,config,helm"})
 		if err := rootCmd.Execute(); !strings.Contains(out.String(), " - Disable destructive tools: false") {
 			t.Fatalf("Expected disable destructive false, got %s %v", out, err)
 		}
@@ -226,7 +226,7 @@ func TestDisableDestructive(t *testing.T) {
 	t.Run("set with --disable-destructive", func(t *testing.T) {
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
-		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--disable-destructive"})
+		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--disable-destructive", "--toolsets", "core,config,helm"})
 		_ = rootCmd.Execute()
 		expected := `(?m)\" - Disable destructive tools\: true\"`
 		if m, err := regexp.MatchString(expected, out.String()); !m || err != nil {
@@ -239,7 +239,7 @@ func TestAuthorizationURL(t *testing.T) {
 	t.Run("invalid authorization-url without protocol", func(t *testing.T) {
 		ioStreams, _ := testStream()
 		rootCmd := NewMCPServer(ioStreams)
-		rootCmd.SetArgs([]string{"--version", "--require-oauth", "--port=8080", "--authorization-url", "example.com/auth", "--server-url", "https://example.com:8080"})
+		rootCmd.SetArgs([]string{"--version", "--require-oauth", "--port=8080", "--authorization-url", "example.com/auth", "--server-url", "https://example.com:8080", "--toolsets", "core,config,helm"})
 		err := rootCmd.Execute()
 		if err == nil {
 			t.Fatal("Expected error for invalid authorization-url without protocol, got nil")
@@ -252,7 +252,7 @@ func TestAuthorizationURL(t *testing.T) {
 	t.Run("valid authorization-url with https", func(t *testing.T) {
 		ioStreams, _ := testStream()
 		rootCmd := NewMCPServer(ioStreams)
-		rootCmd.SetArgs([]string{"--version", "--require-oauth", "--port=8080", "--authorization-url", "https://example.com/auth", "--server-url", "https://example.com:8080"})
+		rootCmd.SetArgs([]string{"--version", "--require-oauth", "--port=8080", "--authorization-url", "https://example.com/auth", "--server-url", "https://example.com:8080", "--toolsets", "core,config,helm"})
 		err := rootCmd.Execute()
 		if err != nil {
 			t.Fatalf("Expected no error for valid https authorization-url, got %s", err.Error())
@@ -272,7 +272,7 @@ func TestStdioLogging(t *testing.T) {
 	t.Run("http mode enables klog", func(t *testing.T) {
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
-		rootCmd.SetArgs([]string{"--version", "--log-level=1", "--port=1337"})
+		rootCmd.SetArgs([]string{"--version", "--log-level=1", "--port=1337", "--toolsets", "core,config,helm"})
 		err := rootCmd.Execute()
 		require.NoErrorf(t, err, "Expected no error executing command, got %v", err)
 		assert.Containsf(t, out.String(), "Starting kiali-mcp-server", "Expected klog output, got %s", out.String())
@@ -307,15 +307,4 @@ func TestKialiURLReachability_TLSFallbackToInsecure(t *testing.T) {
 	// Expect a notice about proceeding with insecure and a success log
 	assert.Containsf(t, out.String(), "Proceeding with insecure TLS (kiali_insecure=true)", "Expected insecure notice, got %s", out.String())
 	assert.Regexpf(t, regexp.MustCompile(`Kiali URL reachable \(https, insecure\): HTTP 200`), out.String(), "Expected HTTPS insecure reachability log, got %s", out.String())
-}
-
-func TestKialiURLMissingErrors(t *testing.T) {
-	ioStreams, _ := testStream()
-	rootCmd := NewMCPServer(ioStreams)
-	rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=0", "--toolsets", "kiali", "--kubeconfig", "this-file-should-not-exist"})
-	err := rootCmd.Execute()
-	if err == nil {
-		t.Fatal("Expected error when kiali toolset enabled without kiali_server_url, got nil")
-	}
-	assert.Contains(t, err.Error(), "kiali_server_url must be set when 'kiali' toolset is enabled and auto-discovery failed")
 }

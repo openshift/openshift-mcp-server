@@ -260,71 +260,74 @@ func (m *MCPServerOptions) Validate() error {
 		}
 	}
 
-	// If kiali toolset is enabled, require kiali_server_url to be set
-	hasKiali := false
-	for _, ts := range m.StaticConfig.Toolsets {
-		if strings.TrimSpace(ts) == "kiali" {
-			hasKiali = true
-			break
-		}
-	}
-	if hasKiali && strings.TrimSpace(m.StaticConfig.KialiServerURL) == "" {
-		// Try to discover the Kiali URL before starting the server
-		// Build a temporary Kubernetes manager from current static config
-		k8sMgr, err := internalk8s.NewManager(m.StaticConfig)
-		if err == nil && k8sMgr.IsOpenShift(context.Background()) {
-			if url, dErr := k8sMgr.DiscoverRouteURLForService(context.Background(), "istio-system", "kiali"); dErr == nil && strings.TrimSpace(url) != "" {
-				klog.V(0).Infof("auto-discovered Kiali URL: %s", url)
-				m.StaticConfig.KialiServerURL = url
-			} else if dErr != nil {
-				klog.V(3).Infof("auto-discovery of Kiali URL failed: %v", dErr)
+	// Only enforce Kiali URL logic when running the HTTP/SSE server (port mode)
+	if m.StaticConfig.Port != "" {
+		// If kiali toolset is enabled, require kiali_server_url to be set
+		hasKiali := false
+		for _, ts := range m.StaticConfig.Toolsets {
+			if strings.TrimSpace(ts) == "kiali" {
+				hasKiali = true
+				break
 			}
 		}
-		if strings.TrimSpace(m.StaticConfig.KialiServerURL) == "" {
-			return fmt.Errorf("kiali_server_url must be set when 'kiali' toolset is enabled and auto-discovery failed")
-		}
-	} else {
-		klog.V(0).Infof("Kiali URL defined: %s", m.StaticConfig.KialiServerURL)
-	}
-
-	// Validate reachability of KialiServerURL (configured or discovered)
-	if hasKiali && strings.TrimSpace(m.StaticConfig.KialiServerURL) != "" {
-		u, err := url.Parse(m.StaticConfig.KialiServerURL)
-		if err != nil {
-			return fmt.Errorf("invalid kiali_server_url: %w", err)
-		}
-		transport := &http.Transport{}
-		if m.StaticConfig.KialiInsecure {
-			transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // allowed via configuration
-		}
-		client := &http.Client{Transport: transport, Timeout: 10 * time.Second}
-		req, rErr := http.NewRequestWithContext(context.Background(), http.MethodGet, strings.TrimRight(m.StaticConfig.KialiServerURL, "/"), nil)
-		if rErr != nil {
-			return fmt.Errorf("failed to create request to kiali_server_url: %w", rErr)
-		}
-		resp, hErr := client.Do(req)
-		if hErr != nil {
-			var unknownAuthErr x509.UnknownAuthorityError
-			var hostnameErr x509.HostnameError
-			var certInvalidErr x509.CertificateInvalidError
-			if u.Scheme == "https" && !m.StaticConfig.KialiInsecure && (errors.As(hErr, &unknownAuthErr) || errors.As(hErr, &hostnameErr) || errors.As(hErr, &certInvalidErr)) {
-				// Auto-enable insecure for self-signed/untrusted certs and retry once
-				klog.V(0).Infof("TLS verification failed for Kiali at %s: %v. Proceeding with insecure TLS (kiali_insecure=true)", m.StaticConfig.KialiServerURL, hErr)
-				m.StaticConfig.KialiInsecure = true
-				transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // allowed via configuration
-				client.Transport = transport
-				resp2, hErr2 := client.Do(req)
-				if hErr2 != nil {
-					return fmt.Errorf("failed to reach Kiali at %s even with insecure TLS: %v", m.StaticConfig.KialiServerURL, hErr2)
+		if hasKiali && strings.TrimSpace(m.StaticConfig.KialiServerURL) == "" {
+			// Try to discover the Kiali URL before starting the server
+			// Build a temporary Kubernetes manager from current static config
+			k8sMgr, err := internalk8s.NewManager(m.StaticConfig)
+			if err == nil && k8sMgr.IsOpenShift(context.Background()) {
+				if url, dErr := k8sMgr.DiscoverRouteURLForService(context.Background(), "istio-system", "kiali"); dErr == nil && strings.TrimSpace(url) != "" {
+					klog.V(0).Infof("auto-discovered Kiali URL: %s", url)
+					m.StaticConfig.KialiServerURL = url
+				} else if dErr != nil {
+					klog.V(3).Infof("auto-discovery of Kiali URL failed: %v", dErr)
 				}
-				_ = resp2.Body.Close()
-				klog.V(0).Infof("Kiali URL reachable (https, insecure): HTTP %d", resp2.StatusCode)
-				return nil
 			}
-			return fmt.Errorf("failed to reach Kiali at %s: %v", m.StaticConfig.KialiServerURL, hErr)
+			if strings.TrimSpace(m.StaticConfig.KialiServerURL) == "" {
+				return fmt.Errorf("kiali_server_url must be set when 'kiali' toolset is enabled and auto-discovery failed")
+			}
+		} else if hasKiali {
+			klog.V(0).Infof("Kiali URL defined: %s", m.StaticConfig.KialiServerURL)
 		}
-		_ = resp.Body.Close()
-		klog.V(0).Infof("Kiali URL reachable (%s): HTTP %d", u.Scheme, resp.StatusCode)
+
+		// Validate reachability of KialiServerURL (configured or discovered)
+		if hasKiali && strings.TrimSpace(m.StaticConfig.KialiServerURL) != "" {
+			u, err := url.Parse(m.StaticConfig.KialiServerURL)
+			if err != nil {
+				return fmt.Errorf("invalid kiali_server_url: %w", err)
+			}
+			transport := &http.Transport{}
+			if m.StaticConfig.KialiInsecure {
+				transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // allowed via configuration
+			}
+			client := &http.Client{Transport: transport, Timeout: 10 * time.Second}
+			req, rErr := http.NewRequestWithContext(context.Background(), http.MethodGet, strings.TrimRight(m.StaticConfig.KialiServerURL, "/"), nil)
+			if rErr != nil {
+				return fmt.Errorf("failed to create request to kiali_server_url: %w", rErr)
+			}
+			resp, hErr := client.Do(req)
+			if hErr != nil {
+				var unknownAuthErr x509.UnknownAuthorityError
+				var hostnameErr x509.HostnameError
+				var certInvalidErr x509.CertificateInvalidError
+				if u.Scheme == "https" && !m.StaticConfig.KialiInsecure && (errors.As(hErr, &unknownAuthErr) || errors.As(hErr, &hostnameErr) || errors.As(hErr, &certInvalidErr)) {
+					// Auto-enable insecure for self-signed/untrusted certs and retry once
+					klog.V(0).Infof("TLS verification failed for Kiali at %s: %v. Proceeding with insecure TLS (kiali_insecure=true)", m.StaticConfig.KialiServerURL, hErr)
+					m.StaticConfig.KialiInsecure = true
+					transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // allowed via configuration
+					client.Transport = transport
+					resp2, hErr2 := client.Do(req)
+					if hErr2 != nil {
+						return fmt.Errorf("failed to reach Kiali at %s even with insecure TLS: %v", m.StaticConfig.KialiServerURL, hErr2)
+					}
+					_ = resp2.Body.Close()
+					klog.V(0).Infof("Kiali URL reachable (https, insecure): HTTP %d", resp2.StatusCode)
+					return nil
+				}
+				return fmt.Errorf("failed to reach Kiali at %s: %v", m.StaticConfig.KialiServerURL, hErr)
+			}
+			_ = resp.Body.Close()
+			klog.V(0).Infof("Kiali URL reachable (%s): HTTP %d", u.Scheme, resp.StatusCode)
+		}
 	}
 	return nil
 }
