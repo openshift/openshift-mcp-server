@@ -219,7 +219,7 @@ func (c *mcpContext) withKubeConfig(rc *rest.Config) *clientcmdapi.Config {
 	_ = clientcmd.WriteToFile(*fakeConfig, kubeConfig)
 	_ = os.Setenv("KUBECONFIG", kubeConfig)
 	if c.mcpServer != nil {
-		if err := c.mcpServer.reloadKubernetesClient(); err != nil {
+		if err := c.mcpServer.reloadKubernetesClusterProvider(); err != nil {
 			panic(err)
 		}
 	}
@@ -436,7 +436,7 @@ func (s *BaseMcpSuite) SetupTest() {
 
 func (s *BaseMcpSuite) TearDownTest() {
 	if s.McpClient != nil {
-		s.McpClient.Close()
+		s.Close()
 	}
 	if s.mcpServer != nil {
 		s.mcpServer.Close()
