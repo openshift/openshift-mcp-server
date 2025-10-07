@@ -234,6 +234,50 @@
   },
   {
     "annotations": {
+      "title": "Nodes: Debug Exec",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "description": "Run commands on an OpenShift node using a privileged debug pod with comprehensive troubleshooting utilities. The debug pod uses the UBI9 toolbox image which includes: systemd tools (systemctl, journalctl), networking tools (ss, ip, ping, traceroute, nmap), process tools (ps, top, lsof, strace), file system tools (find, tar, rsync), and debugging tools (gdb). The host filesystem is mounted at /host, allowing commands to chroot /host if needed to access node-level resources. Output is truncated to the most recent 100 lines, so prefer filters like grep when expecting large logs.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "node": {
+          "description": "Name of the node to debug (e.g. worker-0).",
+          "type": "string"
+        },
+        "command": {
+          "description": "Command to execute on the node. All standard debugging utilities from the UBI9 toolbox are available. The host filesystem is mounted at /host - use 'chroot /host <command>' to access node-level resources, or run commands directly in the toolbox environment. Provide each argument as a separate array item (e.g. ['chroot', '/host', 'systemctl', 'status', 'kubelet'] or ['journalctl', '-u', 'kubelet', '--since', '1 hour ago']).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "namespace": {
+          "description": "Namespace to create the temporary debug pod in (optional, defaults to the current namespace or 'default').",
+          "type": "string"
+        },
+        "image": {
+          "description": "Container image to use for the debug pod (optional). Defaults to registry.access.redhat.com/ubi9/toolbox:latest which provides comprehensive debugging and troubleshooting utilities.",
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "description": "Maximum time to wait for the command to complete before timing out (optional, defaults to 60 seconds).",
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "node",
+        "command"
+      ]
+    },
+    "name": "nodes_debug_exec"
+  },
+  {
+    "annotations": {
       "title": "Node: Log",
       "readOnlyHint": true,
       "destructiveHint": false,
@@ -256,7 +300,7 @@
           "type": "string"
         },
         "query": {
-          "description": "query specifies services(s) or files from which to return logs (required). Example: \"kubelet\" to fetch kubelet logs, \"/\u003clog-file-name\u003e\" to fetch a specific log file from the node (e.g., \"/var/log/kubelet.log\" or \"/var/log/kube-proxy.log\")",
+          "description": "query specifies services(s) or files from which to return logs (required). Example: \"kubelet\" to fetch kubelet logs, \"/<log-file-name>\" to fetch a specific log file from the node (e.g., \"/var/log/kubelet.log\" or \"/var/log/kube-proxy.log\")",
           "type": "string"
         },
         "tailLines": {

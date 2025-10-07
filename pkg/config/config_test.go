@@ -248,7 +248,7 @@ func (s *ConfigSuite) TestReadConfigValidPreservesDefaultsForMissingFields() {
 	})
 	s.Run("toolsets defaulted correctly", func() {
 		s.Require().Lenf(config.Toolsets, 4, "Expected 4 toolsets, got %d", len(config.Toolsets))
-		for _, toolset := range []string{"core", "config", "helm", "observability"} {
+		for _, toolset := range []string{"core", "config", "helm", "observability", "openshift-core"} {
 			s.Containsf(config.Toolsets, toolset, "Expected toolsets to contain %s", toolset)
 		}
 	})
