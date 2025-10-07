@@ -1,5 +1,7 @@
 reviewers:
   - ardaguclu
+  - Cali0707
+  - matzew
 approvers:
   - ardaguclu
 component: "openshift-mcp-server"
