@@ -41,6 +41,30 @@
   },
   {
     "annotations": {
+      "title": "Graph: Mesh status",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "description": "Check the status of my mesh by querying Kiali graph",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "description": "Optional single namespace to include in the graph (alternative to namespaces)",
+          "type": "string"
+        },
+        "namespaces": {
+          "description": "Optional comma-separated list of namespaces to include in the graph",
+          "type": "string"
+        }
+      }
+    },
+    "name": "graph"
+  },
+  {
+    "annotations": {
       "title": "Helm: Install",
       "readOnlyHint": false,
       "destructiveHint": false,
@@ -552,7 +576,11 @@
       "type": "object",
       "properties": {        
         "namespace": {
-          "description": "Optional Namespace to retrieve the namespaced resources from (ignored in case of cluster scoped resources). If not provided, will list resources from all namespaces",
+          "description": "Optional single namespace to retrieve validations from (alternative to namespaces)",
+          "type": "string"
+        },
+        "namespaces": {
+          "description": "Optional comma-separated list of namespaces to retrieve validations from",
           "type": "string"
         }
       }

@@ -12,39 +12,39 @@ import (
 	internalk8s "github.com/kiali/kiali-mcp-server/pkg/kubernetes"
 )
 
-func initValidations() []api.ServerTool {
+func initGraph() []api.ServerTool {
 	ret := make([]api.ServerTool, 0)
 	ret = append(ret, api.ServerTool{
 		Tool: api.Tool{
-			Name:        "validations_list",
-			Description: "List all the validations in the current cluster from all namespaces",
+			Name:        "graph",
+			Description: "Check the status of my mesh by querying Kiali graph",
 			InputSchema: &jsonschema.Schema{
 				Type: "object",
 				Properties: map[string]*jsonschema.Schema{
 					"namespace": {
 						Type:        "string",
-						Description: "Optional single namespace to retrieve validations from (alternative to namespaces)",
+						Description: "Optional single namespace to include in the graph (alternative to namespaces)",
 					},
 					"namespaces": {
 						Type:        "string",
-						Description: "Optional comma-separated list of namespaces to retrieve validations from",
+						Description: "Optional comma-separated list of namespaces to include in the graph",
 					},
 				},
 				Required: []string{},
 			},
 			Annotations: api.ToolAnnotations{
-				Title:           "Validations: List",
+				Title:           "Graph: Mesh status",
 				ReadOnlyHint:    ptr.To(true),
 				DestructiveHint: ptr.To(false),
 				IdempotentHint:  ptr.To(false),
 				OpenWorldHint:   ptr.To(true),
 			},
-		}, Handler: validationsList,
+		}, Handler: graphHandler,
 	})
 	return ret
 }
 
-func validationsList(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
+func graphHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	// Extract the Authorization header from context
 	authHeader, _ := params.Context.Value(internalk8s.OAuthAuthorizationHeader).(string)
 	if strings.TrimSpace(authHeader) == "" {
@@ -90,9 +90,9 @@ func validationsList(params api.ToolHandlerParams) (*api.ToolCallResult, error) 
 		namespaces = unique
 	}
 
-	content, err := kialiClient.ValidationsList(params.Context, authHeader, namespaces)
+	content, err := kialiClient.MeshGraph(params.Context, authHeader, namespaces)
 	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to list validations: %v", err)), nil
+		return api.NewToolCallResult("", fmt.Errorf("failed to retrieve mesh graph: %v", err)), nil
 	}
 	return api.NewToolCallResult(content, nil), nil
 }
