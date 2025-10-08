@@ -92,6 +92,7 @@ func main() {
 		// Filter known Kiali tools
 		kialiSet := map[string]struct{}{
 			"validations_list": {},
+			"graph":            {},
 		}
 		infos := make([]output.ToolInfo, 0)
 		for _, t := range toolsRes.Tools {
@@ -112,6 +113,10 @@ func main() {
 	args := map[string]any{}
 	switch toolName {
 	case "validations_list":
+		if strings.TrimSpace(namespace) != "" {
+			args["namespace"] = namespace
+		}
+	case "graph":
 		if strings.TrimSpace(namespace) != "" {
 			args["namespace"] = namespace
 		}

@@ -197,7 +197,7 @@ func TestReadOnly(t *testing.T) {
 	t.Run("defaults to false", func(t *testing.T) {
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
-		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1" , "--toolsets", "core,config,helm"})
+		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--toolsets", "core,config,helm"})
 		if err := rootCmd.Execute(); !strings.Contains(out.String(), " - Read-only mode: false") {
 			t.Fatalf("Expected read-only mode false, got %s %v", out, err)
 		}

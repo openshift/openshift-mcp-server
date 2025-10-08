@@ -105,12 +105,10 @@ The following sets of tools are available (only Kiali by default):
 
 <!-- AVAILABLE-TOOLSETS-START -->
 
-| Toolset | Description                                                                         |
-|---------|-------------------------------------------------------------------------------------|
-| config  | View and manage the current local Kubernetes configuration (kubeconfig)             |
-| core    | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.) |
-| helm    | Tools for managing Helm charts and releases                                         |
-| kiali   | View and manage resources in your Mesh                                              |
+| Toolset | Description                          |
+|---------|--------------------------------------|
+| kiali   | Most common tools for managing Kiali |
+
 <!-- AVAILABLE-TOOLSETS-END -->
 
 ### Tools
@@ -121,11 +119,18 @@ The following sets of tools are available (only Kiali by default):
 
 <summary>kiali</summary>
 
-- **valdiation_list** - List all the validations in the current cluster from all namespaces
-  - `namespace` (`string`) - Optional Namespace to retrieve the namespaced resources from (ignored in case of cluster scoped resources). If not provided, will list resources from all namespaces
+- **validations_list** - List all the validations in the current cluster from all namespaces
+  - `namespace` (`string`) - Optional single namespace to retrieve validations from (alternative to namespaces)
+  - `namespaces` (`string`) - Optional comma-separated list of namespaces to retrieve validations from
+
+- **graph** - Check the status of my mesh by querying Kiali graph
+  - `namespace` (`string`) - Optional single namespace to include in the graph (alternative to namespaces)
+  - `namespaces` (`string`) - Optional comma-separated list of namespaces to include in the graph
 
 </details>
 
+
+<!-- AVAILABLE-TOOLSETS-TOOLS-END -->
 ## 🎥 Demos <a id="demos"></a>
 
 In this video, we explore how the Mesh Control Plane (MCP) in Kubernetes/OpenShift works together with Kiali to validate Istio configuration objects directly in your editor (_Cursor_).

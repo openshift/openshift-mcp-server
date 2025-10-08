@@ -33,8 +33,8 @@ func NewFromConfig(cfg *config.StaticConfig) *Kiali {
 
 // ValidationsList calls the Kiali validations API using the provided Authorization header value.
 // The authHeader must be the full header value (for example: "Bearer <token>").
-// Namespace and allNamespaces are currently ignored as the endpoint aggregates cluster validations.
-func (k *Kiali) ValidationsList(ctx context.Context, authHeader string, namespace string, allNamespaces bool) (string, error) {
+// `namespaces` may contain zero, one or many namespaces. If empty, returns validations from all namespaces.
+func (k *Kiali) ValidationsList(ctx context.Context, authHeader string, namespaces []string) (string, error) {
 	if k == nil || k.manager == nil || k.manager.staticConfig == nil {
 		return "", fmt.Errorf("kiali client not initialized")
 	}
@@ -43,16 +43,102 @@ func (k *Kiali) ValidationsList(ctx context.Context, authHeader string, namespac
 		return "", fmt.Errorf("kiali server URL not configured")
 	}
 	endpoint := strings.TrimRight(baseURL, "/") + "/api/istio/validations"
-	if !allNamespaces && strings.TrimSpace(namespace) != "" {
+
+	// Add namespaces query parameter if any provided
+	cleaned := make([]string, 0, len(namespaces))
+	for _, ns := range namespaces {
+		ns = strings.TrimSpace(ns)
+		if ns != "" {
+			cleaned = append(cleaned, ns)
+		}
+	}
+	if len(cleaned) > 0 {
 		u, err := url.Parse(endpoint)
 		if err != nil {
 			return "", err
 		}
 		q := u.Query()
-		q.Set("namespaces", strings.TrimSpace(namespace))
+		q.Set("namespaces", strings.Join(cleaned, ","))
 		u.RawQuery = q.Encode()
 		endpoint = u.String()
 	}
+
+	klog.V(0).Infof("kiali API call: %s", endpoint)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return "", err
+	}
+	if authHeader != "" {
+		req.Header.Set("Authorization", authHeader)
+	} else if k.manager.staticConfig.RequireOAuth {
+		return "", fmt.Errorf("authorization token required for Kiali call")
+	}
+
+	// Configure HTTP client, honoring insecure TLS if requested
+	transport := &http.Transport{}
+	if k.manager.staticConfig.KialiInsecure {
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // allowed via configuration
+	}
+	client := &http.Client{Transport: transport, Timeout: 30 * time.Second}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if len(body) > 0 {
+			return "", fmt.Errorf("kiali API error: %s", strings.TrimSpace(string(body)))
+		}
+		return "", fmt.Errorf("kiali API error: status %d", resp.StatusCode)
+	}
+	return string(body), nil
+}
+
+// MeshGraph calls the Kiali graph API using the provided Authorization header value.
+// `namespaces` may contain zero, one or many namespaces. If empty, the API may return an empty graph
+// or the server default, depending on Kiali configuration.
+func (k *Kiali) MeshGraph(ctx context.Context, authHeader string, namespaces []string) (string, error) {
+	if k == nil || k.manager == nil || k.manager.staticConfig == nil {
+		return "", fmt.Errorf("kiali client not initialized")
+	}
+	baseURL := strings.TrimSpace(k.manager.staticConfig.KialiServerURL)
+	if baseURL == "" {
+		return "", fmt.Errorf("kiali server URL not configured")
+	}
+	endpoint := strings.TrimRight(baseURL, "/") + "/api/namespaces/graph"
+
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", err
+	}
+	q := u.Query()
+	// Static graph parameters per requirements
+	q.Set("duration", "60s")
+	q.Set("graphType", "versionedApp")
+	q.Set("includeIdleEdges", "false")
+	q.Set("injectServiceNodes", "true")
+	q.Set("boxBy", "cluster,namespace,app")
+	q.Set("ambientTraffic", "none")
+	q.Set("appenders", "deadNode,istio,serviceEntry,meshCheck,workloadEntry,health")
+	q.Set("rateGrpc", "requests")
+	q.Set("rateHttp", "requests")
+	q.Set("rateTcp", "sent")
+	// Optional namespaces param
+	cleaned := make([]string, 0, len(namespaces))
+	for _, ns := range namespaces {
+		ns = strings.TrimSpace(ns)
+		if ns != "" {
+			cleaned = append(cleaned, ns)
+		}
+	}
+	if len(cleaned) > 0 {
+		q.Set("namespaces", strings.Join(cleaned, ","))
+	}
+	u.RawQuery = q.Encode()
+	endpoint = u.String()
+
 	klog.V(0).Infof("kiali API call: %s", endpoint)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
