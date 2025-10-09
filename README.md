@@ -6,33 +6,74 @@
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/kiali/kiali-mcp-server?sort=semver)](https://github.com/kiali/kiali-mcp-server/releases/latest)
 [![Build](https://github.com/kiali/kiali-mcp-server/actions/workflows/build.yaml/badge.svg)](https://github.com/kiali/kiali-mcp-server/actions/workflows/build.yaml)
 
-https://github.com/user-attachments/assets/d88a3b72-980c-43db-a69a-a19ad564cf49
+https://github.com/user-attachments/assets/0a7c1e08-2044-4426-92d6-89cbf6084ca1
 
-Kiali MCP Server is a thin extension of the upstream Kubernetes MCP Server. It adds Kiali-specific tooling while keeping the same core behavior and configuration.
+**Kiali MCP Server** is a specialized Model Context Protocol (MCP) server that brings powerful Istio service mesh management capabilities to AI assistants like Claude, Cursor, and others. Built as an extension of the upstream Kubernetes MCP Server, it provides seamless integration with Kiali for service mesh observability and management.
 
-- Based on `kubernetes-mcp-server` (native Go MCP server for Kubernetes/OpenShift)
-- For the full set of tools and behavior adopted from upstream, see the upstream README: [openshift/openshift-mcp-server README](https://github.com/openshift/openshift-mcp-server/blob/main/README.md)
+- 🌐 **Native Kiali Integration**: Direct access to service mesh topology, validations, and health data
+- 🔧 **Built on Kubernetes MCP**: Inherits all Kubernetes/OpenShift management capabilities  
+- 🚀 **AI-First Design**: Optimized for AI assistant workflows and natural language interactions
+- 📊 **Real-time Mesh Insights**: Live service mesh topology, traffic flows, and health status
+
+For the complete set of Kubernetes tools and capabilities, see the upstream documentation: [openshift/openshift-mcp-server README](https://github.com/openshift/openshift-mcp-server/blob/main/README.md)
 
 [✨ Features](#features) | [🚀 Getting Started](#getting-started) | [🎥 Demos](#demos) | [⚙️ Configuration](#configuration) | [🛠️ Tools](#tools-and-functionalities) | [🧑‍💻 Development](#development)
 
 ## ✨ Features <a id="features"></a>
 
-- **✅ Istio Objects**:
-  - `validations_list`: Lists Istio object validations aggregated by namespace and cluster from a Kiali instance.
+### 🎯 Service Mesh Management
+- **📊 Mesh Topology Visualization**: Real-time service graph with traffic flows, health status, and connectivity
+- **🔍 Configuration Validation**: Comprehensive Istio object validation across namespaces
+- **🌐 Multi-Namespace Support**: Work with single namespaces or multiple namespaces simultaneously
+- **⚡ Live Data**: Direct integration with running Kiali instances for up-to-date mesh insights
+
+### 🤖 AI-Optimized Experience  
+- **Natural Language Queries**: Ask questions like "Check my bookinfo mesh status" or "Show validations for istio-system"
+- **Intelligent Context**: Tools designed for AI understanding and optimal prompt engineering
+- **Flexible Parameters**: Support both single and multiple namespace operations
+- **Rich Responses**: Structured JSON data perfect for AI analysis and interpretation
+
+### 🔧 Built on Kubernetes MCP
+Inherits all capabilities from the upstream Kubernetes MCP Server including pod management, resource operations, Helm integration, and more.
 
 ## 🚀 Getting Started <a id="getting-started"></a>
 
 ### Requirements
 
-- Access to a Kubernetes or OpenShift cluster (kubeconfig or in-cluster service account)
-- A reachable Kiali server URL
+- **Kubernetes/OpenShift Cluster**: Access via kubeconfig or in-cluster service account
+- **Kiali Instance**: A running and accessible Kiali server 
+- **Network Access**: Connectivity between the MCP server and your Kiali instance
+- **AI Assistant**: Claude Desktop, Cursor, or any MCP-compatible AI tool
 
-### Cursor
+### Quick Start with Claude Desktop
 
-Install the Kubernetes MCP server extension in Cursor by pressing the following link:
+https://github.com/user-attachments/assets/0a7c1e08-2044-4426-92d6-89cbf6084ca1
+
+#### Using npx (Recommended)
+
+If you have npm installed, this is the fastest way to get started with Kiali MCP Server on Claude Desktop.
+
+Open your `claude_desktop_config.json` and add the MCP server to the list of `mcpServers`:
+
+```json
+{
+  "mcpServers": {
+    "kiali-mcp-server": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "kiali-mcp-server@latest"
+      ]
+    }
+  }
+}
+```
+
+### Quick Start with Cursor
+
+Install the Kiali MCP server extension in Cursor by clicking the button below:
 
 [![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=kiali-mcp-server&config=eyJjb21tYW5kIjoibnB4IC15IGtpYWxpLW1jcC1zZXJ2ZXJAbGF0ZXN0In0%3D)
-
 
 Alternatively, you can install the extension manually by editing the `mcp.json` file:
 
@@ -46,7 +87,13 @@ Alternatively, you can install the extension manually by editing the `mcp.json` 
   }
 }
 ```
-*Note:* You must specify the Kiali endpoint if the MCP cannot detect it.You must also specify whether it should skip TLS. 
+
+https://github.com/user-attachments/assets/d88a3b72-980c-43db-a69a-a19ad564cf49
+
+### Configuring Kiali Connection
+
+**Note:** You must specify the Kiali endpoint if the MCP server cannot auto-detect it. You may also need to configure TLS settings.
+
 ```json
 {
   "mcpServers": {
@@ -64,34 +111,115 @@ Alternatively, you can install the extension manually by editing the `mcp.json` 
 }
 ```
 
-## Configuration <a id="configuration"></a>
+### Common Configuration Examples
 
-Kiali MCP Server reuses the same configuration and flags as the upstream Kubernetes MCP Server. In addition, it adds the following Kiali-specific flags:
+<details>
+<summary>🔒 Secure Kiali with Valid TLS</summary>
 
-- `--kiali-server-url` string: URL of the Kiali server (e.g. "https://kiali-istio-system.apps-crc.testing/")
-- `--kiali-insecure`: Skip TLS verification when connecting to the Kiali server
+```json
+{
+  "mcpServers": {
+    "kiali-mcp-server": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "kiali-mcp-server@latest",
+        "--kiali-server-url",
+        "https://kiali.example.com/"
+      ]
+    }
+  }
+}
+```
+</details>
 
-*By default, Kubernetes and Kiali tools are exposed. If you want to only Kiali use this configuration*
+<details>
+<summary>🔓 Local Development with Self-Signed Certificates</summary>
 
-- `--toolsets`:  kiali
+```json
+{
+  "mcpServers": {
+    "kiali-mcp-server": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "kiali-mcp-server@latest",
+        "--kiali-server-url",
+        "https://kiali-istio-system.apps-crc.testing/",
+        "--kiali-insecure"
+      ]
+    }
+  }
+}
+```
+</details>
 
-You can run the server via npx, uvx, or the compiled binary. Example using npx:
+<details>
+<summary>🎯 Kiali-Only Mode</summary>
 
-```sh
+```json
+{
+  "mcpServers": {
+    "kiali-mcp-server": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "kiali-mcp-server@latest",
+        "--toolsets",
+        "kiali",
+        "--kiali-server-url",
+        "https://kiali.example.com/"
+      ]
+    }
+  }
+}
+```
+</details>
+
+## ⚙️ Configuration <a id="configuration"></a>
+
+Kiali MCP Server extends the upstream Kubernetes MCP Server with additional Kiali-specific configuration options.
+
+### Kiali-Specific Flags
+
+| Flag | Type | Description | Example |
+|------|------|-------------|---------|
+| `--kiali-server-url` | `string` | URL of the Kiali server | `https://kiali-istio-system.apps-crc.testing/` |
+| `--kiali-insecure` | `boolean` | Skip TLS verification when connecting to Kiali | Use for self-signed certificates |
+
+### Toolset Configuration
+
+By default, both Kubernetes and Kiali tools are available. Use `--toolsets` to control which tool groups are enabled:
+
+```bash
+# Kiali tools only
+--toolsets kiali
+
+# All available toolsets (default)
+--toolsets core,config,helm,kiali
+```
+
+### Command Line Examples
+
+**Using npx:**
+```bash
 npx -y kiali-mcp-server@latest \
   --kiali-server-url "https://kiali-istio-system.apps-crc.testing/" \
-  --kiali-insecure
+  --kiali-insecure \
+  --toolsets kiali
 ```
 
-Or using the binary after building:
-
-```sh
+**Using compiled binary:**
+```bash
 ./kiali-mcp-server \
   --kiali-server-url "https://kiali-istio-system.apps-crc.testing/" \
-  --kiali-insecure
+  --kiali-insecure \
+  --port 8080
 ```
 
-Refer to the upstream README for the rest of the flags and features (ports, auth, read-only, list output, etc.): [openshift/openshift-mcp-server README](https://github.com/openshift/openshift-mcp-server/blob/main/README.md)
+### Additional Configuration
+
+For comprehensive configuration options including authentication, ports, read-only mode, and output formats, refer to the upstream documentation: [openshift/openshift-mcp-server README](https://github.com/openshift/openshift-mcp-server/blob/main/README.md)
 
 ## 🛠️ Tools and Functionalities <a id="tools-and-functionalities"></a>
 
