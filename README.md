@@ -247,13 +247,15 @@ The following sets of tools are available (only Kiali by default):
 
 <summary>kiali</summary>
 
-- **validations_list** - List all the validations in the current cluster from all namespaces
-  - `namespace` (`string`) - Optional single namespace to retrieve validations from (alternative to namespaces)
-  - `namespaces` (`string`) - Optional comma-separated list of namespaces to retrieve validations from
-
 - **graph** - Check the status of my mesh by querying Kiali graph
   - `namespace` (`string`) - Optional single namespace to include in the graph (alternative to namespaces)
   - `namespaces` (`string`) - Optional comma-separated list of namespaces to include in the graph
+
+- **namespaces** - Get all namespaces in the mesh that the user has access to
+
+- **validations_list** - List all the validations in the current cluster from all namespaces
+  - `namespace` (`string`) - Optional single namespace to retrieve validations from (alternative to namespaces)
+  - `namespaces` (`string`) - Optional comma-separated list of namespaces to retrieve validations from
 
 </details>
 

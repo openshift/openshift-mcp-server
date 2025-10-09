@@ -31,16 +31,63 @@ func NewFromConfig(cfg *config.StaticConfig) *Kiali {
 	return &Kiali{manager: &Manager{staticConfig: cfg}}
 }
 
-// ValidationsList calls the Kiali validations API using the provided Authorization header value.
-// The authHeader must be the full header value (for example: "Bearer <token>").
-// `namespaces` may contain zero, one or many namespaces. If empty, returns validations from all namespaces.
-func (k *Kiali) ValidationsList(ctx context.Context, authHeader string, namespaces []string) (string, error) {
+// validateAndGetBaseURL validates the Kiali client configuration and returns the base URL.
+func (k *Kiali) validateAndGetBaseURL() (string, error) {
 	if k == nil || k.manager == nil || k.manager.staticConfig == nil {
 		return "", fmt.Errorf("kiali client not initialized")
 	}
 	baseURL := strings.TrimSpace(k.manager.staticConfig.KialiServerURL)
 	if baseURL == "" {
 		return "", fmt.Errorf("kiali server URL not configured")
+	}
+	return baseURL, nil
+}
+
+// createHTTPClient creates an HTTP client with appropriate TLS configuration.
+func (k *Kiali) createHTTPClient() *http.Client {
+	transport := &http.Transport{}
+	if k.manager.staticConfig.KialiInsecure {
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // allowed via configuration
+	}
+	return &http.Client{Transport: transport, Timeout: 30 * time.Second}
+}
+
+// executeRequest executes an HTTP request and handles common error scenarios.
+func (k *Kiali) executeRequest(ctx context.Context, authHeader, endpoint string) (string, error) {
+	klog.V(0).Infof("kiali API call: %s", endpoint)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return "", err
+	}
+	if authHeader != "" {
+		req.Header.Set("Authorization", authHeader)
+	} else if k.manager.staticConfig.RequireOAuth {
+		return "", fmt.Errorf("authorization token required for Kiali call")
+	}
+
+	client := k.createHTTPClient()
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if len(body) > 0 {
+			return "", fmt.Errorf("kiali API error: %s", strings.TrimSpace(string(body)))
+		}
+		return "", fmt.Errorf("kiali API error: status %d", resp.StatusCode)
+	}
+	return string(body), nil
+}
+
+// ValidationsList calls the Kiali validations API using the provided Authorization header value.
+// The authHeader must be the full header value (for example: "Bearer <token>").
+// `namespaces` may contain zero, one or many namespaces. If empty, returns validations from all namespaces.
+func (k *Kiali) ValidationsList(ctx context.Context, authHeader string, namespaces []string) (string, error) {
+	baseURL, err := k.validateAndGetBaseURL()
+	if err != nil {
+		return "", err
 	}
 	endpoint := strings.TrimRight(baseURL, "/") + "/api/istio/validations"
 
@@ -63,49 +110,16 @@ func (k *Kiali) ValidationsList(ctx context.Context, authHeader string, namespac
 		endpoint = u.String()
 	}
 
-	klog.V(0).Infof("kiali API call: %s", endpoint)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return "", err
-	}
-	if authHeader != "" {
-		req.Header.Set("Authorization", authHeader)
-	} else if k.manager.staticConfig.RequireOAuth {
-		return "", fmt.Errorf("authorization token required for Kiali call")
-	}
-
-	// Configure HTTP client, honoring insecure TLS if requested
-	transport := &http.Transport{}
-	if k.manager.staticConfig.KialiInsecure {
-		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // allowed via configuration
-	}
-	client := &http.Client{Transport: transport, Timeout: 30 * time.Second}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		if len(body) > 0 {
-			return "", fmt.Errorf("kiali API error: %s", strings.TrimSpace(string(body)))
-		}
-		return "", fmt.Errorf("kiali API error: status %d", resp.StatusCode)
-	}
-	return string(body), nil
+	return k.executeRequest(ctx, authHeader, endpoint)
 }
 
 // MeshGraph calls the Kiali graph API using the provided Authorization header value.
 // `namespaces` may contain zero, one or many namespaces. If empty, the API may return an empty graph
 // or the server default, depending on Kiali configuration.
 func (k *Kiali) MeshGraph(ctx context.Context, authHeader string, namespaces []string) (string, error) {
-	if k == nil || k.manager == nil || k.manager.staticConfig == nil {
-		return "", fmt.Errorf("kiali client not initialized")
-	}
-	baseURL := strings.TrimSpace(k.manager.staticConfig.KialiServerURL)
-	if baseURL == "" {
-		return "", fmt.Errorf("kiali server URL not configured")
+	baseURL, err := k.validateAndGetBaseURL()
+	if err != nil {
+		return "", err
 	}
 	endpoint := strings.TrimRight(baseURL, "/") + "/api/namespaces/graph"
 
@@ -139,37 +153,19 @@ func (k *Kiali) MeshGraph(ctx context.Context, authHeader string, namespaces []s
 	u.RawQuery = q.Encode()
 	endpoint = u.String()
 
-	klog.V(0).Infof("kiali API call: %s", endpoint)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	return k.executeRequest(ctx, authHeader, endpoint)
+}
+
+// MeshNamespaces calls the Kiali namespaces API using the provided Authorization header value.
+// Returns all namespaces in the mesh that the user has access to.
+func (k *Kiali) MeshNamespaces(ctx context.Context, authHeader string) (string, error) {
+	baseURL, err := k.validateAndGetBaseURL()
 	if err != nil {
 		return "", err
 	}
-	if authHeader != "" {
-		req.Header.Set("Authorization", authHeader)
-	} else if k.manager.staticConfig.RequireOAuth {
-		return "", fmt.Errorf("authorization token required for Kiali call")
-	}
+	endpoint := strings.TrimRight(baseURL, "/") + "/api/namespaces"
 
-	// Configure HTTP client, honoring insecure TLS if requested
-	transport := &http.Transport{}
-	if k.manager.staticConfig.KialiInsecure {
-		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // allowed via configuration
-	}
-	client := &http.Client{Transport: transport, Timeout: 30 * time.Second}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		if len(body) > 0 {
-			return "", fmt.Errorf("kiali API error: %s", strings.TrimSpace(string(body)))
-		}
-		return "", fmt.Errorf("kiali API error: status %d", resp.StatusCode)
-	}
-	return string(body), nil
+	return k.executeRequest(ctx, authHeader, endpoint)
 }
 
 func (m *Manager) Derived(ctx context.Context) (*Kiali, error) {

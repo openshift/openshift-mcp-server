@@ -90,10 +90,10 @@ func main() {
 			os.Exit(1)
 		}
 		// Filter known Kiali tools
-		kialiSet := map[string]struct{}{
-			"validations_list": {},
-			"graph":            {},
-		}
+	kialiSet := map[string]struct{}{
+		"validations_list": {},
+		"graph":            {},
+	}
 		infos := make([]output.ToolInfo, 0)
 		for _, t := range toolsRes.Tools {
 			if _, ok := kialiSet[t.Name]; ok {

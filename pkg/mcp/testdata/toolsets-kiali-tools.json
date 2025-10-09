@@ -25,6 +25,20 @@
   },
   {
     "annotations": {
+      "title": "Namespaces: List",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "description": "Get all namespaces in the mesh that the user has access to",
+    "inputSchema": {
+      "type": "object"
+    },
+    "name": "namespaces"
+  },
+  {
+    "annotations": {
       "title": "Validations: List",
       "readOnlyHint": true,
       "destructiveHint": false,
