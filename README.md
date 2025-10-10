@@ -213,6 +213,8 @@ The following sets of tools are available (all on by default):
 
 <summary>config</summary>
 
+- **configuration_contexts_list** - List all available context names and associated server urls from the kubeconfig file
+
 - **configuration_view** - Get the current Kubernetes configuration content as a kubeconfig YAML
   - `minified` (`boolean`) - Return a minified version of the configuration. If set to true, keeps only the current-context and the relevant pieces of the configuration for that context. If set to false, all contexts, clusters, auth-infos, and users are returned in the configuration. (Optional, default true)
 
@@ -293,6 +295,19 @@ The following sets of tools are available (all on by default):
   - `kind` (`string`) **(required)** - kind of the resource (examples of valid kind are: Pod, Service, Deployment, Ingress)
   - `name` (`string`) **(required)** - Name of the resource
   - `namespace` (`string`) - Optional Namespace to delete the namespaced resource from (ignored in case of cluster scoped resources). If not provided, will delete resource from configured namespace
+
+- **plan_mustgather** - Plan for collecting a must-gather archive from an OpenShift cluster, must-gather is a tool for collecting cluster data related to debugging and troubleshooting like logs, kubernetes resources, etc.
+  - `all_component_images` (`boolean`) - Optional when enabled, collects and runs multiple must gathers for all operators and components on the cluster that have an annotated must-gather image available
+  - `gather_command` (`string`) - Optionally specify a custom gather command to run a specialized script, eg. /usr/bin/gather_audit_logs
+  - `host_network` (`boolean`) - Optionally run the must-gather pods in the host network of the node. This is only relevant if a specific gather image needs to capture host-level data
+  - `images` (`array`) - Optional list of images to use for gathering custom information about specific operators or cluster components. If not specified, OpenShift's default must-gather image will be used by default
+  - `keep_namespace` (`boolean`) - Optional to retain all temporary resources when the mustgather completes, otherwise temporary resources created will be cleaned up
+  - `namespace` (`string`) - Optional to specify an existing privileged namespace where must-gather pods should run. If not provided, a temporary namespace will be created
+  - `node_name` (`string`) - Optional node to run the mustgather pod. If not provided, a random control-plane node will be selected automatically
+  - `node_selector` (`string`) - Optional node label selector to use, only relevant when specifying a command and image which needs to capture data on a set of cluster nodes simultaneously
+  - `since` (`string`) - Optional to collect logs newer than a relative duration like 5s, 2m5s, or 3h6m10s. If unspecified, all available logs will be collected
+  - `source_dir` (`string`) - Optional to set a specific directory where the pod will copy gathered data from
+  - `timeout` (`string`) - Timeout of the gather process eg. 30s, 6m20s, or 2h10m30s
 
 </details>
 
