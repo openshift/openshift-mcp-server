@@ -7,7 +7,7 @@
     "kubernetes-mcp-server": "bin/index.js"
   },
   "optionalDependencies": {
-    "kubernetes-mcp-server-darwin-amd64": "0.0.0",
+    "kubernetes-mcp-server-darwin-amd64": "0.0.53",
     "kubernetes-mcp-server-darwin-arm64": "0.0.0",
     "kubernetes-mcp-server-linux-amd64": "0.0.0",
     "kubernetes-mcp-server-linux-arm64": "0.0.0",
