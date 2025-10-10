@@ -41,6 +41,12 @@ type Kubernetes struct {
 	manager *Manager
 }
 
+// AccessControlClientset returns the access-controlled clientset
+// This ensures that any denied resources configured in the system are properly enforced
+func (k *Kubernetes) AccessControlClientset() *AccessControlClientset {
+	return k.manager.accessControlClientSet
+}
+
 type Manager struct {
 	cfg                     *rest.Config
 	clientCmdConfig         clientcmd.ClientConfig
