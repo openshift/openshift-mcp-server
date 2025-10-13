@@ -83,9 +83,9 @@ func initMustGatherPlan(o internalk8s.Openshift) []api.ServerTool {
 						Type:        "string",
 						Description: "Optional to specify an existing privileged namespace where must-gather pods should run. If not provided, a temporary namespace will be created",
 					},
-					"keep_namespace": {
+					"keep_resources": {
 						Type:        "boolean",
-						Description: "Optional to retain all temporary resources when the mustgather completes, otherwise temporary resources created will be cleaned up",
+						Description: "Optional to retain all temporary resources when the mustgather completes, otherwise temporary resources created will be advised to be cleaned up",
 					},
 					"since": {
 						Type:        "string",
@@ -110,7 +110,7 @@ func mustGatherPlan(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 
 	var nodeName, sourceDir, namespace, gatherCmd, timeout, since string
-	var hostNetwork, keepNamespace, allImages bool
+	var hostNetwork, keepResources, allImages bool
 	var images []string
 	var nodeSelector map[string]string
 
@@ -136,8 +136,8 @@ func mustGatherPlan(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		namespace = args["namespace"].(string)
 	}
 
-	if args["keep_namespace"] != nil {
-		keepNamespace = args["keep_namespace"].(bool)
+	if args["keep_resources"] != nil {
+		keepResources = args["keep_resources"].(bool)
 	}
 
 	gatherCmd = defaultGatherCmd
@@ -247,8 +247,9 @@ func mustGatherPlan(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 			Kind:       "Pod",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "must-gather-",
-			Namespace:    namespace,
+			// Avoiding generateName as resources_create_or_update fails without explicit name.
+			Name:      fmt.Sprintf("must-gather-%s", rand.String(6)),
+			Namespace: namespace,
 		},
 		Spec: corev1.PodSpec{
 			ServiceAccountName: serviceAccountName,
@@ -343,52 +344,61 @@ func mustGatherPlan(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		},
 	}
 
-	// TODO(swghosh,smuley): Improve the instructions prompt
-	// to give users the choice either to use oc/kubectl or let LLM perform resources_create_or_update tool call
-	// refer: https://github.com/openshift/lightspeed-service/pull/2629/files#diff-2d682107ea06b9d72f61df72d71bccd1f34ef1bc487a1595476398a90ca73c05R25-R55
 	var result strings.Builder
-	result.WriteString("# Save the following content to a file (e.g., must-gather-plan.yaml) and apply it with 'kubectl apply -f must-gather-plan.yaml'\n")
-	result.WriteString("# Monitor the pod's logs to see when the must-gather process is complete:\n")
-	result.WriteString(fmt.Sprintf("# kubectl logs -f -n %s <pod-name> -c gather\n", namespace))
-	result.WriteString("# Once the logs indicate completion, copy the results with:\n")
-	result.WriteString(fmt.Sprintf("# kubectl cp -n %s <pod-name>:/must-gather ./must-gather-output -c wait\n", namespace))
-	if !keepNamespace {
-		result.WriteString("# Finally, clean up the resources with:\n")
-		result.WriteString(fmt.Sprintf("# kubectl delete ns %s\n", namespace))
-		result.WriteString(fmt.Sprintf("# kubectl delete clusterrolebinding %s\n", clusterRoleBindingName))
+	result.WriteString("The generated plan contains YAML manifests for must-gather pods and required resources (namespace, serviceaccount, clusterrolebinding). " +
+		"Suggest how the user can apply the manifest and copy results locally (`oc cp` / `kubectl cp`). \n\n",
+	)
+	result.WriteString("Ask the user if they want to apply the plan \n" +
+		"- use the resource_create_or_update tool to apply the manifest \n" +
+		"- alternatively, advise the user to execute `oc apply` / `kubectl apply` instead. \n\n",
+	)
+
+	if !keepResources {
+		result.WriteString("Once the must-gather collection is completed, the user may which to cleanup the created resources. \n" +
+			"- use the resources_delete tool to delete the namespace and the clusterrolebinding \n" +
+			"- or, execute cleanup using `kubectl delete`. \n\n")
 	}
-	result.WriteString("\n")
-	result.WriteString("```yaml\n")
 
 	if !namespaceExists {
 		namespaceYaml, err := yaml.Marshal(namespaceObj)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal namespace to yaml: %w", err)
 		}
+
+		result.WriteString("```yaml\n")
 		result.Write(namespaceYaml)
-		result.WriteString("---\n")
+		result.WriteString("```\n\n")
 	}
+
+	// yaml(s) are dumped into individual code blocks of ``` ```
+	// because resources_create_or_update tool call fails when content has more than one more resource,
+	// some models are smart to detect an error and retry with one resource a time though.
 
 	serviceAccountYaml, err := yaml.Marshal(serviceAccount)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal service account to yaml: %w", err)
 	}
+	result.WriteString("```yaml\n")
 	result.Write(serviceAccountYaml)
-	result.WriteString("---\n")
+	result.WriteString("```\n\n")
 
 	clusterRoleBindingYaml, err := yaml.Marshal(clusterRoleBinding)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal cluster role binding to yaml: %w", err)
 	}
+
+	result.WriteString("```yaml\n")
 	result.Write(clusterRoleBindingYaml)
-	result.WriteString("---\n")
+	result.WriteString("```\n\n")
 
 	podYaml, err := yaml.Marshal(pod)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal pod to yaml: %w", err)
 	}
+
+	result.WriteString("```yaml\n")
 	result.Write(podYaml)
-	result.WriteString("```")
+	result.WriteString("```\n")
 
 	return api.NewToolCallResult(result.String(), nil), nil
 }
