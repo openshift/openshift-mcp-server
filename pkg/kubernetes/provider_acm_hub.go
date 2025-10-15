@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -17,10 +18,75 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 
+	"github.com/BurntSushi/toml"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 )
 
 const ACMHubTargetParameterName = "cluster"
+
+// ACMProviderConfig holds ACM-specific configuration that users can set in config.toml
+type ACMProviderConfig struct {
+	// The host for the ACM cluster proxy addon
+	// If using the acm-kubeconfig strategy, this should be the route for the proxy
+	// If using the acm strategy, this should be the service for the proxy
+	ClusterProxyAddonHost string `toml:"cluster_proxy_addon_host,omitempty"`
+
+	// Whether to skip verifying the TLS certs from the cluster proxy
+	ClusterProxyAddonSkipTLSVerify bool `toml:"cluster_proxy_addon_skip_tls_verify"`
+
+	// The CA file for the cluster proxy addon
+	ClusterProxyAddonCAFile string `toml:"cluster_proxy_addon_ca_file,omitempty"`
+}
+
+func (c *ACMProviderConfig) Validate() error {
+	var err error = nil
+
+	if c.ClusterProxyAddonCAFile == "" {
+		err = errors.Join(err, fmt.Errorf("cluster_proxy_addon_host is required"))
+	}
+
+	if !c.ClusterProxyAddonSkipTLSVerify && c.ClusterProxyAddonCAFile == "" {
+		err = errors.Join(err, fmt.Errorf("cluster_proxy_addon_ca_file is required if tls verification is not disabled"))
+	}
+
+	return err
+}
+
+type ACMKubeConfigProviderConfig struct {
+	ACMProviderConfig
+
+	// Name of the context in the kubeconfig file to look for acm access credentials in.
+	// Should point to the "hub" cluster.
+	ContextName string `toml:"context_name,omitempty"`
+}
+
+func (c *ACMKubeConfigProviderConfig) Validate() error {
+	err := c.ACMProviderConfig.Validate()
+
+	if c.ContextName == "" {
+		err = errors.Join(err, fmt.Errorf("context_name is required is acm-kubeconfig strategy is used"))
+	}
+
+	return err
+}
+
+func parseAcmConfig(primitive toml.Primitive, md toml.MetaData) (config.ProviderConfig, error) {
+	var cfg ACMProviderConfig
+	if err := md.PrimitiveDecode(primitive, &cfg); err != nil {
+		return nil, err
+	}
+
+	return &cfg, nil
+}
+
+func parseAcmKubeConfigConfig(primitive toml.Primitive, md toml.MetaData) (config.ProviderConfig, error) {
+	var cfg ACMKubeConfigProviderConfig
+	if err := md.PrimitiveDecode(primitive, &cfg); err != nil {
+		return nil, err
+	}
+
+	return &cfg, nil
+}
 
 type acmHubClusterProvider struct {
 	hubManager         *Manager // for the main "hub" cluster
@@ -45,6 +111,9 @@ var _ Provider = &acmHubClusterProvider{}
 func init() {
 	RegisterProvider(config.ClusterProviderACM, newACMHubClusterProvider)
 	RegisterProvider(config.ClusterProviderACMKubeConfig, newACMKubeConfigClusterProvider)
+
+	config.RegisterProviderConfig(config.ClusterProviderACM, parseAcmConfig)
+	config.RegisterProviderConfig(config.ClusterProviderACMKubeConfig, parseAcmKubeConfigConfig)
 }
 
 // IsACMHub checks if the current cluster is an ACM hub by looking for ACM CRDs
@@ -82,37 +151,36 @@ func newACMHubClusterProvider(m *Manager, cfg *config.StaticConfig) (Provider, e
 		return nil, fmt.Errorf("acm provider required in-cluster deployment")
 	}
 
-	return newACMClusterProvider(m, cfg, false)
+	providerCfg, ok := cfg.GetProviderConfig(config.ClusterProviderACM)
+	if !ok {
+		return nil, fmt.Errorf("missing required config for strategy '%s'", config.ClusterProviderACM)
+	}
+
+	return newACMClusterProvider(m, providerCfg.(*ACMProviderConfig), false)
 }
 
 func newACMKubeConfigClusterProvider(m *Manager, cfg *config.StaticConfig) (Provider, error) {
-	if cfg.AcmContextName == "" {
-		return nil, fmt.Errorf("acm_context_name is required for ACM kubeconfig cluster provider")
+	providerCfg, ok := cfg.GetProviderConfig(config.ClusterProviderACMKubeConfig)
+	if !ok {
+		return nil, fmt.Errorf("missing required config for strategy '%s'", config.ClusterProviderACMKubeConfig)
 	}
 
-	baseManager, err := m.newForContext(cfg.AcmContextName)
+	acmKubeConfigProviderCfg := providerCfg.(*ACMKubeConfigProviderConfig)
+	baseManager, err := m.newForContext(acmKubeConfigProviderCfg.ContextName)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to create manager to hub cluster specified by acm_context_name %s: %w",
-			cfg.AcmContextName,
+			acmKubeConfigProviderCfg.ContextName,
 			err,
 		)
 	}
 
-	return newACMClusterProvider(baseManager, cfg, true)
+	return newACMClusterProvider(baseManager, &acmKubeConfigProviderCfg.ACMProviderConfig, true)
 }
 
-func newACMClusterProvider(m *Manager, cfg *config.StaticConfig, watchKubeConfig bool) (Provider, error) {
+func newACMClusterProvider(m *Manager, cfg *ACMProviderConfig, watchKubeConfig bool) (Provider, error) {
 	if !m.IsACMHub() {
 		return nil, fmt.Errorf("not deployed in an ACM hub cluster")
-	}
-
-	if cfg.AcmClusterProxyAddonHost == "" {
-		return nil, fmt.Errorf("cluster proxy addon host is required when using any acm cluster provider strategy")
-	}
-
-	if !cfg.AcmClusterProxyAddonSkipTLSVerify && cfg.AcmClusterProxyAddonCaFile == "" {
-		return nil, fmt.Errorf("cluster proxy addon ca file is required if tls verification is not disabled")
 	}
 
 	// Create cancellable context for the watch goroutine
@@ -124,9 +192,9 @@ func newACMClusterProvider(m *Manager, cfg *config.StaticConfig, watchKubeConfig
 		watchKubeConfig:    watchKubeConfig,
 		watchCtx:           watchCtx,
 		watchCancel:        watchCancel,
-		clusterProxyHost:   cfg.AcmClusterProxyAddonHost,
-		clusterProxyCAFile: cfg.AcmClusterProxyAddonCaFile,
-		skipTLSVerify:      cfg.AcmClusterProxyAddonSkipTLSVerify,
+		clusterProxyHost:   cfg.ClusterProxyAddonHost,
+		clusterProxyCAFile: cfg.ClusterProxyAddonCAFile,
+		skipTLSVerify:      cfg.ClusterProxyAddonSkipTLSVerify,
 	}
 
 	ctx := context.Background()
