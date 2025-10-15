@@ -7,9 +7,11 @@ import (
 )
 
 const (
-	ClusterProviderKubeConfig = "kubeconfig"
-	ClusterProviderInCluster  = "in-cluster"
-	ClusterProviderDisabled   = "disabled"
+	ClusterProviderKubeConfig    = "kubeconfig"
+	ClusterProviderInCluster     = "in-cluster"
+	ClusterProviderDisabled      = "disabled"
+	ClusterProviderACM           = "acm"
+	ClusterProviderACMKubeConfig = "acm-kubeconfig"
 )
 
 // StaticConfig is the configuration for the server.
@@ -61,6 +63,17 @@ type StaticConfig struct {
 	ClusterProviderStrategy string `toml:"cluster_provider_strategy,omitempty"`
 	// ClusterContexts is which context should be used for each cluster
 	ClusterContexts map[string]string `toml:"cluster_contexts"`
+
+	// name of the context in the kubeconfig file to look for acm access credentials in. should point to the "hub" cluster
+	AcmContextName string `toml:"acm_context_name,omitempty"`
+	// the host for the ACM cluster proxy addon
+	// if using the acm-kubeconfig strategy, this should be the route for the proxy
+	// if using the acm strategy, this should be the service for the proxy
+	AcmClusterProxyAddonHost string `toml:"acm_cluster_proxy_addon_host,omitempty"`
+	// whether to skip verifiying the tls certs from the cluster proxy
+	AcmClusterProxyAddonSkipTLSVerify bool `toml:"acm_cluster_proxy_addon_skip_tls_verify"`
+	// the CA file for the cluster proxy addon
+	AcmClusterProxyAddonCaFile string `toml:"acm_cluster_proxy_addon_ca_file"`
 }
 
 func Default() *StaticConfig {
