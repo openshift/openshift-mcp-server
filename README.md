@@ -235,6 +235,13 @@ In case multi-cluster support is enabled (default) and you have access to multip
 
 - **projects_list** - List all the OpenShift projects in the current cluster
 
+- **nodes_debug_exec** - Run commands on an OpenShift node using a privileged debug pod with comprehensive troubleshooting utilities. The debug pod uses the UBI9 toolbox image which includes: systemd tools (systemctl, journalctl), networking tools (ss, ip, ping, traceroute, nmap), process tools (ps, top, lsof, strace), file system tools (find, tar, rsync), and debugging tools (gdb). Commands execute in a chroot of the host filesystem, providing full access to node-level diagnostics. Output is truncated to the most recent 100 lines, so prefer filters like grep when expecting large logs.
+  - `command` (`array`) **(required)** - Command to execute on the node via chroot. All standard debugging utilities are available including systemctl, journalctl, ss, ip, ping, traceroute, nmap, ps, top, lsof, strace, find, tar, rsync, gdb, and more. Provide each argument as a separate array item (e.g. ['systemctl', 'status', 'kubelet'] or ['journalctl', '-u', 'kubelet', '--since', '1 hour ago']).
+  - `image` (`string`) - Container image to use for the debug pod (optional). Defaults to registry.access.redhat.com/ubi9/toolbox:latest which provides comprehensive debugging and troubleshooting utilities.
+  - `namespace` (`string`) - Namespace to create the temporary debug pod in (optional, defaults to the current namespace or 'default').
+  - `node` (`string`) **(required)** - Name of the node to debug (e.g. worker-0).
+  - `timeout_seconds` (`integer`) - Maximum time to wait for the command to complete before timing out (optional, defaults to 300 seconds).
+
 - **pods_list** - List all the Kubernetes pods in the current cluster from all namespaces
   - `labelSelector` (`string`) - Optional Kubernetes label selector (e.g. 'app=myapp,env=prod' or 'app in (myapp,yourapp)'), use this option when you want to filter the pods by label
 
