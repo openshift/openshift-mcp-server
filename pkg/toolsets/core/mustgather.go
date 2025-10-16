@@ -344,6 +344,39 @@ func mustGatherPlan(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		},
 	}
 
+	allowChecks := map[string]struct {
+		schema.GroupVersionResource
+		name string
+		verb string
+	}{
+		"create_namespace": {
+			GroupVersionResource: schema.GroupVersionResource{Version: "v1", Resource: "namespace"},
+			verb:                 "create",
+		},
+		"create_serviceaccount": {
+			GroupVersionResource: schema.GroupVersionResource{Version: "v1", Resource: "serviceaccount"},
+			verb:                 "create",
+		},
+		"create_clusterrolebinding": {
+			GroupVersionResource: schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1", Resource: "clusterrolebindings"},
+			verb:                 "create",
+		},
+		"create_pod": {
+			GroupVersionResource: schema.GroupVersionResource{Version: "v1", Resource: "pod"},
+			verb:                 "create",
+		},
+		"use_scc_hostnetwork": {
+			GroupVersionResource: schema.GroupVersionResource{Group: "security.openshift.io", Version: "v1", Resource: "securitycontextconstraints"},
+			name:                 "hostnetwork-v2",
+			verb:                 "use",
+		},
+	}
+	isAllowed := make(map[string]bool)
+
+	for k, check := range allowChecks {
+		isAllowed[k] = params.CanIUse(params, &check.GroupVersionResource, "", check.verb)
+	}
+
 	var result strings.Builder
 	result.WriteString("The generated plan contains YAML manifests for must-gather pods and required resources (namespace, serviceaccount, clusterrolebinding). " +
 		"Suggest how the user can apply the manifest and copy results locally (`oc cp` / `kubectl cp`). \n\n",
@@ -354,12 +387,12 @@ func mustGatherPlan(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	)
 
 	if !keepResources {
-		result.WriteString("Once the must-gather collection is completed, the user may which to cleanup the created resources. \n" +
+		result.WriteString("Once the must-gather collection is completed, the user may wish to cleanup the created resources. \n" +
 			"- use the resources_delete tool to delete the namespace and the clusterrolebinding \n" +
 			"- or, execute cleanup using `kubectl delete`. \n\n")
 	}
 
-	if !namespaceExists {
+	if !namespaceExists && isAllowed["create_namespace"] {
 		namespaceYaml, err := yaml.Marshal(namespaceObj)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal namespace to yaml: %w", err)
@@ -368,6 +401,10 @@ func mustGatherPlan(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		result.WriteString("```yaml\n")
 		result.Write(namespaceYaml)
 		result.WriteString("```\n\n")
+	}
+
+	if !namespaceExists && !isAllowed["create_namespace"] {
+		result.WriteString("WARNING: The resources_create_or_update call does not have permission to create namespace(s).\n")
 	}
 
 	// yaml(s) are dumped into individual code blocks of ``` ```
@@ -382,6 +419,10 @@ func mustGatherPlan(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	result.Write(serviceAccountYaml)
 	result.WriteString("```\n\n")
 
+	if !isAllowed["create_serviceaccount"] {
+		result.WriteString("WARNING: The resources_create_or_update call does not have permission to create serviceaccount(s).\n")
+	}
+
 	clusterRoleBindingYaml, err := yaml.Marshal(clusterRoleBinding)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal cluster role binding to yaml: %w", err)
@@ -391,6 +432,10 @@ func mustGatherPlan(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	result.Write(clusterRoleBindingYaml)
 	result.WriteString("```\n\n")
 
+	if !isAllowed["create_clusterrolebinding"] {
+		result.WriteString("WARNING: The resources_create_or_update call does not have permission to create clusterrolebinding(s).\n")
+	}
+
 	podYaml, err := yaml.Marshal(pod)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal pod to yaml: %w", err)
@@ -399,6 +444,14 @@ func mustGatherPlan(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	result.WriteString("```yaml\n")
 	result.Write(podYaml)
 	result.WriteString("```\n")
+
+	if !isAllowed["create_pod"] {
+		result.WriteString("WARNING: The resources_create_or_update call does not have permission to create pod(s).\n")
+	}
+
+	if hostNetwork && !isAllowed["use_scc_hostnetwork"] {
+		result.WriteString("WARNING: The resources_create_or_update call does not have permission to create pod(s) with hostNetwork: true.\n")
+	}
 
 	return api.NewToolCallResult(result.String(), nil), nil
 }
