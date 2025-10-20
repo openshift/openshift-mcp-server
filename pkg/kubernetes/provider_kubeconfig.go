@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
@@ -27,11 +28,16 @@ func init() {
 }
 
 // newKubeConfigClusterProvider creates a provider that manages multiple clusters
-// via kubeconfig contexts. Returns an error if the manager is in-cluster mode.
-func newKubeConfigClusterProvider(m *Manager, cfg *config.StaticConfig) (Provider, error) {
-	// Handle in-cluster mode
-	if IsInCluster(cfg) {
-		return nil, fmt.Errorf("kubeconfig ClusterProviderStrategy is invalid for in-cluster deployments")
+// via kubeconfig contexts.
+// Internally, it leverages a KubeconfigManager for each context, initializing them
+// lazily when requested.
+func newKubeConfigClusterProvider(cfg *config.StaticConfig) (Provider, error) {
+	m, err := NewKubeconfigManager(cfg, "")
+	if err != nil {
+		if errors.Is(err, ErrorKubeconfigInClusterNotAllowed) {
+			return nil, fmt.Errorf("kubeconfig ClusterProviderStrategy is invalid for in-cluster deployments: %v", err)
+		}
+		return nil, err
 	}
 
 	rawConfig, err := m.clientCmdConfig.RawConfig()
@@ -65,7 +71,7 @@ func (p *kubeConfigClusterProvider) managerForContext(context string) (*Manager,
 
 	baseManager := p.managers[p.defaultContext]
 
-	m, err := NewManager(baseManager.staticConfig, context)
+	m, err := NewKubeconfigManager(baseManager.staticConfig, context)
 	if err != nil {
 		return nil, err
 	}
