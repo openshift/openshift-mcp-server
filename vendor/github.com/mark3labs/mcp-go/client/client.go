@@ -86,15 +86,10 @@ func (c *Client) Start(ctx context.Context) error {
 		return fmt.Errorf("transport is nil")
 	}
 
-	if _, ok := c.transport.(*transport.Stdio); !ok {
-		// the stdio transport from NewStdioMCPClientWithOptions
-		// is already started, dont start again.
-		//
-		// Start the transport for other transport types
-		err := c.transport.Start(ctx)
-		if err != nil {
-			return err
-		}
+	// Start is idempotent - transports handle being called multiple times
+	err := c.transport.Start(ctx)
+	if err != nil {
+		return err
 	}
 
 	c.transport.SetNotificationHandler(func(notification mcp.JSONRPCNotification) {
@@ -499,6 +494,19 @@ func (c *Client) handleSamplingRequestTransport(ctx context.Context, request tra
 		}
 		if err := json.Unmarshal(paramsBytes, &params); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal params: %w", err)
+		}
+	}
+
+	// Fix content parsing - HTTP transport unmarshals TextContent as map[string]any
+	// Use the helper function to properly handle content from different transports
+	for i := range params.Messages {
+		if contentMap, ok := params.Messages[i].Content.(map[string]any); ok {
+			// Parse the content map into a proper Content type
+			content, err := mcp.ParseContent(contentMap)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse content for message %d: %w", i, err)
+			}
+			params.Messages[i].Content = content
 		}
 	}
 
