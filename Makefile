@@ -16,7 +16,7 @@ LD_FLAGS = -s -w \
 COMMON_BUILD_ARGS = -ldflags "$(LD_FLAGS)"
 
 GOLANGCI_LINT = $(shell pwd)/_output/tools/bin/golangci-lint
-GOLANGCI_LINT_VERSION ?= v2.2.2
+GOLANGCI_LINT_VERSION ?= v2.5.0
 
 # NPM version should not append the -dirty flag
 NPM_VERSION ?= $(shell echo $(shell git describe --tags --always) | sed 's/^v//')
@@ -71,16 +71,14 @@ npm-publish: npm-copy-binaries ## Publish the npm packages
 	$(foreach os,$(OSES),$(foreach arch,$(ARCHS), \
 		DIRNAME="$(BINARY_NAME)-$(os)-$(arch)"; \
 		cd npm/$$DIRNAME; \
-		echo '//registry.npmjs.org/:_authToken=$(NPM_TOKEN)' >> .npmrc; \
 		jq '.version = "$(NPM_VERSION)"' package.json > tmp.json && mv tmp.json package.json; \
-		npm publish; \
+		npm publish --tag latest; \
 		cd ../..; \
 	))
 	cp README.md LICENSE ./npm/kubernetes-mcp-server/
-	echo '//registry.npmjs.org/:_authToken=$(NPM_TOKEN)' >> ./npm/kubernetes-mcp-server/.npmrc
 	jq '.version = "$(NPM_VERSION)"' ./npm/kubernetes-mcp-server/package.json > tmp.json && mv tmp.json ./npm/kubernetes-mcp-server/package.json; \
 	jq '.optionalDependencies |= with_entries(.value = "$(NPM_VERSION)")' ./npm/kubernetes-mcp-server/package.json > tmp.json && mv tmp.json ./npm/kubernetes-mcp-server/package.json; \
-	cd npm/kubernetes-mcp-server && npm publish
+	cd npm/kubernetes-mcp-server && npm publish --tag latest
 
 .PHONY: python-publish
 python-publish: ## Publish the python packages
@@ -115,3 +113,43 @@ lint: golangci-lint ## Lint the code
 .PHONY: update-readme-tools
 update-readme-tools: ## Update the README.md file with the latest toolsets
 	go run ./internal/tools/update-readme/main.go README.md
+
+##@ Tools
+
+.PHONY: tools
+tools: ## Install all required tools (kind) to ./_output/bin/
+	@echo "Checking and installing required tools to ./_output/bin/ ..."
+	@if [ -f _output/bin/kind ]; then echo "[OK] kind already installed"; else echo "Installing kind..."; $(MAKE) -s kind; fi
+	@echo "All tools ready!"
+
+##@ Local Development
+
+.PHONY: local-env-setup
+local-env-setup: ## Setup complete local development environment with Kind cluster
+	@echo "========================================="
+	@echo "Kubernetes MCP Server - Local Setup"
+	@echo "========================================="
+	$(MAKE) tools
+	$(MAKE) kind-create-cluster
+	$(MAKE) keycloak-install
+	$(MAKE) build
+	@echo ""
+	@echo "========================================="
+	@echo "Local environment ready!"
+	@echo "========================================="
+	@echo ""
+	@echo "Configuration file generated:"
+	@echo "  _output/config.toml"
+	@echo ""
+	@echo "Run the MCP server with:"
+	@echo "  ./$(BINARY_NAME) --port 8008 --config _output/config.toml"
+	@echo ""
+	@echo "Or run with MCP inspector:"
+	@echo "  npx @modelcontextprotocol/inspector@latest \$$(pwd)/$(BINARY_NAME) --config _output/config.toml"
+
+.PHONY: local-env-teardown
+local-env-teardown: ## Tear down the local Kind cluster
+	$(MAKE) kind-delete-cluster
+
+# Include build configuration files
+-include build/*.mk
