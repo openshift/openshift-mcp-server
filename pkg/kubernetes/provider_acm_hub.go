@@ -41,7 +41,7 @@ type ACMProviderConfig struct {
 func (c *ACMProviderConfig) Validate() error {
 	var err error = nil
 
-	if c.ClusterProxyAddonCAFile == "" {
+	if c.ClusterProxyAddonHost == "" {
 		err = errors.Join(err, fmt.Errorf("cluster_proxy_addon_host is required"))
 	}
 
@@ -146,9 +146,10 @@ func (m *Manager) IsACMHub() bool {
 	return false
 }
 
-func newACMHubClusterProvider(m *Manager, cfg *config.StaticConfig) (Provider, error) {
-	if !m.IsInCluster() {
-		return nil, fmt.Errorf("acm provider required in-cluster deployment")
+func newACMHubClusterProvider(cfg *config.StaticConfig) (Provider, error) {
+	m, err := NewInClusterManager(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create in-cluster Kubernetes Manager for acm-hub cluster provider strategy: %w", err)
 	}
 
 	providerCfg, ok := cfg.GetProviderConfig(config.ClusterProviderACM)
@@ -159,14 +160,14 @@ func newACMHubClusterProvider(m *Manager, cfg *config.StaticConfig) (Provider, e
 	return newACMClusterProvider(m, providerCfg.(*ACMProviderConfig), false)
 }
 
-func newACMKubeConfigClusterProvider(m *Manager, cfg *config.StaticConfig) (Provider, error) {
+func newACMKubeConfigClusterProvider(cfg *config.StaticConfig) (Provider, error) {
 	providerCfg, ok := cfg.GetProviderConfig(config.ClusterProviderACMKubeConfig)
 	if !ok {
 		return nil, fmt.Errorf("missing required config for strategy '%s'", config.ClusterProviderACMKubeConfig)
 	}
 
 	acmKubeConfigProviderCfg := providerCfg.(*ACMKubeConfigProviderConfig)
-	baseManager, err := m.newForContext(acmKubeConfigProviderCfg.ContextName)
+	baseManager, err := NewKubeconfigManager(cfg, acmKubeConfigProviderCfg.ContextName)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to create manager to hub cluster specified by acm_context_name %s: %w",
