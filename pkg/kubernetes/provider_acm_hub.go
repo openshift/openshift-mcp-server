@@ -22,7 +22,11 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 )
 
-const ACMHubTargetParameterName = "cluster"
+const (
+	ACMHubTargetParameterName    = "cluster"
+	ClusterProviderACM           = "acm"
+	ClusterProviderACMKubeConfig = "acm-kubeconfig"
+)
 
 // ACMProviderConfig holds ACM-specific configuration that users can set in config.toml
 type ACMProviderConfig struct {
@@ -109,11 +113,11 @@ type acmHubClusterProvider struct {
 var _ Provider = &acmHubClusterProvider{}
 
 func init() {
-	RegisterProvider(config.ClusterProviderACM, newACMHubClusterProvider)
-	RegisterProvider(config.ClusterProviderACMKubeConfig, newACMKubeConfigClusterProvider)
+	RegisterProvider(ClusterProviderACM, newACMHubClusterProvider)
+	RegisterProvider(ClusterProviderACMKubeConfig, newACMKubeConfigClusterProvider)
 
-	config.RegisterProviderConfig(config.ClusterProviderACM, parseAcmConfig)
-	config.RegisterProviderConfig(config.ClusterProviderACMKubeConfig, parseAcmKubeConfigConfig)
+	config.RegisterProviderConfig(ClusterProviderACM, parseAcmConfig)
+	config.RegisterProviderConfig(ClusterProviderACMKubeConfig, parseAcmKubeConfigConfig)
 }
 
 // IsACMHub checks if the current cluster is an ACM hub by looking for ACM CRDs
@@ -152,18 +156,18 @@ func newACMHubClusterProvider(cfg *config.StaticConfig) (Provider, error) {
 		return nil, fmt.Errorf("failed to create in-cluster Kubernetes Manager for acm-hub cluster provider strategy: %w", err)
 	}
 
-	providerCfg, ok := cfg.GetProviderConfig(config.ClusterProviderACM)
+	providerCfg, ok := cfg.GetProviderConfig(ClusterProviderACM)
 	if !ok {
-		return nil, fmt.Errorf("missing required config for strategy '%s'", config.ClusterProviderACM)
+		return nil, fmt.Errorf("missing required config for strategy '%s'", ClusterProviderACM)
 	}
 
 	return newACMClusterProvider(m, providerCfg.(*ACMProviderConfig), false)
 }
 
 func newACMKubeConfigClusterProvider(cfg *config.StaticConfig) (Provider, error) {
-	providerCfg, ok := cfg.GetProviderConfig(config.ClusterProviderACMKubeConfig)
+	providerCfg, ok := cfg.GetProviderConfig(ClusterProviderACMKubeConfig)
 	if !ok {
-		return nil, fmt.Errorf("missing required config for strategy '%s'", config.ClusterProviderACMKubeConfig)
+		return nil, fmt.Errorf("missing required config for strategy '%s'", ClusterProviderACMKubeConfig)
 	}
 
 	acmKubeConfigProviderCfg := providerCfg.(*ACMKubeConfigProviderConfig)
