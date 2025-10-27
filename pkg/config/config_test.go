@@ -11,8 +11,23 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type ConfigSuite struct {
+type BaseConfigSuite struct {
 	suite.Suite
+}
+
+func (s *BaseConfigSuite) writeConfig(content string) string {
+	s.T().Helper()
+	tempDir := s.T().TempDir()
+	path := filepath.Join(tempDir, "config.toml")
+	err := os.WriteFile(path, []byte(content), 0644)
+	if err != nil {
+		s.T().Fatalf("Failed to write config file %s: %v", path, err)
+	}
+	return path
+}
+
+type ConfigSuite struct {
+	BaseConfigSuite
 }
 
 func (s *ConfigSuite) TestReadConfigMissingFile() {
@@ -159,15 +174,47 @@ func (s *ConfigSuite) TestReadConfigValidPreservesDefaultsForMissingFields() {
 	})
 }
 
-func (s *ConfigSuite) writeConfig(content string) string {
-	s.T().Helper()
-	tempDir := s.T().TempDir()
-	path := filepath.Join(tempDir, "config.toml")
-	err := os.WriteFile(path, []byte(content), 0644)
-	if err != nil {
-		s.T().Fatalf("Failed to write config file %s: %v", path, err)
+func (s *ConfigSuite) TestMergeConfig() {
+	base := StaticConfig{
+		ListOutput: "table",
+		Toolsets:   []string{"core", "config", "helm"},
+		Port:       "8080",
 	}
-	return path
+	s.Run("merges override values on top of base", func() {
+		override := StaticConfig{
+			ListOutput: "json",
+			Port:       "9090",
+		}
+
+		result := mergeConfig(base, override)
+
+		s.Equal("json", result.ListOutput, "ListOutput should be overridden")
+		s.Equal("9090", result.Port, "Port should be overridden")
+	})
+
+	s.Run("preserves base values when override is empty", func() {
+		override := StaticConfig{}
+
+		result := mergeConfig(base, override)
+
+		s.Equal("table", result.ListOutput, "ListOutput should be preserved from base")
+		s.Equal([]string{"core", "config", "helm"}, result.Toolsets, "Toolsets should be preserved from base")
+		s.Equal("8080", result.Port, "Port should be preserved from base")
+	})
+
+	s.Run("handles partial overrides", func() {
+		override := StaticConfig{
+			Toolsets: []string{"custom"},
+			ReadOnly: true,
+		}
+
+		result := mergeConfig(base, override)
+
+		s.Equal("table", result.ListOutput, "ListOutput should be preserved from base")
+		s.Equal([]string{"custom"}, result.Toolsets, "Toolsets should be overridden")
+		s.Equal("8080", result.Port, "Port should be preserved from base since override doesn't specify it")
+		s.True(result.ReadOnly, "ReadOnly should be overridden to true")
+	})
 }
 
 func TestConfig(t *testing.T) {
