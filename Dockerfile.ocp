@@ -1,0 +1,42 @@
+ARG BUILDER_IMAGE=registry.redhat.io/ubi9/go-toolset:1.24.4-1754467841
+ARG BASE_IMAGE=registry.redhat.io/rhel9-4-els/rhel-minimal:9.4
+
+# Build the manager binary
+FROM ${BUILDER_IMAGE} AS builder
+ARG TARGETOS
+ARG TARGETARCH
+ARG TARGETPLATFORM
+
+USER 0
+
+WORKDIR /workspace
+COPY . .
+
+ENV GOEXPERIMENT=strictfipsruntime
+RUN make -f Makefile-ocp.mk build-ocp GO_BUILD_ENV='GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH}'
+
+FROM --platform=$TARGETPLATFORM ${BASE_IMAGE}
+WORKDIR /
+COPY --from=builder /workspace/openshift-mcp-server .
+RUN mkdir /licenses
+COPY --from=builder /workspace/LICENSE /licenses/.
+USER 65532:65532
+
+COPY mcp_config.toml /mcp_config.toml
+ENV CONFIG_PATH=/mcp_config.toml
+
+# Labels for enterprise contract
+LABEL com.redhat.component=openshift-mcp-server
+LABEL cpe="cpe:/a:redhat:openshift_lightspeed:1::el9"
+LABEL description="Red Hat OpenShift MCP Server"
+LABEL io.k8s.description="Red Hat OpenShift MCP Server"
+LABEL io.k8s.display-name="Red Hat OpenShift MCP Server"
+LABEL io.openshift.tags="openshift,mcp"
+LABEL name="openshift-lightspeed/openshift-mcp-server-rhel9"
+LABEL release=0.0.1
+LABEL url="https://github.com/openshift/openshift-mcp-server"
+LABEL vendor="Red Hat, Inc."
+LABEL version=0.0.1
+LABEL summary="Red Hat OpenShift MCP Server"
+
+ENTRYPOINT ["/openshift-mcp-server", "--config", "$CONFIG_PATH"]
