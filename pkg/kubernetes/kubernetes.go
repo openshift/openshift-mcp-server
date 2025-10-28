@@ -5,6 +5,7 @@ import (
 
 	"github.com/containers/kubernetes-mcp-server/pkg/helm"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 )
@@ -36,4 +37,9 @@ var ParameterCodec = runtime.NewParameterCodec(Scheme)
 func (k *Kubernetes) NewHelm() *helm.Helm {
 	// This is a derived Kubernetes, so it already has the Helm initialized
 	return helm.NewHelm(k.manager)
+}
+
+// ToRESTConfig returns the REST configuration from the underlying manager
+func (k *Kubernetes) ToRESTConfig() (*rest.Config, error) {
+	return k.manager.ToRESTConfig()
 }

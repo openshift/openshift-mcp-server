@@ -202,6 +202,21 @@ func (m *Manager) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 	return m.clientCmdConfig
 }
 
+// GetRESTConfig returns the REST config for OpenShift AI client creation
+func (m *Manager) GetRESTConfig() *rest.Config {
+	return m.cfg
+}
+
+// GetDiscoveryClient returns the discovery client for OpenShift AI operations
+func (m *Manager) GetDiscoveryClient() discovery.CachedDiscoveryInterface {
+	return m.discoveryClient
+}
+
+// GetDynamicClient returns the dynamic client for OpenShift AI operations
+func (m *Manager) GetDynamicClient() *dynamic.DynamicClient {
+	return m.dynamicClient
+}
+
 func (m *Manager) VerifyToken(ctx context.Context, token, audience string) (*authenticationv1api.UserInfo, []string, error) {
 	tokenReviewClient, err := m.accessControlClientSet.TokenReview()
 	if err != nil {
