@@ -1,0 +1,9 @@
+reviewers:
+  - ardaguclu
+  - Cali0707
+  - matzew
+approvers:
+  - ardaguclu
+  - Cali0707
+  - matzew
+component: "openshift-mcp-server"
