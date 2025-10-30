@@ -7,6 +7,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	openshiftai "github.com/containers/kubernetes-mcp-server/pkg/openshift-ai"
+	"k8s.io/client-go/rest"
 )
 
 // ModelsToolset provides tools for managing OpenShift AI Models
@@ -74,10 +75,13 @@ func (t *ModelsToolset) handleModelsList(params api.ToolHandlerParams) (*api.Too
 	status, _ := args["status"].(string)
 
 	// Get OpenShift AI client from Kubernetes manager
-	openshiftAIClient, err := getOpenShiftAIClient(params.Kubernetes)
+	clientInterface, err := params.Kubernetes.GetOrCreateOpenShiftAIClient(func(cfg *rest.Config, config interface{}) (interface{}, error) {
+		return openshiftai.NewClient(cfg, nil)
+	})
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get OpenShift AI client: %w", err)), nil
 	}
+	openshiftAIClient := clientInterface.(*openshiftai.Client)
 
 	// Create Model client
 	modelClient := openshiftai.NewModelClient(openshiftAIClient)
@@ -111,10 +115,13 @@ func (t *ModelsToolset) handleModelGet(params api.ToolHandlerParams) (*api.ToolC
 	}
 
 	// Get OpenShift AI client from Kubernetes manager
-	openshiftAIClient, err := getOpenShiftAIClient(params.Kubernetes)
+	clientInterface, err := params.Kubernetes.GetOrCreateOpenShiftAIClient(func(cfg *rest.Config, config interface{}) (interface{}, error) {
+		return openshiftai.NewClient(cfg, nil)
+	})
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get OpenShift AI client: %w", err)), nil
 	}
+	openshiftAIClient := clientInterface.(*openshiftai.Client)
 
 	// Create Model client
 	modelClient := openshiftai.NewModelClient(openshiftAIClient)
@@ -188,10 +195,13 @@ func (t *ModelsToolset) handleModelCreate(params api.ToolHandlerParams) (*api.To
 	}
 
 	// Get OpenShift AI client from Kubernetes manager
-	openshiftAIClient, err := getOpenShiftAIClient(params.Kubernetes)
+	clientInterface, err := params.Kubernetes.GetOrCreateOpenShiftAIClient(func(cfg *rest.Config, config interface{}) (interface{}, error) {
+		return openshiftai.NewClient(cfg, nil)
+	})
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get OpenShift AI client: %w", err)), nil
 	}
+	openshiftAIClient := clientInterface.(*openshiftai.Client)
 
 	// Create Model client
 	modelClient := openshiftai.NewModelClient(openshiftAIClient)
@@ -266,10 +276,13 @@ func (t *ModelsToolset) handleModelUpdate(params api.ToolHandlerParams) (*api.To
 	}
 
 	// Get OpenShift AI client from Kubernetes manager
-	openshiftAIClient, err := getOpenShiftAIClient(params.Kubernetes)
+	clientInterface, err := params.Kubernetes.GetOrCreateOpenShiftAIClient(func(cfg *rest.Config, config interface{}) (interface{}, error) {
+		return openshiftai.NewClient(cfg, nil)
+	})
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get OpenShift AI client: %w", err)), nil
 	}
+	openshiftAIClient := clientInterface.(*openshiftai.Client)
 
 	// Create Model client
 	modelClient := openshiftai.NewModelClient(openshiftAIClient)
@@ -312,10 +325,13 @@ func (t *ModelsToolset) handleModelDelete(params api.ToolHandlerParams) (*api.To
 	}
 
 	// Get OpenShift AI client from Kubernetes manager
-	openshiftAIClient, err := getOpenShiftAIClient(params.Kubernetes)
+	clientInterface, err := params.Kubernetes.GetOrCreateOpenShiftAIClient(func(cfg *rest.Config, config interface{}) (interface{}, error) {
+		return openshiftai.NewClient(cfg, nil)
+	})
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get OpenShift AI client: %w", err)), nil
 	}
+	openshiftAIClient := clientInterface.(*openshiftai.Client)
 
 	// Create Model client
 	modelClient := openshiftai.NewModelClient(openshiftAIClient)

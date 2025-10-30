@@ -7,6 +7,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	openshiftai "github.com/containers/kubernetes-mcp-server/pkg/openshift-ai"
+	"k8s.io/client-go/rest"
 )
 
 // PipelinesToolset provides tools for managing OpenShift AI Data Science Pipelines
@@ -78,10 +79,13 @@ func (t *PipelinesToolset) handlePipelinesList(params api.ToolHandlerParams) (*a
 	status, _ := args["status"].(string)
 
 	// Get OpenShift AI client from Kubernetes manager
-	openshiftAIClient, err := getOpenShiftAIClient(params.Kubernetes)
+	clientInterface, err := params.Kubernetes.GetOrCreateOpenShiftAIClient(func(cfg *rest.Config, config interface{}) (interface{}, error) {
+		return openshiftai.NewClient(cfg, nil)
+	})
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get OpenShift AI client: %w", err)), nil
 	}
+	openshiftAIClient := clientInterface.(*openshiftai.Client)
 
 	// Create Pipeline client
 	pipelineClient := openshiftai.NewPipelineClient(openshiftAIClient)
@@ -141,10 +145,13 @@ func (t *PipelinesToolset) handlePipelineGet(params api.ToolHandlerParams) (*api
 	}
 
 	// Get OpenShift AI client from Kubernetes manager
-	openshiftAIClient, err := getOpenShiftAIClient(params.Kubernetes)
+	clientInterface, err := params.Kubernetes.GetOrCreateOpenShiftAIClient(func(cfg *rest.Config, config interface{}) (interface{}, error) {
+		return openshiftai.NewClient(cfg, nil)
+	})
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get OpenShift AI client: %w", err)), nil
 	}
+	openshiftAIClient := clientInterface.(*openshiftai.Client)
 
 	// Create Pipeline client
 	pipelineClient := openshiftai.NewPipelineClient(openshiftAIClient)
@@ -192,10 +199,13 @@ func (t *PipelinesToolset) handlePipelineCreate(params api.ToolHandlerParams) (*
 	}
 
 	// Get OpenShift AI client from Kubernetes manager
-	openshiftAIClient, err := getOpenShiftAIClient(params.Kubernetes)
+	clientInterface, err := params.Kubernetes.GetOrCreateOpenShiftAIClient(func(cfg *rest.Config, config interface{}) (interface{}, error) {
+		return openshiftai.NewClient(cfg, nil)
+	})
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get OpenShift AI client: %w", err)), nil
 	}
+	openshiftAIClient := clientInterface.(*openshiftai.Client)
 
 	// Create Pipeline client
 	pipelineClient := openshiftai.NewPipelineClient(openshiftAIClient)
@@ -269,10 +279,13 @@ func (t *PipelinesToolset) handlePipelineDelete(params api.ToolHandlerParams) (*
 	}
 
 	// Get OpenShift AI client from Kubernetes manager
-	openshiftAIClient, err := getOpenShiftAIClient(params.Kubernetes)
+	clientInterface, err := params.Kubernetes.GetOrCreateOpenShiftAIClient(func(cfg *rest.Config, config interface{}) (interface{}, error) {
+		return openshiftai.NewClient(cfg, nil)
+	})
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get OpenShift AI client: %w", err)), nil
 	}
+	openshiftAIClient := clientInterface.(*openshiftai.Client)
 
 	// Create Pipeline client
 	pipelineClient := openshiftai.NewPipelineClient(openshiftAIClient)
@@ -308,10 +321,13 @@ func (t *PipelinesToolset) handlePipelineRunsList(params api.ToolHandlerParams) 
 	status, _ := args["status"].(string)
 
 	// Get OpenShift AI client from Kubernetes manager
-	openshiftAIClient, err := getOpenShiftAIClient(params.Kubernetes)
+	clientInterface, err := params.Kubernetes.GetOrCreateOpenShiftAIClient(func(cfg *rest.Config, config interface{}) (interface{}, error) {
+		return openshiftai.NewClient(cfg, nil)
+	})
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get OpenShift AI client: %w", err)), nil
 	}
+	openshiftAIClient := clientInterface.(*openshiftai.Client)
 
 	// Create Pipeline client
 	pipelineClient := openshiftai.NewPipelineClient(openshiftAIClient)
@@ -375,10 +391,13 @@ func (t *PipelinesToolset) handlePipelineRunGet(params api.ToolHandlerParams) (*
 	}
 
 	// Get OpenShift AI client from Kubernetes manager
-	openshiftAIClient, err := getOpenShiftAIClient(params.Kubernetes)
+	clientInterface, err := params.Kubernetes.GetOrCreateOpenShiftAIClient(func(cfg *rest.Config, config interface{}) (interface{}, error) {
+		return openshiftai.NewClient(cfg, nil)
+	})
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get OpenShift AI client: %w", err)), nil
 	}
+	openshiftAIClient := clientInterface.(*openshiftai.Client)
 
 	// Create Pipeline client
 	pipelineClient := openshiftai.NewPipelineClient(openshiftAIClient)

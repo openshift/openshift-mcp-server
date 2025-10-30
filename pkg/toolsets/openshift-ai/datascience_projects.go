@@ -7,7 +7,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	openshiftai "github.com/containers/kubernetes-mcp-server/pkg/openshift-ai"
-	"k8s.io/klog/v2"
+	"k8s.io/client-go/rest"
 )
 
 // DataScienceProjectsToolset provides tools for managing OpenShift AI Data Science Projects
@@ -65,10 +65,13 @@ func (t *DataScienceProjectsToolset) handleDataScienceProjectsList(params api.To
 	namespace, _ := args["namespace"].(string)
 
 	// Get OpenShift AI client from Kubernetes manager
-	openshiftAIClient, err := getOpenShiftAIClient(params.Kubernetes)
+	clientInterface, err := params.Kubernetes.GetOrCreateOpenShiftAIClient(func(cfg *rest.Config, config interface{}) (interface{}, error) {
+		return openshiftai.NewClient(cfg, nil)
+	})
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get OpenShift AI client: %w", err)), nil
 	}
+	openshiftAIClient := clientInterface.(*openshiftai.Client)
 
 	// Create DataScienceProject client
 	dsClient := openshiftai.NewDataScienceProjectClient(openshiftAIClient)
@@ -102,10 +105,13 @@ func (t *DataScienceProjectsToolset) handleDataScienceProjectGet(params api.Tool
 	}
 
 	// Get OpenShift AI client from Kubernetes manager
-	openshiftAIClient, err := getOpenShiftAIClient(params.Kubernetes)
+	clientInterface, err := params.Kubernetes.GetOrCreateOpenShiftAIClient(func(cfg *rest.Config, config interface{}) (interface{}, error) {
+		return openshiftai.NewClient(cfg, nil)
+	})
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get OpenShift AI client: %w", err)), nil
 	}
+	openshiftAIClient := clientInterface.(*openshiftai.Client)
 
 	// Create DataScienceProject client
 	dsClient := openshiftai.NewDataScienceProjectClient(openshiftAIClient)
@@ -167,10 +173,13 @@ func (t *DataScienceProjectsToolset) handleDataScienceProjectCreate(params api.T
 	}
 
 	// Get OpenShift AI client from Kubernetes manager
-	openshiftAIClient, err := getOpenShiftAIClient(params.Kubernetes)
+	clientInterface, err := params.Kubernetes.GetOrCreateOpenShiftAIClient(func(cfg *rest.Config, config interface{}) (interface{}, error) {
+		return openshiftai.NewClient(cfg, nil)
+	})
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get OpenShift AI client: %w", err)), nil
 	}
+	openshiftAIClient := clientInterface.(*openshiftai.Client)
 
 	// Create DataScienceProject client
 	dsClient := openshiftai.NewDataScienceProjectClient(openshiftAIClient)
@@ -213,10 +222,13 @@ func (t *DataScienceProjectsToolset) handleDataScienceProjectDelete(params api.T
 	}
 
 	// Get OpenShift AI client from Kubernetes manager
-	openshiftAIClient, err := getOpenShiftAIClient(params.Kubernetes)
+	clientInterface, err := params.Kubernetes.GetOrCreateOpenShiftAIClient(func(cfg *rest.Config, config interface{}) (interface{}, error) {
+		return openshiftai.NewClient(cfg, nil)
+	})
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get OpenShift AI client: %w", err)), nil
 	}
+	openshiftAIClient := clientInterface.(*openshiftai.Client)
 
 	// Create DataScienceProject client
 	dsClient := openshiftai.NewDataScienceProjectClient(openshiftAIClient)
@@ -229,22 +241,4 @@ func (t *DataScienceProjectsToolset) handleDataScienceProjectDelete(params api.T
 
 	content := fmt.Sprintf("Successfully deleted Data Science Project '%s' in namespace '%s'", name, namespace)
 	return api.NewToolCallResult(content, nil), nil
-}
-
-// getOpenShiftAIClient creates OpenShift AI client from Kubernetes manager
-func getOpenShiftAIClient(k8s *kubernetes.Kubernetes) (*openshiftai.Client, error) {
-	// Get REST config from Kubernetes manager
-	restConfig, err := k8s.ToRESTConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get REST config: %w", err)
-	}
-
-	// Create OpenShift AI client with default configuration
-	client, err := openshiftai.NewClient(restConfig, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create OpenShift AI client: %w", err)
-	}
-
-	klog.V(2).InfoS("Successfully created OpenShift AI client from Kubernetes manager")
-	return client, nil
 }
