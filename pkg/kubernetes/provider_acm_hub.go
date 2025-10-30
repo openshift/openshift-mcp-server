@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	authenticationv1api "k8s.io/api/authentication/v1"
@@ -56,6 +57,11 @@ func (c *ACMProviderConfig) Validate() error {
 	return err
 }
 
+func (c *ACMProviderConfig) ResolveClusterProxyAddonCAFilePath(ctx context.Context) {
+	path := config.ConfigDirPathFromContext(ctx)
+	c.ClusterProxyAddonCAFile = filepath.Join(path, c.ClusterProxyAddonCAFile)
+}
+
 type ACMKubeConfigProviderConfig struct {
 	ACMProviderConfig
 
@@ -74,22 +80,26 @@ func (c *ACMKubeConfigProviderConfig) Validate() error {
 	return err
 }
 
-func parseAcmConfig(primitive toml.Primitive, md toml.MetaData) (config.ProviderConfig, error) {
-	var cfg ACMProviderConfig
-	if err := md.PrimitiveDecode(primitive, &cfg); err != nil {
+func parseAcmConfig(ctx context.Context, primitive toml.Primitive, md toml.MetaData) (config.ProviderConfig, error) {
+	cfg := &ACMProviderConfig{}
+	if err := md.PrimitiveDecode(primitive, cfg); err != nil {
 		return nil, err
 	}
 
-	return &cfg, nil
+	cfg.ResolveClusterProxyAddonCAFilePath(ctx)
+
+	return cfg, nil
 }
 
-func parseAcmKubeConfigConfig(primitive toml.Primitive, md toml.MetaData) (config.ProviderConfig, error) {
-	var cfg ACMKubeConfigProviderConfig
+func parseAcmKubeConfigConfig(ctx context.Context, primitive toml.Primitive, md toml.MetaData) (config.ProviderConfig, error) {
+	cfg := &ACMKubeConfigProviderConfig{}
 	if err := md.PrimitiveDecode(primitive, &cfg); err != nil {
 		return nil, err
 	}
 
-	return &cfg, nil
+	cfg.ResolveClusterProxyAddonCAFilePath(ctx)
+
+	return cfg, nil
 }
 
 type acmHubClusterProvider struct {
