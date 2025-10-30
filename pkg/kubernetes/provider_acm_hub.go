@@ -74,7 +74,7 @@ func (c *ACMKubeConfigProviderConfig) Validate() error {
 	err := c.ACMProviderConfig.Validate()
 
 	if c.ContextName == "" {
-		err = errors.Join(err, fmt.Errorf("context_name is required is acm-kubeconfig strategy is used"))
+		err = errors.Join(err, fmt.Errorf("context_name is required if acm-kubeconfig strategy is used"))
 	}
 
 	return err
