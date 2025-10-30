@@ -48,6 +48,12 @@ func (c *ExperimentClient) List(ctx context.Context, namespace, status string) (
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert Experiment: %w", err)
 		}
+
+		// Filter by status if specified
+		if status != "" && experiment.Status.Phase != status {
+			continue
+		}
+
 		experiments = append(experiments, experiment)
 	}
 

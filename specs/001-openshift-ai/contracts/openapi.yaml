@@ -1,0 +1,856 @@
+openapi: 3.0.3
+info:
+  title: OpenShift AI MCP Server API
+  description: REST API contracts for OpenShift AI capabilities in Kubernetes MCP Server
+  version: 1.0.0
+
+paths:
+  /api/v1/datascience-projects:
+    get:
+      summary: List all Data Science Projects
+      parameters:
+        - name: namespace
+          in: query
+          schema:
+            type: string
+          description: Filter by namespace (optional)
+        - name: labelSelector
+          in: query
+          schema:
+            type: string
+          description: Kubernetes label selector (optional)
+      responses:
+        '200':
+          description: List of Data Science Projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DataScienceProject'
+
+  /api/v1/datascience-projects/{name}:
+    get:
+      summary: Get specific Data Science Project
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Project name
+        - name: namespace
+          in: query
+          schema:
+            type: string
+          description: Project namespace (optional)
+      responses:
+        '200':
+          description: Data Science Project details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataScienceProject'
+        '404':
+          description: Project not found
+
+    delete:
+      summary: Delete Data Science Project
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Project name
+        - name: namespace
+          in: query
+          schema:
+            type: string
+          description: Project namespace (optional)
+      responses:
+        '200':
+          description: Project deleted successfully
+        '404':
+          description: Project not found
+
+  /api/v1/notebooks:
+    get:
+      summary: List all Jupyter Notebooks
+      parameters:
+        - name: namespace
+          in: query
+          schema:
+            type: string
+          description: Filter by namespace (optional)
+        - name: labelSelector
+          in: query
+          schema:
+            type: string
+          description: Kubernetes label selector (optional)
+      responses:
+        '200':
+          description: List of Jupyter Notebooks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notebook'
+
+  /api/v1/notebooks/{name}:
+    get:
+      summary: Get specific Jupyter Notebook
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Notebook name
+        - name: namespace
+          in: query
+          schema:
+            type: string
+          description: Notebook namespace (optional)
+      responses:
+        '200':
+          description: Notebook details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notebook'
+
+    post:
+      summary: Create new Jupyter Notebook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotebookCreateRequest'
+      responses:
+        '201':
+          description: Notebook created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notebook'
+
+    delete:
+      summary: Delete Jupyter Notebook
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Notebook name
+        - name: namespace
+          in: query
+          schema:
+            type: string
+          description: Notebook namespace (optional)
+      responses:
+        '200':
+          description: Notebook deleted successfully
+        '404':
+          description: Notebook not found
+
+  /api/v1/notebooks/{name}/start:
+    post:
+      summary: Start Jupyter Notebook
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Notebook name
+        - name: namespace
+          in: query
+          schema:
+            type: string
+          description: Notebook namespace (optional)
+      responses:
+        '200':
+          description: Notebook started successfully
+
+  /api/v1/notebooks/{name}/stop:
+    post:
+      summary: Stop Jupyter Notebook
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Notebook name
+        - name: namespace
+          in: query
+          schema:
+            type: string
+          description: Notebook namespace (optional)
+      responses:
+        '200':
+          description: Notebook stopped successfully
+
+  /api/v1/inference-services:
+    get:
+      summary: List all Inference Services
+      parameters:
+        - name: namespace
+          in: query
+          schema:
+            type: string
+          description: Filter by namespace (optional)
+        - name: labelSelector
+          in: query
+          schema:
+            type: string
+          description: Kubernetes label selector (optional)
+      responses:
+        '200':
+          description: List of Inference Services
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InferenceService'
+
+  /api/v1/inference-services/{name}:
+    get:
+      summary: Get specific Inference Service
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Service name
+        - name: namespace
+          in: query
+          schema:
+            type: string
+          description: Service namespace (optional)
+      responses:
+        '200':
+          description: Inference Service details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InferenceService'
+
+    post:
+      summary: Create new Inference Service
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InferenceServiceCreateRequest'
+      responses:
+        '201':
+          description: Inference Service created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InferenceService'
+
+    put:
+      summary: Update Inference Service
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Service name
+        - name: namespace
+          in: query
+          schema:
+            type: string
+          description: Service namespace (optional)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InferenceServiceUpdateRequest'
+      responses:
+        '200':
+          description: Inference Service updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InferenceService'
+
+    delete:
+      summary: Delete Inference Service
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Service name
+        - name: namespace
+          in: query
+          schema:
+            type: string
+          description: Service namespace (optional)
+      responses:
+        '200':
+          description: Inference Service deleted successfully
+        '404':
+          description: Inference Service not found
+
+  /api/v1/pipeline-runs:
+    get:
+      summary: List all Pipeline Runs
+      parameters:
+        - name: namespace
+          in: query
+          schema:
+            type: string
+          description: Filter by namespace (optional)
+        - name: pipeline
+          in: query
+          schema:
+            type: string
+          description: Filter by pipeline name (optional)
+        - name: status
+          in: query
+          schema:
+            type: string
+          description: Filter by status (optional)
+      responses:
+        '200':
+          description: List of Pipeline Runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PipelineRun'
+
+  /api/v1/pipeline-runs/{name}:
+    get:
+      summary: Get specific Pipeline Run
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Pipeline Run name
+        - name: namespace
+          in: query
+          schema:
+            type: string
+          description: Pipeline Run namespace (optional)
+      responses:
+        '200':
+          description: Pipeline Run details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PipelineRun'
+
+    post:
+      summary: Create new Pipeline Run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PipelineRunCreateRequest'
+      responses:
+        '201':
+          description: Pipeline Run created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PipelineRun'
+
+    delete:
+      summary: Cancel Pipeline Run
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Pipeline Run name
+        - name: namespace
+          in: query
+          schema:
+            type: string
+          description: Pipeline Run namespace (optional)
+      responses:
+        '200':
+          description: Pipeline Run cancelled successfully
+        '404':
+          description: Pipeline Run not found
+
+  /api/v1/gpu-resources:
+    get:
+      summary: Get GPU resource status
+      parameters:
+        - name: node
+          in: query
+          schema:
+            type: string
+          description: Filter by node name (optional)
+      responses:
+        '200':
+          description: GPU resource status
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GPUResource'
+
+  /api/v1/gpu-metrics:
+    get:
+      summary: Get detailed GPU metrics
+      parameters:
+        - name: node
+          in: query
+          schema:
+            type: string
+          description: Filter by node name (optional)
+      responses:
+        '200':
+          description: GPU metrics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GPUMetrics'
+
+components:
+  schemas:
+    DataScienceProject:
+      type: object
+      properties:
+        metadata:
+          type: object
+          properties:
+            name:
+              type: string
+            namespace:
+              type: string
+            creationTimestamp:
+              type: string
+              format: date-time
+        spec:
+          type: object
+          properties:
+            displayName:
+              type: string
+            description:
+              type: string
+            resources:
+              type: object
+              properties:
+                limits:
+                  type: object
+                  properties:
+                    cpu:
+                      type: string
+                    memory:
+                      type: string
+                    requests.nvidia.com/gpu:
+                      type: string
+        status:
+          type: object
+          properties:
+            phase:
+              type: string
+              enum: [Creating, Ready, Failed, Deleting]
+            message:
+              type: string
+
+    Notebook:
+      type: object
+      properties:
+        metadata:
+          type: object
+          properties:
+            name:
+              type: string
+            namespace:
+              type: string
+            creationTimestamp:
+              type: string
+              format: date-time
+        spec:
+          type: object
+          properties:
+            template:
+              type: object
+              properties:
+                spec:
+                  type: object
+                  properties:
+                    containers:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          image:
+                            type: string
+                          resources:
+                            type: object
+                            properties:
+                              limits:
+                                type: object
+                                properties:
+                                  cpu:
+                                    type: string
+                                  memory:
+                                    type: string
+                                  requests.nvidia.com/gpu:
+                                    type: string
+                          env:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name:
+                                  type: string
+                                value:
+                                  type: string
+        status:
+          type: object
+          properties:
+            phase:
+              type: string
+              enum: [Creating, Pending, Ready, Stopping, Stopped, Failed]
+            conditions:
+              type: array
+              items:
+                type: object
+                properties:
+                  type:
+                    type: string
+                  status:
+                    type: string
+                  reason:
+                    type: string
+                  message:
+                    type: string
+            url:
+              type: string
+              format: uri
+
+    NotebookCreateRequest:
+      type: object
+      required: [name, image]
+      properties:
+        name:
+          type: string
+        namespace:
+          type: string
+        image:
+          type: string
+        resources:
+          type: object
+          properties:
+            cpu:
+              type: string
+            memory:
+              type: string
+            requests.nvidia.com/gpu:
+              type: string
+        env:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              value:
+                type: string
+
+    InferenceService:
+      type: object
+      properties:
+        metadata:
+          type: object
+          properties:
+            name:
+              type: string
+            namespace:
+              type: string
+            creationTimestamp:
+              type: string
+              format: date-time
+        spec:
+          type: object
+          properties:
+            predictor:
+              type: object
+              properties:
+                model:
+                  type: object
+                  properties:
+                    modelFormat:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                          enum: [pytorch, tensorflow, onnx, sklearn, xgboost]
+                    protocol:
+                      type: string
+                      enum: [v1, v2, grpc-v1]
+                    storageUri:
+                      type: string
+                    resources:
+                      type: object
+                      properties:
+                        limits:
+                          type: object
+                          properties:
+                            cpu:
+                              type: string
+                            memory:
+                              type: string
+                            requests.nvidia.com/gpu:
+                              type: string
+                replicas:
+                  type: integer
+                  minimum: 1
+        status:
+          type: object
+          properties:
+            url:
+              type: string
+              format: uri
+            conditions:
+              type: array
+              items:
+                type: object
+                properties:
+                  type:
+                    type: string
+                  status:
+                    type: string
+                  reason:
+                    type: string
+                  message:
+                    type: string
+            predictorStatus:
+              type: object
+
+    InferenceServiceCreateRequest:
+      type: object
+      required: [name, modelFormat, protocol, storageUri]
+      properties:
+        name:
+          type: string
+        namespace:
+          type: string
+        modelFormat:
+          type: string
+          enum: [pytorch, tensorflow, onnx, sklearn, xgboost]
+        protocol:
+          type: string
+          enum: [v1, v2, grpc-v1]
+        storageUri:
+          type: string
+        resources:
+          type: object
+          properties:
+            cpu:
+              type: string
+            memory:
+              type: string
+            requests.nvidia.com/gpu:
+              type: string
+        replicas:
+          type: integer
+          minimum: 1
+          default: 1
+
+    InferenceServiceUpdateRequest:
+      type: object
+      properties:
+        modelFormat:
+          type: string
+          enum: [pytorch, tensorflow, onnx, sklearn, xgboost]
+        protocol:
+          type: string
+          enum: [v1, v2, grpc-v1]
+        storageUri:
+          type: string
+        resources:
+          type: object
+          properties:
+            cpu:
+              type: string
+            memory:
+              type: string
+            requests.nvidia.com/gpu:
+              type: string
+        replicas:
+          type: integer
+          minimum: 1
+        canary:
+          type: object
+          properties:
+            replicas:
+              type: integer
+              minimum: 0
+
+    PipelineRun:
+      type: object
+      properties:
+        metadata:
+          type: object
+          properties:
+            name:
+              type: string
+            namespace:
+              type: string
+            creationTimestamp:
+              type: string
+              format: date-time
+        spec:
+          type: object
+          properties:
+            pipelineRef:
+              type: object
+              properties:
+                name:
+                  type: string
+            params:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  value:
+                    type: string
+            workspaces:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  volumeClaim:
+                    type: object
+        status:
+          type: object
+          properties:
+            startTime:
+              type: string
+              format: date-time
+            completionTime:
+              type: string
+              format: date-time
+            conditions:
+              type: array
+              items:
+                type: object
+                properties:
+                  type:
+                    type: string
+                  status:
+                    type: string
+                  reason:
+                    type: string
+                  message:
+                    type: string
+            taskRuns:
+              type: array
+              items:
+                type: object
+            artifacts:
+              type: array
+              items:
+                type: object
+
+    PipelineRunCreateRequest:
+      type: object
+      required: [pipelineName]
+      properties:
+        name:
+          type: string
+        namespace:
+          type: string
+        pipelineName:
+          type: string
+        params:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              value:
+                type: string
+        workspaces:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              volumeClaim:
+                type: object
+
+    GPUResource:
+      type: object
+      properties:
+        nodeName:
+          type: string
+        gpuType:
+          type: string
+        totalGPUs:
+          type: integer
+          minimum: 0
+        allocatedGPUs:
+          type: integer
+          minimum: 0
+        availableGPUs:
+          type: integer
+          minimum: 0
+        utilizationPercent:
+          type: number
+          minimum: 0
+          maximum: 100
+
+    GPUMetrics:
+      type: object
+      properties:
+        nodeName:
+          type: string
+        gpuType:
+          type: string
+        gpuIndex:
+          type: integer
+          minimum: 0
+        utilizationPercent:
+          type: number
+          minimum: 0
+          maximum: 100
+        memoryUsedMB:
+          type: integer
+          minimum: 0
+        memoryTotalMB:
+          type: integer
+          minimum: 0
+        temperatureCelsius:
+          type: number
+        powerUsageWatts:
+          type: number
+          minimum: 0

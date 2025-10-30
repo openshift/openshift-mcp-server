@@ -29,13 +29,26 @@ func (c *PipelineClient) List(ctx context.Context, namespace string, filters map
 		return nil, err
 	}
 
+	// Build list options with label selector from filters
+	listOpts := metav1.ListOptions{}
+	if len(filters) > 0 {
+		labelSelector := ""
+		for k, v := range filters {
+			if labelSelector != "" {
+				labelSelector += ","
+			}
+			labelSelector += k + "=" + v
+		}
+		listOpts.LabelSelector = labelSelector
+	}
+
 	resourceInterface := c.client.GetDynamicClient().Resource(gvr)
 	var list *unstructured.UnstructuredList
 
 	if namespace != "" {
-		list, err = resourceInterface.Namespace(namespace).List(ctx, metav1.ListOptions{})
+		list, err = resourceInterface.Namespace(namespace).List(ctx, listOpts)
 	} else {
-		list, err = resourceInterface.List(ctx, metav1.ListOptions{})
+		list, err = resourceInterface.List(ctx, listOpts)
 	}
 
 	if err != nil {
@@ -137,13 +150,26 @@ func (c *PipelineClient) ListRuns(ctx context.Context, namespace string, filters
 		return nil, err
 	}
 
+	// Build list options with label selector from filters
+	listOpts := metav1.ListOptions{}
+	if len(filters) > 0 {
+		labelSelector := ""
+		for k, v := range filters {
+			if labelSelector != "" {
+				labelSelector += ","
+			}
+			labelSelector += k + "=" + v
+		}
+		listOpts.LabelSelector = labelSelector
+	}
+
 	resourceInterface := c.client.GetDynamicClient().Resource(gvr)
 	var list *unstructured.UnstructuredList
 
 	if namespace != "" {
-		list, err = resourceInterface.Namespace(namespace).List(ctx, metav1.ListOptions{})
+		list, err = resourceInterface.Namespace(namespace).List(ctx, listOpts)
 	} else {
-		list, err = resourceInterface.List(ctx, metav1.ListOptions{})
+		list, err = resourceInterface.List(ctx, listOpts)
 	}
 
 	if err != nil {

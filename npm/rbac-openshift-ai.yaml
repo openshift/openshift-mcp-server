@@ -1,0 +1,64 @@
+---
+# Option 2: OpenShift AI Specific Permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: openshift-ai-admin
+rules:
+# Core Kubernetes resources (needed for OpenShift AI operations)
+- apiGroups: [""]
+  resources: ["namespaces", "configmaps", "secrets", "services", "pods", "persistentvolumeclaims"]
+  verbs: ["*"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "statefulsets"]
+  verbs: ["*"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+  verbs: ["*"]
+
+# OpenShift AI/RHODS specific resources
+- apiGroups: ["datascience.opendatahub.io"]
+  resources: ["datascienceprojects", "datasciencepipelines", "datasciencepipelinesapplications"]
+  verbs: ["*"]
+- apiGroups: ["kubeflow.org"]
+  resources: ["notebooks", "notebooktemplates", "poddefaults"]
+  verbs: ["*"]
+- apiGroups: ["serving.kserve.io"]
+  resources: ["inferenceservices", "inferencegraphs"]
+  verbs: ["*"]
+- apiGroups: ["serving.kubeflow.org"]
+  resources: ["inferenceservices", "inferencegraphs"]
+  verbs: ["*"]
+- apiGroups: ["modelmesh-serving.io"]
+  resources: ["inferenceservices", "modelmeshes"]
+  verbs: ["*"]
+- apiGroups: ["odh.ai"]
+  resources: ["*"]
+  verbs: ["*"]
+- apiGroups: ["dashboard.opendatahub.io"]
+  resources: ["odhdashboardconfigs"]
+  verbs: ["*"]
+
+# OpenShift routes (needed for model serving)
+- apiGroups: ["route.openshift.io"]
+  resources: ["routes"]
+  verbs: ["*"]
+
+# Custom Resource Definitions access
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["list", "watch", "get"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mcp-bot-openshift-ai-admin
+subjects:
+- kind: ServiceAccount
+  name: mcp-bot
+  namespace: macayaven-dev
+roleRef:
+  kind: ClusterRole
+  name: openshift-ai-admin
+  apiGroup: rbac.authorization.k8s.io

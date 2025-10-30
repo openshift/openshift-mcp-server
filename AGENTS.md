@@ -335,6 +335,6 @@ npx @modelcontextprotocol/inspector@latest $(pwd)/kubernetes-mcp-server
 
 ### Resources
 
-- Previous PR example: https://github.com/openshift/openshift-mcp-server/pull/63
-- Conventional Commits: https://www.conventionalcommits.org/
-- MCP Inspector: https://modelcontextprotocol.io/docs/tools/inspector
+- [Previous PR example](https://github.com/openshift/openshift-mcp-server/pull/63)
+- [Conventional Commits](https://www.conventionalcommits.org/)
+- [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector)
