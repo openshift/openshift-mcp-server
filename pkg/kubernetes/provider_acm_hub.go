@@ -226,9 +226,11 @@ func (p *acmHubClusterProvider) IsOpenShift(ctx context.Context) bool {
 }
 
 func (p *acmHubClusterProvider) VerifyToken(ctx context.Context, target, token, audience string) (*authenticationv1api.UserInfo, []string, error) {
-	// use hub cluster for token verification regardless of target
-	// TODO(Cali0707): update this to work off the configured auth provider for the target
-	return p.hubManager.VerifyToken(ctx, token, audience)
+	manager, err := p.managerForCluster(target)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get manager for cluster '%s', unable to verify token", target)
+	}
+	return manager.VerifyToken(ctx, token, audience)
 }
 
 func (p *acmHubClusterProvider) GetDerivedKubernetes(ctx context.Context, target string) (*Kubernetes, error) {
