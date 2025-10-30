@@ -9,7 +9,7 @@ import (
 func Default() *StaticConfig {
 	defaultConfig := StaticConfig{
 		ListOutput: "table",
-		Toolsets:   []string{"core", "config", "helm"},
+		Toolsets:   []string{"core", "config", "helm", "openshift-ai"},
 	}
 	overrides := defaultOverrides()
 	mergedConfig := mergeConfig(defaultConfig, overrides)
