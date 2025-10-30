@@ -43,3 +43,9 @@ func (k *Kubernetes) NewHelm() *helm.Helm {
 func (k *Kubernetes) ToRESTConfig() (*rest.Config, error) {
 	return k.manager.ToRESTConfig()
 }
+
+// GetOrCreateOpenShiftAIClient returns a cached OpenShift AI client instance from the underlying manager
+// clientFactory should be a function that creates the OpenShift AI client: func(*rest.Config, interface{}) (interface{}, error)
+func (k *Kubernetes) GetOrCreateOpenShiftAIClient(clientFactory func(*rest.Config, interface{}) (interface{}, error)) (interface{}, error) {
+	return k.manager.GetOrCreateOpenShiftAIClient(clientFactory)
+}
