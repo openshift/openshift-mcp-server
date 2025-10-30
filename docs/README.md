@@ -18,5 +18,6 @@ Choose the guide that matches your needs:
 
 ## Additional Documentation
 
+- **[ACM Cluster Provider](ACM_CLUSTER_PROVIDER.md)** - Configure multi-cluster management with Red Hat Advanced Cluster Management
 - **[Keycloak OIDC Setup](KEYCLOAK_OIDC_SETUP.md)** - Developer guide for local Keycloak environment and testing with MCP Inspector
 - **[Main README](../README.md)** - Project overview and general information
