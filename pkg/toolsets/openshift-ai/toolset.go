@@ -28,10 +28,12 @@ func (t *Toolset) GetDescription() string {
 func (t *Toolset) GetTools(o internalk8s.Openshift) []api.ServerTool {
 	tools := []api.ServerTool{}
 
-	// For initial integration, only Data Science Project tools are registered.
-	// Additional OpenShift AI tools (models, experiments, applications, pipelines)
-	// can be enabled in future PRs once test data and docs are updated.
+	// Register all OpenShift AI tools
 	tools = append(tools, t.createDataScienceProjectTools(o)...)
+	tools = append(tools, t.createModelTools(o)...)
+	tools = append(tools, t.createApplicationTools(o)...)
+	tools = append(tools, t.createExperimentTools(o)...)
+	tools = append(tools, t.createPipelineTools(o)...)
 
 	return tools
 }
@@ -45,8 +47,28 @@ func (t *Toolset) createDataScienceProjectTools(o internalk8s.Openshift) []api.S
 }
 
 // createModelTools creates Model management tools
-// The following helpers for additional OpenShift AI tools are intentionally
-// omitted from registration for now to keep the scope minimal and tests stable.
+func (t *Toolset) createModelTools(o internalk8s.Openshift) []api.ServerTool {
+	tempToolset := &ModelsToolset{}
+	return tempToolset.GetTools(o)
+}
+
+// createApplicationTools creates Application management tools
+func (t *Toolset) createApplicationTools(o internalk8s.Openshift) []api.ServerTool {
+	tempToolset := &ApplicationsToolset{}
+	return tempToolset.GetTools(o)
+}
+
+// createExperimentTools creates Experiment management tools
+func (t *Toolset) createExperimentTools(o internalk8s.Openshift) []api.ServerTool {
+	tempToolset := &ExperimentsToolset{}
+	return tempToolset.GetTools(o)
+}
+
+// createPipelineTools creates Pipeline management tools
+func (t *Toolset) createPipelineTools(o internalk8s.Openshift) []api.ServerTool {
+	tempToolset := &PipelinesToolset{}
+	return tempToolset.GetTools(o)
+}
 
 func init() {
 	toolsets.Register(&Toolset{})

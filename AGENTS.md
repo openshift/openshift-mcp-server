@@ -183,3 +183,158 @@ The server is distributed as a binary executable, a Docker image, an npm package
 - A **Python** package is available at [pypi.org](https://pypi.org/project/kubernetes-mcp-server/).
   It provides a script that downloads the correct platform binary from the GitHub releases page and runs it.
   It provides a convenient way to run the server using `uvx` or `python -m kubernetes_mcp_server`.
+
+## Contributing to Red Hat OpenShift MCP Server
+
+This is a **fork** of the official Red Hat openshift-mcp-server repository. When contributing upstream, follow these strict requirements.
+
+### Git Remote Configuration
+
+This fork has the following remotes configured:
+
+```bash
+fork:     https://github.com/macayaven/openshift-mcp-server.git     # Your fork
+origin:   https://github.com/openshift/openshift-mcp-server.git     # Red Hat upstream
+upstream: https://github.com/containers/kubernetes-mcp-server.git   # Original project
+```
+
+### Red Hat PR Requirements (from PR #63 feedback)
+
+**CRITICAL**: Red Hat reviewers require clean, well-organized PRs. Based on PR #63 feedback:
+
+1. **Clean Commit History - MANDATORY**
+   - **Rebase before submitting**: Squash WIP commits into logical, reviewable chunks
+   - **One feature per commit** (or small number of well-organized commits)
+   - Reviewers WILL request rebasing if there are too many commits
+   - Use `git rebase -i origin/main` to clean up history before creating PR
+   - Example: 37 commits → rebased to 3-5 logical commits
+
+2. **Commit Message Format**
+   - Follow conventional commits style
+   - Clear, descriptive commit messages
+   - Reference issues if applicable
+   - Format: `type: description` (e.g., `feat: add OpenShift AI toolset`)
+
+3. **Code Quality Requirements**
+   - Must pass `make build`
+   - Must pass `make lint`
+   - Must pass `make test`
+   - Test with mcp-inspector: `npx @modelcontextprotocol/inspector@latest $(pwd)/kubernetes-mcp-server`
+
+4. **PR Approval Process**
+   - PRs require approval from OWNERS file maintainers
+   - Organization members must verify patches with `/ok-to-test` comment
+   - Need `lgtm` label for merge
+   - First-time contributors receive community support
+
+5. **Architecture Principles**
+   - Go-based native implementation (NOT kubectl/helm wrappers)
+   - Direct Kubernetes API interaction via client-go
+   - Maintain extensive test coverage
+   - Follow existing package structure (`pkg/`, `cmd/`, `internal/`)
+
+### PR Workflow for Red Hat Upstream
+
+```bash
+# 1. Ensure you're on your feature branch with changes
+git checkout 001-openshift-ai
+
+# 2. Fetch latest from Red Hat upstream
+git fetch origin
+
+# 3. Rebase onto latest upstream main
+git rebase origin/main
+
+# 4. IMPORTANT: Clean up commit history
+git rebase -i origin/main
+# In the interactive rebase:
+# - Squash WIP commits
+# - Combine related changes
+# - Keep commits logical and reviewable
+# - Aim for 3-5 commits maximum per feature
+
+# 5. Force push to your fork (this updates the PR)
+git push fork 001-openshift-ai --force-with-lease
+
+# 6. Verify build and tests pass
+make build
+make lint
+make test
+
+# 7. Test with mcp-inspector
+npx @modelcontextprotocol/inspector@latest $(pwd)/kubernetes-mcp-server
+
+# 8. Create PR to Red Hat upstream
+# - Title: Clear, descriptive (e.g., "Add OpenShift AI toolset")
+# - Description: What, why, how
+# - Link to any related issues
+# - Include testing notes
+```
+
+### Example: Cleaning Up Commit History
+
+```bash
+# Before: 37 commits with WIP, fixes, debugging
+git log --oneline | head -40
+
+# Interactive rebase to squash
+git rebase -i origin/main
+
+# In editor, change commits like this:
+# pick abc1234 feat: add OpenShift AI client package
+# squash def5678 wip: update imports
+# squash ghi9012 fix: typo in client
+# pick jkl3456 feat: implement DataScienceProjects tools
+# squash mno7890 fix: linting errors
+# pick pqr1234 feat: register OpenShift AI toolset
+# squash stu5678 docs: update README
+
+# After: 3 clean commits
+# 1. feat: add OpenShift AI client package
+# 2. feat: implement DataScienceProjects tools
+# 3. feat: register OpenShift AI toolset
+```
+
+### Common Pitfalls to Avoid
+
+- ❌ Submitting PRs with 30+ commits
+- ❌ Commits like "wip", "fix", "debugging", "oops"
+- ❌ Not rebasing before submitting
+- ❌ Not running `make build` and `make test` before PR
+- ❌ Wrapping kubectl/helm instead of using Go clients
+- ❌ Adding features without tests
+
+### PR Checklist Before Submitting
+
+- [ ] Rebased onto latest `origin/main`
+- [ ] Commit history cleaned up (3-5 logical commits)
+- [ ] `make build` passes
+- [ ] `make lint` passes
+- [ ] `make test` passes
+- [ ] Tested with `mcp-inspector`
+- [ ] Commit messages follow conventional format
+- [ ] PR description explains what, why, how
+- [ ] Tests added for new functionality
+- [ ] Documentation updated if needed
+
+### Local Testing with MCP Inspector
+
+```bash
+# Build the server
+make build
+
+# Test interactively with MCP Inspector
+npx @modelcontextprotocol/inspector@latest $(pwd)/kubernetes-mcp-server
+
+# This opens a web UI where you can:
+# - Browse available tools
+# - Test tool invocations
+# - Inspect JSON schemas
+# - Verify tool responses
+```
+
+### Resources
+
+- Previous PR example: https://github.com/openshift/openshift-mcp-server/pull/63
+- Conventional Commits: https://www.conventionalcommits.org/
+- MCP Inspector: https://modelcontextprotocol.io/docs/tools/inspector

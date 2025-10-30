@@ -27,6 +27,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/mcp"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
+	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/openshift-ai"
 	"github.com/containers/kubernetes-mcp-server/pkg/version"
 )
 
