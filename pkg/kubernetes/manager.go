@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/helm"
@@ -32,6 +33,11 @@ type Manager struct {
 
 	staticConfig         *config.StaticConfig
 	CloseWatchKubeConfig CloseWatchKubeConfig
+
+	// OpenShift AI client (lazy-initialized) - using interface{} to avoid import cycle
+	openshiftAIClient     interface{}
+	openshiftAIClientOnce sync.Once
+	openshiftAIClientErr  error
 }
 
 var _ helm.Kubernetes = (*Manager)(nil)
@@ -202,6 +208,21 @@ func (m *Manager) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 	return m.clientCmdConfig
 }
 
+// GetRESTConfig returns the REST config for OpenShift AI client creation
+func (m *Manager) GetRESTConfig() *rest.Config {
+	return m.cfg
+}
+
+// GetDiscoveryClient returns the discovery client for OpenShift AI operations
+func (m *Manager) GetDiscoveryClient() discovery.CachedDiscoveryInterface {
+	return m.discoveryClient
+}
+
+// GetDynamicClient returns the dynamic client for OpenShift AI operations
+func (m *Manager) GetDynamicClient() *dynamic.DynamicClient {
+	return m.dynamicClient
+}
+
 func (m *Manager) VerifyToken(ctx context.Context, token, audience string) (*authenticationv1api.UserInfo, []string, error) {
 	tokenReviewClient, err := m.accessControlClientSet.TokenReview()
 	if err != nil {
@@ -298,4 +319,22 @@ func (m *Manager) Derived(ctx context.Context) (*Kubernetes, error) {
 		return &Kubernetes{manager: m}, nil
 	}
 	return derived, nil
+}
+
+// GetOrCreateOpenShiftAIClient returns a cached OpenShift AI client instance.
+// The client is created lazily on first access and reused for all subsequent calls.
+// This avoids the overhead of creating new dynamic and discovery clients on every tool invocation.
+// Thread-safe via sync.Once.
+// clientFactory should be a function that creates the OpenShift AI client: func(*rest.Config, interface{}) (interface{}, error)
+func (m *Manager) GetOrCreateOpenShiftAIClient(clientFactory func(*rest.Config, interface{}) (interface{}, error)) (interface{}, error) {
+	m.openshiftAIClientOnce.Do(func() {
+		m.openshiftAIClient, m.openshiftAIClientErr = clientFactory(m.cfg, nil)
+		if m.openshiftAIClientErr == nil {
+			klog.V(2).InfoS("OpenShift AI client initialized and cached")
+		} else {
+			klog.ErrorS(m.openshiftAIClientErr, "Failed to initialize OpenShift AI client")
+		}
+	})
+
+	return m.openshiftAIClient, m.openshiftAIClientErr
 }

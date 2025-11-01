@@ -1,6 +1,161 @@
 [
   {
     "annotations": {
+      "title": "Application: Create",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Create a new OpenShift AI application (Jupyter notebook, code server, etc.)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Annotations to apply to the application (optional)",
+          "type": "object"
+        },
+        "app_type": {
+          "description": "Application type (e.g., 'Jupyter', 'CodeServer')",
+          "type": "string"
+        },
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "description": {
+          "description": "Description for the application (optional)",
+          "type": "string"
+        },
+        "display_name": {
+          "description": "Display name for the application (optional)",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Labels to apply to the application (optional)",
+          "type": "object"
+        },
+        "name": {
+          "description": "The name of the application",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "The namespace where to create the application",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "namespace",
+        "app_type"
+      ]
+    },
+    "name": "application_create"
+  },
+  {
+    "annotations": {
+      "title": "Application: Delete",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Delete an OpenShift AI application",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name of the application",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "The namespace of the application",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "namespace"
+      ]
+    },
+    "name": "application_delete"
+  },
+  {
+    "annotations": {
+      "title": "Application: Get",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Get a specific OpenShift AI application",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name of the application",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "The namespace of the application",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "namespace"
+      ]
+    },
+    "name": "application_get"
+  },
+  {
+    "annotations": {
+      "title": "Applications: List",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "description": "List all OpenShift AI applications (Jupyter notebooks, code servers, etc.)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "app_type": {
+          "description": "Filter by application type (optional, e.g., 'Jupyter', 'CodeServer')",
+          "type": "string"
+        },
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Namespace to filter applications (optional, defaults to all namespaces)",
+          "type": "string"
+        },
+        "status": {
+          "description": "Filter by application status (optional)",
+          "type": "string"
+        }
+      }
+    },
+    "name": "applications_list"
+  },
+  {
+    "annotations": {
       "title": "Configuration: Contexts List",
       "readOnlyHint": true,
       "destructiveHint": false,
@@ -35,6 +190,148 @@
   },
   {
     "annotations": {
+      "title": "Data Science Project: Create",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Create a new Data Science Project",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Annotations to apply to the Data Science Project (optional)",
+          "type": "object"
+        },
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "description": {
+          "description": "A description for the Data Science Project (optional)",
+          "type": "string"
+        },
+        "display_name": {
+          "description": "A display name for the Data Science Project (optional)",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Labels to apply to the Data Science Project (optional)",
+          "type": "object"
+        },
+        "name": {
+          "description": "The name of the Data Science Project",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "The namespace where to create the Data Science Project",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "namespace"
+      ]
+    },
+    "name": "datascience_project_create"
+  },
+  {
+    "annotations": {
+      "title": "Data Science Project: Delete",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Delete a Data Science Project",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name of the Data Science Project",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "The namespace of the Data Science Project",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "namespace"
+      ]
+    },
+    "name": "datascience_project_delete"
+  },
+  {
+    "annotations": {
+      "title": "Data Science Project: Get",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Get details of a specific Data Science Project",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name of the Data Science Project",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "The namespace of the Data Science Project",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "namespace"
+      ]
+    },
+    "name": "datascience_project_get"
+  },
+  {
+    "annotations": {
+      "title": "Data Science Projects: List",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "description": "List all Data Science Projects in the current OpenShift AI cluster",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "The namespace to search for Data Science Projects (optional, defaults to all namespaces)",
+          "type": "string"
+        }
+      }
+    },
+    "name": "datascience_projects_list"
+  },
+  {
+    "annotations": {
       "title": "Events: List",
       "readOnlyHint": true,
       "destructiveHint": false,
@@ -56,6 +353,152 @@
       }
     },
     "name": "events_list"
+  },
+  {
+    "annotations": {
+      "title": "Experiment: Create",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Create a new OpenShift AI machine learning experiment",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Annotations to apply to the experiment (optional)",
+          "type": "object"
+        },
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "description": {
+          "description": "Description for the experiment (optional)",
+          "type": "string"
+        },
+        "display_name": {
+          "description": "Display name for the experiment (optional)",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Labels to apply to the experiment (optional)",
+          "type": "object"
+        },
+        "name": {
+          "description": "The name of the experiment",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "The namespace where to create the experiment",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "namespace"
+      ]
+    },
+    "name": "experiment_create"
+  },
+  {
+    "annotations": {
+      "title": "Experiment: Delete",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Delete an OpenShift AI machine learning experiment",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name of experiment",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "The namespace of the experiment",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "namespace"
+      ]
+    },
+    "name": "experiment_delete"
+  },
+  {
+    "annotations": {
+      "title": "Experiment: Get",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Get a specific OpenShift AI machine learning experiment",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name of the experiment",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "The namespace of the experiment",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "namespace"
+      ]
+    },
+    "name": "experiment_get"
+  },
+  {
+    "annotations": {
+      "title": "Experiments: List",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "description": "List all OpenShift AI machine learning experiments",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Namespace to filter experiments (optional, defaults to all namespaces)",
+          "type": "string"
+        },
+        "status": {
+          "description": "Filter by experiment status (optional)",
+          "type": "string"
+        }
+      }
+    },
+    "name": "experiments_list"
   },
   {
     "annotations": {
@@ -157,6 +600,228 @@
   },
   {
     "annotations": {
+      "title": "Model: Create",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Create a new machine learning model entry in OpenShift AI",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Annotations to apply to the model (optional)",
+          "type": "object"
+        },
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "description": {
+          "description": "A description for the model (optional)",
+          "type": "string"
+        },
+        "display_name": {
+          "description": "A display name for the model (optional)",
+          "type": "string"
+        },
+        "format": {
+          "description": "The model format (e.g., pickle, onnx, savedmodel)",
+          "type": "string"
+        },
+        "framework_version": {
+          "description": "The framework version (optional)",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Labels to apply to the model (optional)",
+          "type": "object"
+        },
+        "model_type": {
+          "description": "The model type (e.g., pytorch, tensorflow, sklearn)",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name of the model",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "The namespace where to create the model",
+          "type": "string"
+        },
+        "version": {
+          "description": "The model version (optional)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "namespace",
+        "model_type",
+        "format"
+      ]
+    },
+    "name": "model_create"
+  },
+  {
+    "annotations": {
+      "title": "Model: Delete",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Delete a machine learning model from OpenShift AI",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name of the model",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "The namespace of the model",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "namespace"
+      ]
+    },
+    "name": "model_delete"
+  },
+  {
+    "annotations": {
+      "title": "Model: Get",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Get details of a specific machine learning model",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name of the model",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "The namespace of the model",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "namespace"
+      ]
+    },
+    "name": "model_get"
+  },
+  {
+    "annotations": {
+      "title": "Model: Update",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Update an existing machine learning model in OpenShift AI",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Annotations to apply to the model (optional)",
+          "type": "object"
+        },
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "description": {
+          "description": "A description for the model (optional)",
+          "type": "string"
+        },
+        "display_name": {
+          "description": "A display name for the model (optional)",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Labels to apply to the model (optional)",
+          "type": "object"
+        },
+        "name": {
+          "description": "The name of the model",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "The namespace of the model",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "namespace"
+      ]
+    },
+    "name": "model_update"
+  },
+  {
+    "annotations": {
+      "title": "Models: List",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "description": "List all machine learning models in the current OpenShift AI cluster",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "model_type": {
+          "description": "Filter models by type (e.g., pytorch, tensorflow, sklearn)",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "The namespace to search for models (optional, defaults to all namespaces)",
+          "type": "string"
+        },
+        "status": {
+          "description": "Filter models by status (e.g., Ready, Pending, Failed)",
+          "type": "string"
+        }
+      }
+    },
+    "name": "models_list"
+  },
+  {
+    "annotations": {
       "title": "Namespaces: List",
       "readOnlyHint": true,
       "destructiveHint": false,
@@ -239,6 +904,216 @@
       ]
     },
     "name": "nodes_stats_summary"
+  },
+  {
+    "annotations": {
+      "title": "Pipeline: Create",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Create a new OpenShift AI data science pipeline",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Annotations to apply to the pipeline (optional)",
+          "type": "object"
+        },
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "description": {
+          "description": "Description for the pipeline (optional)",
+          "type": "string"
+        },
+        "display_name": {
+          "description": "Display name for the pipeline (optional)",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Labels to apply to the pipeline (optional)",
+          "type": "object"
+        },
+        "name": {
+          "description": "The name of the pipeline",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "The namespace where to create the pipeline",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "namespace"
+      ]
+    },
+    "name": "pipeline_create"
+  },
+  {
+    "annotations": {
+      "title": "Pipeline: Delete",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Delete an OpenShift AI data science pipeline",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name of the pipeline",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "The namespace of the pipeline",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "namespace"
+      ]
+    },
+    "name": "pipeline_delete"
+  },
+  {
+    "annotations": {
+      "title": "Pipeline: Get",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Get a specific OpenShift AI data science pipeline",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name of the pipeline",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "The namespace of the pipeline",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "namespace"
+      ]
+    },
+    "name": "pipeline_get"
+  },
+  {
+    "annotations": {
+      "title": "Pipeline Run: Get",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "description": "Get a specific OpenShift AI data science pipeline run",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name of the pipeline run",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "The namespace of the pipeline run",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "namespace"
+      ]
+    },
+    "name": "pipeline_run_get"
+  },
+  {
+    "annotations": {
+      "title": "Pipeline Runs: List",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "description": "List all OpenShift AI data science pipeline runs",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Namespace to filter pipeline runs (optional, defaults to all namespaces)",
+          "type": "string"
+        },
+        "pipeline_name": {
+          "description": "Filter by pipeline name (optional)",
+          "type": "string"
+        },
+        "status": {
+          "description": "Filter by pipeline run status (optional)",
+          "type": "string"
+        }
+      }
+    },
+    "name": "pipeline_runs_list"
+  },
+  {
+    "annotations": {
+      "title": "Pipelines: List",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "description": "List all OpenShift AI data science pipelines",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Namespace to filter pipelines (optional, defaults to all namespaces)",
+          "type": "string"
+        },
+        "status": {
+          "description": "Filter by pipeline status (optional)",
+          "type": "string"
+        }
+      }
+    },
+    "name": "pipelines_list"
   },
   {
     "annotations": {
