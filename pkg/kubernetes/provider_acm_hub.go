@@ -32,8 +32,9 @@ const (
 // ACMProviderConfig holds ACM-specific configuration that users can set in config.toml
 type ACMProviderConfig struct {
 	// The host for the ACM cluster proxy addon
-	// If using the acm-kubeconfig strategy, this should be the route for the proxy
-	// If using the acm strategy, this should be the service for the proxy
+	// Optional: If not provided, will auto-discover the cluster-proxy-addon-user OCP route
+	// If using the acm-kubeconfig strategy, this should be the route hostname for the proxy
+	// If using the acm strategy, this should be the service name for the proxy
 	ClusterProxyAddonHost string `toml:"cluster_proxy_addon_host,omitempty"`
 
 	// Whether to skip verifying the TLS certs from the cluster proxy
@@ -45,11 +46,6 @@ type ACMProviderConfig struct {
 
 func (c *ACMProviderConfig) Validate() error {
 	var err error = nil
-
-	if c.ClusterProxyAddonHost == "" {
-		err = errors.Join(err, fmt.Errorf("cluster_proxy_addon_host is required"))
-	}
-
 	if !c.ClusterProxyAddonSkipTLSVerify && c.ClusterProxyAddonCAFile == "" {
 		err = errors.Join(err, fmt.Errorf("cluster_proxy_addon_ca_file is required if tls verification is not disabled"))
 	}
@@ -193,9 +189,60 @@ func newACMKubeConfigClusterProvider(cfg *config.StaticConfig) (Provider, error)
 	return newACMClusterProvider(baseManager, &acmKubeConfigProviderCfg.ACMProviderConfig, true)
 }
 
+func discoverClusterProxyHost(m *Manager, isOpenShift bool) (string, error) {
+	ctx := context.Background()
+
+	// Try to discover the cluster-proxy route (OpenShift) or service (vanilla Kubernetes)
+	if isOpenShift {
+		// Try OpenShift Route in multicluster-engine namespace
+		routeGVR := schema.GroupVersionResource{
+			Group:    "route.openshift.io",
+			Version:  "v1",
+			Resource: "routes",
+		}
+
+		route, err := m.dynamicClient.Resource(routeGVR).Namespace("multicluster-engine").Get(ctx, "cluster-proxy-addon-user", metav1.GetOptions{})
+		if err == nil {
+			host, found, err := unstructured.NestedString(route.Object, "spec", "host")
+			if err == nil && found && host != "" {
+				klog.V(2).Infof("Auto-discovered cluster-proxy route: %s", host)
+				return host, nil
+			}
+		}
+	}
+
+	// Fallback: Try to find the service
+	svcClient, err := m.accessControlClientSet.Services("multicluster-engine")
+	if err != nil {
+		return "", fmt.Errorf("failed to get services client: %w", err)
+	}
+
+	svc, err := svcClient.Get(ctx, "cluster-proxy-addon-user", metav1.GetOptions{})
+	if err == nil {
+		host := fmt.Sprintf("%s.%s.svc.cluster.local", svc.Name, svc.Namespace)
+		klog.V(2).Infof("Auto-discovered cluster-proxy service: %s", host)
+		return host, nil
+	}
+
+	return "", fmt.Errorf("failed to auto-discover cluster-proxy host: route and service not found")
+}
+
 func newACMClusterProvider(m *Manager, cfg *ACMProviderConfig, watchKubeConfig bool) (Provider, error) {
 	if !m.IsACMHub() {
 		return nil, fmt.Errorf("not deployed in an ACM hub cluster")
+	}
+
+	// Auto-discover cluster-proxy host if not provided
+	clusterProxyHost := cfg.ClusterProxyAddonHost
+	if clusterProxyHost == "" {
+		ctx := context.Background()
+		isOpenShift := m.IsOpenShift(ctx)
+		discoveredHost, err := discoverClusterProxyHost(m, isOpenShift)
+		if err != nil {
+			return nil, fmt.Errorf("cluster_proxy_addon_host not provided and auto-discovery failed: %w", err)
+		}
+		clusterProxyHost = discoveredHost
+		klog.V(1).Infof("Using auto-discovered cluster-proxy host: %s", clusterProxyHost)
 	}
 
 	// Create cancellable context for the watch goroutine
@@ -207,7 +254,7 @@ func newACMClusterProvider(m *Manager, cfg *ACMProviderConfig, watchKubeConfig b
 		watchKubeConfig:    watchKubeConfig,
 		watchCtx:           watchCtx,
 		watchCancel:        watchCancel,
-		clusterProxyHost:   cfg.ClusterProxyAddonHost,
+		clusterProxyHost:   clusterProxyHost,
 		clusterProxyCAFile: cfg.ClusterProxyAddonCAFile,
 		skipTLSVerify:      cfg.ClusterProxyAddonSkipTLSVerify,
 	}
