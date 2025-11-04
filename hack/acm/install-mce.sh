@@ -39,19 +39,27 @@ spec:
   sourceNamespace: openshift-marketplace
 EOF
 
-# Wait for CSV to appear
+# Wait for CSV to appear and get its name
 echo "Waiting for MCE operator CSV to be ready..."
+CSV_NAME=""
 for i in {1..60}; do
-    if oc get csv -n multicluster-engine -o name 2>/dev/null | grep -q multicluster-engine; then
-        echo "MCE CSV found, waiting for Succeeded phase..."
+    CSV_NAME=$(oc get csv -n multicluster-engine -o name 2>/dev/null | grep multicluster-engine || true)
+    if [ -n "$CSV_NAME" ]; then
+        echo "MCE CSV found: $CSV_NAME"
         break
     fi
     echo "  Waiting for MCE CSV to appear ($i/60)..."
     sleep 5
 done
 
+if [ -z "$CSV_NAME" ]; then
+    echo "Error: MCE CSV not found after waiting"
+    exit 1
+fi
+
 # Wait for CSV to be ready
-oc wait --for=jsonpath='{.status.phase}'=Succeeded csv -l operators.coreos.com/multicluster-engine.multicluster-engine -n multicluster-engine --timeout=300s
+echo "Waiting for CSV to reach Succeeded phase..."
+oc wait --for=jsonpath='{.status.phase}'=Succeeded "$CSV_NAME" -n multicluster-engine --timeout=300s
 
 # Create MultiClusterEngine instance
 echo "Creating MultiClusterEngine instance..."
