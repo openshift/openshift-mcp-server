@@ -10,6 +10,7 @@ import (
 	"k8s.io/client-go/dynamic"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+
 	"github.com/containers/kubernetes-mcp-server/pkg/version"
 	authv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,9 @@ func (c *Core) ResourcesList(ctx context.Context, gvk *schema.GroupVersionKind, 
 
 	// Check if operation is allowed for all namespaces (applicable for namespaced resources)
 	isNamespaced, _ := c.isNamespaced(gvk)
-	if isNamespaced && !c.canIUse(ctx, gvr, namespace, "list") && namespace == "" {
+	if isNamespaced && !c.CanIUse(ctx, gvr, namespace, "list") && namespace == "" {
 		namespace = c.NamespaceOrDefault("")
+
 	}
 	if options.AsTable {
 		return c.resourcesListAsTable(ctx, gvk, gvr, namespace, options)
@@ -227,8 +229,9 @@ func (c *Core) supportsGroupVersion(groupVersion string) bool {
 	return true
 }
 
-func (c *Core) canIUse(ctx context.Context, gvr *schema.GroupVersionResource, namespace, verb string) bool {
+func (c *Core) CanIUse(ctx context.Context, gvr *schema.GroupVersionResource, namespace, verb string) bool {
 	accessReviews := c.AuthorizationV1().SelfSubjectAccessReviews()
+
 	response, err := accessReviews.Create(ctx, &authv1.SelfSubjectAccessReview{
 		Spec: authv1.SelfSubjectAccessReviewSpec{ResourceAttributes: &authv1.ResourceAttributes{
 			Namespace: namespace,
