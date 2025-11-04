@@ -55,7 +55,7 @@ acm-mce-install:
 		'spec: {}' \
 		| oc apply -f -
 	@echo "Waiting for ManagedCluster CRD to be available..."
-	@for i in $$(seq 1 120); do \
+	@for i in {1..120}; do \
 		if oc get crd managedclusters.cluster.open-cluster-management.io >/dev/null 2>&1; then \
 			echo "✅ ManagedCluster CRD is now available!"; \
 			break; \
@@ -70,7 +70,7 @@ acm-operator-install:
 	@echo "Installing ACM Operator (release 2.14)..."
 	oc apply -k https://github.com/redhat-cop/gitops-catalog/advanced-cluster-management/operator/overlays/release-2.14
 	@echo "Waiting for ACM operator CSV to be ready..."
-	@for i in $$(seq 1 60); do \
+	@for i in {1..60}; do \
 		if oc get csv -n open-cluster-management -o name 2>/dev/null | grep -q advanced-cluster-management; then \
 			echo "ACM CSV found, waiting for Succeeded phase..."; \
 			break; \
@@ -150,7 +150,7 @@ acm-import-cluster: ## Import a managed cluster (requires CLUSTER_NAME and MANAG
 		'  hubAcceptsClient: true' \
 		| oc apply -f -
 	@echo "Step 2: Waiting for import secret to be created..."
-	@for i in $$(seq 1 60); do \
+	@for i in {1..60}; do \
 		if oc get secret -n $(CLUSTER_NAME) $(CLUSTER_NAME)-import 2>/dev/null; then \
 			echo "✅ Import secret created!"; \
 			break; \
@@ -170,7 +170,7 @@ acm-import-cluster: ## Import a managed cluster (requires CLUSTER_NAME and MANAG
 	@echo "Step 5: Applying import manifest to managed cluster..."
 	@KUBECONFIG=$(MANAGED_KUBECONFIG) oc apply -f _output/acm-import/$(CLUSTER_NAME)-import.yaml
 	@echo "Step 6: Waiting for klusterlet to be ready..."
-	@for i in $$(seq 1 120); do \
+	@for i in {1..120}; do \
 		if oc get managedcluster $(CLUSTER_NAME) -o jsonpath='{.status.conditions[?(@.type=="ManagedClusterConditionAvailable")].status}' 2>/dev/null | grep -q "True"; then \
 			echo "✅ Cluster $(CLUSTER_NAME) is now available!"; \
 			break; \
