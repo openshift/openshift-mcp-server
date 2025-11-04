@@ -5,6 +5,7 @@ import (
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/openshift/nodes"
 )
 
 type Toolset struct{}
@@ -21,7 +22,7 @@ func (t *Toolset) GetDescription() string {
 
 func (t *Toolset) GetTools(o api.Openshift) []api.ServerTool {
 	return slices.Concat(
-		initNodes(),
+		nodes.NodeTools(),
 	)
 }
 

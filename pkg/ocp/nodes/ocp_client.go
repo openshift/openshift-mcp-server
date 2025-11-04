@@ -1,4 +1,4 @@
-package ocp
+package nodes
 
 import (
 	"context"

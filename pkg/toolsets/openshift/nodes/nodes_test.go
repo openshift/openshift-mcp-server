@@ -1,4 +1,4 @@
-package openshift
+package nodes
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
-	"github.com/containers/kubernetes-mcp-server/pkg/ocp"
+	"github.com/containers/kubernetes-mcp-server/pkg/ocp/nodes"
 )
 
 type staticRequest struct {
@@ -51,12 +51,12 @@ func TestNodesDebugExecHandlerValidatesInput(t *testing.T) {
 }
 
 func TestNodesDebugExecHandlerExecutesCommand(t *testing.T) {
-	env := ocp.NewNodeDebugTestEnv(t)
+	env := nodes.NewNodeDebugTestEnv(t)
 	env.Pods.Logs = "done"
 
 	// Call NodesDebugExec directly instead of going through the handler
 	// This avoids the need to mock the full kubernetes.Kubernetes type
-	output, err := ocp.NodesDebugExec(
+	output, err := nodes.NodesDebugExec(
 		context.Background(),
 		env.Kubernetes,
 		"debug",
