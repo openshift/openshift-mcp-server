@@ -37,7 +37,7 @@ acm-mce-install:
 		'  sourceNamespace: openshift-marketplace' \
 		| oc apply -f -
 	@echo "Waiting for MCE operator CSV to be ready..."
-	@for i in $$(seq 1 60); do \
+	@for i in {1..60}; do \
 		if oc get csv -n multicluster-engine -o name 2>/dev/null | grep -q multicluster-engine; then \
 			echo "MCE CSV found, waiting for Succeeded phase..."; \
 			oc wait --for=jsonpath='{.status.phase}'=Succeeded csv -l operators.coreos.com/multicluster-engine.multicluster-engine -n multicluster-engine --timeout=300s && break; \
