@@ -40,11 +40,12 @@ acm-mce-install:
 	@for i in {1..60}; do \
 		if oc get csv -n multicluster-engine -o name 2>/dev/null | grep -q multicluster-engine; then \
 			echo "MCE CSV found, waiting for Succeeded phase..."; \
-			oc wait --for=jsonpath='{.status.phase}'=Succeeded csv -l operators.coreos.com/multicluster-engine.multicluster-engine -n multicluster-engine --timeout=300s && break; \
+			break; \
 		fi; \
 		echo "  Waiting for MCE CSV to appear ($$i/60)..."; \
 		sleep 5; \
 	done
+	@oc wait --for=jsonpath='{.status.phase}'=Succeeded csv -l operators.coreos.com/multicluster-engine.multicluster-engine -n multicluster-engine --timeout=300s
 	@echo "Creating MultiClusterEngine instance..."
 	@printf '%s\n' \
 		'apiVersion: multicluster.openshift.io/v1' \
@@ -72,11 +73,12 @@ acm-operator-install:
 	@for i in $$(seq 1 60); do \
 		if oc get csv -n open-cluster-management -o name 2>/dev/null | grep -q advanced-cluster-management; then \
 			echo "ACM CSV found, waiting for Succeeded phase..."; \
-			oc wait --for=jsonpath='{.status.phase}'=Succeeded csv -l operators.coreos.com/advanced-cluster-management.open-cluster-management -n open-cluster-management --timeout=300s && break; \
+			break; \
 		fi; \
 		echo "  Waiting for ACM CSV to appear ($$i/60)..."; \
 		sleep 5; \
 	done
+	@oc wait --for=jsonpath='{.status.phase}'=Succeeded csv -l operators.coreos.com/advanced-cluster-management.open-cluster-management -n open-cluster-management --timeout=300s
 	@echo "✓ ACM Operator installation complete"
 
 # Install ACM instance (MultiClusterHub CR)
