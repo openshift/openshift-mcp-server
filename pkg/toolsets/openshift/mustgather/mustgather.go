@@ -65,6 +65,10 @@ func MustGatherTools() []api.ServerTool {
 						Type:        "string",
 						Description: "Optional to collect logs newer than a relative duration like 5s, 2m5s, or 3h6m10s. If unspecified, all available logs will be collected",
 					},
+					"with_storage": {
+						Type:        "boolean",
+						Description: "Optional to persist the collected must-gather data to a storage volume.",
+					},
 				},
 			},
 			Annotations: api.ToolAnnotations{

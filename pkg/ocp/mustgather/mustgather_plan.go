@@ -10,6 +10,7 @@ import (
 	internalk8s "github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,7 +31,7 @@ func PlanMustGather(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 
 	var nodeName, sourceDir, namespace, gatherCmd, timeout, since string
-	var hostNetwork, keepResources, allImages bool
+	var hostNetwork, keepResources, allImages, withStorage bool
 	var images []string
 	var nodeSelector map[string]string
 
@@ -44,6 +45,10 @@ func PlanMustGather(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 
 	if args["host_network"] != nil {
 		hostNetwork = args["host_network"].(bool)
+	}
+
+	if args["with_storage"] != nil {
+		withStorage = args["with_storage"].(bool)
 	}
 
 	sourceDir = defaultGatherSourceDir
@@ -160,6 +165,31 @@ func PlanMustGather(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	}
 
 	serviceAccountName := "must-gather-collector"
+	pvcName := fmt.Sprintf("must-gather-pvc-%s", rand.String(6))
+
+	// Configure volume based on storage type
+	var volumes []corev1.Volume
+	if withStorage {
+		volumes = []corev1.Volume{
+			{
+				Name: "must-gather-output",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: pvcName,
+					},
+				},
+			},
+		}
+	} else {
+		volumes = []corev1.Volume{
+			{
+				Name: "must-gather-output",
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
+				},
+			},
+		}
+	}
 
 	pod := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -176,14 +206,7 @@ func PlanMustGather(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 			NodeName:           nodeName,
 			PriorityClassName:  "system-cluster-critical",
 			RestartPolicy:      corev1.RestartPolicyNever,
-			Volumes: []corev1.Volume{
-				{
-					Name: "must-gather-output",
-					VolumeSource: corev1.VolumeSource{
-						EmptyDir: &corev1.EmptyDirVolumeSource{},
-					},
-				},
-			},
+			Volumes:            volumes,
 			Containers: append(gatherContainers, corev1.Container{
 				Name:            "wait",
 				Image:           "registry.redhat.io/ubi9/ubi-minimal",
@@ -264,6 +287,31 @@ func PlanMustGather(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		},
 	}
 
+	// Create PVC if persistent storage is requested
+	var pvc *corev1.PersistentVolumeClaim
+	if withStorage {
+		pvc = &corev1.PersistentVolumeClaim{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "v1",
+				Kind:       "PersistentVolumeClaim",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      pvcName,
+				Namespace: namespace,
+			},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				AccessModes: []corev1.PersistentVolumeAccessMode{
+					corev1.ReadWriteOnce,
+				},
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("10Gi"),
+					},
+				},
+			},
+		}
+	}
+
 	allowChecks := map[string]struct {
 		schema.GroupVersionResource
 		name string
@@ -285,6 +333,10 @@ func PlanMustGather(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 			GroupVersionResource: schema.GroupVersionResource{Version: "v1", Resource: "pod"},
 			verb:                 "create",
 		},
+		"create_persistentvolumeclaim": {
+			GroupVersionResource: schema.GroupVersionResource{Version: "v1", Resource: "persistentvolumeclaims"},
+			verb:                 "create",
+		},
 		"use_scc_hostnetwork": {
 			GroupVersionResource: schema.GroupVersionResource{Group: "security.openshift.io", Version: "v1", Resource: "securitycontextconstraints"},
 			name:                 "hostnetwork-v2",
@@ -298,9 +350,15 @@ func PlanMustGather(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	}
 
 	var result strings.Builder
-	result.WriteString("The generated plan contains YAML manifests for must-gather pods and required resources (namespace, serviceaccount, clusterrolebinding). " +
-		"Suggest how the user can apply the manifest and copy results locally (`oc cp` / `kubectl cp`). \n\n",
-	)
+	result.WriteString("The generated plan contains YAML manifests for must-gather pods and required resources (namespace, serviceaccount, clusterrolebinding")
+	if withStorage {
+		result.WriteString(", persistentvolumeclaim). " +
+			"The data will be stored on a persistent volume (10Gi) and preserved even after pod deletion. ")
+	} else {
+		result.WriteString("). ")
+	}
+	result.WriteString("Suggest how the user can apply the manifest and copy results locally (`oc cp` / `kubectl cp`). \n\n")
+
 	result.WriteString("Ask the user if they want to apply the plan \n" +
 		"- use the resource_create_or_update tool to apply the manifest \n" +
 		"- alternatively, advise the user to execute `oc apply` / `kubectl apply` instead. \n\n",
@@ -341,6 +399,22 @@ func PlanMustGather(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 
 	if !isAllowed["create_serviceaccount"] {
 		result.WriteString("WARNING: The resources_create_or_update call does not have permission to create serviceaccount(s).\n")
+	}
+
+	// Output PVC YAML if persistent storage is requested
+	if withStorage {
+		pvcYaml, err := yaml.Marshal(pvc)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal PVC to yaml: %w", err)
+		}
+
+		result.WriteString("```yaml\n")
+		result.Write(pvcYaml)
+		result.WriteString("```\n\n")
+
+		if !isAllowed["create_persistentvolumeclaim"] {
+			result.WriteString("WARNING: The resources_create_or_update call does not have permission to create persistentvolumeclaim(s).\n")
+		}
 	}
 
 	clusterRoleBindingYaml, err := yaml.Marshal(clusterRoleBinding)
