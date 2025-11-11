@@ -1,0 +1,26 @@
+{
+  "clientId": "mcp-sts",
+  "name": "MCP STS",
+  "description": "Security Token Service client for token exchange (same-realm and cross-realm)",
+  "enabled": true,
+  "publicClient": false,
+  "consentRequired": false,
+  "standardFlowEnabled": false,
+  "implicitFlowEnabled": false,
+  "directAccessGrantsEnabled": false,
+  "serviceAccountsEnabled": true,
+  "authorizationServicesEnabled": false,
+  "protocol": "openid-connect",
+  "redirectUris": [],
+  "webOrigins": [],
+  "fullScopeAllowed": false,
+  "defaultClientScopes": ["openid", "profile", "email"],
+  "optionalClientScopes": [],
+  "attributes": {
+    "oauth2.device.authorization.grant.enabled": "false",
+    "oidc.ciba.grant.enabled": "false",
+    "backchannel.logout.session.required": "false",
+    "backchannel.logout.revoke.offline.tokens": "false",
+    "display.on.consent.screen": "false"
+  }
+}

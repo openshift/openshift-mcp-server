@@ -1,0 +1,18 @@
+{
+  "username": "mcp",
+  "enabled": true,
+  "emailVerified": true,
+  "firstName": "MCP",
+  "lastName": "User",
+  "email": "mcp@example.com",
+  "credentials": [
+    {
+      "type": "password",
+      "value": "mcp",
+      "temporary": false
+    }
+  ],
+  "realmRoles": ["offline_access", "uma_authorization"],
+  "clientRoles": {},
+  "groups": []
+}

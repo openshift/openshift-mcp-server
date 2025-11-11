@@ -1,0 +1,27 @@
+{
+  "clientId": "mcp-client",
+  "name": "MCP Client",
+  "description": "Public OAuth client for browser-based authentication (inspector)",
+  "enabled": true,
+  "publicClient": true,
+  "consentRequired": false,
+  "standardFlowEnabled": true,
+  "implicitFlowEnabled": false,
+  "directAccessGrantsEnabled": false,
+  "serviceAccountsEnabled": false,
+  "authorizationServicesEnabled": false,
+  "protocol": "openid-connect",
+  "redirectUris": ["*"],
+  "webOrigins": ["*"],
+  "fullScopeAllowed": false,
+  "defaultClientScopes": ["openid", "profile", "email", "mcp-server"],
+  "optionalClientScopes": [],
+  "attributes": {
+    "pkce.code.challenge.method": "S256",
+    "oauth2.device.authorization.grant.enabled": "false",
+    "oidc.ciba.grant.enabled": "false",
+    "backchannel.logout.session.required": "false",
+    "backchannel.logout.revoke.offline.tokens": "false",
+    "display.on.consent.screen": "false"
+  }
+}
