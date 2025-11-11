@@ -3,9 +3,10 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/runtime"
 	"regexp"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/version"
 	authv1 "k8s.io/api/authorization/v1"
@@ -36,7 +37,7 @@ func (k *Kubernetes) ResourcesList(ctx context.Context, gvk *schema.GroupVersion
 
 	// Check if operation is allowed for all namespaces (applicable for namespaced resources)
 	isNamespaced, _ := k.isNamespaced(gvk)
-	if isNamespaced && !k.canIUse(ctx, gvr, namespace, "list") && namespace == "" {
+	if isNamespaced && !k.CanIUse(ctx, gvr, namespace, "list") && namespace == "" {
 		namespace = k.manager.configuredNamespace()
 	}
 	if options.AsTable {
@@ -187,7 +188,7 @@ func (k *Kubernetes) supportsGroupVersion(groupVersion string) bool {
 	return true
 }
 
-func (k *Kubernetes) canIUse(ctx context.Context, gvr *schema.GroupVersionResource, namespace, verb string) bool {
+func (k *Kubernetes) CanIUse(ctx context.Context, gvr *schema.GroupVersionResource, namespace, verb string) bool {
 	accessReviews, err := k.manager.accessControlClientSet.SelfSubjectAccessReviews()
 	if err != nil {
 		return false
