@@ -46,14 +46,83 @@ keycloak-acm-setup-hub: ## Deploy Keycloak on OpenShift with V1 token exchange f
 	@echo "  2. Start MCP server with: ./kubernetes-mcp-server --config acm-kubeconfig.toml"
 
 .PHONY: keycloak-acm-generate-toml
-keycloak-acm-generate-toml: ## Generate acm-kubeconfig.toml from saved Keycloak configuration
+keycloak-acm-generate-toml: ## Generate _output/acm-kubeconfig.toml from saved Keycloak configuration
 	@echo "==========================================="
 	@echo "Generating MCP Server Configuration"
 	@echo "==========================================="
 	@echo ""
 	@bash ./hack/keycloak-acm/generate-toml.sh
 	@echo ""
-	@echo "Next: Start MCP server with: ./kubernetes-mcp-server --port 8080 --config acm-kubeconfig.toml"
+	@echo "Next: Start MCP server with: ./kubernetes-mcp-server --port 8080 --config _output/acm-kubeconfig.toml"
+
+.PHONY: keycloak-acm-register-managed-cluster
+keycloak-acm-register-managed-cluster: ## Register managed cluster with ACM and configure OIDC (requires: CLUSTER_NAME, MANAGED_KUBECONFIG)
+	@if [ -z "$(CLUSTER_NAME)" ]; then \
+		echo "Error: CLUSTER_NAME is required"; \
+		echo "Usage: make keycloak-acm-register-managed-cluster CLUSTER_NAME=my-cluster MANAGED_KUBECONFIG=/path/to/kubeconfig"; \
+		exit 1; \
+	fi
+	@if [ -z "$(MANAGED_KUBECONFIG)" ]; then \
+		echo "Error: MANAGED_KUBECONFIG is required"; \
+		echo "Usage: make keycloak-acm-register-managed-cluster CLUSTER_NAME=my-cluster MANAGED_KUBECONFIG=/path/to/kubeconfig"; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(MANAGED_KUBECONFIG)" ]; then \
+		echo "Error: Kubeconfig file not found: $(MANAGED_KUBECONFIG)"; \
+		exit 1; \
+	fi
+	@echo "==========================================="
+	@echo "Managed Cluster Setup: $(CLUSTER_NAME)"
+	@echo "==========================================="
+	@echo ""
+	@echo "This will:"
+	@echo "  1. Create ACM ManagedCluster resource"
+	@echo "  2. Apply ACM import manifests (starts cluster-proxy agents)"
+	@echo "  3. Create managed cluster realm in Keycloak"
+	@echo "  4. Configure cross-realm token exchange"
+	@echo "  5. Enable TechPreviewNoUpgrade on managed cluster"
+	@echo "  6. Configure OIDC authentication"
+	@echo "  7. Create RBAC for service-account-mcp-server"
+	@echo ""
+	@echo "⏳ Total time: ~25-30 minutes (rollouts happen in background)"
+	@echo ""
+	@HUB_KUBECONFIG="$${HUB_KUBECONFIG:-$$KUBECONFIG}" && \
+	if [ -z "$$HUB_KUBECONFIG" ]; then \
+		echo "Error: HUB_KUBECONFIG not set and KUBECONFIG is empty"; \
+		echo "Either set KUBECONFIG to hub cluster or pass HUB_KUBECONFIG=..."; \
+		exit 1; \
+	fi && \
+	CLUSTER_NAME="$(CLUSTER_NAME)" \
+	HUB_KUBECONFIG="$$HUB_KUBECONFIG" \
+	MANAGED_KUBECONFIG="$(MANAGED_KUBECONFIG)" \
+	bash ./hack/keycloak-acm/register-managed-cluster.sh
+
+.PHONY: keycloak-acm-apply-import-manifests
+keycloak-acm-apply-import-manifests: ## [Optional] Re-apply ACM import manifests to managed cluster (already included in registration)
+	@if [ -z "$(CLUSTER_NAME)" ]; then \
+		echo "Error: CLUSTER_NAME is required"; \
+		echo "Usage: make keycloak-acm-apply-import-manifests CLUSTER_NAME=my-cluster MANAGED_KUBECONFIG=/path/to/kubeconfig"; \
+		exit 1; \
+	fi
+	@if [ -z "$(MANAGED_KUBECONFIG)" ]; then \
+		echo "Error: MANAGED_KUBECONFIG is required"; \
+		echo "Usage: make keycloak-acm-apply-import-manifests CLUSTER_NAME=my-cluster MANAGED_KUBECONFIG=/path/to/kubeconfig"; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(MANAGED_KUBECONFIG)" ]; then \
+		echo "Error: Kubeconfig file not found: $(MANAGED_KUBECONFIG)"; \
+		exit 1; \
+	fi
+	@HUB_KUBECONFIG="$${HUB_KUBECONFIG:-$$KUBECONFIG}" && \
+	if [ -z "$$HUB_KUBECONFIG" ]; then \
+		echo "Error: HUB_KUBECONFIG not set and KUBECONFIG is empty"; \
+		echo "Either set KUBECONFIG to hub cluster or pass HUB_KUBECONFIG=..."; \
+		exit 1; \
+	fi && \
+	CLUSTER_NAME="$(CLUSTER_NAME)" \
+	HUB_KUBECONFIG="$$HUB_KUBECONFIG" \
+	MANAGED_KUBECONFIG="$(MANAGED_KUBECONFIG)" \
+	bash ./hack/keycloak-acm/apply-import-manifests.sh
 
 .PHONY: keycloak-acm-status
 keycloak-acm-status: ## Show Keycloak ACM configuration status

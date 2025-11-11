@@ -7,9 +7,16 @@ set -eo pipefail
 #   - .keycloak-config/hub-config.env
 #   - .keycloak-config/clusters/*.env
 #
-# And generates: acm-kubeconfig.toml
+# And generates: _output/acm-kubeconfig.toml
 
-OUTPUT_FILE="acm-kubeconfig.toml"
+# Get script directory and repo root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Create _output directory if it doesn't exist
+mkdir -p "$REPO_ROOT/_output"
+
+OUTPUT_FILE="$REPO_ROOT/_output/acm-kubeconfig.toml"
 
 echo "==========================================="
 echo "Generating acm-kubeconfig.toml"
@@ -151,17 +158,15 @@ if [ "$CLUSTER_COUNT" -gt 0 ]; then
 
         echo "  Adding cluster: $CLUSTER_NAME"
 
-        cat >> "$OUTPUT_FILE" <<EOF
-# Cluster: $CLUSTER_NAME
-[cluster_provider_configs.acm-kubeconfig.clusters."$CLUSTER_NAME"]
-token_url = "$KEYCLOAK_URL/realms/$MANAGED_REALM/protocol/openid-connect/token"
-client_id = "$CLUSTER_CLIENT_ID"
-client_secret = "$CLUSTER_CLIENT_SECRET"
-subject_issuer = "$CLUSTER_IDP_ALIAS"
-audience = "mcp-server"
-subject_token_type = "urn:ietf:params:oauth:token-type:jwt"
-
-EOF
+        echo "# Cluster: $CLUSTER_NAME" >> "$OUTPUT_FILE"
+        echo "[cluster_provider_configs.acm-kubeconfig.clusters.\"$CLUSTER_NAME\"]" >> "$OUTPUT_FILE"
+        echo "token_url = \"$KEYCLOAK_URL/realms/$MANAGED_REALM/protocol/openid-connect/token\"" >> "$OUTPUT_FILE"
+        echo "client_id = \"$CLUSTER_CLIENT_ID\"" >> "$OUTPUT_FILE"
+        echo "client_secret = \"$CLUSTER_CLIENT_SECRET\"" >> "$OUTPUT_FILE"
+        echo "subject_issuer = \"$CLUSTER_IDP_ALIAS\"" >> "$OUTPUT_FILE"
+        echo "audience = \"mcp-server\"" >> "$OUTPUT_FILE"
+        echo "subject_token_type = \"urn:ietf:params:oauth:token-type:jwt\"" >> "$OUTPUT_FILE"
+        echo "" >> "$OUTPUT_FILE"
     done
 fi
 

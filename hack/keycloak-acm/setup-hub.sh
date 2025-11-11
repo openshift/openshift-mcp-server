@@ -489,8 +489,50 @@ if [ -z "$MCP_SERVER_SCOPE_UUID" ] || [ "$MCP_SERVER_SCOPE_UUID" = "null" ]; the
     -H "Authorization: Bearer $ADMIN_TOKEN")
   MCP_SERVER_SCOPE_UUID=$(echo "$SCOPES_RESPONSE" | jq -r '.[] | select(.name == "mcp-server") | .id // empty')
   echo "  ✅ Created mcp-server scope"
+
+  # Add audience mapper to mcp-server scope
+  echo "  Adding mcp-server-audience mapper..."
+  curl -sk -X POST "$KEYCLOAK_URL/admin/realms/$HUB_REALM/client-scopes/$MCP_SERVER_SCOPE_UUID/protocol-mappers/models" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "name": "mcp-server-audience",
+      "protocol": "openid-connect",
+      "protocolMapper": "oidc-audience-mapper",
+      "config": {
+        "included.client.audience": "mcp-server",
+        "id.token.claim": "true",
+        "access.token.claim": "true"
+      }
+    }' > /dev/null 2>&1
+  echo "  ✅ Added mcp-server-audience mapper"
 else
   echo "  ✅ mcp-server scope already exists"
+
+  # Check and add audience mapper if missing
+  MAPPERS=$(curl -sk "$KEYCLOAK_URL/admin/realms/$HUB_REALM/client-scopes/$MCP_SERVER_SCOPE_UUID/protocol-mappers/models" \
+    -H "Authorization: Bearer $ADMIN_TOKEN")
+  AUDIENCE_MAPPER=$(echo "$MAPPERS" | jq -r '.[] | select(.name == "mcp-server-audience") | .id')
+
+  if [ -z "$AUDIENCE_MAPPER" ] || [ "$AUDIENCE_MAPPER" = "null" ]; then
+    echo "  Adding mcp-server-audience mapper..."
+    curl -sk -X POST "$KEYCLOAK_URL/admin/realms/$HUB_REALM/client-scopes/$MCP_SERVER_SCOPE_UUID/protocol-mappers/models" \
+      -H "Authorization: Bearer $ADMIN_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "mcp-server-audience",
+        "protocol": "openid-connect",
+        "protocolMapper": "oidc-audience-mapper",
+        "config": {
+          "included.client.audience": "mcp-server",
+          "id.token.claim": "true",
+          "access.token.claim": "true"
+        }
+      }' > /dev/null 2>&1
+    echo "  ✅ Added mcp-server-audience mapper"
+  else
+    echo "  ✅ mcp-server-audience mapper already configured"
+  fi
 fi
 
 # Create mcp-server client
@@ -656,11 +698,59 @@ if [ -z "$STS_CLIENT_UUID" ] || [ "$STS_CLIENT_UUID" = "null" ]; then
 
   echo "  ✅ Created mcp-sts client"
   echo "  📝 STS Client Secret: $STS_CLIENT_SECRET"
+
+  # Add user-id protocol mapper for sub claim (required for token exchange)
+  echo "  Adding user-id protocol mapper..."
+  curl -sk -X POST "$KEYCLOAK_URL/admin/realms/$HUB_REALM/clients/$STS_CLIENT_UUID/protocol-mappers/models" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "name": "user-id",
+      "protocol": "openid-connect",
+      "protocolMapper": "oidc-usermodel-property-mapper",
+      "config": {
+        "user.attribute": "id",
+        "claim.name": "sub",
+        "jsonType.label": "String",
+        "id.token.claim": "true",
+        "access.token.claim": "true",
+        "userinfo.token.claim": "true"
+      }
+    }' > /dev/null 2>&1
+  echo "  ✅ Added user-id mapper for sub claim"
 else
   echo "  ✅ mcp-sts client already exists"
   STS_CLIENT_SECRET=$(curl -sk -X GET "$KEYCLOAK_URL/admin/realms/$HUB_REALM/clients/$STS_CLIENT_UUID/client-secret" \
     -H "Authorization: Bearer $ADMIN_TOKEN" | jq -r '.value')
   echo "  📝 STS Client Secret: $STS_CLIENT_SECRET"
+
+  # Check and add user-id mapper if missing
+  MAPPERS=$(curl -sk "$KEYCLOAK_URL/admin/realms/$HUB_REALM/clients/$STS_CLIENT_UUID/protocol-mappers/models" \
+    -H "Authorization: Bearer $ADMIN_TOKEN")
+  USER_ID_MAPPER=$(echo "$MAPPERS" | jq -r '.[] | select(.name == "user-id") | .id')
+
+  if [ -z "$USER_ID_MAPPER" ] || [ "$USER_ID_MAPPER" = "null" ]; then
+    echo "  Adding user-id protocol mapper..."
+    curl -sk -X POST "$KEYCLOAK_URL/admin/realms/$HUB_REALM/clients/$STS_CLIENT_UUID/protocol-mappers/models" \
+      -H "Authorization: Bearer $ADMIN_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "user-id",
+        "protocol": "openid-connect",
+        "protocolMapper": "oidc-usermodel-property-mapper",
+        "config": {
+          "user.attribute": "id",
+          "claim.name": "sub",
+          "jsonType.label": "String",
+          "id.token.claim": "true",
+          "access.token.claim": "true",
+          "userinfo.token.claim": "true"
+        }
+      }' > /dev/null 2>&1
+    echo "  ✅ Added user-id mapper for sub claim"
+  else
+    echo "  ✅ user-id mapper already configured"
+  fi
 fi
 
 # Create test user
