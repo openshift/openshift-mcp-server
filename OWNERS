@@ -3,11 +3,9 @@ reviewers:
   - Cali0707
   - matzew
   - Kaustubh-pande
-  - rudyredhat1
 approvers:
   - ardaguclu
   - Cali0707
   - matzew
   - Kaustubh-pande
-  - rudyredhat1
 component: "openshift-mcp-server"
