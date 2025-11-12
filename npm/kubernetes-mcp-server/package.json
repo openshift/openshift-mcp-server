@@ -12,7 +12,7 @@
     "kubernetes-mcp-server-linux-amd64": "0.0.0",
     "kubernetes-mcp-server-linux-arm64": "0.0.0",
     "kubernetes-mcp-server-windows-amd64": "0.0.0",
-    "kubernetes-mcp-server-windows-arm64": "0.0.0"
+    "kubernetes-mcp-server-windows-arm64": "0.0.54"
   },
   "repository": {
     "type": "git",
