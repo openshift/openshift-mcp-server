@@ -7,6 +7,11 @@
 
 set -e
 
+# Get script directory and repo root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+KEYCLOAK_CONFIG_DIR="$REPO_ROOT/dev/config/openshift/keycloak"
+
 # Configuration
 HUB_REALM="${HUB_REALM:-hub}"
 CLIENT_ID="${CLIENT_ID:-mcp-server}"
@@ -62,93 +67,8 @@ else
     POSTGRESQL_PASSWORD="$(openssl rand -base64 24 | tr -d '=+/' | cut -c1-24)"
 fi
 
-cat <<EOF | oc apply -n "$KEYCLOAK_NAMESPACE" -f -
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: postgresql-data
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 5Gi
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: postgresql-credentials
-type: Opaque
-stringData:
-  POSTGRESQL_DATABASE: keycloak
-  POSTGRESQL_USER: keycloak
-  POSTGRESQL_PASSWORD: $POSTGRESQL_PASSWORD
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: postgresql
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: postgresql
-  template:
-    metadata:
-      labels:
-        app: postgresql
-    spec:
-      containers:
-      - name: postgresql
-        image: registry.redhat.io/rhel9/postgresql-16:latest
-        ports:
-        - containerPort: 5432
-          name: postgresql
-        envFrom:
-        - secretRef:
-            name: postgresql-credentials
-        volumeMounts:
-        - name: postgresql-data
-          mountPath: /var/lib/pgsql/data
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-        livenessProbe:
-          tcpSocket:
-            port: 5432
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          exec:
-            command:
-            - /bin/sh
-            - -c
-            - pg_isready -U keycloak
-          initialDelaySeconds: 10
-          periodSeconds: 5
-      volumes:
-      - name: postgresql-data
-        persistentVolumeClaim:
-          claimName: postgresql-data
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: postgresql
-spec:
-  ports:
-  - port: 5432
-    targetPort: 5432
-    name: postgresql
-  selector:
-    app: postgresql
-  type: ClusterIP
-EOF
+sed "s/POSTGRESQL_PASSWORD_PLACEHOLDER/$POSTGRESQL_PASSWORD/" "$KEYCLOAK_CONFIG_DIR/postgresql.yaml" | \
+    oc apply -n "$KEYCLOAK_NAMESPACE" -f -
 
 echo "✅ PostgreSQL deployment created"
 
@@ -161,105 +81,11 @@ echo "✅ PostgreSQL is ready"
 echo ""
 echo "Deploying Keycloak with V1 features enabled..."
 
-cat <<EOF | oc apply -n "$KEYCLOAK_NAMESPACE" -f -
-apiVersion: v1
-kind: Service
-metadata:
-  name: keycloak
-  labels:
-    app: keycloak
-spec:
-  ports:
-  - name: https
-    port: 8443
-    targetPort: 8443
-  - name: http
-    port: 8080
-    targetPort: 8080
-  selector:
-    app: keycloak
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: keycloak
-  labels:
-    app: keycloak
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: keycloak
-  template:
-    metadata:
-      labels:
-        app: keycloak
-    spec:
-      containers:
-      - name: keycloak
-        image: quay.io/keycloak/keycloak:$KEYCLOAK_VERSION
-        args:
-        - start-dev
-        - --features=token-exchange:v1,admin-fine-grained-authz:v1
-        env:
-        - name: KC_DB
-          value: postgres
-        - name: KC_DB_URL
-          value: jdbc:postgresql://postgresql:5432/keycloak
-        - name: KC_DB_USERNAME
-          valueFrom:
-            secretKeyRef:
-              name: postgresql-credentials
-              key: POSTGRESQL_USER
-        - name: KC_DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: postgresql-credentials
-              key: POSTGRESQL_PASSWORD
-        - name: KC_BOOTSTRAP_ADMIN_USERNAME
-          value: "$ADMIN_USER"
-        - name: KC_BOOTSTRAP_ADMIN_PASSWORD
-          value: "$ADMIN_PASSWORD"
-        - name: KC_PROXY_HEADERS
-          value: "xforwarded"
-        - name: KC_HTTP_ENABLED
-          value: "true"
-        - name: KC_HOSTNAME_STRICT
-          value: "false"
-        ports:
-        - name: http
-          containerPort: 8080
-        - name: https
-          containerPort: 8443
-        readinessProbe:
-          httpGet:
-            path: /realms/master
-            port: 8080
-          initialDelaySeconds: 60
-          periodSeconds: 10
-        livenessProbe:
-          httpGet:
-            path: /realms/master
-            port: 8080
-          initialDelaySeconds: 90
-          periodSeconds: 30
----
-apiVersion: route.openshift.io/v1
-kind: Route
-metadata:
-  name: keycloak
-  labels:
-    app: keycloak
-spec:
-  to:
-    kind: Service
-    name: keycloak
-  port:
-    targetPort: http
-  tls:
-    termination: edge
-    insecureEdgeTerminationPolicy: Redirect
-EOF
+sed -e "s/KEYCLOAK_VERSION_PLACEHOLDER/$KEYCLOAK_VERSION/" \
+    -e "s/ADMIN_USER_PLACEHOLDER/$ADMIN_USER/" \
+    -e "s/ADMIN_PASSWORD_PLACEHOLDER/$ADMIN_PASSWORD/" \
+    "$KEYCLOAK_CONFIG_DIR/keycloak.yaml" | \
+    oc apply -n "$KEYCLOAK_NAMESPACE" -f -
 
 echo "✅ Keycloak deployment created with V1 features: token-exchange:v1,admin-fine-grained-authz:v1"
 
