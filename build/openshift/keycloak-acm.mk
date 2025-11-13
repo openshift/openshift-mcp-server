@@ -131,28 +131,55 @@ keycloak-acm-status: ## Show Keycloak ACM configuration status
 	@echo "==========================================="
 	@echo ""
 	@if [ -f .keycloak-config/hub-config.env ]; then \
-		echo "✅ Hub configuration found:"; \
+		source .keycloak-config/hub-config.env; \
+		POD_STATUS=$$(kubectl get pods -n keycloak -l app=keycloak -o jsonpath='{.items[0].metadata.name} ({.items[0].status.phase})' 2>/dev/null || echo "No pod found"); \
+		echo "Pod: $$POD_STATUS"; \
 		echo ""; \
-		source .keycloak-config/hub-config.env && \
-		echo "  Keycloak URL: $$KEYCLOAK_URL"; \
-		echo "  Hub Realm:    $$HUB_REALM"; \
-		echo "  MCP User:     $$MCP_USERNAME"; \
+		KEYCLOAK_ROUTE=$$(kubectl get route keycloak -n keycloak -o jsonpath='{.spec.host}' 2>/dev/null); \
+		if [ -n "$$KEYCLOAK_ROUTE" ]; then \
+			echo "Route: https://$$KEYCLOAK_ROUTE"; \
+		else \
+			echo "Route: $$KEYCLOAK_URL"; \
+		fi; \
 		echo ""; \
-		kubectl get pods -n keycloak -l app=keycloak 2>/dev/null && echo "" || echo "  ⚠️  Keycloak pod not found"; \
-		kubectl get route keycloak -n keycloak -o jsonpath='{.spec.host}' 2>/dev/null && echo "" || echo "  ⚠️  Keycloak route not found"; \
+		echo "Admin Console:"; \
+		echo "  URL: $$KEYCLOAK_URL/admin"; \
+		echo "  Username: $$ADMIN_USER"; \
+		echo "  Password: $$ADMIN_PASSWORD"; \
+		echo ""; \
+		echo "Hub Realm: $$HUB_REALM"; \
+		echo "  MCP User: $$MCP_USERNAME"; \
+		echo "  Client ID: $$CLIENT_ID"; \
+		echo ""; \
+		echo "OIDC Endpoints ($$HUB_REALM realm):"; \
+		echo "  Discovery: $$KEYCLOAK_URL/realms/$$HUB_REALM/.well-known/openid-configuration"; \
+		echo "  Token:     $$KEYCLOAK_URL/realms/$$HUB_REALM/protocol/openid-connect/token"; \
+		echo "  Authorize: $$KEYCLOAK_URL/realms/$$HUB_REALM/protocol/openid-connect/auth"; \
+		echo ""; \
 	else \
 		echo "❌ Hub configuration not found"; \
 		echo "   Run: make keycloak-acm-setup-hub"; \
 	fi
 	@echo ""
-	@if [ -f acm-kubeconfig.toml ]; then \
-		echo "✅ MCP configuration found: acm-kubeconfig.toml"; \
+	@if [ -f .keycloak-config/clusters ]; then \
+		echo "Managed Clusters:"; \
+		for cluster_env in .keycloak-config/clusters/*.env; do \
+			if [ -f "$$cluster_env" ]; then \
+				source "$$cluster_env"; \
+				echo "  - $$CLUSTER_NAME (realm: $$MANAGED_REALM)"; \
+			fi; \
+		done; \
 		echo ""; \
-		echo "Configured clusters:"; \
-		grep '^\[cluster_provider_configs.acm-kubeconfig.clusters' acm-kubeconfig.toml | \
-			sed 's/\[cluster_provider_configs.acm-kubeconfig.clusters."\(.*\)"\]/  - \1/'; \
+	fi
+	@if [ -f _output/acm-kubeconfig.toml ]; then \
+		echo "✅ MCP configuration: _output/acm-kubeconfig.toml"; \
+		echo ""; \
+		echo "Configured clusters in TOML:"; \
+		grep '^\[cluster_provider_configs.acm-kubeconfig.clusters' _output/acm-kubeconfig.toml 2>/dev/null | \
+			sed 's/\[cluster_provider_configs.acm-kubeconfig.clusters."\(.*\)"\]/  - \1/' || echo "  (none)"; \
 	else \
 		echo "❌ MCP configuration not found"; \
 		echo "   Run: make keycloak-acm-generate-toml"; \
 	fi
 	@echo ""
+	@echo "==========================================="
