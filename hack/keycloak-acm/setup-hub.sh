@@ -235,13 +235,13 @@ spec:
           httpGet:
             path: /realms/master
             port: 8080
-          initialDelaySeconds: 30
+          initialDelaySeconds: 60
           periodSeconds: 10
         livenessProbe:
           httpGet:
             path: /realms/master
             port: 8080
-          initialDelaySeconds: 60
+          initialDelaySeconds: 90
           periodSeconds: 30
 ---
 apiVersion: route.openshift.io/v1
