@@ -1,0 +1,9 @@
+{
+  "name": "mcp-server",
+  "description": "MCP Server audience scope",
+  "protocol": "openid-connect",
+  "attributes": {
+    "display.on.consent.screen": "false",
+    "include.in.token.scope": "true"
+  }
+}
