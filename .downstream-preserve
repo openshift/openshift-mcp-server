@@ -1,0 +1,11 @@
+# Downstream files/folders to preserve during upstream sync
+# One entry per line, supports directories with trailing /
+.ci-operator.yaml
+.snyk
+.tekton/
+Dockerfile.ci
+Dockerfile.ocp
+Makefile-ocp.mk
+OWNERS
+mcp_config.toml
+renovate.json
