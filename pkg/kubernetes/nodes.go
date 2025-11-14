@@ -2,7 +2,12 @@ package kubernetes
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/metrics/pkg/apis/metrics"
+	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 )
 
 func (k *Kubernetes) NodesLog(ctx context.Context, name string, query string, tailLines int64) (string, error) {
@@ -39,6 +44,7 @@ func (k *Kubernetes) NodesLog(ctx context.Context, name string, query string, ta
 
 func (k *Kubernetes) NodesStatsSummary(ctx context.Context, name string) (string, error) {
 	// Use the node proxy API to access stats summary from the kubelet
+	// https://kubernetes.io/docs/reference/instrumentation/understand-psi-metrics/
 	// This endpoint provides CPU, memory, filesystem, and network statistics
 
 	req, err := k.AccessControlClientset().NodesStatsSummary(ctx, name)
@@ -57,4 +63,17 @@ func (k *Kubernetes) NodesStatsSummary(ctx context.Context, name string) (string
 	}
 
 	return string(rawData), nil
+}
+
+type NodesTopOptions struct {
+	metav1.ListOptions
+	Name string
+}
+
+func (k *Kubernetes) NodesTop(ctx context.Context, options NodesTopOptions) (*metrics.NodeMetricsList, error) {
+	// TODO, maybe move to mcp Tools setup and omit in case metrics aren't available in the target cluster
+	if !k.supportsGroupVersion(metrics.GroupName + "/" + metricsv1beta1api.SchemeGroupVersion.Version) {
+		return nil, errors.New("metrics API is not available")
+	}
+	return k.manager.accessControlClientSet.NodesMetricses(ctx, options.Name, options.ListOptions)
 }

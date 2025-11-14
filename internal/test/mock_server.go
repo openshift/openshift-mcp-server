@@ -59,6 +59,10 @@ func (m *MockServer) Handle(handler http.Handler) {
 	m.restHandlers = append(m.restHandlers, handler.ServeHTTP)
 }
 
+func (m *MockServer) ResetHandlers() {
+	m.restHandlers = make([]http.HandlerFunc, 0)
+}
+
 func (m *MockServer) Config() *rest.Config {
 	return m.config
 }
@@ -213,6 +217,36 @@ func (h *InOpenShiftHandler) ServeHTTP(w http.ResponseWriter, req *http.Request)
 			"resources":[
 				{"name":"projects","singularName":"","namespaced":false,"kind":"Project","verbs":["create","delete","get","list","patch","update","watch"],"shortNames":["pr"]}
 			]}`))
+		return
+	}
+}
+
+const tokenReviewSuccessful = `
+	{
+		"kind": "TokenReview",
+		"apiVersion": "authentication.k8s.io/v1",
+		"spec": {"token": "valid-token"},
+		"status": {
+			"authenticated": true,
+			"user": {
+				"username": "test-user",
+				"groups": ["system:authenticated"]
+			},
+			"audiences": ["the-audience"]
+		}
+	}`
+
+type TokenReviewHandler struct {
+	TokenReviewed bool
+}
+
+var _ http.Handler = (*TokenReviewHandler)(nil)
+
+func (h *TokenReviewHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	if req.URL.EscapedPath() == "/apis/authentication.k8s.io/v1/tokenreviews" {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(tokenReviewSuccessful))
+		h.TokenReviewed = true
 		return
 	}
 }
