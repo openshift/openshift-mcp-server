@@ -53,11 +53,23 @@ func (k *Kiali) validateAndGetURL(endpoint string) (string, error) {
 	if endpoint == "" {
 		return baseURL.String(), nil
 	}
-	ref, err := url.Parse(endpoint)
+	// Parse the endpoint to extract path, query, and fragment
+	endpoint = strings.TrimSpace(endpoint)
+	endpointURL, err := url.Parse(endpoint)
+
 	if err != nil {
 		return "", fmt.Errorf("invalid endpoint path: %w", err)
 	}
-	return baseURL.ResolveReference(ref).String(), nil
+	resultURL, err := url.JoinPath(baseURL.String(), endpointURL.Path)
+	if err != nil {
+		return "", fmt.Errorf("failed to join kiali base URL with endpoint path: %w", err)
+	}
+
+	u, _ := url.Parse(resultURL)
+	u.RawQuery = endpointURL.RawQuery
+	u.Fragment = endpointURL.Fragment
+
+	return u.String(), nil
 }
 
 func (k *Kiali) createHTTPClient() *http.Client {
