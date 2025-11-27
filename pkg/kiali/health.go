@@ -12,7 +12,7 @@ import (
 //   - namespaces: comma-separated list of namespaces (optional, if empty returns health for all accessible namespaces)
 //   - queryParams: optional query parameters map for filtering health data (e.g., "type", "rateInterval", "queryTime")
 //   - type: health type - "app", "service", or "workload" (default: "app")
-//   - rateInterval: rate interval for fetching error rate (default: "1m")
+//   - rateInterval: rate interval for fetching error rate (default: DefaultRateInterval, which is "10m")
 //   - queryTime: Unix timestamp for the prometheus query (optional)
 func (k *Kiali) Health(ctx context.Context, namespaces string, queryParams map[string]string) (string, error) {
 	// Build query parameters
@@ -34,14 +34,18 @@ func (k *Kiali) Health(ctx context.Context, namespaces string, queryParams map[s
 		}
 	}
 
-	// Ensure health "type" aligns with graphType (versionedApp -> app)
+	// Ensure health "type" aligns with graphType (versionedApp -> app, mesh -> app)
+	// The Kiali health API only accepts "app", "service", or "workload" as valid types
 	healthType := "app"
 	if gt, ok := queryParams["graphType"]; ok && strings.TrimSpace(gt) != "" {
 		v := strings.TrimSpace(gt)
 		if strings.EqualFold(v, "versionedApp") {
 			healthType = "app"
-		} else {
+		} else if v == "workload" || v == "service" {
 			healthType = v
+		} else {
+			// For "mesh" or any other graphType, default to "app"
+			healthType = "app"
 		}
 	}
 	q.Set("type", healthType)

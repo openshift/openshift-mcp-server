@@ -7,20 +7,24 @@ import (
 	"sync"
 )
 
+// GetMeshGraphResponse contains the combined response from multiple Kiali API endpoints.
+// Note: Health data is fetched from Kiali's health API and used internally to compute
+// MeshHealthSummary, but the raw health data is not included in the response to reduce payload size.
+// MeshHealthSummary contains all the key aggregated metrics needed for mesh health overview.
 type GetMeshGraphResponse struct {
-	Graph      json.RawMessage   `json:"graph,omitempty"`
-	Health     json.RawMessage   `json:"health,omitempty"`
-	MeshStatus json.RawMessage   `json:"mesh_status,omitempty"`
-	Namespaces json.RawMessage   `json:"namespaces,omitempty"`
-	Errors     map[string]string `json:"errors,omitempty"`
+	Graph             json.RawMessage    `json:"graph,omitempty"`
+	MeshStatus        json.RawMessage    `json:"mesh_status,omitempty"`
+	Namespaces        json.RawMessage    `json:"namespaces,omitempty"`
+	MeshHealthSummary *MeshHealthSummary `json:"mesh_health_summary,omitempty"` // Aggregated summary computed from health data
+	Errors            map[string]string  `json:"errors,omitempty"`
 }
 
 // GetMeshGraph fetches multiple Kiali endpoints in parallel and returns a combined response.
 // Each field in the response corresponds to one API call result.
 // - graph:       /api/namespaces/graph (optionally filtered by namespaces)
-// - health:      /api/clusters/health  (optionally filtered by namespaces and queryParams)
-// - status(mesh):/api/mesh/graph
+// - mesh_status: /api/mesh/graph
 // - namespaces:  /api/namespaces
+// - mesh_health_summary: computed from /api/clusters/health (health data is fetched but not included in response)
 func (k *Kiali) GetMeshGraph(ctx context.Context, namespaces []string, queryParams map[string]string) (string, error) {
 	cleaned := make([]string, 0, len(namespaces))
 	for _, ns := range namespaces {
@@ -51,7 +55,7 @@ func (k *Kiali) GetMeshGraph(ctx context.Context, namespaces []string, queryPara
 		resp.Graph = data
 	}()
 
-	// Health
+	// Health - compute MeshHealthSummary inside the goroutine
 	go func() {
 		defer wg.Done()
 		data, err := k.getHealth(ctx, cleaned, queryParams)
@@ -61,7 +65,13 @@ func (k *Kiali) GetMeshGraph(ctx context.Context, namespaces []string, queryPara
 			errorsMu.Unlock()
 			return
 		}
-		resp.Health = data
+		// Compute mesh health summary from health data
+		if len(data) > 0 {
+			summary := computeMeshHealthSummary(data, cleaned, queryParams)
+			if summary != nil {
+				resp.MeshHealthSummary = summary
+			}
+		}
 	}()
 
 	// Mesh status
