@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/version"
 	authv1 "k8s.io/api/authorization/v1"
@@ -84,6 +85,50 @@ func (k *Kubernetes) ResourcesDelete(ctx context.Context, gvk *schema.GroupVersi
 		namespace = k.NamespaceOrDefault(namespace)
 	}
 	return k.AccessControlClientset().DynamicClient().Resource(*gvr).Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+}
+
+func (k *Kubernetes) ResourcesScale(
+	ctx context.Context,
+	gvk *schema.GroupVersionKind,
+	namespace, name string,
+	desiredScale int64,
+	shouldScale bool,
+) (*unstructured.Unstructured, error) {
+	gvr, err := k.resourceFor(gvk)
+	if err != nil {
+		return nil, err
+	}
+
+	var resourceClient dynamic.ResourceInterface
+
+	if namespaced, nsErr := k.isNamespaced(gvk); nsErr == nil && namespaced {
+		resourceClient = k.
+			AccessControlClientset().
+			DynamicClient().
+			Resource(*gvr).
+			Namespace(k.NamespaceOrDefault(namespace))
+	} else {
+		resourceClient = k.
+			AccessControlClientset().DynamicClient().Resource(*gvr)
+	}
+
+	scale, err := resourceClient.Get(ctx, name, metav1.GetOptions{}, "scale")
+	if err != nil {
+		return nil, err
+	}
+
+	if shouldScale {
+		if err := unstructured.SetNestedField(scale.Object, desiredScale, "spec", "replicas"); err != nil {
+			return scale, fmt.Errorf("failed to set .spec.replicas on scale object %v: %w", scale, err)
+		}
+
+		scale, err = resourceClient.Update(ctx, scale, metav1.UpdateOptions{}, "scale")
+		if err != nil {
+			return scale, fmt.Errorf("failed to update scale: %w", err)
+		}
+	}
+
+	return scale, nil
 }
 
 // resourcesListAsTable retrieves a list of resources in a table format.
