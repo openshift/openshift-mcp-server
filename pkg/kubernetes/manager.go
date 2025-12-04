@@ -4,37 +4,25 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
-	"github.com/containers/kubernetes-mcp-server/pkg/helm"
-	"github.com/fsnotify/fsnotify"
 	authenticationv1api "k8s.io/api/authentication/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/discovery/cached/memory"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
 )
 
 type Manager struct {
-	cfg                     *rest.Config
-	clientCmdConfig         clientcmd.ClientConfig
-	discoveryClient         discovery.CachedDiscoveryInterface
-	accessControlClientSet  *AccessControlClientset
-	accessControlRESTMapper *AccessControlRESTMapper
-	dynamicClient           *dynamic.DynamicClient
+	accessControlClientset *AccessControlClientset
 
-	staticConfig         *config.StaticConfig
-	CloseWatchKubeConfig CloseWatchKubeConfig
+	staticConfig *config.StaticConfig
 }
 
-var _ helm.Kubernetes = (*Manager)(nil)
 var _ Openshift = (*Manager)(nil)
 
 var (
@@ -63,7 +51,7 @@ func NewKubeconfigManager(config *config.StaticConfig, kubeconfigContext string)
 		return nil, fmt.Errorf("failed to create kubernetes rest config from kubeconfig: %v", err)
 	}
 
-	return newManager(config, restConfig, clientCmdConfig)
+	return NewManager(config, restConfig, clientCmdConfig)
 }
 
 func NewInClusterManager(config *config.StaticConfig) (*Manager, error) {
@@ -95,118 +83,40 @@ func NewInClusterManager(config *config.StaticConfig) (*Manager, error) {
 	}
 	clientCmdConfig.CurrentContext = inClusterKubeConfigDefaultContext
 
-	return newManager(config, restConfig, clientcmd.NewDefaultClientConfig(*clientCmdConfig, nil))
+	return NewManager(config, restConfig, clientcmd.NewDefaultClientConfig(*clientCmdConfig, nil))
 }
 
-func newManager(config *config.StaticConfig, restConfig *rest.Config, clientCmdConfig clientcmd.ClientConfig) (*Manager, error) {
-	k8s := &Manager{
-		staticConfig:    config,
-		cfg:             restConfig,
-		clientCmdConfig: clientCmdConfig,
+func NewManager(config *config.StaticConfig, restConfig *rest.Config, clientCmdConfig clientcmd.ClientConfig) (*Manager, error) {
+	if config == nil {
+		return nil, errors.New("config cannot be nil")
 	}
-	if k8s.cfg.UserAgent == "" {
-		k8s.cfg.UserAgent = rest.DefaultKubernetesUserAgent()
+	if restConfig == nil {
+		return nil, errors.New("restConfig cannot be nil")
+	}
+	if clientCmdConfig == nil {
+		return nil, errors.New("clientCmdConfig cannot be nil")
+	}
+
+	// Apply QPS and Burst from environment variables if set (primarily for testing)
+	applyRateLimitFromEnv(restConfig)
+
+	k8s := &Manager{
+		staticConfig: config,
 	}
 	var err error
 	// TODO: Won't work because not all client-go clients use the shared context (e.g. discovery client uses context.TODO())
 	//k8s.cfg.Wrap(func(original http.RoundTripper) http.RoundTripper {
 	//	return &impersonateRoundTripper{original}
 	//})
-	k8s.accessControlClientSet, err = NewAccessControlClientset(k8s.cfg, k8s.staticConfig)
-	if err != nil {
-		return nil, err
-	}
-	k8s.discoveryClient = memory.NewMemCacheClient(k8s.accessControlClientSet.DiscoveryClient())
-	k8s.accessControlRESTMapper = NewAccessControlRESTMapper(
-		restmapper.NewDeferredDiscoveryRESTMapper(k8s.discoveryClient),
-		k8s.staticConfig,
-	)
-	k8s.dynamicClient, err = dynamic.NewForConfig(k8s.cfg)
+	k8s.accessControlClientset, err = NewAccessControlClientset(k8s.staticConfig, clientCmdConfig, restConfig)
 	if err != nil {
 		return nil, err
 	}
 	return k8s, nil
 }
 
-func (m *Manager) WatchKubeConfig(onKubeConfigChange func() error) {
-	if m.clientCmdConfig == nil {
-		return
-	}
-	kubeConfigFiles := m.clientCmdConfig.ConfigAccess().GetLoadingPrecedence()
-	if len(kubeConfigFiles) == 0 {
-		return
-	}
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		return
-	}
-	for _, file := range kubeConfigFiles {
-		_ = watcher.Add(file)
-	}
-	go func() {
-		for {
-			select {
-			case _, ok := <-watcher.Events:
-				if !ok {
-					return
-				}
-				_ = onKubeConfigChange()
-			case _, ok := <-watcher.Errors:
-				if !ok {
-					return
-				}
-			}
-		}
-	}()
-	if m.CloseWatchKubeConfig != nil {
-		_ = m.CloseWatchKubeConfig()
-	}
-	m.CloseWatchKubeConfig = watcher.Close
-}
-
-func (m *Manager) Close() {
-	if m.CloseWatchKubeConfig != nil {
-		_ = m.CloseWatchKubeConfig()
-	}
-}
-
-func (m *Manager) configuredNamespace() string {
-	if ns, _, nsErr := m.clientCmdConfig.Namespace(); nsErr == nil {
-		return ns
-	}
-	return ""
-}
-
-func (m *Manager) NamespaceOrDefault(namespace string) string {
-	if namespace == "" {
-		return m.configuredNamespace()
-	}
-	return namespace
-}
-
-func (m *Manager) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
-	return m.discoveryClient, nil
-}
-
-func (m *Manager) ToRESTMapper() (meta.RESTMapper, error) {
-	return m.accessControlRESTMapper, nil
-}
-
-// ToRESTConfig returns the rest.Config object (genericclioptions.RESTClientGetter)
-func (m *Manager) ToRESTConfig() (*rest.Config, error) {
-	return m.cfg, nil
-}
-
-// ToRawKubeConfigLoader returns the clientcmd.ClientConfig object (genericclioptions.RESTClientGetter)
-func (m *Manager) ToRawKubeConfigLoader() clientcmd.ClientConfig {
-	return m.clientCmdConfig
-}
-
 func (m *Manager) VerifyToken(ctx context.Context, token, audience string) (*authenticationv1api.UserInfo, []string, error) {
-	tokenReviewClient, err := m.accessControlClientSet.TokenReview()
-	if err != nil {
-		return nil, nil, err
-	}
+	tokenReviewClient := m.accessControlClientset.AuthenticationV1().TokenReviews()
 	tokenReview := &authenticationv1api.TokenReview{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "authentication.k8s.io/v1",
@@ -239,63 +149,67 @@ func (m *Manager) Derived(ctx context.Context) (*Kubernetes, error) {
 		if m.staticConfig.RequireOAuth {
 			return nil, errors.New("oauth token required")
 		}
-		return &Kubernetes{manager: m}, nil
+		return &Kubernetes{m.accessControlClientset}, nil
 	}
 	klog.V(5).Infof("%s header found (Bearer), using provided bearer token", OAuthAuthorizationHeader)
 	derivedCfg := &rest.Config{
-		Host:    m.cfg.Host,
-		APIPath: m.cfg.APIPath,
+		Host:          m.accessControlClientset.cfg.Host,
+		APIPath:       m.accessControlClientset.cfg.APIPath,
+		WrapTransport: m.accessControlClientset.cfg.WrapTransport,
 		// Copy only server verification TLS settings (CA bundle and server name)
 		TLSClientConfig: rest.TLSClientConfig{
-			Insecure:   m.cfg.Insecure,
-			ServerName: m.cfg.ServerName,
-			CAFile:     m.cfg.CAFile,
-			CAData:     m.cfg.CAData,
+			Insecure:   m.accessControlClientset.cfg.Insecure,
+			ServerName: m.accessControlClientset.cfg.ServerName,
+			CAFile:     m.accessControlClientset.cfg.CAFile,
+			CAData:     m.accessControlClientset.cfg.CAData,
 		},
 		BearerToken: strings.TrimPrefix(authorization, "Bearer "),
 		// pass custom UserAgent to identify the client
 		UserAgent:   CustomUserAgent,
-		QPS:         m.cfg.QPS,
-		Burst:       m.cfg.Burst,
-		Timeout:     m.cfg.Timeout,
+		QPS:         m.accessControlClientset.cfg.QPS,
+		Burst:       m.accessControlClientset.cfg.Burst,
+		Timeout:     m.accessControlClientset.cfg.Timeout,
 		Impersonate: rest.ImpersonationConfig{},
 	}
-	clientCmdApiConfig, err := m.clientCmdConfig.RawConfig()
+	clientCmdApiConfig, err := m.accessControlClientset.clientCmdConfig.RawConfig()
 	if err != nil {
 		if m.staticConfig.RequireOAuth {
 			klog.Errorf("failed to get kubeconfig: %v", err)
-			return nil, errors.New("failed to get kubeconfig")
+			return nil, fmt.Errorf("failed to get kubeconfig: %w", err)
 		}
-		return &Kubernetes{manager: m}, nil
+		return &Kubernetes{m.accessControlClientset}, nil
 	}
 	clientCmdApiConfig.AuthInfos = make(map[string]*clientcmdapi.AuthInfo)
-	derived := &Kubernetes{
-		manager: &Manager{
-			clientCmdConfig: clientcmd.NewDefaultClientConfig(clientCmdApiConfig, nil),
-			cfg:             derivedCfg,
-			staticConfig:    m.staticConfig,
-		},
-	}
-	derived.manager.accessControlClientSet, err = NewAccessControlClientset(derived.manager.cfg, derived.manager.staticConfig)
+	derived, err := NewAccessControlClientset(m.staticConfig, clientcmd.NewDefaultClientConfig(clientCmdApiConfig, nil), derivedCfg)
 	if err != nil {
 		if m.staticConfig.RequireOAuth {
-			klog.Errorf("failed to get kubeconfig: %v", err)
-			return nil, errors.New("failed to get kubeconfig")
+			klog.Errorf("failed to create derived clientset: %v", err)
+			return nil, fmt.Errorf("failed to create derived clientset: %w", err)
 		}
-		return &Kubernetes{manager: m}, nil
+		return &Kubernetes{m.accessControlClientset}, nil
 	}
-	derived.manager.discoveryClient = memory.NewMemCacheClient(derived.manager.accessControlClientSet.DiscoveryClient())
-	derived.manager.accessControlRESTMapper = NewAccessControlRESTMapper(
-		restmapper.NewDeferredDiscoveryRESTMapper(derived.manager.discoveryClient),
-		derived.manager.staticConfig,
-	)
-	derived.manager.dynamicClient, err = dynamic.NewForConfig(derived.manager.cfg)
-	if err != nil {
-		if m.staticConfig.RequireOAuth {
-			klog.Errorf("failed to initialize dynamic client: %v", err)
-			return nil, errors.New("failed to initialize dynamic client")
+	return &Kubernetes{derived}, nil
+}
+
+// Invalidate invalidates the cached discovery information.
+func (m *Manager) Invalidate() {
+	m.accessControlClientset.DiscoveryClient().Invalidate()
+}
+
+// applyRateLimitFromEnv applies QPS and Burst rate limits from environment variables if set.
+// This is primarily useful for tests to avoid client-side rate limiting.
+// Environment variables:
+//   - KUBE_CLIENT_QPS: Sets the QPS (queries per second) limit
+//   - KUBE_CLIENT_BURST: Sets the burst limit
+func applyRateLimitFromEnv(cfg *rest.Config) {
+	if qpsStr := os.Getenv("KUBE_CLIENT_QPS"); qpsStr != "" {
+		if qps, err := strconv.ParseFloat(qpsStr, 32); err == nil {
+			cfg.QPS = float32(qps)
 		}
-		return &Kubernetes{manager: m}, nil
 	}
-	return derived, nil
+	if burstStr := os.Getenv("KUBE_CLIENT_BURST"); burstStr != "" {
+		if burst, err := strconv.Atoi(burstStr); err == nil {
+			cfg.Burst = burst
+		}
+	}
 }
