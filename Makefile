@@ -153,3 +153,4 @@ local-env-teardown: ## Tear down the local Kind cluster
 
 # Include build configuration files
 -include build/*.mk
+-include build/openshift/*.mk
