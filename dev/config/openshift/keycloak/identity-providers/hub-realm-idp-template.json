@@ -1,0 +1,23 @@
+{
+  "alias": "hub-realm",
+  "displayName": "Hub Realm",
+  "providerId": "oidc",
+  "enabled": true,
+  "updateProfileFirstLoginMode": "on",
+  "trustEmail": true,
+  "storeToken": false,
+  "addReadTokenRoleOnCreate": false,
+  "authenticateByDefault": false,
+  "linkOnly": false,
+  "firstBrokerLoginFlowAlias": "first broker login",
+  "config": {
+    "issuer": "${KEYCLOAK_URL}/realms/hub",
+    "validateSignature": "true",
+    "useJwksUrl": "true",
+    "jwksUrl": "${KEYCLOAK_URL}/realms/hub/protocol/openid-connect/certs",
+    "clientId": "mcp-server",
+    "clientSecret": "${HUB_CLIENT_SECRET}",
+    "clientAuthMethod": "client_secret_post",
+    "syncMode": "IMPORT"
+  }
+}
