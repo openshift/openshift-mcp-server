@@ -208,11 +208,12 @@ The following sets of tools are available (all on by default):
 
 <!-- AVAILABLE-TOOLSETS-START -->
 
-| Toolset | Description                                                                         |
-|---------|-------------------------------------------------------------------------------------|
-| config  | View and manage the current local Kubernetes configuration (kubeconfig)             |
-| core    | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.) |
-| helm    | Tools for managing Helm charts and releases                                         |
+| Toolset        | Description                                                                         |
+|----------------|-------------------------------------------------------------------------------------|
+| config         | View and manage the current local Kubernetes configuration (kubeconfig)             |
+| core           | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.) |
+| helm           | Tools for managing Helm charts and releases                                         |
+| openshift-core | Core OpenShift-specific tools (Node debugging, etc.)                                |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -248,6 +249,9 @@ In case multi-cluster support is enabled (default) and you have access to multip
   - `name` (`string`) **(required)** - Name of the node to get logs from
   - `query` (`string`) **(required)** - query specifies services(s) or files from which to return logs (required). Example: "kubelet" to fetch kubelet logs, "/<log-file-name>" to fetch a specific log file from the node (e.g., "/var/log/kubelet.log" or "/var/log/kube-proxy.log")
   - `tailLines` (`integer`) - Number of lines to retrieve from the end of the logs (Optional, 0 means all logs)
+
+- **nodes_stats_summary** - Get detailed resource usage statistics from a Kubernetes node via the kubelet's Summary API. Provides comprehensive metrics including CPU, memory, filesystem, and network usage at the node, pod, and container levels. On systems with cgroup v2 and kernel 4.20+, also includes PSI (Pressure Stall Information) metrics that show resource pressure for CPU, memory, and I/O. See https://kubernetes.io/docs/reference/instrumentation/understand-psi-metrics/ for details on PSI metrics
+  - `name` (`string`) **(required)** - Name of the node to get stats from
 
 - **pods_list** - List all the Kubernetes pods in the current cluster from all namespaces
   - `labelSelector` (`string`) - Optional Kubernetes label selector (e.g. 'app=myapp,env=prod' or 'app in (myapp,yourapp)'), use this option when you want to filter the pods by label
@@ -333,6 +337,19 @@ In case multi-cluster support is enabled (default) and you have access to multip
 - **helm_uninstall** - Uninstall a Helm release in the current or provided namespace
   - `name` (`string`) **(required)** - Name of the Helm release to uninstall
   - `namespace` (`string`) - Namespace to uninstall the Helm release from (Optional, current namespace if not provided)
+
+</details>
+
+<details>
+
+<summary>openshift-core</summary>
+
+- **nodes_debug_exec** - Run commands on an OpenShift node using a privileged debug pod with comprehensive troubleshooting utilities. The debug pod uses the UBI9 toolbox image which includes: systemd tools (systemctl, journalctl), networking tools (ss, ip, ping, traceroute, nmap), process tools (ps, top, lsof, strace), file system tools (find, tar, rsync), and debugging tools (gdb). The host filesystem is mounted at /host, allowing commands to chroot /host if needed to access node-level resources. Output is truncated to the most recent 100 lines, so prefer filters like grep when expecting large logs.
+  - `command` (`array`) **(required)** - Command to execute on the node. All standard debugging utilities from the UBI9 toolbox are available. The host filesystem is mounted at /host - use 'chroot /host <command>' to access node-level resources, or run commands directly in the toolbox environment. Provide each argument as a separate array item (e.g. ['chroot', '/host', 'systemctl', 'status', 'kubelet'] or ['journalctl', '-u', 'kubelet', '--since', '1 hour ago']).
+  - `image` (`string`) - Container image to use for the debug pod (optional). Defaults to registry.access.redhat.com/ubi9/toolbox:latest which provides comprehensive debugging and troubleshooting utilities.
+  - `namespace` (`string`) - Namespace to create the temporary debug pod in (optional, defaults to the current namespace or 'default').
+  - `node` (`string`) **(required)** - Name of the node to debug (e.g. worker-0).
+  - `timeout_seconds` (`integer`) - Maximum time to wait for the command to complete before timing out (optional, defaults to 60 seconds).
 
 </details>
 
