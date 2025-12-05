@@ -137,7 +137,7 @@ func TestToolsets(t *testing.T) {
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--help"})
 		o, err := captureOutput(rootCmd.Execute) // --help doesn't use logger/klog, cobra prints directly to stdout
-		if !strings.Contains(o, "Comma-separated list of MCP toolsets to use (available toolsets: config, core, helm).") {
+		if !strings.Contains(o, "Comma-separated list of MCP toolsets to use (available toolsets: config, core, helm, openshift-ai).") {
 			t.Fatalf("Expected all available toolsets, got %s %v", o, err)
 		}
 	})
@@ -145,7 +145,7 @@ func TestToolsets(t *testing.T) {
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1"})
-		if err := rootCmd.Execute(); !strings.Contains(out.String(), "- Toolsets: core, config, helm") {
+		if err := rootCmd.Execute(); !strings.Contains(out.String(), "- Toolsets: core, config, helm, openshift-ai") {
 			t.Fatalf("Expected toolsets 'full', got %s %v", out, err)
 		}
 	})
