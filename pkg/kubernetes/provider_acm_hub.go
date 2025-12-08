@@ -12,15 +12,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/discovery/cached/memory"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 
 	"github.com/BurntSushi/toml"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes/watcher"
 )
 
 const (
@@ -76,7 +74,7 @@ func (c *ACMKubeConfigProviderConfig) Validate() error {
 	return err
 }
 
-func parseAcmConfig(ctx context.Context, primitive toml.Primitive, md toml.MetaData) (config.ProviderConfig, error) {
+func parseAcmConfig(ctx context.Context, primitive toml.Primitive, md toml.MetaData) (config.Extended, error) {
 	cfg := &ACMProviderConfig{}
 	if err := md.PrimitiveDecode(primitive, cfg); err != nil {
 		return nil, err
@@ -87,7 +85,7 @@ func parseAcmConfig(ctx context.Context, primitive toml.Primitive, md toml.MetaD
 	return cfg, nil
 }
 
-func parseAcmKubeConfigConfig(ctx context.Context, primitive toml.Primitive, md toml.MetaData) (config.ProviderConfig, error) {
+func parseAcmKubeConfigConfig(ctx context.Context, primitive toml.Primitive, md toml.MetaData) (config.Extended, error) {
 	cfg := &ACMKubeConfigProviderConfig{}
 	if err := md.PrimitiveDecode(primitive, &cfg); err != nil {
 		return nil, err
@@ -106,6 +104,9 @@ type acmHubClusterProvider struct {
 	skipTLSVerify      bool
 	clusterProxyCAFile string
 	watchKubeConfig    bool // whether or not the kubeconfig should be watched for changes
+
+	kubeConfigWatcher *watcher.Kubeconfig
+	clusterWatcher    *watcher.ClusterState
 
 	// Context for cancelling the watch goroutine
 	watchCtx     context.Context
@@ -130,11 +131,7 @@ func init() {
 // This is included here instead of in other files so that it doesn't create conflicts
 // with upstream changes
 func (m *Manager) IsACMHub() bool {
-	discoveryClient, err := m.ToDiscoveryClient()
-	if err != nil {
-		klog.V(3).Infof("failed to get discovery client for ACM detection: %v", err)
-		return false
-	}
+	discoveryClient := m.accessControlClientset.DiscoveryClient()
 
 	_, apiLists, err := discoveryClient.ServerGroupsAndResources()
 	if err != nil {
@@ -201,7 +198,7 @@ func discoverClusterProxyHost(m *Manager, isOpenShift bool) (string, error) {
 			Resource: "routes",
 		}
 
-		route, err := m.dynamicClient.Resource(routeGVR).Namespace("multicluster-engine").Get(ctx, "cluster-proxy-addon-user", metav1.GetOptions{})
+		route, err := m.accessControlClientset.DynamicClient().Resource(routeGVR).Namespace("multicluster-engine").Get(ctx, "cluster-proxy-addon-user", metav1.GetOptions{})
 		if err == nil {
 			host, found, err := unstructured.NestedString(route.Object, "spec", "host")
 			if err == nil && found && host != "" {
@@ -212,7 +209,7 @@ func discoverClusterProxyHost(m *Manager, isOpenShift bool) (string, error) {
 	}
 
 	// Fallback: Try to find the service
-	svcClient, err := m.accessControlClientSet.Services("multicluster-engine")
+	svcClient, err := m.accessControlClientset.Services("multicluster-engine")
 	if err != nil {
 		return "", fmt.Errorf("failed to get services client: %w", err)
 	}
@@ -257,6 +254,8 @@ func newACMClusterProvider(m *Manager, cfg *ACMProviderConfig, watchKubeConfig b
 		clusterProxyHost:   clusterProxyHost,
 		clusterProxyCAFile: cfg.ClusterProxyAddonCAFile,
 		skipTLSVerify:      cfg.ClusterProxyAddonSkipTLSVerify,
+		kubeConfigWatcher:  watcher.NewKubeconfig(m.accessControlClientset.clientCmdConfig),
+		clusterWatcher:     watcher.NewClusterState(m.accessControlClientset.discoveryClient),
 	}
 
 	ctx := context.Background()
@@ -305,15 +304,17 @@ func (p *acmHubClusterProvider) GetTargetParameterName() string {
 	return ACMHubTargetParameterName
 }
 
-func (p *acmHubClusterProvider) WatchTargets(onTargetsChanged func() error) {
+func (p *acmHubClusterProvider) WatchTargets(reload McpReload) {
 	if p.watchKubeConfig {
-		p.hubManager.WatchKubeConfig(onTargetsChanged)
+		p.kubeConfigWatcher.Watch(reload)
 	}
+
+	p.clusterWatcher.Watch(reload)
 
 	// Only start watch if not already running
 	if !p.watchStarted {
 		p.watchStarted = true
-		go p.watchManagedClusters(onTargetsChanged)
+		go p.watchManagedClusters(reload)
 	}
 }
 
@@ -326,13 +327,8 @@ func (p *acmHubClusterProvider) Close() {
 	// Reset watch state
 	p.watchStarted = false
 
-	p.hubManager.Close()
-
-	for _, manager := range p.clusterManagers {
-		if manager != nil {
-			manager.Close()
-		}
-	}
+	p.clusterWatcher.Close()
+	p.kubeConfigWatcher.Close()
 }
 
 func (p *acmHubClusterProvider) watchManagedClusters(onTargetsChanged func() error) {
@@ -360,9 +356,12 @@ func (p *acmHubClusterProvider) watchManagedClusters(onTargetsChanged func() err
 		default:
 		}
 
-		watchInterface, err := p.hubManager.dynamicClient.Resource(gvr).Watch(p.watchCtx, metav1.ListOptions{
-			ResourceVersion: p.lastResourceVersion,
-		})
+		watchInterface, err := p.hubManager.accessControlClientset.DynamicClient().Resource(gvr).Watch(
+			p.watchCtx,
+			metav1.ListOptions{
+				ResourceVersion: p.lastResourceVersion,
+			},
+		)
 		if err != nil {
 			klog.Errorf("Failed to start watch on managed clusters: %v", err)
 
@@ -404,7 +403,7 @@ func (p *acmHubClusterProvider) watchManagedClusters(onTargetsChanged func() err
 }
 
 func (p *acmHubClusterProvider) refreshClusters(ctx context.Context) error {
-	dynamicClient := p.hubManager.dynamicClient
+	dynamicClient := p.hubManager.accessControlClientset.dynamicClient
 
 	gvr := schema.GroupVersionResource{
 		Group:    "cluster.open-cluster-management.io",
@@ -437,7 +436,7 @@ func (p *acmHubClusterProvider) managerForCluster(cluster string) (*Manager, err
 		return manager, nil
 	}
 
-	proxyConfig := rest.CopyConfig(p.hubManager.cfg)
+	proxyConfig := rest.CopyConfig(p.hubManager.accessControlClientset.cfg)
 	proxyHost := fmt.Sprintf("https://%s/%s", p.clusterProxyHost, cluster)
 	proxyConfig.Host = proxyHost
 
@@ -452,7 +451,7 @@ func (p *acmHubClusterProvider) managerForCluster(cluster string) (*Manager, err
 	}
 
 	// Create modified clientCmdConfig to match the proxy configuration
-	hubRawConfig, err := p.hubManager.clientCmdConfig.RawConfig()
+	hubRawConfig, err := p.hubManager.accessControlClientset.clientCmdConfig.RawConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get hub kubeconfig: %w", err)
 	}
@@ -474,40 +473,13 @@ func (p *acmHubClusterProvider) managerForCluster(cluster string) (*Manager, err
 		}
 	}
 
-	manager := &Manager{
-		cfg:             proxyConfig,
-		staticConfig:    p.hubManager.staticConfig,
-		clientCmdConfig: clientcmd.NewDefaultClientConfig(*proxyRawConfig, nil),
-	}
-
-	if err := p.initializeManager(manager); err != nil {
-		return nil, fmt.Errorf("failed to initialize manager for cluster %s: %w", cluster, err)
+	proxyClientCmdConfig := clientcmd.NewDefaultClientConfig(*proxyRawConfig, nil)
+	manager, err := NewManager(p.hubManager.staticConfig, proxyConfig, proxyClientCmdConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create manager for cluster %s: %w", cluster, err)
 	}
 
 	// Cache the manager before returning
 	p.clusterManagers[cluster] = manager
 	return manager, nil
-}
-
-func (p *acmHubClusterProvider) initializeManager(m *Manager) error {
-	var err error
-
-	m.accessControlClientSet, err = NewAccessControlClientset(m.cfg, m.staticConfig)
-	if err != nil {
-		return err
-	}
-
-	m.discoveryClient = memory.NewMemCacheClient(m.accessControlClientSet.DiscoveryClient())
-
-	m.accessControlRESTMapper = NewAccessControlRESTMapper(
-		restmapper.NewDeferredDiscoveryRESTMapper(m.discoveryClient),
-		m.staticConfig,
-	)
-
-	m.dynamicClient, err = dynamic.NewForConfig(m.cfg)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
