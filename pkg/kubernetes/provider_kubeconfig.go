@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes/watcher"
 	authenticationv1api "k8s.io/api/authentication/v1"
 )
 
@@ -17,8 +19,11 @@ const KubeConfigTargetParameterName = "context"
 // Kubernetes clusters using different contexts from a kubeconfig file.
 // It lazily initializes managers for each context as they are requested.
 type kubeConfigClusterProvider struct {
-	defaultContext string
-	managers       map[string]*Manager
+	staticConfig        *config.StaticConfig
+	defaultContext      string
+	managers            map[string]*Manager
+	kubeconfigWatcher   *watcher.Kubeconfig
+	clusterStateWatcher *watcher.ClusterState
 }
 
 var _ Provider = &kubeConfigClusterProvider{}
@@ -32,20 +37,28 @@ func init() {
 // Internally, it leverages a KubeconfigManager for each context, initializing them
 // lazily when requested.
 func newKubeConfigClusterProvider(cfg *config.StaticConfig) (Provider, error) {
-	m, err := NewKubeconfigManager(cfg, "")
+	ret := &kubeConfigClusterProvider{staticConfig: cfg}
+	if err := ret.reset(); err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
+func (p *kubeConfigClusterProvider) reset() error {
+	m, err := NewKubeconfigManager(p.staticConfig, "")
 	if err != nil {
 		if errors.Is(err, ErrorKubeconfigInClusterNotAllowed) {
-			return nil, fmt.Errorf("kubeconfig ClusterProviderStrategy is invalid for in-cluster deployments: %v", err)
+			return fmt.Errorf("kubeconfig ClusterProviderStrategy is invalid for in-cluster deployments: %v", err)
 		}
-		return nil, err
+		return err
 	}
 
-	rawConfig, err := m.clientCmdConfig.RawConfig()
+	rawConfig, err := m.accessControlClientset.clientCmdConfig.RawConfig()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	allClusterManagers := map[string]*Manager{
+	p.managers = map[string]*Manager{
 		rawConfig.CurrentContext: m, // we already initialized a manager for the default context, let's use it
 	}
 
@@ -53,14 +66,15 @@ func newKubeConfigClusterProvider(cfg *config.StaticConfig) (Provider, error) {
 		if name == rawConfig.CurrentContext {
 			continue // already initialized this, don't want to set it to nil
 		}
-
-		allClusterManagers[name] = nil
+		p.managers[name] = nil
 	}
 
-	return &kubeConfigClusterProvider{
-		defaultContext: rawConfig.CurrentContext,
-		managers:       allClusterManagers,
-	}, nil
+	p.Close()
+	p.kubeconfigWatcher = watcher.NewKubeconfig(m.accessControlClientset.clientCmdConfig)
+	p.clusterStateWatcher = watcher.NewClusterState(m.accessControlClientset.DiscoveryClient())
+	p.defaultContext = rawConfig.CurrentContext
+
+	return nil
 }
 
 func (p *kubeConfigClusterProvider) managerForContext(context string) (*Manager, error) {
@@ -118,14 +132,22 @@ func (p *kubeConfigClusterProvider) GetDefaultTarget() string {
 	return p.defaultContext
 }
 
-func (p *kubeConfigClusterProvider) WatchTargets(onKubeConfigChanged func() error) {
-	m := p.managers[p.defaultContext]
-
-	m.WatchKubeConfig(onKubeConfigChanged)
+func (p *kubeConfigClusterProvider) WatchTargets(reload McpReload) {
+	reloadWithReset := func() error {
+		if err := p.reset(); err != nil {
+			return err
+		}
+		p.WatchTargets(reload)
+		return reload()
+	}
+	p.kubeconfigWatcher.Watch(reloadWithReset)
+	p.clusterStateWatcher.Watch(reload)
 }
 
 func (p *kubeConfigClusterProvider) Close() {
-	m := p.managers[p.defaultContext]
-
-	m.Close()
+	for _, w := range []watcher.Watcher{p.kubeconfigWatcher, p.clusterStateWatcher} {
+		if !reflect.ValueOf(w).IsNil() {
+			w.Close()
+		}
+	}
 }

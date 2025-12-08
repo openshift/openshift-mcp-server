@@ -33,7 +33,6 @@ func initPods() []api.ServerTool {
 				Title:           "Pods: List",
 				ReadOnlyHint:    ptr.To(true),
 				DestructiveHint: ptr.To(false),
-				IdempotentHint:  ptr.To(false),
 				OpenWorldHint:   ptr.To(true),
 			},
 		}, Handler: podsListInAllNamespaces},
@@ -59,7 +58,6 @@ func initPods() []api.ServerTool {
 				Title:           "Pods: List in Namespace",
 				ReadOnlyHint:    ptr.To(true),
 				DestructiveHint: ptr.To(false),
-				IdempotentHint:  ptr.To(false),
 				OpenWorldHint:   ptr.To(true),
 			},
 		}, Handler: podsListInNamespace},
@@ -84,7 +82,6 @@ func initPods() []api.ServerTool {
 				Title:           "Pods: Get",
 				ReadOnlyHint:    ptr.To(true),
 				DestructiveHint: ptr.To(false),
-				IdempotentHint:  ptr.To(false),
 				OpenWorldHint:   ptr.To(true),
 			},
 		}, Handler: podsGet},
@@ -107,7 +104,6 @@ func initPods() []api.ServerTool {
 			},
 			Annotations: api.ToolAnnotations{
 				Title:           "Pods: Delete",
-				ReadOnlyHint:    ptr.To(false),
 				DestructiveHint: ptr.To(true),
 				IdempotentHint:  ptr.To(true),
 				OpenWorldHint:   ptr.To(true),
@@ -177,9 +173,7 @@ func initPods() []api.ServerTool {
 			},
 			Annotations: api.ToolAnnotations{
 				Title:           "Pods: Exec",
-				ReadOnlyHint:    ptr.To(false),
 				DestructiveHint: ptr.To(true), // Depending on the Pod's entrypoint, executing certain commands may kill the Pod
-				IdempotentHint:  ptr.To(false),
 				OpenWorldHint:   ptr.To(true),
 			},
 		}, Handler: podsExec},
@@ -218,7 +212,6 @@ func initPods() []api.ServerTool {
 				Title:           "Pods: Log",
 				ReadOnlyHint:    ptr.To(true),
 				DestructiveHint: ptr.To(false),
-				IdempotentHint:  ptr.To(false),
 				OpenWorldHint:   ptr.To(true),
 			},
 		}, Handler: podsLog},
@@ -249,9 +242,7 @@ func initPods() []api.ServerTool {
 			},
 			Annotations: api.ToolAnnotations{
 				Title:           "Pods: Run",
-				ReadOnlyHint:    ptr.To(false),
 				DestructiveHint: ptr.To(false),
-				IdempotentHint:  ptr.To(false),
 				OpenWorldHint:   ptr.To(true),
 			},
 		}, Handler: podsRun},
@@ -406,16 +397,10 @@ func podsLog(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	tail := params.GetArguments()["tail"]
 	var tailInt int64
 	if tail != nil {
-		// Convert to int64 - safely handle both float64 (JSON number) and int types
-		switch v := tail.(type) {
-		case float64:
-			tailInt = int64(v)
-		case int:
-			tailInt = int64(v)
-		case int64:
-			tailInt = v
-		default:
-			return api.NewToolCallResult("", fmt.Errorf("failed to parse tail parameter: expected integer, got %T", tail)), nil
+		var err error
+		tailInt, err = api.ParseInt64(tail)
+		if err != nil {
+			return api.NewToolCallResult("", fmt.Errorf("failed to parse tail parameter: %w", err)), nil
 		}
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -24,6 +25,7 @@ type Client struct {
 	serverCapabilities mcp.ServerCapabilities
 	protocolVersion    string
 	samplingHandler    SamplingHandler
+	rootsHandler       RootsHandler
 	elicitationHandler ElicitationHandler
 }
 
@@ -41,6 +43,15 @@ func WithClientCapabilities(capabilities mcp.ClientCapabilities) ClientOption {
 func WithSamplingHandler(handler SamplingHandler) ClientOption {
 	return func(c *Client) {
 		c.samplingHandler = handler
+	}
+}
+
+// WithRootsHandler sets the roots handler for the client.
+// WithRootsHandler returns a ClientOption that sets the client's RootsHandler.
+// When provided, the client will declare the roots capability (ListChanged) during initialization.
+func WithRootsHandler(handler RootsHandler) ClientOption {
+	return func(c *Client) {
+		c.rootsHandler = handler
 	}
 }
 
@@ -140,6 +151,7 @@ func (c *Client) sendRequest(
 	ctx context.Context,
 	method string,
 	params any,
+	header http.Header,
 ) (*json.RawMessage, error) {
 	if !c.initialized && method != "initialize" {
 		return nil, fmt.Errorf("client not initialized")
@@ -152,6 +164,7 @@ func (c *Client) sendRequest(
 		ID:      mcp.NewRequestId(id),
 		Method:  method,
 		Params:  params,
+		Header:  header,
 	}
 
 	response, err := c.transport.SendRequest(ctx, request)
@@ -177,6 +190,13 @@ func (c *Client) Initialize(
 	if c.samplingHandler != nil {
 		capabilities.Sampling = &struct{}{}
 	}
+	if c.rootsHandler != nil {
+		capabilities.Roots = &struct {
+			ListChanged bool `json:"listChanged,omitempty"`
+		}{
+			ListChanged: true,
+		}
+	}
 	// Add elicitation capability if handler is configured
 	if c.elicitationHandler != nil {
 		capabilities.Elicitation = &struct{}{}
@@ -193,7 +213,7 @@ func (c *Client) Initialize(
 		Capabilities:    capabilities,
 	}
 
-	response, err := c.sendRequest(ctx, "initialize", params)
+	response, err := c.sendRequest(ctx, "initialize", params, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +258,7 @@ func (c *Client) Initialize(
 }
 
 func (c *Client) Ping(ctx context.Context) error {
-	_, err := c.sendRequest(ctx, "ping", nil)
+	_, err := c.sendRequest(ctx, "ping", nil, nil)
 	return err
 }
 
@@ -319,7 +339,7 @@ func (c *Client) ReadResource(
 	ctx context.Context,
 	request mcp.ReadResourceRequest,
 ) (*mcp.ReadResourceResult, error) {
-	response, err := c.sendRequest(ctx, "resources/read", request.Params)
+	response, err := c.sendRequest(ctx, "resources/read", request.Params, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +351,7 @@ func (c *Client) Subscribe(
 	ctx context.Context,
 	request mcp.SubscribeRequest,
 ) error {
-	_, err := c.sendRequest(ctx, "resources/subscribe", request.Params)
+	_, err := c.sendRequest(ctx, "resources/subscribe", request.Params, request.Header)
 	return err
 }
 
@@ -339,7 +359,7 @@ func (c *Client) Unsubscribe(
 	ctx context.Context,
 	request mcp.UnsubscribeRequest,
 ) error {
-	_, err := c.sendRequest(ctx, "resources/unsubscribe", request.Params)
+	_, err := c.sendRequest(ctx, "resources/unsubscribe", request.Params, request.Header)
 	return err
 }
 
@@ -383,7 +403,7 @@ func (c *Client) GetPrompt(
 	ctx context.Context,
 	request mcp.GetPromptRequest,
 ) (*mcp.GetPromptResult, error) {
-	response, err := c.sendRequest(ctx, "prompts/get", request.Params)
+	response, err := c.sendRequest(ctx, "prompts/get", request.Params, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -431,7 +451,7 @@ func (c *Client) CallTool(
 	ctx context.Context,
 	request mcp.CallToolRequest,
 ) (*mcp.CallToolResult, error) {
-	response, err := c.sendRequest(ctx, "tools/call", request.Params)
+	response, err := c.sendRequest(ctx, "tools/call", request.Params, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -443,7 +463,7 @@ func (c *Client) SetLevel(
 	ctx context.Context,
 	request mcp.SetLevelRequest,
 ) error {
-	_, err := c.sendRequest(ctx, "logging/setLevel", request.Params)
+	_, err := c.sendRequest(ctx, "logging/setLevel", request.Params, request.Header)
 	return err
 }
 
@@ -451,7 +471,7 @@ func (c *Client) Complete(
 	ctx context.Context,
 	request mcp.CompleteRequest,
 ) (*mcp.CompleteResult, error) {
-	response, err := c.sendRequest(ctx, "completion/complete", request.Params)
+	response, err := c.sendRequest(ctx, "completion/complete", request.Params, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -464,6 +484,28 @@ func (c *Client) Complete(
 	return &result, nil
 }
 
+// RootListChanges sends a roots list-changed notification to the server.
+func (c *Client) RootListChanges(
+	ctx context.Context,
+) error {
+	// Send root list changes notification
+	notification := mcp.JSONRPCNotification{
+		JSONRPC: mcp.JSONRPC_VERSION,
+		Notification: mcp.Notification{
+			Method: mcp.MethodNotificationRootsListChanged,
+		},
+	}
+
+	err := c.transport.SendNotification(ctx, notification)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to send root list change notification: %w",
+			err,
+		)
+	}
+	return nil
+}
+
 // handleIncomingRequest processes incoming requests from the server.
 // This is the main entry point for server-to-client requests like sampling and elicitation.
 func (c *Client) handleIncomingRequest(ctx context.Context, request transport.JSONRPCRequest) (*transport.JSONRPCResponse, error) {
@@ -474,6 +516,8 @@ func (c *Client) handleIncomingRequest(ctx context.Context, request transport.JS
 		return c.handleElicitationRequestTransport(ctx, request)
 	case string(mcp.MethodPing):
 		return c.handlePingRequestTransport(ctx, request)
+	case string(mcp.MethodListRoots):
+		return c.handleListRootsRequestTransport(ctx, request)
 	default:
 		return nil, fmt.Errorf("unsupported request method: %s", request.Method)
 	}
@@ -520,6 +564,37 @@ func (c *Client) handleSamplingRequestTransport(ctx context.Context, request tra
 
 	// Call the sampling handler
 	result, err := c.samplingHandler.CreateMessage(ctx, mcpRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	// Marshal the result
+	resultBytes, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal result: %w", err)
+	}
+
+	// Create the transport response
+	response := transport.NewJSONRPCResultResponse(request.ID, json.RawMessage(resultBytes))
+
+	return response, nil
+}
+
+// handleListRootsRequestTransport handles list roots requests at the transport level.
+func (c *Client) handleListRootsRequestTransport(ctx context.Context, request transport.JSONRPCRequest) (*transport.JSONRPCResponse, error) {
+	if c.rootsHandler == nil {
+		return nil, fmt.Errorf("no roots handler configured")
+	}
+
+	// Create the MCP request
+	mcpRequest := mcp.ListRootsRequest{
+		Request: mcp.Request{
+			Method: string(mcp.MethodListRoots),
+		},
+	}
+
+	// Call the list roots handler
+	result, err := c.rootsHandler.ListRoots(ctx, mcpRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -591,7 +666,7 @@ func listByPage[T any](
 	request mcp.PaginatedRequest,
 	method string,
 ) (*T, error) {
-	response, err := client.sendRequest(ctx, method, request.Params)
+	response, err := client.sendRequest(ctx, method, request.Params, nil)
 	if err != nil {
 		return nil, err
 	}

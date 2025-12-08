@@ -3,9 +3,11 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/runtime"
 	"regexp"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/version"
 	authv1 "k8s.io/api/authorization/v1"
@@ -37,12 +39,12 @@ func (k *Kubernetes) ResourcesList(ctx context.Context, gvk *schema.GroupVersion
 	// Check if operation is allowed for all namespaces (applicable for namespaced resources)
 	isNamespaced, _ := k.isNamespaced(gvk)
 	if isNamespaced && !k.canIUse(ctx, gvr, namespace, "list") && namespace == "" {
-		namespace = k.manager.configuredNamespace()
+		namespace = k.configuredNamespace()
 	}
 	if options.AsTable {
 		return k.resourcesListAsTable(ctx, gvk, gvr, namespace, options)
 	}
-	return k.manager.dynamicClient.Resource(*gvr).Namespace(namespace).List(ctx, options.ListOptions)
+	return k.AccessControlClientset().DynamicClient().Resource(*gvr).Namespace(namespace).List(ctx, options.ListOptions)
 }
 
 func (k *Kubernetes) ResourcesGet(ctx context.Context, gvk *schema.GroupVersionKind, namespace, name string) (*unstructured.Unstructured, error) {
@@ -55,7 +57,7 @@ func (k *Kubernetes) ResourcesGet(ctx context.Context, gvk *schema.GroupVersionK
 	if namespaced, nsErr := k.isNamespaced(gvk); nsErr == nil && namespaced {
 		namespace = k.NamespaceOrDefault(namespace)
 	}
-	return k.manager.dynamicClient.Resource(*gvr).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+	return k.AccessControlClientset().DynamicClient().Resource(*gvr).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
 func (k *Kubernetes) ResourcesCreateOrUpdate(ctx context.Context, resource string) ([]*unstructured.Unstructured, error) {
@@ -82,7 +84,51 @@ func (k *Kubernetes) ResourcesDelete(ctx context.Context, gvk *schema.GroupVersi
 	if namespaced, nsErr := k.isNamespaced(gvk); nsErr == nil && namespaced {
 		namespace = k.NamespaceOrDefault(namespace)
 	}
-	return k.manager.dynamicClient.Resource(*gvr).Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	return k.AccessControlClientset().DynamicClient().Resource(*gvr).Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+}
+
+func (k *Kubernetes) ResourcesScale(
+	ctx context.Context,
+	gvk *schema.GroupVersionKind,
+	namespace, name string,
+	desiredScale int64,
+	shouldScale bool,
+) (*unstructured.Unstructured, error) {
+	gvr, err := k.resourceFor(gvk)
+	if err != nil {
+		return nil, err
+	}
+
+	var resourceClient dynamic.ResourceInterface
+
+	if namespaced, nsErr := k.isNamespaced(gvk); nsErr == nil && namespaced {
+		resourceClient = k.
+			AccessControlClientset().
+			DynamicClient().
+			Resource(*gvr).
+			Namespace(k.NamespaceOrDefault(namespace))
+	} else {
+		resourceClient = k.
+			AccessControlClientset().DynamicClient().Resource(*gvr)
+	}
+
+	scale, err := resourceClient.Get(ctx, name, metav1.GetOptions{}, "scale")
+	if err != nil {
+		return nil, err
+	}
+
+	if shouldScale {
+		if err := unstructured.SetNestedField(scale.Object, desiredScale, "spec", "replicas"); err != nil {
+			return scale, fmt.Errorf("failed to set .spec.replicas on scale object %v: %w", scale, err)
+		}
+
+		scale, err = resourceClient.Update(ctx, scale, metav1.UpdateOptions{}, "scale")
+		if err != nil {
+			return scale, fmt.Errorf("failed to update scale: %w", err)
+		}
+	}
+
+	return scale, nil
 }
 
 // resourcesListAsTable retrieves a list of resources in a table format.
@@ -101,7 +147,7 @@ func (k *Kubernetes) resourcesListAsTable(ctx context.Context, gvk *schema.Group
 	}
 	url = append(url, gvr.Resource)
 	var table metav1.Table
-	err := k.manager.discoveryClient.RESTClient().
+	err := k.AccessControlClientset().CoreV1().RESTClient().
 		Get().
 		SetHeader("Accept", strings.Join([]string{
 			fmt.Sprintf("application/json;as=Table;v=%s;g=%s", metav1.SchemeGroupVersion.Version, metav1.GroupName),
@@ -145,7 +191,7 @@ func (k *Kubernetes) resourcesCreateOrUpdate(ctx context.Context, resources []*u
 		if namespaced, nsErr := k.isNamespaced(&gvk); nsErr == nil && namespaced {
 			namespace = k.NamespaceOrDefault(namespace)
 		}
-		resources[i], rErr = k.manager.dynamicClient.Resource(*gvr).Namespace(namespace).Apply(ctx, obj.GetName(), obj, metav1.ApplyOptions{
+		resources[i], rErr = k.AccessControlClientset().DynamicClient().Resource(*gvr).Namespace(namespace).Apply(ctx, obj.GetName(), obj, metav1.ApplyOptions{
 			FieldManager: version.BinaryName,
 		})
 		if rErr != nil {
@@ -153,14 +199,14 @@ func (k *Kubernetes) resourcesCreateOrUpdate(ctx context.Context, resources []*u
 		}
 		// Clear the cache to ensure the next operation is performed on the latest exposed APIs (will change after the CRD creation)
 		if gvk.Kind == "CustomResourceDefinition" {
-			k.manager.accessControlRESTMapper.Reset()
+			k.AccessControlClientset().RESTMapper().Reset()
 		}
 	}
 	return resources, nil
 }
 
 func (k *Kubernetes) resourceFor(gvk *schema.GroupVersionKind) (*schema.GroupVersionResource, error) {
-	m, err := k.manager.accessControlRESTMapper.RESTMapping(schema.GroupKind{Group: gvk.Group, Kind: gvk.Kind}, gvk.Version)
+	m, err := k.AccessControlClientset().RESTMapper().RESTMapping(schema.GroupKind{Group: gvk.Group, Kind: gvk.Kind}, gvk.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +214,7 @@ func (k *Kubernetes) resourceFor(gvk *schema.GroupVersionKind) (*schema.GroupVer
 }
 
 func (k *Kubernetes) isNamespaced(gvk *schema.GroupVersionKind) (bool, error) {
-	apiResourceList, err := k.manager.discoveryClient.ServerResourcesForGroupVersion(gvk.GroupVersion().String())
+	apiResourceList, err := k.AccessControlClientset().DiscoveryClient().ServerResourcesForGroupVersion(gvk.GroupVersion().String())
 	if err != nil {
 		return false, err
 	}
@@ -181,17 +227,14 @@ func (k *Kubernetes) isNamespaced(gvk *schema.GroupVersionKind) (bool, error) {
 }
 
 func (k *Kubernetes) supportsGroupVersion(groupVersion string) bool {
-	if _, err := k.manager.discoveryClient.ServerResourcesForGroupVersion(groupVersion); err != nil {
+	if _, err := k.AccessControlClientset().DiscoveryClient().ServerResourcesForGroupVersion(groupVersion); err != nil {
 		return false
 	}
 	return true
 }
 
 func (k *Kubernetes) canIUse(ctx context.Context, gvr *schema.GroupVersionResource, namespace, verb string) bool {
-	accessReviews, err := k.manager.accessControlClientSet.SelfSubjectAccessReviews()
-	if err != nil {
-		return false
-	}
+	accessReviews := k.AccessControlClientset().AuthorizationV1().SelfSubjectAccessReviews()
 	response, err := accessReviews.Create(ctx, &authv1.SelfSubjectAccessReview{
 		Spec: authv1.SelfSubjectAccessReviewSpec{ResourceAttributes: &authv1.ResourceAttributes{
 			Namespace: namespace,
