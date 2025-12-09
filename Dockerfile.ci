@@ -1,5 +1,4 @@
-# Switch to registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.21 when Go >= v1.24.10 available
-ARG BUILDER_IMAGE=registry.access.redhat.com/ubi9/go-toolset:1.25-1764620329
+ARG BUILDER_IMAGE=registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.21
 ARG BASE_IMAGE=registry.ci.openshift.org/ocp/4.20:base-rhel9
 
 # Build the manager binary
