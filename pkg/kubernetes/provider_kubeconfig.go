@@ -11,7 +11,7 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
-	"github.com/containers/kubernetes-mcp-server/pkg/sts"
+	"github.com/containers/kubernetes-mcp-server/pkg/tokenexchange"
 	authenticationv1api "k8s.io/api/authentication/v1"
 	"k8s.io/klog/v2"
 )
@@ -29,7 +29,7 @@ type KubeConfigProviderConfig struct {
 
 	// Contexts holds per-context token exchange configuration
 	// The key is the context name from the kubeconfig file
-	Contexts map[string]sts.TargetSTSConfig `toml:"contexts,omitempty"`
+	Contexts map[string]tokenexchange.TargetSTSConfig `toml:"contexts,omitempty"`
 }
 
 func (c *KubeConfigProviderConfig) Validate() error {
@@ -52,8 +52,8 @@ type kubeConfigClusterProvider struct {
 	managers       map[string]*Manager
 
 	// Per-context token exchange configuration
-	tokenExchanger    sts.TokenExchanger
-	contextSTSConfigs map[string]sts.TargetSTSConfig
+	tokenExchanger    tokenexchange.TokenExchanger
+	contextSTSConfigs map[string]tokenexchange.TargetSTSConfig
 	httpClient        *http.Client
 }
 
@@ -104,7 +104,7 @@ func newKubeConfigClusterProvider(cfg *config.StaticConfig) (Provider, error) {
 	if ok {
 		kubeConfigCfg := providerCfg.(*KubeConfigProviderConfig)
 		if kubeConfigCfg.TokenExchangeStrategy != "" {
-			tokenExchanger, err := sts.GetTokenExchanger(kubeConfigCfg.TokenExchangeStrategy)
+			tokenExchanger, err := tokenexchange.GetTokenExchanger(kubeConfigCfg.TokenExchangeStrategy)
 			if err != nil {
 				return nil, fmt.Errorf("failed to initialize token exchanger: %w", err)
 			}

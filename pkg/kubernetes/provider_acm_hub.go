@@ -22,7 +22,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
-	"github.com/containers/kubernetes-mcp-server/pkg/sts"
+	"github.com/containers/kubernetes-mcp-server/pkg/tokenexchange"
 )
 
 const (
@@ -52,7 +52,7 @@ type ACMProviderConfig struct {
 
 	// Clusters holds per-cluster token exchange configuration
 	// The key is the cluster name (e.g., "my-managed-cluster")
-	Clusters map[string]sts.TargetSTSConfig `toml:"clusters,omitempty"`
+	Clusters map[string]tokenexchange.TargetSTSConfig `toml:"clusters,omitempty"`
 }
 
 func (c *ACMProviderConfig) Validate() error {
@@ -127,8 +127,8 @@ type acmHubClusterProvider struct {
 	lastResourceVersion string
 
 	// Per-cluster token exchange configuration
-	tokenExchanger    sts.TokenExchanger
-	clusterSTSConfigs map[string]sts.TargetSTSConfig
+	tokenExchanger    tokenexchange.TokenExchanger
+	clusterSTSConfigs map[string]tokenexchange.TargetSTSConfig
 }
 
 var _ Provider = &acmHubClusterProvider{}
@@ -276,7 +276,7 @@ func newACMClusterProvider(m *Manager, cfg *ACMProviderConfig, watchKubeConfig b
 
 	// Initialize per-cluster token exchange if strategy is configured
 	if cfg.TokenExchangeStrategy != "" {
-		tokenExchanger, err := sts.GetTokenExchanger(cfg.TokenExchangeStrategy)
+		tokenExchanger, err := tokenexchange.GetTokenExchanger(cfg.TokenExchangeStrategy)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize token exchanger: %w", err)
 		}

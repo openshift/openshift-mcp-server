@@ -1,4 +1,4 @@
-package sts
+package tokenexchange
 
 import (
 	"context"
