@@ -10,8 +10,10 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/spf13/cobra"
@@ -57,8 +59,7 @@ const (
 	flagVersion              = "version"
 	flagLogLevel             = "log-level"
 	flagConfig               = "config"
-	flagSSEPort              = "sse-port"
-	flagHttpPort             = "http-port"
+	flagConfigDir            = "config-dir"
 	flagPort                 = "port"
 	flagSSEBaseUrl           = "sse-base-url"
 	flagKubeconfig           = "kubeconfig"
@@ -79,8 +80,6 @@ type MCPServerOptions struct {
 	Version              bool
 	LogLevel             int
 	Port                 string
-	SSEPort              int
-	HttpPort             int
 	SSEBaseUrl           string
 	Kubeconfig           string
 	Toolsets             []string
@@ -96,6 +95,7 @@ type MCPServerOptions struct {
 	DisableMultiCluster  bool
 
 	ConfigPath   string
+	ConfigDir    string
 	StaticConfig *config.StaticConfig
 
 	genericiooptions.IOStreams
@@ -133,10 +133,7 @@ func NewMCPServer(streams genericiooptions.IOStreams) *cobra.Command {
 	cmd.Flags().BoolVar(&o.Version, flagVersion, o.Version, "Print version information and quit")
 	cmd.Flags().IntVar(&o.LogLevel, flagLogLevel, o.LogLevel, "Set the log level (from 0 to 9)")
 	cmd.Flags().StringVar(&o.ConfigPath, flagConfig, o.ConfigPath, "Path of the config file.")
-	cmd.Flags().IntVar(&o.SSEPort, flagSSEPort, o.SSEPort, "Start a SSE server on the specified port")
-	cmd.Flag(flagSSEPort).Deprecated = "Use --port instead"
-	cmd.Flags().IntVar(&o.HttpPort, flagHttpPort, o.HttpPort, "Start a streamable HTTP server on the specified port")
-	cmd.Flag(flagHttpPort).Deprecated = "Use --port instead"
+	cmd.Flags().StringVar(&o.ConfigDir, flagConfigDir, o.ConfigDir, "Path to drop-in configuration directory (files loaded in lexical order). Defaults to "+config.DefaultDropInConfigDir+" relative to the config file if --config is set.")
 	cmd.Flags().StringVar(&o.Port, flagPort, o.Port, "Start a streamable HTTP and SSE HTTP server on the specified port (e.g. 8080)")
 	cmd.Flags().StringVar(&o.SSEBaseUrl, flagSSEBaseUrl, o.SSEBaseUrl, "SSE public base URL to use when sending the endpoint message (e.g. https://example.com)")
 	cmd.Flags().StringVar(&o.Kubeconfig, flagKubeconfig, o.Kubeconfig, "Path to the kubeconfig file to use for authentication")
@@ -162,8 +159,8 @@ func NewMCPServer(streams genericiooptions.IOStreams) *cobra.Command {
 }
 
 func (m *MCPServerOptions) Complete(cmd *cobra.Command) error {
-	if m.ConfigPath != "" {
-		cnf, err := config.Read(m.ConfigPath)
+	if m.ConfigPath != "" || m.ConfigDir != "" {
+		cnf, err := config.Read(m.ConfigPath, m.ConfigDir)
 		if err != nil {
 			return err
 		}
@@ -188,10 +185,6 @@ func (m *MCPServerOptions) loadFlags(cmd *cobra.Command) {
 	}
 	if cmd.Flag(flagPort).Changed {
 		m.StaticConfig.Port = m.Port
-	} else if cmd.Flag(flagSSEPort).Changed {
-		m.StaticConfig.Port = strconv.Itoa(m.SSEPort)
-	} else if cmd.Flag(flagHttpPort).Changed {
-		m.StaticConfig.Port = strconv.Itoa(m.HttpPort)
 	}
 	if cmd.Flag(flagSSEBaseUrl).Changed {
 		m.StaticConfig.SSEBaseURL = m.SSEBaseUrl
@@ -253,9 +246,6 @@ func (m *MCPServerOptions) initializeLogging() {
 }
 
 func (m *MCPServerOptions) Validate() error {
-	if m.Port != "" && (m.SSEPort > 0 || m.HttpPort > 0) {
-		return fmt.Errorf("--port is mutually exclusive with deprecated --http-port and --sse-port flags")
-	}
 	if output.FromString(m.StaticConfig.ListOutput) == nil {
 		return fmt.Errorf("invalid output name: %s, valid names are: %s", m.StaticConfig.ListOutput, strings.Join(output.Names, ", "))
 	}
@@ -275,6 +265,12 @@ func (m *MCPServerOptions) Validate() error {
 		}
 		if u.Scheme == "http" {
 			klog.Warningf("authorization-url is using http://, this is not recommended production use")
+		}
+	}
+	// Validate that certificate_authority is a valid file
+	if caValue := strings.TrimSpace(m.StaticConfig.CertificateAuthority); caValue != "" {
+		if _, err := os.Stat(caValue); err != nil {
+			return fmt.Errorf("certificate-authority must be a valid file path: %w", err)
 		}
 	}
 	return nil
@@ -334,20 +330,58 @@ func (m *MCPServerOptions) Run() error {
 		oidcProvider = provider
 	}
 
-	mcpServer, err := mcp.NewServer(mcp.Configuration{StaticConfig: m.StaticConfig})
+	mcpServer, err := mcp.NewServer(mcp.Configuration{
+		StaticConfig: m.StaticConfig,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to initialize MCP server: %w", err)
 	}
 	defer mcpServer.Close()
+
+	// Set up SIGHUP handler for configuration reload
+	if m.ConfigPath != "" || m.ConfigDir != "" {
+		m.setupSIGHUPHandler(mcpServer)
+	}
 
 	if m.StaticConfig.Port != "" {
 		ctx := context.Background()
 		return internalhttp.Serve(ctx, mcpServer, m.StaticConfig, oidcProvider, httpClient)
 	}
 
-	if err := mcpServer.ServeStdio(); err != nil && !errors.Is(err, context.Canceled) {
+	ctx := context.Background()
+	if err := mcpServer.ServeStdio(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}
 
 	return nil
+}
+
+// setupSIGHUPHandler sets up a signal handler to reload configuration on SIGHUP.
+// This is a blocking call that runs in a separate goroutine.
+func (m *MCPServerOptions) setupSIGHUPHandler(mcpServer *mcp.Server) {
+	sigHupCh := make(chan os.Signal, 1)
+	signal.Notify(sigHupCh, syscall.SIGHUP)
+
+	go func() {
+		for range sigHupCh {
+			klog.V(1).Info("Received SIGHUP signal, reloading configuration...")
+
+			// Reload config from files
+			newConfig, err := config.Read(m.ConfigPath, m.ConfigDir)
+			if err != nil {
+				klog.Errorf("Failed to reload configuration from disk: %v", err)
+				continue
+			}
+
+			// Apply the new configuration to the MCP server
+			if err := mcpServer.ReloadConfiguration(newConfig); err != nil {
+				klog.Errorf("Failed to apply reloaded configuration: %v", err)
+				continue
+			}
+
+			klog.V(1).Info("Configuration reloaded successfully via SIGHUP")
+		}
+	}()
+
+	klog.V(2).Info("SIGHUP handler registered for configuration reload")
 }

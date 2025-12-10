@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes/watcher"
 	authenticationv1api "k8s.io/api/authentication/v1"
 )
 
@@ -13,8 +15,11 @@ import (
 // Kubernetes cluster. Used for in-cluster deployments or when multi-cluster
 // support is disabled.
 type singleClusterProvider struct {
-	strategy string
-	manager  *Manager
+	staticConfig        *config.StaticConfig
+	strategy            string
+	manager             *Manager
+	kubeconfigWatcher   *watcher.Kubeconfig
+	clusterStateWatcher *watcher.ClusterState
 }
 
 var _ Provider = &singleClusterProvider{}
@@ -29,29 +34,41 @@ func init() {
 // Otherwise, it uses a KubeconfigManager.
 func newSingleClusterProvider(strategy string) ProviderFactory {
 	return func(cfg *config.StaticConfig) (Provider, error) {
-		if cfg != nil && cfg.KubeConfig != "" && strategy == config.ClusterProviderInCluster {
-			return nil, fmt.Errorf("kubeconfig file %s cannot be used with the in-cluster ClusterProviderStrategy", cfg.KubeConfig)
+		ret := &singleClusterProvider{
+			staticConfig: cfg,
+			strategy:     strategy,
 		}
-
-		var m *Manager
-		var err error
-		if strategy == config.ClusterProviderInCluster || IsInCluster(cfg) {
-			m, err = NewInClusterManager(cfg)
-		} else {
-			m, err = NewKubeconfigManager(cfg, "")
-		}
-		if err != nil {
-			if errors.Is(err, ErrorInClusterNotInCluster) {
-				return nil, fmt.Errorf("server must be deployed in cluster for the %s ClusterProviderStrategy: %v", strategy, err)
-			}
+		if err := ret.reset(); err != nil {
 			return nil, err
 		}
-
-		return &singleClusterProvider{
-			manager:  m,
-			strategy: strategy,
-		}, nil
+		return ret, nil
 	}
+}
+
+func (p *singleClusterProvider) reset() error {
+	if p.staticConfig != nil && p.staticConfig.KubeConfig != "" && p.strategy == config.ClusterProviderInCluster {
+		return fmt.Errorf("kubeconfig file %s cannot be used with the in-cluster ClusterProviderStrategy",
+			p.staticConfig.KubeConfig)
+	}
+
+	var err error
+	if p.strategy == config.ClusterProviderInCluster || IsInCluster(p.staticConfig) {
+		p.manager, err = NewInClusterManager(p.staticConfig)
+	} else {
+		p.manager, err = NewKubeconfigManager(p.staticConfig, "")
+	}
+	if err != nil {
+		if errors.Is(err, ErrorInClusterNotInCluster) {
+			return fmt.Errorf("server must be deployed in cluster for the %s ClusterProviderStrategy: %v",
+				p.strategy, err)
+		}
+		return err
+	}
+
+	p.Close()
+	p.kubeconfigWatcher = watcher.NewKubeconfig(p.manager.accessControlClientset.clientCmdConfig)
+	p.clusterStateWatcher = watcher.NewClusterState(p.manager.accessControlClientset.DiscoveryClient())
+	return nil
 }
 
 func (p *singleClusterProvider) IsOpenShift(ctx context.Context) bool {
@@ -85,10 +102,22 @@ func (p *singleClusterProvider) GetTargetParameterName() string {
 	return ""
 }
 
-func (p *singleClusterProvider) WatchTargets(watch func() error) {
-	p.manager.WatchKubeConfig(watch)
+func (p *singleClusterProvider) WatchTargets(reload McpReload) {
+	reloadWithReset := func() error {
+		if err := p.reset(); err != nil {
+			return err
+		}
+		p.WatchTargets(reload)
+		return reload()
+	}
+	p.kubeconfigWatcher.Watch(reloadWithReset)
+	p.clusterStateWatcher.Watch(reload)
 }
 
 func (p *singleClusterProvider) Close() {
-	p.manager.Close()
+	for _, w := range []watcher.Watcher{p.kubeconfigWatcher, p.clusterStateWatcher} {
+		if !reflect.ValueOf(w).IsNil() {
+			w.Close()
+		}
+	}
 }

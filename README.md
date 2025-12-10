@@ -189,12 +189,108 @@ uvx kubernetes-mcp-server@latest --help
 |---------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `--port`                  | Starts the MCP server in Streamable HTTP mode (path /mcp) and Server-Sent Event (SSE) (path /sse) mode and listens on the specified port .                                                                                                                                                    |
 | `--log-level`             | Sets the logging level (values [from 0-9](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-instrumentation/logging.md)). Similar to [kubectl logging levels](https://kubernetes.io/docs/reference/kubectl/quick-reference/#kubectl-output-verbosity-and-debugging). |
+| `--config`                | (Optional) Path to the main TOML configuration file. See [Drop-in Configuration](#drop-in-configuration) section below for details.                                                                                                                                                          |
+| `--config-dir`            | (Optional) Path to drop-in configuration directory. Files are loaded in lexical (alphabetical) order. Defaults to `conf.d` relative to the main config file if `--config` is specified. See [Drop-in Configuration](#drop-in-configuration) section below for details.                       |
 | `--kubeconfig`            | Path to the Kubernetes configuration file. If not provided, it will try to resolve the configuration (in-cluster, default location, etc.).                                                                                                                                                    |
 | `--list-output`           | Output format for resource list operations (one of: yaml, table) (default "table")                                                                                                                                                                                                            |
 | `--read-only`             | If set, the MCP server will run in read-only mode, meaning it will not allow any write operations (create, update, delete) on the Kubernetes cluster. This is useful for debugging or inspecting the cluster without making changes.                                                          |
 | `--disable-destructive`   | If set, the MCP server will disable all destructive operations (delete, update, etc.) on the Kubernetes cluster. This is useful for debugging or inspecting the cluster without accidentally making changes. This option has no effect when `--read-only` is used.                            |
 | `--toolsets`              | Comma-separated list of toolsets to enable. Check the [🛠️ Tools and Functionalities](#tools-and-functionalities) section for more information.                                                                                                                                               |
 | `--disable-multi-cluster` | If set, the MCP server will disable multi-cluster support and will only use the current context from the kubeconfig file. This is useful if you want to restrict the MCP server to a single cluster.                                                                                          |
+
+### Drop-in Configuration <a id="drop-in-configuration"></a>
+
+The Kubernetes MCP server supports flexible configuration through both a main config file and drop-in files. **Both are optional** - you can use either, both, or neither (server will use built-in defaults).
+
+#### Configuration Loading Order
+
+Configuration values are loaded and merged in the following order (later sources override earlier ones):
+
+1. **Internal Defaults** - Always loaded (hardcoded default values)
+2. **Main Configuration File** - Optional, loaded via `--config` flag
+3. **Drop-in Files** - Optional, loaded from `--config-dir` in **lexical (alphabetical) order**
+
+#### How Drop-in Files Work
+
+- **Default Directory**: If `--config-dir` is not specified, the server looks for drop-in files in `conf.d/` relative to the main config file's directory (when `--config` is provided)
+- **File Naming**: Use numeric prefixes to control loading order (e.g., `00-base.toml`, `10-cluster.toml`, `99-override.toml`)
+- **File Extension**: Only `.toml` files are processed; dotfiles (starting with `.`) are ignored
+- **Partial Configuration**: Drop-in files can contain only a subset of configuration options
+- **Merge Behavior**: Values present in a drop-in file override previous values; missing values are preserved
+
+#### Dynamic Configuration Reload
+
+To reload configuration after modifying config files, send a `SIGHUP` signal to the running server process.
+
+**Prerequisite**: SIGHUP reload requires the server to be started with either the `--config` flag or `--config-dir` flag (or both). If neither is specified, SIGHUP signals will be ignored.
+
+**How to reload:**
+
+```shell
+# Find the process ID
+ps aux | grep kubernetes-mcp-server
+
+# Send SIGHUP to reload configuration
+kill -HUP <pid>
+
+# Or use pkill
+pkill -HUP kubernetes-mcp-server
+```
+
+The server will:
+- Reload the main config file and all drop-in files
+- Update configuration values (log level, output format, etc.)
+- Rebuild the toolset registry with new tool configurations
+- Log the reload status
+
+**Note**: Changing `kubeconfig` or cluster-related settings requires a server restart. Only tool configurations, log levels, and output formats can be reloaded dynamically.
+
+**Note**: SIGHUP reload is not available on Windows. On Windows, restart the server to reload configuration.
+
+#### Example: Using Both Config Methods
+
+**Command (using default `conf.d` directory):**
+```shell
+kubernetes-mcp-server --config /etc/kubernetes-mcp-server/config.toml
+```
+
+**Directory structure:**
+```
+/etc/kubernetes-mcp-server/
+├── config.toml              # Main configuration
+└── conf.d/                  # Default drop-in directory (automatically loaded)
+    ├── 00-base.toml         # Base overrides
+    ├── 10-toolsets.toml     # Toolset-specific config
+    └── 99-local.toml        # Local overrides
+```
+
+**Command (with explicit `--config-dir`):**
+```shell
+kubernetes-mcp-server --config /etc/kubernetes-mcp-server/config.toml \
+                      --config-dir /etc/kubernetes-mcp-server/config.d/
+```
+
+**Example drop-in file** (`10-toolsets.toml`):
+```toml
+# Override only the toolsets - all other config preserved
+toolsets = ["core", "config", "helm", "logs"]
+```
+
+**Example drop-in file** (`99-local.toml`):
+```toml
+# Local development overrides
+log_level = 9
+read_only = true
+```
+
+**To apply changes:**
+```shell
+# Edit config files
+vim /etc/kubernetes-mcp-server/conf.d/99-local.toml
+
+# Reload without restarting
+pkill -HUP kubernetes-mcp-server
+```
 
 ## 🛠️ Tools and Functionalities <a id="tools-and-functionalities"></a>
 
@@ -204,15 +300,17 @@ Enabling only the toolsets you need can help reduce the context size and improve
 
 ### Available Toolsets
 
-The following sets of tools are available (all on by default):
+The following sets of tools are available (toolsets marked with ✓ in the Default column are enabled by default):
 
 <!-- AVAILABLE-TOOLSETS-START -->
 
-| Toolset | Description                                                                         |
-|---------|-------------------------------------------------------------------------------------|
-| config  | View and manage the current local Kubernetes configuration (kubeconfig)             |
-| core    | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.) |
-| helm    | Tools for managing Helm charts and releases                                         |
+| Toolset  | Description                                                                                                                                                          | Default |
+|----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| config   | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                              | ✓       |
+| core     | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                  | ✓       |
+| helm     | Tools for managing Helm charts and releases                                                                                                                          | ✓       |
+| kiali    | Most common tools for managing Kiali, check the [Kiali documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/KIALI.md) for more details. |         |
+| kubevirt | KubeVirt virtual machine management tools                                                                                                                            |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -248,6 +346,13 @@ In case multi-cluster support is enabled (default) and you have access to multip
   - `name` (`string`) **(required)** - Name of the node to get logs from
   - `query` (`string`) **(required)** - query specifies services(s) or files from which to return logs (required). Example: "kubelet" to fetch kubelet logs, "/<log-file-name>" to fetch a specific log file from the node (e.g., "/var/log/kubelet.log" or "/var/log/kube-proxy.log")
   - `tailLines` (`integer`) - Number of lines to retrieve from the end of the logs (Optional, 0 means all logs)
+
+- **nodes_stats_summary** - Get detailed resource usage statistics from a Kubernetes node via the kubelet's Summary API. Provides comprehensive metrics including CPU, memory, filesystem, and network usage at the node, pod, and container levels. On systems with cgroup v2 and kernel 4.20+, also includes PSI (Pressure Stall Information) metrics that show resource pressure for CPU, memory, and I/O. See https://kubernetes.io/docs/reference/instrumentation/understand-psi-metrics/ for details on PSI metrics
+  - `name` (`string`) **(required)** - Name of the node to get stats from
+
+- **nodes_top** - List the resource consumption (CPU and memory) as recorded by the Kubernetes Metrics Server for the specified Kubernetes Nodes or all nodes in the cluster
+  - `label_selector` (`string`) - Kubernetes label selector (e.g. 'node-role.kubernetes.io/worker=') to filter nodes by label (Optional, only applicable when name is not provided)
+  - `name` (`string`) - Name of the Node to get the resource consumption from (Optional, all Nodes if not provided)
 
 - **pods_list** - List all the Kubernetes pods in the current cluster from all namespaces
   - `labelSelector` (`string`) - Optional Kubernetes label selector (e.g. 'app=myapp,env=prod' or 'app in (myapp,yourapp)'), use this option when you want to filter the pods by label
@@ -314,6 +419,13 @@ In case multi-cluster support is enabled (default) and you have access to multip
   - `name` (`string`) **(required)** - Name of the resource
   - `namespace` (`string`) - Optional Namespace to delete the namespaced resource from (ignored in case of cluster scoped resources). If not provided, will delete resource from configured namespace
 
+- **resources_scale** - Get or update the scale of a Kubernetes resource in the current cluster by providing its apiVersion, kind, name, and optionally the namespace. If the scale is set in the tool call, the scale will be updated to that value. Always returns the current scale of the resource
+  - `apiVersion` (`string`) **(required)** - apiVersion of the resource (examples of valid apiVersion are apps/v1)
+  - `kind` (`string`) **(required)** - kind of the resource (examples of valid kind are: StatefulSet, Deployment)
+  - `name` (`string`) **(required)** - Name of the resource
+  - `namespace` (`string`) - Optional Namespace to get/update the namespaced resource scale from (ignored in case of cluster scoped resources). If not provided, will get/update resource scale from configured namespace
+  - `scale` (`integer`) - Optional scale to update the resources scale to. If not provided, will return the current scale of the resource, and not update it
+
 </details>
 
 <details>
@@ -336,8 +448,87 @@ In case multi-cluster support is enabled (default) and you have access to multip
 
 </details>
 
+<details>
+
+<summary>kiali</summary>
+
+- **kiali_get_mesh_graph** - Returns the topology of a specific namespaces, health, status of the mesh and namespaces. Includes a mesh health summary overview with aggregated counts of healthy, degraded, and failing apps, workloads, and services. Use this for high-level overviews
+  - `graphType` (`string`) - Type of graph to return: 'versionedApp', 'app', 'service', 'workload', 'mesh'
+  - `namespace` (`string`) - Optional single namespace to include in the graph (alternative to namespaces)
+  - `namespaces` (`string`) - Optional comma-separated list of namespaces to include in the graph
+  - `rateInterval` (`string`) - Rate interval for fetching (e.g., '10m', '5m', '1h').
+
+- **kiali_manage_istio_config** - Manages Istio configuration objects (Gateways, VirtualServices, etc.). Can list (objects and validations), get, create, patch, or delete objects
+  - `action` (`string`) **(required)** - Action to perform: list, get, create, patch, or delete
+  - `group` (`string`) - API group of the Istio object (e.g., 'networking.istio.io', 'gateway.networking.k8s.io')
+  - `json_data` (`string`) - JSON data to apply or create the object
+  - `kind` (`string`) - Kind of the Istio object (e.g., 'DestinationRule', 'VirtualService', 'HTTPRoute', 'Gateway')
+  - `name` (`string`) - Name of the Istio object
+  - `namespace` (`string`) - Namespace containing the Istio object
+  - `version` (`string`) - API version of the Istio object (e.g., 'v1', 'v1beta1')
+
+- **kiali_get_resource_details** - Gets lists or detailed info for Kubernetes resources (services, workloads) within the mesh
+  - `namespaces` (`string`) - Comma-separated list of namespaces to get services from (e.g. 'bookinfo' or 'bookinfo,default'). If not provided, will list services from all accessible namespaces
+  - `resource_name` (`string`) - Name of the resource to get details for (optional string - if provided, gets details; if empty, lists all).
+  - `resource_type` (`string`) - Type of resource to get details for (service, workload)
+
+- **kiali_get_metrics** - Gets lists or detailed info for Kubernetes resources (services, workloads) within the mesh
+  - `byLabels` (`string`) - Comma-separated list of labels to group metrics by (e.g., 'source_workload,destination_service'). Optional
+  - `direction` (`string`) - Traffic direction: 'inbound' or 'outbound'. Optional, defaults to 'outbound'
+  - `duration` (`string`) - Time range to get metrics for (optional string - if provided, gets metrics (e.g., '1m', '5m', '1h'); if empty, get default 30m).
+  - `namespace` (`string`) **(required)** - Namespace to get resources from
+  - `quantiles` (`string`) - Comma-separated list of quantiles for histogram metrics (e.g., '0.5,0.95,0.99'). Optional
+  - `rateInterval` (`string`) - Rate interval for metrics (e.g., '1m', '5m'). Optional, defaults to '10m'
+  - `reporter` (`string`) - Metrics reporter: 'source', 'destination', or 'both'. Optional, defaults to 'source'
+  - `requestProtocol` (`string`) - Filter by request protocol (e.g., 'http', 'grpc', 'tcp'). Optional
+  - `resource_name` (`string`) **(required)** - Name of the resource to get details for (optional string - if provided, gets details; if empty, lists all).
+  - `resource_type` (`string`) **(required)** - Type of resource to get details for (service, workload)
+  - `step` (`string`) - Step between data points in seconds (e.g., '15'). Optional, defaults to 15 seconds
+
+- **workload_logs** - Get logs for a specific workload's pods in a namespace. Only requires namespace and workload name - automatically discovers pods and containers. Optionally filter by container name, time range, and other parameters. Container is auto-detected if not specified.
+  - `container` (`string`) - Optional container name to filter logs. If not provided, automatically detects and uses the main application container (excludes istio-proxy and istio-init)
+  - `namespace` (`string`) **(required)** - Namespace containing the workload
+  - `since` (`string`) - Time duration to fetch logs from (e.g., '5m', '1h', '30s'). If not provided, returns recent logs
+  - `tail` (`integer`) - Number of lines to retrieve from the end of logs (default: 100)
+  - `workload` (`string`) **(required)** - Name of the workload to get logs for
+
+- **kiali_get_traces** - Gets traces for a specific resource (app, service, workload) in a namespace, or gets detailed information for a specific trace by its ID. If traceId is provided, it returns detailed trace information and other parameters are not required.
+  - `clusterName` (`string`) - Cluster name for multi-cluster environments (optional, only used when traceId is not provided)
+  - `endMicros` (`string`) - End time for traces in microseconds since epoch (optional, defaults to 10 minutes after startMicros if not provided, only used when traceId is not provided)
+  - `limit` (`integer`) - Maximum number of traces to return (default: 100, only used when traceId is not provided)
+  - `minDuration` (`integer`) - Minimum trace duration in microseconds (optional, only used when traceId is not provided)
+  - `namespace` (`string`) - Namespace to get resources from. Required if traceId is not provided.
+  - `resource_name` (`string`) - Name of the resource to get traces for. Required if traceId is not provided.
+  - `resource_type` (`string`) - Type of resource to get traces for (app, service, workload). Required if traceId is not provided.
+  - `startMicros` (`string`) - Start time for traces in microseconds since epoch (optional, defaults to 10 minutes before current time if not provided, only used when traceId is not provided)
+  - `tags` (`string`) - JSON string of tags to filter traces (optional, only used when traceId is not provided)
+  - `traceId` (`string`) - Unique identifier of the trace to retrieve detailed information for. If provided, this will return detailed trace information and other parameters (resource_type, namespace, resource_name) are not required.
+
+</details>
+
+<details>
+
+<summary>kubevirt</summary>
+
+- **vm_create** - Create a VirtualMachine in the cluster with the specified configuration, automatically resolving instance types, preferences, and container disk images. VM will be created in Halted state by default; use autostart parameter to start it immediately.
+  - `autostart` (`boolean`) - Optional flag to automatically start the VM after creation (sets runStrategy to Always instead of Halted). Defaults to false.
+  - `instancetype` (`string`) - Optional instance type name for the VM (e.g., 'u1.small', 'u1.medium', 'u1.large')
+  - `name` (`string`) **(required)** - The name of the virtual machine
+  - `namespace` (`string`) **(required)** - The namespace for the virtual machine
+  - `performance` (`string`) - Optional performance family hint for the VM instance type (e.g., 'u1' for general-purpose, 'o1' for overcommitted, 'c1' for compute-optimized, 'm1' for memory-optimized). Defaults to 'u1' (general-purpose) if not specified.
+  - `preference` (`string`) - Optional preference name for the VM
+  - `size` (`string`) - Optional workload size hint for the VM (e.g., 'small', 'medium', 'large', 'xlarge'). Used to auto-select an appropriate instance type if not explicitly specified.
+  - `storage` (`string`) - Optional storage size for the VM's root disk when using DataSources (e.g., '30Gi', '50Gi', '100Gi'). Defaults to 30Gi. Ignored when using container disks.
+  - `workload` (`string`) - The workload for the VM. Accepts OS names (e.g., 'fedora' (default), 'ubuntu', 'centos', 'centos-stream', 'debian', 'rhel', 'opensuse', 'opensuse-tumbleweed', 'opensuse-leap') or full container disk image URLs
+
+</details>
+
 
 <!-- AVAILABLE-TOOLSETS-TOOLS-END -->
+
+## Helm Chart
+
+A [Helm Chart](https://helm.sh) is available to simplify the deployment of the Kubernetes MCP server. Additional details can be found in the [chart README](./charts/kubernetes-mcp-server/README.md).
 
 ## 🧑‍💻 Development <a id="development"></a>
 
