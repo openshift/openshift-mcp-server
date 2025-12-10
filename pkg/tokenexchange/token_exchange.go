@@ -68,24 +68,18 @@ type TargetSTSConfig struct {
 	// CAFile is the path to a CA certificate file for TLS verification
 	// Used when the token endpoint uses a certificate signed by a private CA
 	CAFile string `toml:"ca_file,omitempty"`
-	// InsecureSkipTLSVerify disables TLS certificate verification (not recommended for production)
-	InsecureSkipTLSVerify bool `toml:"insecure_skip_tls_verify,omitempty"`
 }
 
 // HTTPClient creates an HTTP client configured with the TLS settings from this config.
-// If neither CAFile nor InsecureSkipTLSVerify is set, returns a default client.
+// If CAFile is not set, returns a default client.
 func (c *TargetSTSConfig) HTTPClient() (*http.Client, error) {
 	// If no TLS customization needed, return default client with timeout
-	if c.CAFile == "" && !c.InsecureSkipTLSVerify {
+	if c.CAFile == "" {
 		return &http.Client{Timeout: 30 * time.Second}, nil
 	}
 
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
-	}
-
-	if c.InsecureSkipTLSVerify {
-		tlsConfig.InsecureSkipVerify = true
 	}
 
 	if c.CAFile != "" {
