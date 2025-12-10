@@ -408,7 +408,16 @@ curl -sk -X PUT "$KEYCLOAK_URL/admin/realms/$HUB_REALM/clients/$CLIENT_UUID/defa
   -H "Authorization: Bearer $ADMIN_TOKEN" > /dev/null 2>&1
 curl -sk -X PUT "$KEYCLOAK_URL/admin/realms/$HUB_REALM/clients/$CLIENT_UUID/default-client-scopes/$MCP_SERVER_SCOPE_UUID" \
   -H "Authorization: Bearer $ADMIN_TOKEN" > /dev/null 2>&1
-echo "✅ Scopes added (openid, mcp-server)"
+
+# Add basic scope (contains sub claim mapper) - important for token exchange
+BASIC_SCOPE_UUID=$(echo "$SCOPES_RESPONSE" | jq -r '.[] | select(.name == "basic") | .id // empty')
+if [ -n "$BASIC_SCOPE_UUID" ] && [ "$BASIC_SCOPE_UUID" != "null" ]; then
+  curl -sk -X PUT "$KEYCLOAK_URL/admin/realms/$HUB_REALM/clients/$CLIENT_UUID/default-client-scopes/$BASIC_SCOPE_UUID" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" > /dev/null 2>&1
+  echo "✅ Scopes added (openid, mcp-server, basic)"
+else
+  echo "✅ Scopes added (openid, mcp-server)"
+fi
 
 # Add sub claim mapper
 echo ""
