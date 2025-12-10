@@ -16,6 +16,12 @@ const (
 	ClusterProviderDisabled   = "disabled"
 )
 
+// ContextKey is a type for context keys to avoid collisions
+type ContextKey string
+
+// TokenScopesContextKey is the context key for storing token scopes
+const TokenScopesContextKey = ContextKey("TokenScopesContextKey")
+
 // StaticConfig is the configuration for the server.
 // It allows to configure server specific settings and tools to be enabled or disabled.
 type StaticConfig struct {

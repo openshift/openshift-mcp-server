@@ -358,20 +358,53 @@ if [ -z "$HUB_USER_ID" ]; then
     exit 1
 fi
 
-# Get the service account user for mcp-server client (this is the user used in token exchange)
-SERVICE_ACCOUNT_USER=$(curl $CURL_OPTS -X GET "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/clients/$MANAGED_CLIENT_UUID/service-account-user" \
+echo "  ✅ Found hub user: $MCP_USERNAME (ID: $HUB_USER_ID)"
+
+# For V1 cross-realm token exchange, we need a regular user in the managed realm
+# with a federated identity link to the hub user. The sub claim from the hub token
+# must match the userId in the federated identity link.
+
+# Check if user already exists in managed realm
+MANAGED_USERS=$(curl $CURL_OPTS -X GET "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/users?username=$MCP_USERNAME" \
     -H "Authorization: Bearer $ADMIN_TOKEN")
-MANAGED_USER_ID=$(echo "$SERVICE_ACCOUNT_USER" | jq -r '.id // empty')
+MANAGED_USER_ID=$(echo "$MANAGED_USERS" | jq -r '.[0].id // empty')
 
 if [ -z "$MANAGED_USER_ID" ] || [ "$MANAGED_USER_ID" = "null" ]; then
-    echo "  ❌ Service account for mcp-server client not found"
+    # Create user in managed realm
+    echo "  Creating user $MCP_USERNAME in managed realm..."
+    USER_CREATE_RESPONSE=$(curl $CURL_OPTS -w "%{http_code}" -X POST "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/users" \
+        -H "Authorization: Bearer $ADMIN_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "{
+            \"username\": \"$MCP_USERNAME\",
+            \"enabled\": true,
+            \"email\": \"$MCP_USERNAME@example.com\",
+            \"firstName\": \"MCP\",
+            \"lastName\": \"User\"
+        }")
+    USER_CREATE_CODE=$(echo "$USER_CREATE_RESPONSE" | tail -c 4)
+
+    if [ "$USER_CREATE_CODE" = "201" ]; then
+        echo "  ✅ User $MCP_USERNAME created in managed realm"
+    else
+        echo "  ⚠️  User creation returned HTTP $USER_CREATE_CODE"
+    fi
+
+    # Get the new user ID
+    MANAGED_USERS=$(curl $CURL_OPTS -X GET "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/users?username=$MCP_USERNAME" \
+        -H "Authorization: Bearer $ADMIN_TOKEN")
+    MANAGED_USER_ID=$(echo "$MANAGED_USERS" | jq -r '.[0].id // empty')
+else
+    echo "  ✅ User $MCP_USERNAME already exists in managed realm (ID: $MANAGED_USER_ID)"
+fi
+
+if [ -z "$MANAGED_USER_ID" ] || [ "$MANAGED_USER_ID" = "null" ]; then
+    echo "  ❌ Failed to get managed realm user ID"
     exit 1
 fi
 
-SERVICE_ACCOUNT_USERNAME=$(echo "$SERVICE_ACCOUNT_USER" | jq -r '.username // empty')
-echo "  ✅ Found service account: $SERVICE_ACCOUNT_USERNAME (ID: $MANAGED_USER_ID)"
-
-# Create federated identity link between hub user and managed service account
+# Create federated identity link between managed user and hub user
+# The userId here is the hub user's ID - this is how Keycloak matches the sub claim
 FED_IDENTITY_JSON="{
   \"identityProvider\": \"$IDP_ALIAS\",
   \"userId\": \"$HUB_USER_ID\",
@@ -385,7 +418,7 @@ FED_RESPONSE=$(curl $CURL_OPTS -w "%{http_code}" -X POST "$KEYCLOAK_URL/admin/re
 
 FED_CODE=$(echo "$FED_RESPONSE" | tail -c 4)
 if [ "$FED_CODE" = "204" ] || [ "$FED_CODE" = "409" ]; then
-    echo "  ✅ Federated identity link created (hub user: $MCP_USERNAME/$HUB_USER_ID → managed service account: $SERVICE_ACCOUNT_USERNAME/$MANAGED_USER_ID)"
+    echo "  ✅ Federated identity link created (hub: $MCP_USERNAME/$HUB_USER_ID → managed: $MCP_USERNAME/$MANAGED_USER_ID)"
 else
     echo "  ⚠️  Federated identity link returned HTTP $FED_CODE"
 fi
@@ -522,13 +555,13 @@ else
     echo "  ✅ CA certificate ConfigMap created"
 fi
 
-# Step 3: Create RBAC for service-account-mcp-server user
+# Step 3: Create RBAC for mcp user (the user from token exchange)
 echo ""
-echo "Step 3: Creating RBAC for service-account-mcp-server user..."
-kubectl --kubeconfig="$MANAGED_KUBECONFIG" create clusterrolebinding svc-acct-mcp-server-admin \
-    --clusterrole=cluster-admin --user=service-account-mcp-server \
+echo "Step 3: Creating RBAC for $MCP_USERNAME user..."
+kubectl --kubeconfig="$MANAGED_KUBECONFIG" create clusterrolebinding mcp-user-admin \
+    --clusterrole=cluster-admin --user="$MCP_USERNAME" \
     --dry-run=client -o yaml | kubectl --kubeconfig="$MANAGED_KUBECONFIG" apply -f -
-echo "  ✅ RBAC created"
+echo "  ✅ RBAC created for $MCP_USERNAME"
 
 # Step 4: Configure OIDC provider
 echo ""

@@ -56,8 +56,12 @@ echo "  Keycloak URL: $KEYCLOAK_URL"
 echo "  Hub Realm: $HUB_REALM"
 echo ""
 
-# Count managed clusters
-CLUSTER_COUNT=$(ls -1 .keycloak-config/clusters/*.env 2>/dev/null | wc -l)
+# Count managed clusters (handle case where directory is empty or doesn't exist)
+if [ -d ".keycloak-config/clusters" ]; then
+    CLUSTER_COUNT=$(find .keycloak-config/clusters -maxdepth 1 -name "*.env" -type f 2>/dev/null | wc -l | tr -d ' ')
+else
+    CLUSTER_COUNT=0
+fi
 echo "  Managed Clusters: $CLUSTER_COUNT"
 echo ""
 
@@ -122,6 +126,8 @@ cat >> "$OUTPUT_FILE" <<EOF
 [cluster_provider_configs.acm-kubeconfig]
 context_name = "$CONTEXT_NAME"
 cluster_proxy_addon_skip_tls_verify = true
+# Token exchange strategy: keycloak-v1, rfc8693, or external-account
+token_exchange_strategy = "keycloak-v1"
 
 EOF
 
@@ -131,6 +137,19 @@ echo "" >> "$OUTPUT_FILE"
 
 # Always add local-cluster (hub itself) with same-realm token exchange
 echo "Adding local-cluster (hub itself)..."
+if [ -f "$CA_FILE" ]; then
+cat >> "$OUTPUT_FILE" <<EOF
+# Cluster: local-cluster (hub itself - same-realm token exchange)
+[cluster_provider_configs.acm-kubeconfig.clusters."local-cluster"]
+token_url = "$KEYCLOAK_URL/realms/$HUB_REALM/protocol/openid-connect/token"
+client_id = "$STS_CLIENT_ID"
+client_secret = "$STS_CLIENT_SECRET"
+audience = "mcp-server"
+subject_token_type = "urn:ietf:params:oauth:token-type:access_token"
+ca_file = "$CA_FILE"
+
+EOF
+else
 cat >> "$OUTPUT_FILE" <<EOF
 # Cluster: local-cluster (hub itself - same-realm token exchange)
 [cluster_provider_configs.acm-kubeconfig.clusters."local-cluster"]
@@ -141,6 +160,7 @@ audience = "mcp-server"
 subject_token_type = "urn:ietf:params:oauth:token-type:access_token"
 
 EOF
+fi
 
 # Add other managed clusters
 if [ "$CLUSTER_COUNT" -gt 0 ]; then
@@ -166,6 +186,9 @@ if [ "$CLUSTER_COUNT" -gt 0 ]; then
         echo "subject_issuer = \"$CLUSTER_IDP_ALIAS\"" >> "$OUTPUT_FILE"
         echo "audience = \"mcp-server\"" >> "$OUTPUT_FILE"
         echo "subject_token_type = \"urn:ietf:params:oauth:token-type:jwt\"" >> "$OUTPUT_FILE"
+        if [ -f "$CA_FILE" ]; then
+            echo "ca_file = \"$CA_FILE\"" >> "$OUTPUT_FILE"
+        fi
         echo "" >> "$OUTPUT_FILE"
     done
 fi

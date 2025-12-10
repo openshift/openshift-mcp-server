@@ -9,6 +9,7 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"golang.org/x/oauth2"
 	authenticationapiv1 "k8s.io/api/authentication/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -20,10 +21,6 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
 	"github.com/containers/kubernetes-mcp-server/pkg/version"
 )
-
-type ContextKey string
-
-const TokenScopesContextKey = ContextKey("TokenScopesContextKey")
 
 type Configuration struct {
 	*config.StaticConfig
@@ -192,6 +189,22 @@ func (s *Server) GetTargetParameterName() string {
 	return s.p.GetTargetParameterName()
 }
 
+// HasTargetTokenExchange returns true if per-target token exchange is configured for the given target.
+func (s *Server) HasTargetTokenExchange(target string) bool {
+	if s.p == nil {
+		return false
+	}
+	return s.p.HasTargetTokenExchange(target)
+}
+
+// ExchangeTokenForTarget exchanges the given token for a target-specific token.
+func (s *Server) ExchangeTokenForTarget(ctx context.Context, target, token string) (*oauth2.Token, error) {
+	if s.p == nil {
+		return nil, fmt.Errorf("kubernetes cluster provider is not initialized")
+	}
+	return s.p.ExchangeTokenForTarget(ctx, target, token)
+}
+
 func (s *Server) GetEnabledTools() []string {
 	return s.enabledTools
 }
@@ -255,7 +268,7 @@ func toolCallLoggingMiddleware(next server.ToolHandlerFunc) server.ToolHandlerFu
 
 func toolScopedAuthorizationMiddleware(next server.ToolHandlerFunc) server.ToolHandlerFunc {
 	return func(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		scopes, ok := ctx.Value(TokenScopesContextKey).([]string)
+		scopes, ok := ctx.Value(config.TokenScopesContextKey).([]string)
 		if !ok {
 			return NewTextResult("", fmt.Errorf("authorization failed: Access denied: Tool '%s' requires scope 'mcp:%s' but no scope is available", ctr.Params.Name, ctr.Params.Name)), nil
 		}

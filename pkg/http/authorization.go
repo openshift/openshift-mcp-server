@@ -18,7 +18,6 @@ import (
 	"k8s.io/utils/strings/slices"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
-	"github.com/containers/kubernetes-mcp-server/pkg/mcp"
 )
 
 type KubernetesApiTokenVerifier interface {
@@ -26,6 +25,13 @@ type KubernetesApiTokenVerifier interface {
 	KubernetesApiVerifyToken(ctx context.Context, cluster, token, audience string) (*authenticationapiv1.UserInfo, []string, error)
 	// GetTargetParameterName returns the parameter name used for target identification in MCP requests
 	GetTargetParameterName() string
+	// HasTargetTokenExchange returns true if per-target token exchange is configured for the given target.
+	// When true, ExchangeTokenForTarget should be used instead of global STS exchange.
+	HasTargetTokenExchange(target string) bool
+	// ExchangeTokenForTarget exchanges the given token for a target-specific token.
+	// This is used for per-cluster token exchange (e.g., cross-realm Keycloak exchange).
+	// Returns the exchanged token, or an error if exchange fails.
+	ExchangeTokenForTarget(ctx context.Context, target, token string) (*oauth2.Token, error)
 }
 
 // extractTargetFromRequest extracts cluster parameter from MCP request body
@@ -151,37 +157,51 @@ func AuthorizationMiddleware(staticConfig *config.StaticConfig, oidcProvider *oi
 			if err == nil {
 				scopes := claims.GetScopes()
 				klog.V(2).Infof("JWT token validated - Scopes: %v", scopes)
-				r = r.WithContext(context.WithValue(r.Context(), mcp.TokenScopesContextKey, scopes))
+				r = r.WithContext(context.WithValue(r.Context(), config.TokenScopesContextKey, scopes))
 			}
-			// Token exchange with OIDC provider
-			sts := NewFromConfig(staticConfig, oidcProvider)
-			// TODO: Maybe the token had already been exchanged, if it has the right audience and scopes, we can skip this step.
-			if err == nil && sts.IsEnabled() {
-				var exchangedToken *oauth2.Token
-				// If the token is valid, we can exchange it for a new token with the specified audience and scopes.
+
+			// Extract target early so we can check for per-target token exchange
+			var target string
+			if err == nil {
+				targetParameterName := verifier.GetTargetParameterName()
+				target, _ = extractTargetFromRequest(r, targetParameterName)
+			}
+
+			// Token exchange: per-target exchange takes priority over global STS
+			if err == nil {
 				ctx := r.Context()
 				if httpClient != nil {
 					ctx = context.WithValue(ctx, oauth2.HTTPClient, httpClient)
 				}
-				exchangedToken, err = sts.ExternalAccountTokenExchange(ctx, &oauth2.Token{
-					AccessToken: claims.Token,
-					TokenType:   "Bearer",
-				})
-				if err == nil {
-					// Replace the original token with the exchanged token
+
+				var exchangedToken *oauth2.Token
+				if verifier.HasTargetTokenExchange(target) {
+					// Per-target token exchange (e.g., cross-realm Keycloak exchange)
+					klog.V(2).Infof("Using per-target token exchange for target: %s", target)
+					exchangedToken, err = verifier.ExchangeTokenForTarget(ctx, target, claims.Token)
+				} else {
+					// Fall back to global STS exchange if configured
+					// TODO: Maybe the token had already been exchanged, if it has the right audience and scopes, we can skip this step.
+					sts := NewFromConfig(staticConfig, oidcProvider)
+					if sts.IsEnabled() {
+						exchangedToken, err = sts.ExternalAccountTokenExchange(ctx, &oauth2.Token{
+							AccessToken: claims.Token,
+							TokenType:   "Bearer",
+						})
+					}
+				}
+
+				// Replace the original token with the exchanged token
+				if err == nil && exchangedToken != nil {
 					token = exchangedToken.AccessToken
 					claims, err = ParseJWTClaims(token)
 					r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token)) // TODO: Implement test to verify, THIS IS A CRITICAL PART
 				}
 			}
+
 			// Kubernetes API Server TokenReview validation
 			if err == nil && staticConfig.ValidateToken {
-				targetParameterName := verifier.GetTargetParameterName()
-				cluster, clusterErr := extractTargetFromRequest(r, targetParameterName)
-				if clusterErr != nil {
-					klog.V(2).Infof("Failed to extract cluster from request, using default: %v", clusterErr)
-				}
-				err = claims.ValidateWithKubernetesApi(r.Context(), staticConfig.OAuthAudience, cluster, verifier)
+				err = claims.ValidateWithKubernetesApi(r.Context(), staticConfig.OAuthAudience, target, verifier)
 			}
 			if err != nil {
 				klog.V(1).Infof("Authentication failed - JWT validation error: %s %s from %s, error: %v", r.Method, r.URL.Path, r.RemoteAddr, err)
