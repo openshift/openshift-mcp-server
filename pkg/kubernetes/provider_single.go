@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"golang.org/x/oauth2"
+
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	authenticationv1api "k8s.io/api/authentication/v1"
 )
@@ -91,4 +93,14 @@ func (p *singleClusterProvider) WatchTargets(watch func() error) {
 
 func (p *singleClusterProvider) Close() {
 	p.manager.Close()
+}
+
+// HasTargetTokenExchange returns false for single cluster provider (no per-target exchange).
+func (p *singleClusterProvider) HasTargetTokenExchange(_ string) bool {
+	return false
+}
+
+// ExchangeTokenForTarget is not supported for single cluster provider.
+func (p *singleClusterProvider) ExchangeTokenForTarget(_ context.Context, _, _ string) (*oauth2.Token, error) {
+	return nil, fmt.Errorf("per-target token exchange not supported with %s strategy", p.strategy)
 }

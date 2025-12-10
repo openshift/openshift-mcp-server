@@ -14,6 +14,7 @@ type Provider interface {
 	// See: https://github.com/containers/kubernetes-mcp-server/pull/372#discussion_r2421592315
 	Openshift
 	TokenVerifier
+	TokenExchanger
 	GetTargets(ctx context.Context) ([]string, error)
 	GetDerivedKubernetes(ctx context.Context, target string) (*Kubernetes, error)
 	GetDefaultTarget() string

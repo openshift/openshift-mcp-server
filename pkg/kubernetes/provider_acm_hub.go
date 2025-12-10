@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"golang.org/x/oauth2"
 	authenticationv1api "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -21,6 +22,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/containers/kubernetes-mcp-server/pkg/sts"
 )
 
 const (
@@ -42,6 +44,15 @@ type ACMProviderConfig struct {
 
 	// The CA file for the cluster proxy addon
 	ClusterProxyAddonCAFile string `toml:"cluster_proxy_addon_ca_file,omitempty"`
+
+	// TokenExchangeStrategy specifies which token exchange protocol to use
+	// Valid values: "keycloak-v1", "rfc8693", "external-account"
+	// Default: "" (no per-cluster token exchange)
+	TokenExchangeStrategy string `toml:"token_exchange_strategy,omitempty"`
+
+	// Clusters holds per-cluster token exchange configuration
+	// The key is the cluster name (e.g., "my-managed-cluster")
+	Clusters map[string]sts.TargetSTSConfig `toml:"clusters,omitempty"`
 }
 
 func (c *ACMProviderConfig) Validate() error {
@@ -114,6 +125,10 @@ type acmHubClusterProvider struct {
 
 	// Resource version from last list operation to use for watch
 	lastResourceVersion string
+
+	// Per-cluster token exchange configuration
+	tokenExchanger    sts.TokenExchanger
+	clusterSTSConfigs map[string]sts.TargetSTSConfig
 }
 
 var _ Provider = &acmHubClusterProvider{}
@@ -257,6 +272,17 @@ func newACMClusterProvider(m *Manager, cfg *ACMProviderConfig, watchKubeConfig b
 		clusterProxyHost:   clusterProxyHost,
 		clusterProxyCAFile: cfg.ClusterProxyAddonCAFile,
 		skipTLSVerify:      cfg.ClusterProxyAddonSkipTLSVerify,
+	}
+
+	// Initialize per-cluster token exchange if strategy is configured
+	if cfg.TokenExchangeStrategy != "" {
+		tokenExchanger, err := sts.GetTokenExchanger(cfg.TokenExchangeStrategy)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize token exchanger: %w", err)
+		}
+		provider.tokenExchanger = tokenExchanger
+		provider.clusterSTSConfigs = cfg.Clusters
+		klog.V(2).Infof("Per-cluster token exchange enabled with strategy: %s", cfg.TokenExchangeStrategy)
 	}
 
 	ctx := context.Background()
@@ -510,4 +536,39 @@ func (p *acmHubClusterProvider) initializeManager(m *Manager) error {
 	}
 
 	return nil
+}
+
+// HasTargetTokenExchange returns true if per-target token exchange is configured for the given target.
+func (p *acmHubClusterProvider) HasTargetTokenExchange(target string) bool {
+	if p.tokenExchanger == nil || p.clusterSTSConfigs == nil {
+		return false
+	}
+	_, ok := p.clusterSTSConfigs[target]
+	return ok
+}
+
+// ExchangeTokenForTarget exchanges the given token for a target-specific token.
+func (p *acmHubClusterProvider) ExchangeTokenForTarget(ctx context.Context, target, token string) (*oauth2.Token, error) {
+	if p.tokenExchanger == nil {
+		return nil, fmt.Errorf("token exchanger not configured")
+	}
+
+	stsCfg, ok := p.clusterSTSConfigs[target]
+	if !ok {
+		return nil, fmt.Errorf("no token exchange configuration for target %s", target)
+	}
+
+	// Create HTTP client with TLS config from target's STS config
+	httpClient, err := stsCfg.HTTPClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP client for target %s: %w", target, err)
+	}
+
+	exchangedToken, err := p.tokenExchanger.Exchange(ctx, httpClient, stsCfg, token)
+	if err != nil {
+		return nil, fmt.Errorf("token exchange failed for target %s: %w", target, err)
+	}
+
+	klog.V(3).Infof("Successfully exchanged token for target %s", target)
+	return exchangedToken, nil
 }
