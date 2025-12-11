@@ -22,6 +22,6 @@
     "clientSecret": "${HUB_CLIENT_SECRET}",
     "clientAuthMethod": "client_secret_post",
     "syncMode": "IMPORT",
-    "disableUserInfo": "false"
+    "disableUserInfo": "true"
   }
 }

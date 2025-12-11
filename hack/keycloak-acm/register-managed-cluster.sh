@@ -422,6 +422,36 @@ if [ "$FED_CODE" = "204" ] || [ "$FED_CODE" = "409" ]; then
 else
     echo "  ⚠️  Federated identity link returned HTTP $FED_CODE"
 fi
+
+# Remove any federated identity link from service account user to prevent
+# "More results found" error during token exchange. The mcp-server client's
+# service account should NOT have a federated identity link.
+echo "  Checking for service account federated identity..."
+SA_USER=$(curl $CURL_OPTS -X GET "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/clients/$MANAGED_CLIENT_UUID/service-account-user" \
+    -H "Authorization: Bearer $ADMIN_TOKEN")
+SA_USER_ID=$(echo "$SA_USER" | jq -r '.id // empty')
+
+if [ -n "$SA_USER_ID" ] && [ "$SA_USER_ID" != "null" ]; then
+    # Check if service account has a federated identity link
+    SA_FED=$(curl $CURL_OPTS -X GET "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/users/$SA_USER_ID/federated-identity" \
+        -H "Authorization: Bearer $ADMIN_TOKEN")
+    SA_FED_IDP=$(echo "$SA_FED" | jq -r '.[] | select(.identityProvider == "'"$IDP_ALIAS"'") | .identityProvider // empty')
+
+    if [ -n "$SA_FED_IDP" ]; then
+        echo "  Removing federated identity from service account..."
+        curl $CURL_OPTS -X DELETE "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/users/$SA_USER_ID/federated-identity/$IDP_ALIAS" \
+            -H "Authorization: Bearer $ADMIN_TOKEN" > /dev/null
+        echo "  ✅ Removed federated identity from service account"
+    else
+        echo "  ✅ Service account has no conflicting federated identity"
+    fi
+fi
+
+# Clear Keycloak user cache to ensure federated identity changes take effect immediately
+echo "  Clearing Keycloak user cache..."
+curl $CURL_OPTS -X POST "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/clear-user-cache" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" > /dev/null
+echo "  ✅ User cache cleared"
 echo ""
 
 # Step 9: Configure cross-realm token exchange permissions
