@@ -82,7 +82,7 @@ keycloak-acm-register-managed-cluster: ## Register managed cluster with ACM and 
 	@echo "  4. Configure cross-realm token exchange"
 	@echo "  5. Enable TechPreviewNoUpgrade on managed cluster"
 	@echo "  6. Configure OIDC authentication"
-	@echo "  7. Create RBAC for service-account-mcp-server"
+	@echo "  7. Create RBAC for mcp user"
 	@echo ""
 	@echo "⏳ Total time: ~25-30 minutes (rollouts happen in background)"
 	@echo ""
