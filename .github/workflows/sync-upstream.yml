@@ -1,0 +1,30 @@
+name: Sync Upstream via PR
+
+on:
+  schedule:
+    - cron: '0 2 * * 0' # Sundays at 2 AM UTC
+  workflow_dispatch:    # Manual trigger
+
+jobs:
+  sync-pull-request:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Sync and Create PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: make sync-upstream-pr
