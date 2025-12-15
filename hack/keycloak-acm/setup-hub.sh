@@ -128,17 +128,27 @@ echo "STEP 2: Configuring OpenShift Authentication"
 echo "========================================"
 echo ""
 
-echo "Enabling TechPreviewNoUpgrade feature gate..."
-CURRENT_FEATURE_SET=$(oc get featuregate cluster -o jsonpath='{.spec.featureSet}' 2>/dev/null || echo "")
-if [ "$CURRENT_FEATURE_SET" != "TechPreviewNoUpgrade" ]; then
-    echo "  Enabling TechPreviewNoUpgrade..."
-    oc patch featuregate cluster --type=merge -p='{"spec":{"featureSet":"TechPreviewNoUpgrade"}}'
-    echo "  ✅ Feature gate enabled"
-    echo "  ⚠️  Control plane will restart (10-15 minutes)"
-    echo "  ⚠️  Waiting 2 minutes for initial rollout..."
-    sleep 120
+echo "Checking ExternalOIDC feature status..."
+
+# Check if ExternalOIDC is already enabled (GA in OpenShift 4.20+)
+EXTERNAL_OIDC_ENABLED=$(oc get featuregate cluster -o json 2>/dev/null | jq -r '.status.featureGates[0].enabled[] | select(.name == "ExternalOIDC") | .name' 2>/dev/null || echo "")
+
+if [ "$EXTERNAL_OIDC_ENABLED" = "ExternalOIDC" ]; then
+    echo "  ✅ ExternalOIDC feature is already enabled (OpenShift 4.20+ GA)"
+    echo "  No need to enable TechPreviewNoUpgrade feature gate"
 else
-    echo "  ✅ TechPreviewNoUpgrade already enabled"
+    echo "  ExternalOIDC not enabled, checking TechPreviewNoUpgrade feature gate..."
+    CURRENT_FEATURE_SET=$(oc get featuregate cluster -o jsonpath='{.spec.featureSet}' 2>/dev/null || echo "")
+    if [ "$CURRENT_FEATURE_SET" != "TechPreviewNoUpgrade" ]; then
+        echo "  Enabling TechPreviewNoUpgrade..."
+        oc patch featuregate cluster --type=merge -p='{"spec":{"featureSet":"TechPreviewNoUpgrade"}}'
+        echo "  ✅ Feature gate enabled"
+        echo "  ⚠️  Control plane will restart (10-15 minutes)"
+        echo "  ⚠️  Waiting 2 minutes for initial rollout..."
+        sleep 120
+    else
+        echo "  ✅ TechPreviewNoUpgrade already enabled"
+    fi
 fi
 
 echo ""
@@ -160,36 +170,11 @@ oc delete configmap keycloak-oidc-ca -n openshift-config 2>/dev/null || true
 oc create configmap keycloak-oidc-ca -n openshift-config --from-file=ca-bundle.crt=/tmp/keycloak-ca.crt
 echo "  ✅ CA certificate configmap created"
 
-echo ""
-echo "Configuring OIDC provider..."
+# Note: Full OIDC configuration (including oidcClients) is done after Keycloak clients are created
 ISSUER_URL="$KEYCLOAK_URL/realms/$HUB_REALM"
-echo "  Issuer URL: $ISSUER_URL"
-echo "  Audiences: openshift, $CLIENT_ID"
-
-CURRENT_ISSUER=$(oc get authentication.config.openshift.io/cluster -o jsonpath='{.spec.oidcProviders[0].issuer.issuerURL}' 2>/dev/null || echo "")
-if [ "$CURRENT_ISSUER" = "$ISSUER_URL" ]; then
-    echo "  ✅ OIDC provider already configured"
-else
-    if [ -n "$CURRENT_ISSUER" ]; then
-        echo "  Updating existing OIDC provider..."
-        printf '[{"op":"replace","path":"/spec/oidcProviders/0/issuer/issuerURL","value":"%s"},{"op":"replace","path":"/spec/oidcProviders/0/issuer/audiences","value":["openshift","%s"]}]' "$ISSUER_URL" "$CLIENT_ID" > /tmp/oidc-patch.json
-    else
-        echo "  Creating new OIDC provider..."
-        printf '[{"op":"remove","path":"/spec/webhookTokenAuthenticator"},{"op":"replace","path":"/spec/type","value":"OIDC"},{"op":"add","path":"/spec/oidcProviders","value":[{"name":"keycloak","issuer":{"issuerURL":"%s","audiences":["openshift","%s"],"issuerCertificateAuthority":{"name":"keycloak-oidc-ca"}},"claimMappings":{"username":{"claim":"preferred_username","prefixPolicy":"NoPrefix"}}}]}]' "$ISSUER_URL" "$CLIENT_ID" > /tmp/oidc-patch.json
-    fi
-    oc patch authentication.config.openshift.io/cluster --type=json -p="$(cat /tmp/oidc-patch.json)"
-    echo "  ✅ Authentication CR configured"
-    echo ""
-    echo "  ⚠️  IMPORTANT: kube-apiserver will now roll out with OIDC configuration"
-    echo "  This takes 10-15 minutes as each master node updates sequentially."
-    echo ""
-    echo "  You can monitor the rollout with:"
-    echo "    oc get co kube-apiserver -w"
-    echo ""
-    echo "  The MCP server will not be able to authenticate until the rollout completes."
-    echo "  Wait until all conditions show: Available=True, Progressing=False, Degraded=False"
-    echo ""
-fi
+echo ""
+echo "OIDC Issuer URL will be: $ISSUER_URL"
+echo "Full OIDC configuration will be applied after Keycloak clients are created..."
 
 #=============================================================================
 # STEP 3: Create Hub Realm
@@ -496,6 +481,126 @@ else
   echo "  ✅ mcp-client already exists"
 fi
 
+# Create openshift-console client (confidential OAuth client for OpenShift console)
+echo ""
+echo "Creating openshift-console client (for OpenShift console)..."
+CONSOLE_CLIENT_UUID=$(curl -sk -X GET "$KEYCLOAK_URL/admin/realms/$HUB_REALM/clients?clientId=openshift-console" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" | jq -r '.[0].id // empty')
+
+if [ -z "$CONSOLE_CLIENT_UUID" ] || [ "$CONSOLE_CLIENT_UUID" = "null" ]; then
+  CONSOLE_CLIENT_SECRET=$(openssl rand -hex 32)
+
+  # Get the OpenShift console route for redirect URI
+  CONSOLE_ROUTE=$(oc get route console -n openshift-console -o jsonpath='{.spec.host}' 2>/dev/null || echo "")
+  if [ -n "$CONSOLE_ROUTE" ]; then
+    CONSOLE_REDIRECT_URI="https://$CONSOLE_ROUTE/auth/callback"
+  else
+    # Fallback pattern for console routes
+    CONSOLE_REDIRECT_URI="https://console-openshift-console.apps.*"
+  fi
+
+  curl -sk -X POST "$KEYCLOAK_URL/admin/realms/$HUB_REALM/clients" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"clientId\": \"openshift-console\",
+      \"enabled\": true,
+      \"protocol\": \"openid-connect\",
+      \"publicClient\": false,
+      \"directAccessGrantsEnabled\": false,
+      \"standardFlowEnabled\": true,
+      \"secret\": \"$CONSOLE_CLIENT_SECRET\",
+      \"redirectUris\": [\"$CONSOLE_REDIRECT_URI\", \"https://console-openshift-console.apps.*/auth/callback\"],
+      \"webOrigins\": [\"https://console-openshift-console.apps.*\"]
+    }" > /dev/null
+
+  CONSOLE_CLIENT_UUID=$(curl -sk -X GET "$KEYCLOAK_URL/admin/realms/$HUB_REALM/clients?clientId=openshift-console" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" | jq -r '.[0].id')
+
+  # Add scopes to openshift-console client
+  curl -sk -X PUT "$KEYCLOAK_URL/admin/realms/$HUB_REALM/clients/$CONSOLE_CLIENT_UUID/default-client-scopes/$OPENID_SCOPE_UUID" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" > /dev/null 2>&1
+
+  # Add username mapper for preferred_username claim
+  curl -sk -X POST "$KEYCLOAK_URL/admin/realms/$HUB_REALM/clients/$CONSOLE_CLIENT_UUID/protocol-mappers/models" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "name": "username",
+      "protocol": "openid-connect",
+      "protocolMapper": "oidc-usermodel-property-mapper",
+      "consentRequired": false,
+      "config": {
+        "user.attribute": "username",
+        "claim.name": "preferred_username",
+        "jsonType.label": "String",
+        "id.token.claim": "true",
+        "access.token.claim": "true",
+        "userinfo.token.claim": "true"
+      }
+    }' > /dev/null 2>&1
+
+  echo "  ✅ Created openshift-console client"
+  echo "  📝 Console Client Secret: $CONSOLE_CLIENT_SECRET"
+else
+  echo "  ✅ openshift-console client already exists"
+  CONSOLE_CLIENT_SECRET=$(curl -sk -X GET "$KEYCLOAK_URL/admin/realms/$HUB_REALM/clients/$CONSOLE_CLIENT_UUID/client-secret" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" | jq -r '.value')
+  echo "  📝 Console Client Secret: $CONSOLE_CLIENT_SECRET"
+fi
+
+# Create openshift-cli client (public OAuth client for oc login)
+echo ""
+echo "Creating openshift-cli client (for oc login)..."
+CLI_CLIENT_UUID=$(curl -sk -X GET "$KEYCLOAK_URL/admin/realms/$HUB_REALM/clients?clientId=openshift-cli" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" | jq -r '.[0].id // empty')
+
+if [ -z "$CLI_CLIENT_UUID" ] || [ "$CLI_CLIENT_UUID" = "null" ]; then
+  curl -sk -X POST "$KEYCLOAK_URL/admin/realms/$HUB_REALM/clients" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "clientId": "openshift-cli",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "redirectUris": ["http://127.0.0.1:*", "http://localhost:*"],
+      "webOrigins": ["*"]
+    }' > /dev/null
+
+  CLI_CLIENT_UUID=$(curl -sk -X GET "$KEYCLOAK_URL/admin/realms/$HUB_REALM/clients?clientId=openshift-cli" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" | jq -r '.[0].id')
+
+  # Add scopes to openshift-cli client
+  curl -sk -X PUT "$KEYCLOAK_URL/admin/realms/$HUB_REALM/clients/$CLI_CLIENT_UUID/default-client-scopes/$OPENID_SCOPE_UUID" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" > /dev/null 2>&1
+
+  # Add username mapper for preferred_username claim
+  curl -sk -X POST "$KEYCLOAK_URL/admin/realms/$HUB_REALM/clients/$CLI_CLIENT_UUID/protocol-mappers/models" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "name": "username",
+      "protocol": "openid-connect",
+      "protocolMapper": "oidc-usermodel-property-mapper",
+      "consentRequired": false,
+      "config": {
+        "user.attribute": "username",
+        "claim.name": "preferred_username",
+        "jsonType.label": "String",
+        "id.token.claim": "true",
+        "access.token.claim": "true",
+        "userinfo.token.claim": "true"
+      }
+    }' > /dev/null 2>&1
+
+  echo "  ✅ Created openshift-cli client (public)"
+else
+  echo "  ✅ openshift-cli client already exists"
+fi
+
 # Create mcp-sts client (for token exchange)
 echo ""
 echo "Creating mcp-sts client (for token exchange)..."
@@ -639,6 +744,9 @@ CLIENT_ID="$CLIENT_ID"
 CLIENT_SECRET="$CLIENT_SECRET"
 STS_CLIENT_ID="mcp-sts"
 STS_CLIENT_SECRET="$STS_CLIENT_SECRET"
+CONSOLE_CLIENT_ID="openshift-console"
+CONSOLE_CLIENT_SECRET="$CONSOLE_CLIENT_SECRET"
+CLI_CLIENT_ID="openshift-cli"
 MCP_USERNAME="$MCP_USERNAME"
 MCP_PASSWORD="$MCP_PASSWORD"
 ADMIN_USER="$ADMIN_USER"
@@ -811,6 +919,79 @@ EOF
     fi
 fi
 
+# Step 15: Configure OpenShift OIDC Authentication with oidcClients
+echo ""
+echo "Step 15: Configuring OpenShift OIDC Authentication..."
+
+# Create console client secret in openshift-config namespace
+echo "  Creating console OIDC client secret..."
+oc delete secret console-oidc-client-secret -n openshift-config 2>/dev/null || true
+oc create secret generic console-oidc-client-secret \
+    -n openshift-config \
+    --from-literal=clientSecret="$CONSOLE_CLIENT_SECRET"
+echo "  ✅ Console client secret created"
+
+# Check if OIDC provider already configured
+CURRENT_ISSUER=$(oc get authentication.config.openshift.io/cluster -o jsonpath='{.spec.oidcProviders[0].issuer.issuerURL}' 2>/dev/null || echo "")
+
+if [ "$CURRENT_ISSUER" = "$ISSUER_URL" ]; then
+    echo "  ✅ OIDC provider already configured with issuer: $ISSUER_URL"
+    echo "  Checking oidcClients configuration..."
+
+    CURRENT_CONSOLE_CLIENT=$(oc get authentication.config.openshift.io/cluster -o jsonpath='{.spec.oidcProviders[0].oidcClients[?(@.componentName=="console")].clientID}' 2>/dev/null || echo "")
+    if [ "$CURRENT_CONSOLE_CLIENT" = "openshift-console" ]; then
+        echo "  ✅ Console oidcClient already configured"
+    else
+        echo "  Updating oidcClients configuration..."
+        oc patch authentication.config.openshift.io/cluster --type=json -p='[
+          {"op":"add","path":"/spec/oidcProviders/0/oidcClients","value":[
+            {"componentName":"console","componentNamespace":"openshift-console","clientID":"openshift-console","clientSecret":{"name":"console-oidc-client-secret"}},
+            {"componentName":"cli","componentNamespace":"openshift-console","clientID":"openshift-cli"}
+          ]}
+        ]'
+        echo "  ✅ oidcClients added to existing OIDC provider"
+    fi
+else
+    echo "  Creating new OIDC provider with oidcClients..."
+    echo "  Issuer URL: $ISSUER_URL"
+    echo "  Audiences: openshift, $CLIENT_ID"
+
+    # Build the complete OIDC configuration patch
+    cat > /tmp/oidc-patch.json <<EOF
+[
+  {"op":"remove","path":"/spec/webhookTokenAuthenticator"},
+  {"op":"replace","path":"/spec/type","value":"OIDC"},
+  {"op":"add","path":"/spec/oidcProviders","value":[{
+    "name":"keycloak",
+    "issuer":{
+      "issuerURL":"$ISSUER_URL",
+      "audiences":["openshift","$CLIENT_ID"],
+      "issuerCertificateAuthority":{"name":"keycloak-oidc-ca"}
+    },
+    "claimMappings":{
+      "username":{"claim":"preferred_username","prefixPolicy":"NoPrefix"}
+    },
+    "oidcClients":[
+      {"componentName":"console","componentNamespace":"openshift-console","clientID":"openshift-console","clientSecret":{"name":"console-oidc-client-secret"}},
+      {"componentName":"cli","componentNamespace":"openshift-console","clientID":"openshift-cli"}
+    ]
+  }]}
+]
+EOF
+
+    oc patch authentication.config.openshift.io/cluster --type=json -p="$(cat /tmp/oidc-patch.json)"
+    echo "  ✅ Authentication CR configured with OIDC provider and oidcClients"
+    echo ""
+    echo "  ⚠️  IMPORTANT: kube-apiserver will now roll out with OIDC configuration"
+    echo "  This takes 10-15 minutes as each master node updates sequentially."
+    echo ""
+    echo "  You can monitor the rollout with:"
+    echo "    oc get co kube-apiserver -w"
+    echo ""
+    echo "  The MCP server will not be able to authenticate until the rollout completes."
+    echo "  Wait until all conditions show: Available=True, Progressing=False, Degraded=False"
+fi
+
 echo ""
 echo "=========================================="
 echo "✅ Hub Keycloak Setup Complete!"
@@ -821,9 +1002,11 @@ echo "  Keycloak URL: $KEYCLOAK_URL"
 echo "  Hub Realm: $KEYCLOAK_URL/realms/$HUB_REALM"
 echo ""
 echo "  Clients created:"
-echo "    - mcp-server (confidential): $CLIENT_SECRET"
+echo "    - mcp-server (confidential): for MCP server token exchange"
 echo "    - mcp-client (public OAuth): for browser/inspector flow"
-echo "    - mcp-sts (STS): $STS_CLIENT_SECRET"
+echo "    - mcp-sts (STS): for token exchange operations"
+echo "    - openshift-console (confidential): for OpenShift console OAuth"
+echo "    - openshift-cli (public): for oc login"
 echo ""
 echo "  Test User: $MCP_USERNAME / $MCP_PASSWORD"
 echo "  Admin: $ADMIN_USER / $ADMIN_PASSWORD"
