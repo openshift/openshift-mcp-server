@@ -434,6 +434,22 @@ if [ -z "$CONSOLE_CLIENT_UUID" ] || [ "$CONSOLE_CLIENT_UUID" = "null" ]; then
           }
         }' > /dev/null 2>&1
 
+    # Add audience mapper for 'openshift' (required for kube-apiserver token validation)
+    curl $CURL_OPTS -X POST "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/clients/$CONSOLE_CLIENT_UUID/protocol-mappers/models" \
+        -H "Authorization: Bearer $ADMIN_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "name": "openshift-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "openshift",
+            "id.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        }' > /dev/null 2>&1
+
     echo "  ✅ Created openshift-console client"
     echo "  📝 Console Client Secret: $MANAGED_CONSOLE_CLIENT_SECRET"
 else
@@ -483,6 +499,22 @@ if [ -z "$CLI_CLIENT_UUID" ] || [ "$CLI_CLIENT_UUID" = "null" ]; then
             "id.token.claim": "true",
             "access.token.claim": "true",
             "userinfo.token.claim": "true"
+          }
+        }' > /dev/null 2>&1
+
+    # Add audience mapper for 'openshift' (required for kube-apiserver token validation)
+    curl $CURL_OPTS -X POST "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/clients/$CLI_CLIENT_UUID/protocol-mappers/models" \
+        -H "Authorization: Bearer $ADMIN_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "name": "openshift-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "openshift",
+            "id.token.claim": "true",
+            "access.token.claim": "true"
           }
         }' > /dev/null 2>&1
 
