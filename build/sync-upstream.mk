@@ -41,6 +41,13 @@ sync-upstream-pr: ## Create/update PR to sync with upstream (requires gh CLI)
 	BEHIND_COUNT=$$(git rev-list --count $(ORIGIN_REMOTE)/main..$(UPSTREAM_REMOTE)/main); \
 	echo "  Behind by $$BEHIND_COUNT commits"; \
 	git checkout -B $(SYNC_BRANCH_NAME) $(UPSTREAM_REMOTE)/main
+	@echo "🔧 Updating dependencies..."
+	@go mod tidy && go mod vendor
+	@if [ -n "$$(git status --porcelain go.mod go.sum vendor/)" ]; then \
+		echo "📦 Changes detected. Committing and pushing..."; \
+		git add go.mod go.sum vendor/; \
+		git commit -m "chore: update dependencies and vendor"; \
+	fi
 	@echo "📤 Pushing sync branch..."
 	@git push -f $(ORIGIN_REMOTE) $(SYNC_BRANCH_NAME)
 	@echo "🚀 Creating or updating PR..."
