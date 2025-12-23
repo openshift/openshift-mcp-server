@@ -27,6 +27,7 @@ func (t *Toolset) GetTools(o internalk8s.Openshift) []api.ServerTool {
 		initNodes(),
 		initPods(),
 		initResources(o),
+		initSecureWorkloads(),
 	)
 }
 
