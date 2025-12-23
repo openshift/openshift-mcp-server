@@ -30,8 +30,9 @@ func (t *Toolset) GetTools(o api.Openshift) []api.ServerTool {
 }
 
 func (t *Toolset) GetPrompts() []api.ServerPrompt {
-	// Core toolset prompts will be added in Feature 3
-	return nil
+	return slices.Concat(
+		initHealthChecks(),
+	)
 }
 
 func init() {
