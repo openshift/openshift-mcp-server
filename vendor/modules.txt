@@ -71,12 +71,16 @@ github.com/containerd/platforms
 ## explicit; go 1.24.0
 github.com/coreos/go-oidc/v3/oidc
 github.com/coreos/go-oidc/v3/oidc/oidctest
-# github.com/cyphar/filepath-securejoin v0.4.1
+# github.com/cyphar/filepath-securejoin v0.6.0
 ## explicit; go 1.18
 github.com/cyphar/filepath-securejoin
+github.com/cyphar/filepath-securejoin/internal/consts
 # github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 ## explicit
 github.com/davecgh/go-spew/spew
+# github.com/docker/go-units v0.5.0
+## explicit
+github.com/docker/go-units
 # github.com/emicklei/go-restful/v3 v3.12.2
 ## explicit; go 1.13
 github.com/emicklei/go-restful/v3
@@ -283,6 +287,12 @@ github.com/opencontainers/go-digest
 ## explicit; go 1.18
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
+# github.com/openshift/api v0.0.0-20251222154221-d4b2fef98af2
+## explicit; go 1.24.0
+github.com/openshift/api/config/v1
+# github.com/openshift/library-go v0.0.0-20251222131241-289839b3ffe8
+## explicit; go 1.24.0
+github.com/openshift/library-go/pkg/config/clusteroperator/v1helpers
 # github.com/peterbourgon/diskv v2.0.1+incompatible
 ## explicit
 github.com/peterbourgon/diskv
@@ -366,7 +376,7 @@ go.yaml.in/yaml/v2
 # go.yaml.in/yaml/v3 v3.0.4
 ## explicit; go 1.16
 go.yaml.in/yaml/v3
-# golang.org/x/crypto v0.43.0
+# golang.org/x/crypto v0.45.0
 ## explicit; go 1.24.0
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blowfish
@@ -380,7 +390,7 @@ golang.org/x/crypto/openpgp/packet
 golang.org/x/crypto/openpgp/s2k
 golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/scrypt
-# golang.org/x/net v0.46.0
+# golang.org/x/net v0.47.0
 ## explicit; go 1.24.0
 golang.org/x/net/context
 golang.org/x/net/html
@@ -400,19 +410,19 @@ golang.org/x/oauth2/google/externalaccount
 golang.org/x/oauth2/google/internal/impersonate
 golang.org/x/oauth2/google/internal/stsexchange
 golang.org/x/oauth2/internal
-# golang.org/x/sync v0.17.0
+# golang.org/x/sync v0.18.0
 ## explicit; go 1.24.0
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.37.0
+# golang.org/x/sys v0.38.0
 ## explicit; go 1.24.0
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/term v0.36.0
+# golang.org/x/term v0.37.0
 ## explicit; go 1.24.0
 golang.org/x/term
-# golang.org/x/text v0.30.0
+# golang.org/x/text v0.31.0
 ## explicit; go 1.24.0
 golang.org/x/text/encoding
 golang.org/x/text/encoding/internal
