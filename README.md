@@ -304,13 +304,14 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 
 <!-- AVAILABLE-TOOLSETS-START -->
 
-| Toolset  | Description                                                                                                                                                          | Default |
-|----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| config   | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                              | ✓       |
-| core     | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                  | ✓       |
-| helm     | Tools for managing Helm charts and releases                                                                                                                          | ✓       |
-| kiali    | Most common tools for managing Kiali, check the [Kiali documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/KIALI.md) for more details. |         |
-| kubevirt | KubeVirt virtual machine management tools                                                                                                                            |         |
+| Toolset          | Description                                                                                                                                                          | Default |
+|------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| config           | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                              | ✓       |
+| core             | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                  | ✓       |
+| external-secrets | Tools for managing External Secrets Operator for Red Hat OpenShift - operator installation, configuration, SecretStore/ExternalSecret management, and debugging      |         |
+| helm             | Tools for managing Helm charts and releases                                                                                                                          | ✓       |
+| kiali            | Most common tools for managing Kiali, check the [Kiali documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/KIALI.md) for more details. |         |
+| kubevirt         | KubeVirt virtual machine management tools                                                                                                                            |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -425,6 +426,209 @@ In case multi-cluster support is enabled (default) and you have access to multip
   - `name` (`string`) **(required)** - Name of the resource
   - `namespace` (`string`) - Optional Namespace to get/update the namespaced resource scale from (ignored in case of cluster scoped resources). If not provided, will get/update resource scale from configured namespace
   - `scale` (`integer`) - Optional scale to update the resources scale to. If not provided, will return the current scale of the resource, and not update it
+
+</details>
+
+<details>
+
+<summary>external-secrets</summary>
+
+- **external_secrets_operator_install** - Install the External Secrets Operator for Red Hat OpenShift via OLM (Operator Lifecycle Manager).
+This creates the required Namespace, OperatorGroup, and Subscription resources.
+The operator will be installed in the 'external-secrets-operator' namespace.
+Reference: https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/security_and_compliance/external-secrets-operator-for-red-hat-openshift
+  - `approval` (`string`) - Install plan approval strategy: 'Automatic' or 'Manual' (default: 'Automatic')
+  - `channel` (`string`) - Subscription channel (default: 'stable')
+
+- **external_secrets_operator_status** - Get the status of the External Secrets Operator installation.
+Returns information about the Subscription, ClusterServiceVersion (CSV), and operator deployment status.
+Use this to verify if the operator is installed and running correctly.
+
+- **external_secrets_operator_uninstall** - Uninstall the External Secrets Operator for Red Hat OpenShift.
+This removes the Subscription and ClusterServiceVersion (CSV) resources.
+WARNING: This will remove the operator but NOT the CRDs or existing ExternalSecrets/SecretStores.
+  - `delete_namespace` (`boolean`) - Also delete the operator namespace (default: false)
+
+- **external_secrets_config_get** - Get the ExternalSecretsConfig resource which controls the operator configuration.
+The ExternalSecretsConfig API allows you to customize operator behavior such as:
+- Controller deployment settings
+- Webhook configuration
+- Cert controller settings
+Reference: https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/security_and_compliance/external-secrets-operator-for-red-hat-openshift#customizing-the-external-secrets-operator-for-red-hat-openshift
+  - `name` (`string`) - Name of the ExternalSecretsConfig resource (default: 'cluster')
+
+- **external_secrets_config_apply** - Create or update the ExternalSecretsConfig resource to configure the operator.
+The ExternalSecretsConfig controls operator deployment settings, webhook configuration, etc.
+Example configuration YAML:
+  apiVersion: operator.external-secrets.io/v1alpha1
+  kind: ExternalSecretsConfig
+  metadata:
+    name: cluster
+  spec:
+    fullnameOverride: my-external-secrets
+Reference: https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/security_and_compliance/external-secrets-operator-for-red-hat-openshift#customizing-the-external-secrets-operator-for-red-hat-openshift
+  - `config` (`string`) **(required)** - YAML or JSON representation of the ExternalSecretsConfig resource
+
+- **external_secrets_store_list** - List SecretStores and/or ClusterSecretStores in the cluster.
+SecretStore is a namespaced resource that specifies how to access a secret provider (AWS, GCP, Azure, Vault, etc.).
+ClusterSecretStore is a cluster-scoped variant that can be referenced from any namespace.
+Reference: https://external-secrets.io/latest/api/secretstore/
+  - `cluster_scoped` (`boolean`) - If true, list ClusterSecretStores instead of SecretStores (default: false)
+  - `namespace` (`string`) - Namespace to list SecretStores from (optional, lists from all namespaces if not provided)
+
+- **external_secrets_store_get** - Get details of a SecretStore or ClusterSecretStore.
+Returns the full specification and current status including validation state and capabilities.
+Reference: https://external-secrets.io/latest/api/secretstore/
+  - `cluster_scoped` (`boolean`) - If true, get a ClusterSecretStore instead of SecretStore (default: false)
+  - `name` (`string`) **(required)** - Name of the SecretStore or ClusterSecretStore
+  - `namespace` (`string`) - Namespace of the SecretStore (not needed for ClusterSecretStore)
+
+- **external_secrets_store_create** - Create or update a SecretStore or ClusterSecretStore.
+Supports various providers: AWS Secrets Manager, GCP Secret Manager, Azure Key Vault, HashiCorp Vault, 
+Kubernetes Secrets, Bitwarden, 1Password, and many more.
+
+Example SecretStore for AWS Secrets Manager:
+  apiVersion: external-secrets.io/v1
+  kind: SecretStore
+  metadata:
+    name: aws-secretsmanager
+    namespace: my-namespace
+  spec:
+    provider:
+      aws:
+        service: SecretsManager
+        region: us-east-1
+        auth:
+          secretRef:
+            accessKeyIDSecretRef:
+              name: aws-credentials
+              key: access-key
+            secretAccessKeySecretRef:
+              name: aws-credentials
+              key: secret-access-key
+
+Reference: https://external-secrets.io/latest/provider/aws-secrets-manager/
+  - `store` (`string`) **(required)** - YAML or JSON representation of the SecretStore or ClusterSecretStore resource
+
+- **external_secrets_store_delete** - Delete a SecretStore or ClusterSecretStore.
+WARNING: Deleting a store will cause ExternalSecrets referencing it to fail syncing.
+  - `cluster_scoped` (`boolean`) - If true, delete a ClusterSecretStore instead of SecretStore (default: false)
+  - `name` (`string`) **(required)** - Name of the SecretStore or ClusterSecretStore to delete
+  - `namespace` (`string`) - Namespace of the SecretStore (not needed for ClusterSecretStore)
+
+- **external_secrets_store_validate** - Check the validation status of SecretStores and/or ClusterSecretStores.
+Returns a summary of store health including:
+- Whether the store is valid and ready
+- Capabilities (ReadOnly, ReadWrite)
+- Any error conditions
+Use this to quickly identify stores with configuration issues.
+  - `include_cluster_stores` (`boolean`) - Also include ClusterSecretStores in the validation check (default: true)
+  - `namespace` (`string`) - Namespace to check SecretStores in (optional, checks all namespaces if not provided)
+
+- **external_secrets_list** - List ExternalSecrets and/or ClusterExternalSecrets in the cluster.
+ExternalSecret is a namespaced resource that defines what secret data to fetch from a SecretStore.
+ClusterExternalSecret can create ExternalSecrets across multiple namespaces.
+Reference: https://external-secrets.io/latest/api/externalsecret/
+  - `cluster_scoped` (`boolean`) - If true, list ClusterExternalSecrets instead of ExternalSecrets (default: false)
+  - `namespace` (`string`) - Namespace to list ExternalSecrets from (optional, lists from all namespaces if not provided)
+
+- **external_secrets_get** - Get details of an ExternalSecret or ClusterExternalSecret.
+Returns the full specification, sync status, and any error conditions.
+Reference: https://external-secrets.io/latest/api/externalsecret/
+  - `cluster_scoped` (`boolean`) - If true, get a ClusterExternalSecret instead of ExternalSecret (default: false)
+  - `name` (`string`) **(required)** - Name of the ExternalSecret or ClusterExternalSecret
+  - `namespace` (`string`) - Namespace of the ExternalSecret (not needed for ClusterExternalSecret)
+
+- **external_secrets_create** - Create or update an ExternalSecret or ClusterExternalSecret.
+ExternalSecret defines how to fetch secret data from a provider and create a Kubernetes Secret.
+
+Example ExternalSecret:
+  apiVersion: external-secrets.io/v1
+  kind: ExternalSecret
+  metadata:
+    name: my-secret
+    namespace: my-namespace
+  spec:
+    refreshInterval: 1h
+    secretStoreRef:
+      name: aws-secretsmanager
+      kind: SecretStore
+    target:
+      name: my-k8s-secret
+      creationPolicy: Owner
+    data:
+    - secretKey: password
+      remoteRef:
+        key: my-aws-secret
+        property: password
+
+Reference: https://external-secrets.io/latest/api/externalsecret/
+  - `secret` (`string`) **(required)** - YAML or JSON representation of the ExternalSecret or ClusterExternalSecret resource
+
+- **external_secrets_delete** - Delete an ExternalSecret or ClusterExternalSecret.
+Note: By default, the associated Kubernetes Secret will also be deleted (depending on creationPolicy).
+  - `cluster_scoped` (`boolean`) - If true, delete a ClusterExternalSecret instead of ExternalSecret (default: false)
+  - `name` (`string`) **(required)** - Name of the ExternalSecret or ClusterExternalSecret to delete
+  - `namespace` (`string`) - Namespace of the ExternalSecret (not needed for ClusterExternalSecret)
+
+- **external_secrets_sync_status** - Check the synchronization status of ExternalSecrets.
+Returns a summary of sync health including:
+- Whether secrets are synced successfully
+- Last sync time and refresh interval
+- Any sync errors or issues
+Use this to quickly identify ExternalSecrets with sync problems.
+  - `name` (`string`) - Specific ExternalSecret name to check (optional, checks all if not provided)
+  - `namespace` (`string`) - Namespace to check ExternalSecrets in (optional, checks all namespaces if not provided)
+
+- **external_secrets_refresh** - Trigger a refresh of an ExternalSecret to immediately sync from the provider.
+This adds an annotation to force the controller to re-sync the secret data.
+Useful when you've updated the secret in the provider and want immediate sync.
+  - `name` (`string`) **(required)** - Name of the ExternalSecret to refresh
+  - `namespace` (`string`) - Namespace of the ExternalSecret
+
+- **external_secrets_debug** - Comprehensive debugging tool for External Secrets Operator issues.
+Collects diagnostic information including:
+- Operator deployment status and logs
+- ExternalSecretsConfig status
+- SecretStore/ClusterSecretStore validation status
+- ExternalSecret sync status and errors
+- Related Kubernetes events
+Use this when troubleshooting sync failures or operator issues.
+Reference: https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/security_and_compliance/external-secrets-operator-for-red-hat-openshift
+  - `include_logs` (`boolean`) - Include operator pod logs in the debug output (default: true)
+  - `log_tail_lines` (`integer`) - Number of log lines to include (default: 50)
+  - `namespace` (`string`) - Namespace to focus debugging on (optional, collects cluster-wide info if not provided)
+
+- **external_secrets_events** - Get Kubernetes events related to External Secrets resources.
+Filters events for ExternalSecret, SecretStore, ClusterSecretStore, and ClusterExternalSecret resources.
+Useful for troubleshooting sync failures and understanding what's happening.
+  - `namespace` (`string`) - Namespace to get events from (optional, gets from all namespaces if not provided)
+  - `resource_name` (`string`) - Filter events for a specific resource name (optional)
+
+- **external_secrets_logs** - Get logs from the External Secrets Operator pods.
+Retrieves logs from the operator controller, webhook, and cert-controller pods.
+Useful for diagnosing operator-level issues.
+  - `container` (`string`) - Specific container to get logs from (optional, gets all containers if not provided)
+  - `previous` (`boolean`) - Get logs from previous container instance (default: false)
+  - `tail_lines` (`integer`) - Number of lines to retrieve from the end of the logs (default: 100)
+
+- **external_secrets_health** - Quick health check for the External Secrets Operator and resources.
+Returns a summary of:
+- Operator installation status
+- Number of healthy/unhealthy SecretStores
+- Number of synced/failed ExternalSecrets
+- Any critical issues detected
+Use this for a quick overview of the External Secrets health.
+  - `namespace` (`string`) - Namespace to check health for (optional, checks cluster-wide if not provided)
+
+- **external_secrets_guide** - Get guidance and examples for using External Secrets Operator.
+Provides documentation, examples, and best practices for:
+- Setting up different secret providers (AWS, GCP, Azure, Vault, etc.)
+- Creating SecretStores and ExternalSecrets
+- Troubleshooting common issues
+- Security best practices
+  - `provider` (`string`) - Specific provider to get examples for: 'aws', 'gcp', 'azure', 'vault', 'kubernetes' (only used when topic is 'providers')
+  - `topic` (`string`) - Topic to get guidance on: 'providers', 'secretstore', 'externalsecret', 'troubleshooting', 'security', or 'overview' (default: 'overview')
 
 </details>
 
