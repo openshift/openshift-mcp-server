@@ -4,6 +4,8 @@ KEYCLOAK_NAMESPACE = keycloak
 KEYCLOAK_ADMIN_USER = admin
 KEYCLOAK_ADMIN_PASSWORD = admin
 
+##@ Keycloak
+
 .PHONY: keycloak-install
 keycloak-install:
 	@echo "Installing Keycloak (dev mode using official image)..."

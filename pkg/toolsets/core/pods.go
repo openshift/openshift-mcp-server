@@ -33,7 +33,6 @@ func initPods() []api.ServerTool {
 				Title:           "Pods: List",
 				ReadOnlyHint:    ptr.To(true),
 				DestructiveHint: ptr.To(false),
-				IdempotentHint:  ptr.To(false),
 				OpenWorldHint:   ptr.To(true),
 			},
 		}, Handler: podsListInAllNamespaces},
@@ -59,7 +58,6 @@ func initPods() []api.ServerTool {
 				Title:           "Pods: List in Namespace",
 				ReadOnlyHint:    ptr.To(true),
 				DestructiveHint: ptr.To(false),
-				IdempotentHint:  ptr.To(false),
 				OpenWorldHint:   ptr.To(true),
 			},
 		}, Handler: podsListInNamespace},
@@ -84,7 +82,6 @@ func initPods() []api.ServerTool {
 				Title:           "Pods: Get",
 				ReadOnlyHint:    ptr.To(true),
 				DestructiveHint: ptr.To(false),
-				IdempotentHint:  ptr.To(false),
 				OpenWorldHint:   ptr.To(true),
 			},
 		}, Handler: podsGet},
@@ -107,7 +104,6 @@ func initPods() []api.ServerTool {
 			},
 			Annotations: api.ToolAnnotations{
 				Title:           "Pods: Delete",
-				ReadOnlyHint:    ptr.To(false),
 				DestructiveHint: ptr.To(true),
 				IdempotentHint:  ptr.To(true),
 				OpenWorldHint:   ptr.To(true),
@@ -177,9 +173,7 @@ func initPods() []api.ServerTool {
 			},
 			Annotations: api.ToolAnnotations{
 				Title:           "Pods: Exec",
-				ReadOnlyHint:    ptr.To(false),
 				DestructiveHint: ptr.To(true), // Depending on the Pod's entrypoint, executing certain commands may kill the Pod
-				IdempotentHint:  ptr.To(false),
 				OpenWorldHint:   ptr.To(true),
 			},
 		}, Handler: podsExec},
@@ -218,7 +212,6 @@ func initPods() []api.ServerTool {
 				Title:           "Pods: Log",
 				ReadOnlyHint:    ptr.To(true),
 				DestructiveHint: ptr.To(false),
-				IdempotentHint:  ptr.To(false),
 				OpenWorldHint:   ptr.To(true),
 			},
 		}, Handler: podsLog},
@@ -249,9 +242,7 @@ func initPods() []api.ServerTool {
 			},
 			Annotations: api.ToolAnnotations{
 				Title:           "Pods: Run",
-				ReadOnlyHint:    ptr.To(false),
 				DestructiveHint: ptr.To(false),
-				IdempotentHint:  ptr.To(false),
 				OpenWorldHint:   ptr.To(true),
 			},
 		}, Handler: podsRun},
@@ -260,13 +251,13 @@ func initPods() []api.ServerTool {
 
 func podsListInAllNamespaces(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	labelSelector := params.GetArguments()["labelSelector"]
-	resourceListOptions := kubernetes.ResourceListOptions{
+	resourceListOptions := api.ListOptions{
 		AsTable: params.ListOutput.AsTable(),
 	}
 	if labelSelector != nil {
 		resourceListOptions.LabelSelector = labelSelector.(string)
 	}
-	ret, err := params.PodsListInAllNamespaces(params, resourceListOptions)
+	ret, err := kubernetes.NewCore(params).PodsListInAllNamespaces(params, resourceListOptions)
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to list pods in all namespaces: %v", err)), nil
 	}
@@ -278,14 +269,14 @@ func podsListInNamespace(params api.ToolHandlerParams) (*api.ToolCallResult, err
 	if ns == nil {
 		return api.NewToolCallResult("", errors.New("failed to list pods in namespace, missing argument namespace")), nil
 	}
-	resourceListOptions := kubernetes.ResourceListOptions{
+	resourceListOptions := api.ListOptions{
 		AsTable: params.ListOutput.AsTable(),
 	}
 	labelSelector := params.GetArguments()["labelSelector"]
 	if labelSelector != nil {
 		resourceListOptions.LabelSelector = labelSelector.(string)
 	}
-	ret, err := params.PodsListInNamespace(params, ns.(string), resourceListOptions)
+	ret, err := kubernetes.NewCore(params).PodsListInNamespace(params, ns.(string), resourceListOptions)
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to list pods in namespace %s: %v", ns, err)), nil
 	}
@@ -301,7 +292,7 @@ func podsGet(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	if name == nil {
 		return api.NewToolCallResult("", errors.New("failed to get pod, missing argument name")), nil
 	}
-	ret, err := params.PodsGet(params, ns.(string), name.(string))
+	ret, err := kubernetes.NewCore(params).PodsGet(params, ns.(string), name.(string))
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get pod %s in namespace %s: %v", name, ns, err)), nil
 	}
@@ -317,7 +308,7 @@ func podsDelete(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	if name == nil {
 		return api.NewToolCallResult("", errors.New("failed to delete pod, missing argument name")), nil
 	}
-	ret, err := params.PodsDelete(params, ns.(string), name.(string))
+	ret, err := kubernetes.NewCore(params).PodsDelete(params, ns.(string), name.(string))
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to delete pod %s in namespace %s: %v", name, ns, err)), nil
 	}
@@ -325,7 +316,7 @@ func podsDelete(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 }
 
 func podsTop(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	podsTopOptions := kubernetes.PodsTopOptions{AllNamespaces: true}
+	podsTopOptions := api.PodsTopOptions{AllNamespaces: true}
 	if v, ok := params.GetArguments()["namespace"].(string); ok {
 		podsTopOptions.Namespace = v
 	}
@@ -338,7 +329,7 @@ func podsTop(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	if v, ok := params.GetArguments()["label_selector"].(string); ok {
 		podsTopOptions.LabelSelector = v
 	}
-	ret, err := params.PodsTop(params, podsTopOptions)
+	ret, err := kubernetes.NewCore(params).PodsTop(params, podsTopOptions)
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get pods top: %v", err)), nil
 	}
@@ -375,7 +366,7 @@ func podsExec(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	} else {
 		return api.NewToolCallResult("", errors.New("failed to exec in pod, invalid command argument")), nil
 	}
-	ret, err := params.PodsExec(params, ns.(string), name.(string), container.(string), command)
+	ret, err := kubernetes.NewCore(params).PodsExec(params, ns.(string), name.(string), container.(string), command)
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to exec in pod %s in namespace %s: %v", name, ns, err)), nil
 	} else if ret == "" {
@@ -406,20 +397,14 @@ func podsLog(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	tail := params.GetArguments()["tail"]
 	var tailInt int64
 	if tail != nil {
-		// Convert to int64 - safely handle both float64 (JSON number) and int types
-		switch v := tail.(type) {
-		case float64:
-			tailInt = int64(v)
-		case int:
-			tailInt = int64(v)
-		case int64:
-			tailInt = v
-		default:
-			return api.NewToolCallResult("", fmt.Errorf("failed to parse tail parameter: expected integer, got %T", tail)), nil
+		var err error
+		tailInt, err = api.ParseInt64(tail)
+		if err != nil {
+			return api.NewToolCallResult("", fmt.Errorf("failed to parse tail parameter: %w", err)), nil
 		}
 	}
 
-	ret, err := params.PodsLog(params.Context, ns.(string), name.(string), container.(string), previousBool, tailInt)
+	ret, err := kubernetes.NewCore(params).PodsLog(params.Context, ns.(string), name.(string), container.(string), previousBool, tailInt)
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get pod %s log in namespace %s: %v", name, ns, err)), nil
 	} else if ret == "" {
@@ -445,7 +430,7 @@ func podsRun(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	if port == nil {
 		port = float64(0)
 	}
-	resources, err := params.PodsRun(params, ns.(string), name.(string), image.(string), int32(port.(float64)))
+	resources, err := kubernetes.NewCore(params).PodsRun(params, ns.(string), name.(string), image.(string), int32(port.(float64)))
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to run pod %s in namespace %s: %v", name, ns, err)), nil
 	}

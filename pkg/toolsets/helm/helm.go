@@ -3,6 +3,7 @@ package helm
 import (
 	"fmt"
 
+	"github.com/containers/kubernetes-mcp-server/pkg/helm"
 	"github.com/google/jsonschema-go/jsonschema"
 	"k8s.io/utils/ptr"
 
@@ -39,9 +40,8 @@ func initHelm() []api.ServerTool {
 			},
 			Annotations: api.ToolAnnotations{
 				Title:           "Helm: Install",
-				ReadOnlyHint:    ptr.To(false),
 				DestructiveHint: ptr.To(false),
-				IdempotentHint:  ptr.To(false), // TODO: consider replacing implementation with equivalent to: helm upgrade --install
+				IdempotentHint:  nil, // TODO: consider replacing implementation with equivalent to: helm upgrade --install
 				OpenWorldHint:   ptr.To(true),
 			},
 		}, Handler: helmInstall},
@@ -65,7 +65,6 @@ func initHelm() []api.ServerTool {
 				Title:           "Helm: List",
 				ReadOnlyHint:    ptr.To(true),
 				DestructiveHint: ptr.To(false),
-				IdempotentHint:  ptr.To(false),
 				OpenWorldHint:   ptr.To(true),
 			},
 		}, Handler: helmList},
@@ -88,7 +87,6 @@ func initHelm() []api.ServerTool {
 			},
 			Annotations: api.ToolAnnotations{
 				Title:           "Helm: Uninstall",
-				ReadOnlyHint:    ptr.To(false),
 				DestructiveHint: ptr.To(true),
 				IdempotentHint:  ptr.To(true),
 				OpenWorldHint:   ptr.To(true),
@@ -115,7 +113,7 @@ func helmInstall(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	if v, ok := params.GetArguments()["namespace"].(string); ok {
 		namespace = v
 	}
-	ret, err := params.NewHelm().Install(params, chart, values, name, namespace)
+	ret, err := helm.NewHelm(params).Install(params, chart, values, name, namespace)
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to install helm chart '%s': %w", chart, err)), nil
 	}
@@ -131,7 +129,7 @@ func helmList(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	if v, ok := params.GetArguments()["namespace"].(string); ok {
 		namespace = v
 	}
-	ret, err := params.NewHelm().List(namespace, allNamespaces)
+	ret, err := helm.NewHelm(params).List(namespace, allNamespaces)
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to list helm releases in namespace '%s': %w", namespace, err)), nil
 	}
@@ -148,7 +146,7 @@ func helmUninstall(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	if v, ok := params.GetArguments()["namespace"].(string); ok {
 		namespace = v
 	}
-	ret, err := params.NewHelm().Uninstall(name, namespace)
+	ret, err := helm.NewHelm(params).Uninstall(name, namespace)
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to uninstall helm chart '%s': %w", name, err)), nil
 	}

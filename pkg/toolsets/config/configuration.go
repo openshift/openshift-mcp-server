@@ -7,6 +7,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
 )
 
@@ -51,7 +52,6 @@ func initConfiguration() []api.ServerTool {
 					Title:           "Configuration: View",
 					ReadOnlyHint:    ptr.To(true),
 					DestructiveHint: ptr.To(false),
-					IdempotentHint:  ptr.To(false),
 					OpenWorldHint:   ptr.To(true),
 				},
 			},
@@ -63,7 +63,7 @@ func initConfiguration() []api.ServerTool {
 }
 
 func contextsList(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	contexts, err := params.ConfigurationContextsList()
+	contexts, err := kubernetes.NewCore(params).ConfigurationContextsList()
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to list contexts: %v", err)), nil
 	}
@@ -72,7 +72,7 @@ func contextsList(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		return api.NewToolCallResult("No contexts found in kubeconfig", nil), nil
 	}
 
-	defaultContext, err := params.ConfigurationContextsDefault()
+	defaultContext, err := kubernetes.NewCore(params).ConfigurationContextsDefault()
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get default context: %v", err)), nil
 	}
@@ -103,7 +103,7 @@ func configurationView(params api.ToolHandlerParams) (*api.ToolCallResult, error
 	if _, ok := minified.(bool); ok {
 		minify = minified.(bool)
 	}
-	ret, err := params.ConfigurationView(minify)
+	ret, err := kubernetes.NewCore(params).ConfigurationView(minify)
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get configuration: %v", err)), nil
 	}
