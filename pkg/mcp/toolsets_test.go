@@ -95,7 +95,7 @@ func (s *ToolsetsSuite) TestDefaultToolsetsToolsInOpenShift() {
 		s.T().Skip("Skipping test because default configuration overrides are present (this is a downstream fork)")
 	}
 	s.Run("Default configuration toolsets in OpenShift", func() {
-		s.Handle(&test.InOpenShiftHandler{})
+		s.Handle(test.NewInOpenShiftHandler())
 		s.InitMcpClient()
 		tools, err := s.ListTools(s.T().Context(), mcp.ListToolsRequest{})
 		s.Run("ListTools returns tools", func() {
@@ -202,7 +202,7 @@ func (s *ToolsetsSuite) TestInputSchemaEdgeCases() {
 
 func (s *ToolsetsSuite) InitMcpClient() {
 	var err error
-	s.mcpServer, err = NewServer(Configuration{StaticConfig: s.Cfg})
+	s.mcpServer, err = NewServer(Configuration{StaticConfig: s.Cfg}, nil, nil)
 	s.Require().NoError(err, "Expected no error creating MCP server")
 	s.McpClient = test.NewMcpClient(s.T(), s.mcpServer.ServeHTTP())
 }

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/BurntSushi/toml"
+	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -31,7 +32,7 @@ type ProviderConfigForTest struct {
 	IntProp  int    `toml:"int_prop"`
 }
 
-var _ Extended = (*ProviderConfigForTest)(nil)
+var _ api.ExtendedConfig = (*ProviderConfigForTest)(nil)
 
 func (p *ProviderConfigForTest) Validate() error {
 	if p.StrProp == "force-error" {
@@ -40,7 +41,7 @@ func (p *ProviderConfigForTest) Validate() error {
 	return nil
 }
 
-func providerConfigForTestParser(_ context.Context, primitive toml.Primitive, md toml.MetaData) (Extended, error) {
+func providerConfigForTestParser(_ context.Context, primitive toml.Primitive, md toml.MetaData) (api.ExtendedConfig, error) {
 	var providerConfigForTest ProviderConfigForTest
 	if err := md.PrimitiveDecode(primitive, &providerConfigForTest); err != nil {
 		return nil, err
@@ -129,7 +130,7 @@ func (s *ProviderConfigSuite) TestReadConfigUnregisteredProviderConfig() {
 }
 
 func (s *ProviderConfigSuite) TestReadConfigParserError() {
-	RegisterProviderConfig("test", func(ctx context.Context, primitive toml.Primitive, md toml.MetaData) (Extended, error) {
+	RegisterProviderConfig("test", func(ctx context.Context, primitive toml.Primitive, md toml.MetaData) (api.ExtendedConfig, error) {
 		return nil, errors.New("parser error forced by test")
 	})
 	invalidConfigPath := s.writeConfig(`
@@ -152,7 +153,7 @@ func (s *ProviderConfigSuite) TestReadConfigParserError() {
 
 func (s *ProviderConfigSuite) TestConfigDirPathInContext() {
 	var capturedDirPath string
-	RegisterProviderConfig("test", func(ctx context.Context, primitive toml.Primitive, md toml.MetaData) (Extended, error) {
+	RegisterProviderConfig("test", func(ctx context.Context, primitive toml.Primitive, md toml.MetaData) (api.ExtendedConfig, error) {
 		capturedDirPath = ConfigDirPathFromContext(ctx)
 		var providerConfigForTest ProviderConfigForTest
 		if err := md.PrimitiveDecode(primitive, &providerConfigForTest); err != nil {
@@ -328,7 +329,7 @@ func (s *ProviderConfigSuite) TestStandaloneConfigDirWithExtendedConfig() {
 func (s *ProviderConfigSuite) TestConfigDirPathInContextStandalone() {
 	// Test that configDirPath is correctly set in context for standalone --config-dir
 	var capturedDirPath string
-	RegisterProviderConfig("test", func(ctx context.Context, primitive toml.Primitive, md toml.MetaData) (Extended, error) {
+	RegisterProviderConfig("test", func(ctx context.Context, primitive toml.Primitive, md toml.MetaData) (api.ExtendedConfig, error) {
 		capturedDirPath = ConfigDirPathFromContext(ctx)
 		var providerConfigForTest ProviderConfigForTest
 		if err := md.PrimitiveDecode(primitive, &providerConfigForTest); err != nil {

@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/containers/kubernetes-mcp-server/internal/test"
+	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/stretchr/testify/suite"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -24,7 +26,7 @@ type ProviderWatchTargetsTestSuite struct {
 
 func (s *ProviderWatchTargetsTestSuite) SetupTest() {
 	s.mockServer = test.NewMockServer()
-	s.discoveryClientHandler = &test.DiscoveryClientHandler{}
+	s.discoveryClientHandler = test.NewDiscoveryClientHandler()
 	s.mockServer.Handle(s.discoveryClientHandler)
 
 	s.T().Setenv("CLUSTER_STATE_POLL_INTERVAL_MS", "100")
@@ -51,7 +53,7 @@ func (s *ProviderWatchTargetsTestSuite) TestClusterStateChanges() {
 	testCases := []func() (Provider, error){
 		func() (Provider, error) { return newKubeConfigClusterProvider(s.staticConfig) },
 		func() (Provider, error) {
-			return newSingleClusterProvider(config.ClusterProviderDisabled)(s.staticConfig)
+			return newSingleClusterProvider(api.ClusterProviderDisabled)(s.staticConfig)
 		},
 	}
 	for _, tc := range testCases {
@@ -62,7 +64,7 @@ func (s *ProviderWatchTargetsTestSuite) TestClusterStateChanges() {
 			callback, waitForCallback := CallbackWaiter()
 			provider.WatchTargets(callback)
 			s.Run("Reloads provider on cluster changes", func() {
-				s.discoveryClientHandler.Groups = append(s.discoveryClientHandler.Groups, `{"name":"alex.example.com","versions":[{"groupVersion":"alex.example.com/v1","version":"v1"}],"preferredVersion":{"groupVersion":"alex.example.com/v1","version":"v1"}}`)
+				s.discoveryClientHandler.AddAPIResourceList(metav1.APIResourceList{GroupVersion: "alex.example.com/v1"})
 
 				s.Require().NoError(waitForCallback(5 * time.Second))
 				// Provider-wise the watcher.ClusterState which triggers the callback has no effect.
@@ -97,7 +99,7 @@ func (s *ProviderWatchTargetsTestSuite) TestKubeConfigClusterProvider() {
 			s.Require().NoError(err, "Expected no error from GetDerivedKubernetes for context-1")
 			s.NotNil(k, "Expected Kubernetes from GetDerivedKubernetes for context-1")
 			s.Run("Derived Kubernetes points to correct context", func() {
-				cfg, err := k.AccessControlClientset().ToRawKubeConfigLoader().RawConfig()
+				cfg, err := k.ToRawKubeConfigLoader().RawConfig()
 				s.Require().NoError(err, "Expected no error from ToRawKubeConfigLoader")
 				s.Equal("context-1", cfg.CurrentContext, "Expected Kubernetes to point to changed-context")
 			})
@@ -116,7 +118,7 @@ func (s *ProviderWatchTargetsTestSuite) TestKubeConfigClusterProvider() {
 }
 
 func (s *ProviderWatchTargetsTestSuite) TestSingleClusterProvider() {
-	provider, err := newSingleClusterProvider(config.ClusterProviderDisabled)(s.staticConfig)
+	provider, err := newSingleClusterProvider(api.ClusterProviderDisabled)(s.staticConfig)
 	s.Require().NoError(err, "Expected no error from provider creation")
 
 	callback, waitForCallback := CallbackWaiter()
@@ -132,7 +134,7 @@ func (s *ProviderWatchTargetsTestSuite) TestSingleClusterProvider() {
 			s.Require().NoError(err, "Expected no error from GetDerivedKubernetes for context-1")
 			s.NotNil(k, "Expected Kubernetes from GetDerivedKubernetes for context-1")
 			s.Run("Derived Kubernetes points to correct context", func() {
-				cfg, err := k.AccessControlClientset().ToRawKubeConfigLoader().RawConfig()
+				cfg, err := k.ToRawKubeConfigLoader().RawConfig()
 				s.Require().NoError(err, "Expected no error from ToRawKubeConfigLoader")
 				s.Equal("context-1", cfg.CurrentContext, "Expected Kubernetes to point to changed-context")
 			})
@@ -147,7 +149,7 @@ func (s *ProviderWatchTargetsTestSuite) TestSingleClusterProvider() {
 				k, err := provider.GetDerivedKubernetes(s.T().Context(), "")
 				s.Require().NoError(err, "Expected no error from GetDerivedKubernetes for context-2")
 				s.NotNil(k, "Expected Kubernetes from GetDerivedKubernetes for context-2")
-				cfg, err := k.AccessControlClientset().ToRawKubeConfigLoader().RawConfig()
+				cfg, err := k.ToRawKubeConfigLoader().RawConfig()
 				s.Require().NoError(err, "Expected no error from ToRawKubeConfigLoader")
 				s.Equal("context-2", cfg.CurrentContext, "Expected Kubernetes to point to changed-context")
 			})

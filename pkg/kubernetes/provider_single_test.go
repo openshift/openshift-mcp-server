@@ -48,33 +48,11 @@ func (s *ProviderSingleTestSuite) TestWithNonOpenShiftCluster() {
 }
 
 func (s *ProviderSingleTestSuite) TestWithOpenShiftCluster() {
-	s.mockServer.Handle(&test.InOpenShiftHandler{})
+	s.mockServer.Handle(test.NewInOpenShiftHandler())
 
 	s.Run("IsOpenShift returns true", func() {
 		inOpenShift := s.provider.IsOpenShift(s.T().Context())
 		s.True(inOpenShift, "Expected InOpenShift to return true")
-	})
-}
-
-func (s *ProviderSingleTestSuite) TestVerifyToken() {
-	s.mockServer.Handle(test.NewTokenReviewHandler())
-
-	s.Run("VerifyToken returns UserInfo for empty target (default target)", func() {
-		userInfo, audiences, err := s.provider.VerifyToken(s.T().Context(), "", "the-token", "the-audience")
-		s.Require().NoError(err, "Expected no error from VerifyToken with empty target")
-		s.Require().NotNil(userInfo, "Expected UserInfo from VerifyToken with empty target")
-		s.Equalf(userInfo.Username, "test-user", "Expected username test-user, got: %s", userInfo.Username)
-		s.Containsf(userInfo.Groups, "system:authenticated", "Expected group system:authenticated in %v", userInfo.Groups)
-		s.Require().NotNil(audiences, "Expected audiences from VerifyToken with empty target")
-		s.Len(audiences, 1, "Expected audiences from VerifyToken with empty target")
-		s.Containsf(audiences, "the-audience", "Expected audience the-audience in %v", audiences)
-	})
-	s.Run("VerifyToken returns error for non-empty context", func() {
-		userInfo, audiences, err := s.provider.VerifyToken(s.T().Context(), "non-empty", "the-token", "the-audience")
-		s.Require().Error(err, "Expected error from VerifyToken with non-empty target")
-		s.ErrorContains(err, "unable to get manager for other context/cluster with in-cluster strategy", "Expected error about trying to get other cluster")
-		s.Nil(userInfo, "Expected no UserInfo from VerifyToken with non-empty target")
-		s.Nil(audiences, "Expected no audiences from VerifyToken with non-empty target")
 	})
 }
 

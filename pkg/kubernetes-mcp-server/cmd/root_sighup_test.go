@@ -32,7 +32,7 @@ type SIGHUPSuite struct {
 
 func (s *SIGHUPSuite) SetupTest() {
 	s.mockServer = test.NewMockServer()
-	s.mockServer.Handle(&test.DiscoveryClientHandler{})
+	s.mockServer.Handle(test.NewDiscoveryClientHandler())
 	s.tempDir = s.T().TempDir()
 	s.dropInConfigDir = filepath.Join(s.tempDir, "conf.d")
 	s.Require().NoError(os.Mkdir(s.dropInConfigDir, 0755))
@@ -59,7 +59,7 @@ func (s *SIGHUPSuite) InitServer(configPath, configDir string) {
 
 	s.server, err = mcp.NewServer(mcp.Configuration{
 		StaticConfig: cfg,
-	})
+	}, nil, nil)
 	s.Require().NoError(err)
 	// Set up SIGHUP handler
 	opts := &MCPServerOptions{
@@ -202,6 +202,45 @@ func (s *SIGHUPSuite) TestSIGHUPWithConfigDirOnly() {
 			return slices.Contains(s.server.GetEnabledTools(), "helm_list")
 		}, 2*time.Second, 50*time.Millisecond)
 	})
+}
+
+func (s *SIGHUPSuite) TestSIGHUPReloadsPrompts() {
+	// Create initial config with one prompt
+	configPath := filepath.Join(s.tempDir, "config.toml")
+	s.Require().NoError(os.WriteFile(configPath, []byte(`
+        [[prompts]]
+        name = "initial-prompt"
+        description = "Initial prompt"
+
+        [[prompts.messages]]
+        role = "user"
+        content = "Initial message"
+    `), 0644))
+	s.InitServer(configPath, "")
+
+	enabledPrompts := s.server.GetEnabledPrompts()
+	s.GreaterOrEqual(len(enabledPrompts), 1)
+	s.Contains(enabledPrompts, "initial-prompt")
+
+	// Update config with new prompt
+	s.Require().NoError(os.WriteFile(configPath, []byte(`
+        [[prompts]]
+        name = "updated-prompt"
+        description = "Updated prompt"
+
+        [[prompts.messages]]
+        role = "user"
+        content = "Updated message"
+    `), 0644))
+
+	// Send SIGHUP
+	s.Require().NoError(syscall.Kill(syscall.Getpid(), syscall.SIGHUP))
+
+	// Verify prompts were reloaded
+	s.Require().Eventually(func() bool {
+		enabledPrompts = s.server.GetEnabledPrompts()
+		return len(enabledPrompts) >= 1 && slices.Contains(enabledPrompts, "updated-prompt") && !slices.Contains(enabledPrompts, "initial-prompt")
+	}, 2*time.Second, 50*time.Millisecond)
 }
 
 func TestSIGHUP(t *testing.T) {

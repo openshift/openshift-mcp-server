@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"k8s.io/klog/v2"
 )
 
@@ -17,37 +18,39 @@ const (
 	DefaultDropInConfigDir = "conf.d"
 )
 
-const (
-	ClusterProviderKubeConfig = "kubeconfig"
-	ClusterProviderInCluster  = "in-cluster"
-	ClusterProviderDisabled   = "disabled"
-)
-
 // StaticConfig is the configuration for the server.
 // It allows to configure server specific settings and tools to be enabled or disabled.
 type StaticConfig struct {
-	DeniedResources []GroupVersionKind `toml:"denied_resources"`
+	DeniedResources []api.GroupVersionKind `toml:"denied_resources"`
 
 	LogLevel   int    `toml:"log_level,omitzero"`
 	Port       string `toml:"port,omitempty"`
 	SSEBaseURL string `toml:"sse_base_url,omitempty"`
 	KubeConfig string `toml:"kubeconfig,omitempty"`
 	ListOutput string `toml:"list_output,omitempty"`
+	// Stateless configures the MCP server to operate in stateless mode.
+	// When true, the server will not send notifications to clients (e.g., tools/list_changed, prompts/list_changed).
+	// This is useful for container deployments, load balancing, and serverless environments where
+	// maintaining client state is not desired or possible. However, this disables dynamic tool
+	// and prompt updates, requiring clients to manually refresh their tool/prompt lists.
+	// Defaults to false (stateful mode with notifications enabled).
+	Stateless bool `toml:"stateless,omitempty"`
 	// When true, expose only tools annotated with readOnlyHint=true
 	ReadOnly bool `toml:"read_only,omitempty"`
 	// When true, disable tools annotated with destructiveHint=true
 	DisableDestructive bool     `toml:"disable_destructive,omitempty"`
 	Toolsets           []string `toml:"toolsets,omitempty"`
-	EnabledTools       []string `toml:"enabled_tools,omitempty"`
-	DisabledTools      []string `toml:"disabled_tools,omitempty"`
+	// Tool configuration
+	EnabledTools  []string `toml:"enabled_tools,omitempty"`
+	DisabledTools []string `toml:"disabled_tools,omitempty"`
+	// Prompt configuration
+	Prompts []api.Prompt `toml:"prompts,omitempty"`
 
 	// Authorization-related fields
 	// RequireOAuth indicates whether the server requires OAuth for authentication.
 	RequireOAuth bool `toml:"require_oauth,omitempty"`
 	// OAuthAudience is the valid audience for the OAuth tokens, used for offline JWT claim validation.
 	OAuthAudience string `toml:"oauth_audience,omitempty"`
-	// ValidateToken indicates whether the server should validate the token against the Kubernetes API Server using TokenReview.
-	ValidateToken bool `toml:"validate_token,omitempty"`
 	// AuthorizationURL is the URL of the OIDC authorization server.
 	// It is used for token validation and for STS token exchange.
 	AuthorizationURL string `toml:"authorization_url,omitempty"`
@@ -79,20 +82,20 @@ type StaticConfig struct {
 	// This map holds raw TOML primitives that will be parsed by registered toolset parsers
 	ToolsetConfigs map[string]toml.Primitive `toml:"toolset_configs,omitempty"`
 
+	// Server instructions to be provided by the MCP server to the MCP client
+	// This can be used to provide specific instructions on how the client should use the server
+	ServerInstructions string `toml:"server_instructions,omitempty"`
+
 	// Internal: parsed provider configs (not exposed to TOML package)
-	parsedClusterProviderConfigs map[string]Extended
+	parsedClusterProviderConfigs map[string]api.ExtendedConfig
 	// Internal: parsed toolset configs (not exposed to TOML package)
-	parsedToolsetConfigs map[string]Extended
+	parsedToolsetConfigs map[string]api.ExtendedConfig
 
 	// Internal: the config.toml directory, to help resolve relative file paths
 	configDirPath string
 }
 
-type GroupVersionKind struct {
-	Group   string `toml:"group"`
-	Version string `toml:"version"`
-	Kind    string `toml:"kind,omitempty"`
-}
+var _ api.BaseConfig = (*StaticConfig)(nil)
 
 type ReadConfigOpt func(cfg *StaticConfig)
 
@@ -292,13 +295,29 @@ func ReadToml(configData []byte, opts ...ReadConfigOpt) (*StaticConfig, error) {
 	return config, nil
 }
 
-func (c *StaticConfig) GetProviderConfig(strategy string) (Extended, bool) {
-	config, ok := c.parsedClusterProviderConfigs[strategy]
-
-	return config, ok
+func (c *StaticConfig) GetClusterProviderStrategy() string {
+	return c.ClusterProviderStrategy
 }
 
-func (c *StaticConfig) GetToolsetConfig(name string) (Extended, bool) {
+func (c *StaticConfig) GetDeniedResources() []api.GroupVersionKind {
+	return c.DeniedResources
+}
+
+func (c *StaticConfig) GetKubeConfigPath() string {
+	return c.KubeConfig
+}
+
+func (c *StaticConfig) GetProviderConfig(strategy string) (api.ExtendedConfig, bool) {
+	cfg, ok := c.parsedClusterProviderConfigs[strategy]
+
+	return cfg, ok
+}
+
+func (c *StaticConfig) GetToolsetConfig(name string) (api.ExtendedConfig, bool) {
 	cfg, ok := c.parsedToolsetConfigs[name]
 	return cfg, ok
+}
+
+func (c *StaticConfig) IsRequireOAuth() bool {
+	return c.RequireOAuth
 }
