@@ -208,18 +208,34 @@ func (s *BaseMcpSuite) TearDownTest() {
 
 func (s *BaseMcpSuite) InitMcpClient(options ...transport.StreamableHTTPCOption) {
 	var err error
-	s.mcpServer, err = NewServer(Configuration{StaticConfig: s.Cfg})
+	s.mcpServer, err = NewServer(Configuration{StaticConfig: s.Cfg}, nil, nil)
 	s.Require().NoError(err, "Expected no error creating MCP server")
 	s.McpClient = test.NewMcpClient(s.T(), s.mcpServer.ServeHTTP(), options...)
 }
 
-// WaitForNotification waits for an MCP server notification or fails the test after a timeout
-func (s *BaseMcpSuite) WaitForNotification(timeout time.Duration) *mcp.JSONRPCNotification {
+// notificationDelay is the time to wait after receiving a notification before capturing it.
+// This accounts for multiple layers of async processing in tests:
+// - go-sdk debounce (10ms in mcp/server.go changeAndNotify)
+// - cluster state / kubeconfig debounce (CLUSTER_STATE_DEBOUNCE_WINDOW_MS, KUBECONFIG_DEBOUNCE_WINDOW_MS)
+// - async tool updates completing after notification is sent
+// We use 50ms to ensure all debouncing and async operations have settled.
+const notificationDelay = time.Millisecond * 50
+
+// WaitForNotification wait for a specific MCP notification method within the given timeout duration.
+func (s *BaseMcpSuite) WaitForNotification(timeout time.Duration, method string) *mcp.JSONRPCNotification {
 	withTimeout, cancel := context.WithTimeout(s.T().Context(), timeout)
 	defer cancel()
 	var notification *mcp.JSONRPCNotification
+	var timer *time.Timer
 	s.OnNotification(func(n mcp.JSONRPCNotification) {
-		notification = &n
+		if n.Method == method {
+			if timer != nil {
+				timer.Stop()
+			}
+			timer = time.AfterFunc(notificationDelay, func() {
+				notification = &n
+			})
+		}
 	})
 	for notification == nil {
 		select {

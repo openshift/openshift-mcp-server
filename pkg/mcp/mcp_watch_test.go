@@ -6,9 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/containers/kubernetes-mcp-server/internal/test"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/suite"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type WatchKubeConfigSuite struct {
@@ -18,7 +20,23 @@ type WatchKubeConfigSuite struct {
 
 func (s *WatchKubeConfigSuite) SetupTest() {
 	s.BaseMcpSuite.SetupTest()
+	s.T().Setenv("KUBECONFIG_DEBOUNCE_WINDOW_MS", "10")
 	s.mockServer = test.NewMockServer()
+	s.Require().NoError(toml.Unmarshal([]byte(`
+		[[prompts]]
+		name = "test-prompt"
+		title = "Test Prompt"
+		description = "A test prompt for testing"
+
+		[[prompts.arguments]]
+		name = "test_arg"
+		description = "A test argument"
+		required = true
+		
+		[[prompts.messages]]
+		role = "user"
+		content = "Test message with {{test_arg}}"
+	`), s.Cfg), "Expected to parse prompts config")
 	s.Cfg.KubeConfig = s.mockServer.KubeconfigFile(s.T())
 }
 
@@ -40,10 +58,21 @@ func (s *WatchKubeConfigSuite) TestNotifiesToolsChange() {
 	s.InitMcpClient()
 	// When
 	s.WriteKubeconfig()
-	notification := s.WaitForNotification(5 * time.Second)
+	notification := s.WaitForNotification(5*time.Second, "notifications/tools/list_changed")
 	// Then
 	s.NotNil(notification, "WatchKubeConfig did not notify")
 	s.Equal("notifications/tools/list_changed", notification.Method, "WatchKubeConfig did not notify tools change")
+}
+
+func (s *WatchKubeConfigSuite) TestNotifiesPromptsChange() {
+	// Given
+	s.InitMcpClient()
+	// When
+	s.WriteKubeconfig()
+	notification := s.WaitForNotification(5*time.Second, "notifications/prompts/list_changed")
+	// Then
+	s.NotNil(notification, "WatchKubeConfig did not notify")
+	s.Equal("notifications/prompts/list_changed", notification.Method, "WatchKubeConfig did not notify prompts change")
 }
 
 func (s *WatchKubeConfigSuite) TestNotifiesToolsChangeMultipleTimes() {
@@ -52,15 +81,28 @@ func (s *WatchKubeConfigSuite) TestNotifiesToolsChangeMultipleTimes() {
 	// When
 	for i := 0; i < 3; i++ {
 		s.WriteKubeconfig()
-		notification := s.WaitForNotification(5 * time.Second)
+		notification := s.WaitForNotification(5*time.Second, "notifications/tools/list_changed")
 		// Then
 		s.NotNil(notification, "WatchKubeConfig did not notify on iteration %d", i)
 		s.Equalf("notifications/tools/list_changed", notification.Method, "WatchKubeConfig did not notify tools change on iteration %d", i)
 	}
 }
 
+func (s *WatchKubeConfigSuite) TestNotifiesPromptsChangeMultipleTimes() {
+	// Given
+	s.InitMcpClient()
+	// When
+	for i := 0; i < 3; i++ {
+		s.WriteKubeconfig()
+		notification := s.WaitForNotification(5*time.Second, "notifications/prompts/list_changed")
+		// Then
+		s.NotNil(notification, "WatchKubeConfig did not notify on iteration %d", i)
+		s.Equalf("notifications/prompts/list_changed", notification.Method, "WatchKubeConfig did not notify prompts change on iteration %d", i)
+	}
+}
+
 func (s *WatchKubeConfigSuite) TestClearsNoLongerAvailableTools() {
-	s.mockServer.Handle(&test.InOpenShiftHandler{})
+	s.mockServer.Handle(test.NewInOpenShiftHandler())
 	s.InitMcpClient()
 
 	s.Run("OpenShift tool is available", func() {
@@ -81,7 +123,7 @@ func (s *WatchKubeConfigSuite) TestClearsNoLongerAvailableTools() {
 		// Reload Config without OpenShift
 		s.mockServer.ResetHandlers()
 		s.WriteKubeconfig()
-		s.WaitForNotification(5 * time.Second)
+		s.WaitForNotification(5*time.Second, "notifications/tools/list_changed")
 
 		tools, err := s.ListTools(s.T().Context(), mcp.ListToolsRequest{})
 		s.Require().NoError(err, "call ListTools failed")
@@ -105,10 +147,10 @@ type WatchClusterStateSuite struct {
 func (s *WatchClusterStateSuite) SetupTest() {
 	s.BaseMcpSuite.SetupTest()
 	// Configure fast polling for tests
-	s.T().Setenv("CLUSTER_STATE_POLL_INTERVAL_MS", "100")
-	s.T().Setenv("CLUSTER_STATE_DEBOUNCE_WINDOW_MS", "50")
+	s.T().Setenv("CLUSTER_STATE_POLL_INTERVAL_MS", "50")
+	s.T().Setenv("CLUSTER_STATE_DEBOUNCE_WINDOW_MS", "10")
 	s.mockServer = test.NewMockServer()
-	s.handler = &test.DiscoveryClientHandler{}
+	s.handler = test.NewDiscoveryClientHandler()
 	s.mockServer.Handle(s.handler)
 	s.Cfg.KubeConfig = s.mockServer.KubeconfigFile(s.T())
 }
@@ -120,8 +162,8 @@ func (s *WatchClusterStateSuite) TearDownTest() {
 	}
 }
 
-func (s *WatchClusterStateSuite) AddAPIGroup(groupName string) {
-	s.handler.Groups = append(s.handler.Groups, groupName)
+func (s *WatchClusterStateSuite) AddAPIGroup(groupVersion string) {
+	s.handler.AddAPIResourceList(metav1.APIResourceList{GroupVersion: groupVersion})
 }
 
 func (s *WatchClusterStateSuite) TestNotifiesToolsChangeOnAPIGroupAddition() {
@@ -129,9 +171,9 @@ func (s *WatchClusterStateSuite) TestNotifiesToolsChangeOnAPIGroupAddition() {
 	s.InitMcpClient()
 
 	// When - Add a new API group to simulate cluster state change
-	s.AddAPIGroup(`{"name":"custom.example.com","versions":[{"groupVersion":"custom.example.com/v1","version":"v1"}],"preferredVersion":{"groupVersion":"custom.example.com/v1","version":"v1"}}`)
+	s.AddAPIGroup("custom.example.com/v1")
 
-	notification := s.WaitForNotification(10 * time.Second)
+	notification := s.WaitForNotification(5*time.Second, "notifications/tools/list_changed")
 
 	// Then
 	s.NotNil(notification, "cluster state watcher did not notify")
@@ -144,9 +186,8 @@ func (s *WatchClusterStateSuite) TestNotifiesToolsChangeMultipleTimes() {
 
 	// When - Add multiple API groups to simulate cluster state changes
 	for i := 0; i < 3; i++ {
-		name := fmt.Sprintf("custom-%d", i)
-		s.AddAPIGroup(`{"name":"` + name + `.example.com","versions":[{"groupVersion":"` + name + `.example.com/v1","version":"v1"}],"preferredVersion":{"groupVersion":"` + name + `.example.com/v1","version":"v1"}}`)
-		notification := s.WaitForNotification(10 * time.Second)
+		s.AddAPIGroup(fmt.Sprintf("custom-%d.example.com/v1", i))
+		notification := s.WaitForNotification(5*time.Second, "notifications/tools/list_changed")
 		s.NotNil(notification, "cluster state watcher did not notify on iteration %d", i)
 		s.Equalf("notifications/tools/list_changed", notification.Method, "cluster state watcher did not notify tools change on iteration %d", i)
 	}
@@ -167,9 +208,9 @@ func (s *WatchClusterStateSuite) TestDetectsOpenShiftClusterStateChange() {
 	s.Run("OpenShift tool is added after cluster becomes OpenShift", func() {
 		// Simulate cluster becoming OpenShift by adding OpenShift API groups
 		s.mockServer.ResetHandlers()
-		s.mockServer.Handle(&test.InOpenShiftHandler{})
+		s.mockServer.Handle(test.NewInOpenShiftHandler())
 
-		notification := s.WaitForNotification(10 * time.Second)
+		notification := s.WaitForNotification(5*time.Second, "notifications/tools/list_changed")
 		s.NotNil(notification, "cluster state watcher did not notify")
 
 		tools, err := s.ListTools(s.T().Context(), mcp.ListToolsRequest{})

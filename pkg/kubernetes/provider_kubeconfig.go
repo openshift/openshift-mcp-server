@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes/watcher"
-	authenticationv1api "k8s.io/api/authentication/v1"
 )
 
 // KubeConfigTargetParameterName is the parameter name used to specify
@@ -19,7 +18,7 @@ const KubeConfigTargetParameterName = "context"
 // Kubernetes clusters using different contexts from a kubeconfig file.
 // It lazily initializes managers for each context as they are requested.
 type kubeConfigClusterProvider struct {
-	staticConfig        *config.StaticConfig
+	config              api.BaseConfig
 	defaultContext      string
 	managers            map[string]*Manager
 	kubeconfigWatcher   *watcher.Kubeconfig
@@ -29,15 +28,15 @@ type kubeConfigClusterProvider struct {
 var _ Provider = &kubeConfigClusterProvider{}
 
 func init() {
-	RegisterProvider(config.ClusterProviderKubeConfig, newKubeConfigClusterProvider)
+	RegisterProvider(api.ClusterProviderKubeConfig, newKubeConfigClusterProvider)
 }
 
 // newKubeConfigClusterProvider creates a provider that manages multiple clusters
 // via kubeconfig contexts.
 // Internally, it leverages a KubeconfigManager for each context, initializing them
 // lazily when requested.
-func newKubeConfigClusterProvider(cfg *config.StaticConfig) (Provider, error) {
-	ret := &kubeConfigClusterProvider{staticConfig: cfg}
+func newKubeConfigClusterProvider(cfg api.BaseConfig) (Provider, error) {
+	ret := &kubeConfigClusterProvider{config: cfg}
 	if err := ret.reset(); err != nil {
 		return nil, err
 	}
@@ -45,7 +44,7 @@ func newKubeConfigClusterProvider(cfg *config.StaticConfig) (Provider, error) {
 }
 
 func (p *kubeConfigClusterProvider) reset() error {
-	m, err := NewKubeconfigManager(p.staticConfig, "")
+	m, err := NewKubeconfigManager(p.config, "")
 	if err != nil {
 		if errors.Is(err, ErrorKubeconfigInClusterNotAllowed) {
 			return fmt.Errorf("kubeconfig ClusterProviderStrategy is invalid for in-cluster deployments: %v", err)
@@ -53,7 +52,7 @@ func (p *kubeConfigClusterProvider) reset() error {
 		return err
 	}
 
-	rawConfig, err := m.accessControlClientset.clientCmdConfig.RawConfig()
+	rawConfig, err := m.kubernetes.clientCmdConfig.RawConfig()
 	if err != nil {
 		return err
 	}
@@ -70,8 +69,8 @@ func (p *kubeConfigClusterProvider) reset() error {
 	}
 
 	p.Close()
-	p.kubeconfigWatcher = watcher.NewKubeconfig(m.accessControlClientset.clientCmdConfig)
-	p.clusterStateWatcher = watcher.NewClusterState(m.accessControlClientset.DiscoveryClient())
+	p.kubeconfigWatcher = watcher.NewKubeconfig(m.kubernetes.clientCmdConfig)
+	p.clusterStateWatcher = watcher.NewClusterState(m.kubernetes.DiscoveryClient())
 	p.defaultContext = rawConfig.CurrentContext
 
 	return nil
@@ -85,7 +84,7 @@ func (p *kubeConfigClusterProvider) managerForContext(context string) (*Manager,
 
 	baseManager := p.managers[p.defaultContext]
 
-	m, err := NewKubeconfigManager(baseManager.staticConfig, context)
+	m, err := NewKubeconfigManager(baseManager.config, context)
 	if err != nil {
 		return nil, err
 	}
@@ -97,14 +96,6 @@ func (p *kubeConfigClusterProvider) managerForContext(context string) (*Manager,
 
 func (p *kubeConfigClusterProvider) IsOpenShift(ctx context.Context) bool {
 	return p.managers[p.defaultContext].IsOpenShift(ctx)
-}
-
-func (p *kubeConfigClusterProvider) VerifyToken(ctx context.Context, context, token, audience string) (*authenticationv1api.UserInfo, []string, error) {
-	m, err := p.managerForContext(context)
-	if err != nil {
-		return nil, nil, err
-	}
-	return m.VerifyToken(ctx, token, audience)
 }
 
 func (p *kubeConfigClusterProvider) GetTargets(_ context.Context) ([]string, error) {

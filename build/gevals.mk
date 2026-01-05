@@ -4,10 +4,16 @@ MCP_PORT ?= 8080
 MCP_HEALTH_TIMEOUT ?= 60
 MCP_HEALTH_INTERVAL ?= 2
 
+##@ Gevals
+
 .PHONY: run-server
 run-server: build ## Start MCP server in background and wait for health check
 	@echo "Starting MCP server on port $(MCP_PORT)..."
-	@./$(BINARY_NAME) --port $(MCP_PORT) & echo $$! > .mcp-server.pid
+	@if [ -n "$(TOOLSETS)" ]; then \
+		./$(BINARY_NAME) --port $(MCP_PORT) --toolsets $(TOOLSETS) & echo $$! > .mcp-server.pid; \
+	else \
+		./$(BINARY_NAME) --port $(MCP_PORT) & echo $$! > .mcp-server.pid; \
+	fi
 	@echo "MCP server started with PID $$(cat .mcp-server.pid)"
 	@echo "Waiting for MCP server to be ready..."
 	@elapsed=0; \

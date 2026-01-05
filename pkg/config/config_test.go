@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -75,6 +76,7 @@ func (s *ConfigSuite) TestReadConfigValid() {
 		list_output = "yaml"
 		read_only = true
 		disable_destructive = true
+		stateless = true
 
 		toolsets = ["core", "config", "helm", "metrics"]
 		
@@ -85,7 +87,19 @@ func (s *ConfigSuite) TestReadConfigValid() {
 			{group = "apps", version = "v1", kind = "Deployment"},
 			{group = "rbac.authorization.k8s.io", version = "v1", kind = "Role"}
 		]
-		
+
+		[[prompts]]
+		name = "k8s-troubleshoot"
+		title = "Troubleshoot Kubernetes"
+		description = "Troubleshoot common Kubernetes issues"
+		arguments = [
+			{name = "namespace", description = "Target namespace", required = true},
+			{name = "resource", description = "Resource type to check", required = false}
+		]
+		messages = [
+			{role = "user", content = "Check the health of resources in namespace {{namespace}}{{resource}}"}
+		]
+
 	`)
 
 	config, err := Read(validConfigPath, "")
@@ -115,6 +129,9 @@ func (s *ConfigSuite) TestReadConfigValid() {
 	s.Run("disable_destructive parsed correctly", func() {
 		s.Truef(config.DisableDestructive, "Expected DisableDestructive to be true, got %v", config.DisableDestructive)
 	})
+	s.Run("stateless parsed correctly", func() {
+		s.Truef(config.Stateless, "Expected Stateless to be true, got %v", config.Stateless)
+	})
 	s.Run("toolsets", func() {
 		s.Require().Lenf(config.Toolsets, 4, "Expected 4 toolsets, got %d", len(config.Toolsets))
 		for _, toolset := range []string{"core", "config", "helm", "metrics"} {
@@ -136,13 +153,73 @@ func (s *ConfigSuite) TestReadConfigValid() {
 	s.Run("denied_resources", func() {
 		s.Require().Lenf(config.DeniedResources, 2, "Expected 2 denied resources, got %d", len(config.DeniedResources))
 		s.Run("contains apps/v1/Deployment", func() {
-			s.Contains(config.DeniedResources, GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
+			s.Contains(config.DeniedResources, api.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
 				"Expected denied resources to contain apps/v1/Deployment")
 		})
 		s.Run("contains rbac.authorization.k8s.io/v1/Role", func() {
-			s.Contains(config.DeniedResources, GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "Role"},
+			s.Contains(config.DeniedResources, api.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "Role"},
 				"Expected denied resources to contain rbac.authorization.k8s.io/v1/Role")
 		})
+	})
+	s.Run("prompts", func() {
+		s.Require().Lenf(config.Prompts, 1, "Expected 1 prompt, got %d", len(config.Prompts))
+		prompt := config.Prompts[0]
+		s.Run("name parsed correctly", func() {
+			s.Equal("k8s-troubleshoot", prompt.Name)
+		})
+		s.Run("title parsed correctly", func() {
+			s.Equal("Troubleshoot Kubernetes", prompt.Title)
+		})
+		s.Run("description parsed correctly", func() {
+			s.Equal("Troubleshoot common Kubernetes issues", prompt.Description)
+		})
+		s.Run("arguments parsed correctly", func() {
+			s.Require().Len(prompt.Arguments, 2)
+			s.Equal("namespace", prompt.Arguments[0].Name)
+			s.Equal("Target namespace", prompt.Arguments[0].Description)
+			s.True(prompt.Arguments[0].Required)
+			s.Equal("resource", prompt.Arguments[1].Name)
+			s.Equal("Resource type to check", prompt.Arguments[1].Description)
+			s.False(prompt.Arguments[1].Required)
+		})
+		s.Run("messages parsed correctly", func() {
+			s.Require().Len(prompt.Templates, 1)
+			s.Equal("user", prompt.Templates[0].Role)
+			s.Equal("Check the health of resources in namespace {{namespace}}{{resource}}", prompt.Templates[0].Content)
+		})
+	})
+}
+
+func (s *ConfigSuite) TestReadConfigStatelessDefaults() {
+	// Test that stateless defaults to false when not specified
+	configPath := s.writeConfig(`
+		log_level = 1
+		port = "8080"
+	`)
+
+	config, err := Read(configPath, "")
+	s.Require().NoError(err)
+	s.Require().NotNil(config)
+
+	s.Run("stateless defaults to false", func() {
+		s.Falsef(config.Stateless, "Expected Stateless to default to false, got %v", config.Stateless)
+	})
+}
+
+func (s *ConfigSuite) TestReadConfigStatelessExplicitFalse() {
+	// Test that stateless can be explicitly set to false
+	configPath := s.writeConfig(`
+		log_level = 1
+		port = "8080"
+		stateless = false
+	`)
+
+	config, err := Read(configPath, "")
+	s.Require().NoError(err)
+	s.Require().NotNil(config)
+
+	s.Run("stateless explicit false", func() {
+		s.Falsef(config.Stateless, "Expected Stateless to be false, got %v", config.Stateless)
 	})
 }
 
@@ -336,6 +413,7 @@ func (s *ConfigSuite) TestDropInConfigPartialOverride() {
 	dropIn := filepath.Join(dropInDir, "10-partial.toml")
 	err = os.WriteFile(dropIn, []byte(`
 		read_only = true
+		stateless = true
 	`), 0644)
 	s.Require().NoError(err)
 
@@ -345,6 +423,7 @@ func (s *ConfigSuite) TestDropInConfigPartialOverride() {
 
 	s.Run("overrides specified field", func() {
 		s.True(config.ReadOnly, "read_only should be overridden to true")
+		s.True(config.Stateless, "stateless should be overridden to true")
 	})
 
 	s.Run("preserves all other fields", func() {
@@ -777,16 +856,16 @@ func (s *ConfigSuite) TestDropInWithDeniedResources() {
 
 	s.Run("drop-in replaces denied_resources array", func() {
 		s.Len(config.DeniedResources, 2, "denied_resources should have 2 entries from drop-in")
-		s.Contains(config.DeniedResources, GroupVersionKind{
+		s.Contains(config.DeniedResources, api.GroupVersionKind{
 			Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRole",
 		})
-		s.Contains(config.DeniedResources, GroupVersionKind{
+		s.Contains(config.DeniedResources, api.GroupVersionKind{
 			Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRoleBinding",
 		})
 	})
 
 	s.Run("original denied_resources from main config are replaced", func() {
-		s.NotContains(config.DeniedResources, GroupVersionKind{
+		s.NotContains(config.DeniedResources, api.GroupVersionKind{
 			Group: "apps", Version: "v1", Kind: "Deployment",
 		}, "original entry should be replaced by drop-in")
 	})

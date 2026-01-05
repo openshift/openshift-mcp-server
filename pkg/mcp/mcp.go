@@ -7,8 +7,8 @@ import (
 	"os"
 	"slices"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	authenticationapiv1 "k8s.io/api/authentication/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 
@@ -16,6 +16,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	internalk8s "github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
+	"github.com/containers/kubernetes-mcp-server/pkg/prompts"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
 	"github.com/containers/kubernetes-mcp-server/pkg/version"
 )
@@ -63,23 +64,34 @@ func (c *Configuration) isToolApplicable(tool api.ServerTool) bool {
 }
 
 type Server struct {
-	configuration *Configuration
-	server        *mcp.Server
-	enabledTools  []string
-	p             internalk8s.Provider
+	configuration  *Configuration
+	oidcProvider   *oidc.Provider
+	httpClient     *http.Client
+	server         *mcp.Server
+	enabledTools   []string
+	enabledPrompts []string
+	p              internalk8s.Provider
 }
 
-func NewServer(configuration Configuration) (*Server, error) {
+func NewServer(configuration Configuration, oidcProvider *oidc.Provider, httpClient *http.Client) (*Server, error) {
 	s := &Server{
 		configuration: &configuration,
+		oidcProvider:  oidcProvider,
+		httpClient:    httpClient,
 		server: mcp.NewServer(
 			&mcp.Implementation{
-				Name: version.BinaryName, Title: version.BinaryName, Version: version.Version,
+				Name:       version.BinaryName,
+				Title:      version.BinaryName,
+				Version:    version.Version,
+				WebsiteURL: version.WebsiteURL,
 			},
 			&mcp.ServerOptions{
-				HasResources: false,
-				HasPrompts:   false,
-				HasTools:     true,
+				Capabilities: &mcp.ServerCapabilities{
+					Resources: nil,
+					Prompts:   &mcp.PromptCapabilities{ListChanged: !configuration.Stateless},
+					Tools:     &mcp.ToolCapabilities{ListChanged: !configuration.Stateless},
+				},
+				Instructions: configuration.ServerInstructions,
 			}),
 	}
 
@@ -160,6 +172,48 @@ func (s *Server) reloadToolsets() error {
 		}
 		s.server.AddTool(goSdkTool, goSdkToolHandler)
 	}
+
+	// Track previously enabled prompts
+	previousPrompts := s.enabledPrompts
+
+	// Build and register prompts from all toolsets
+	toolsetPrompts := make([]api.ServerPrompt, 0)
+	// Load embedded toolset prompts
+	for _, toolset := range s.configuration.Toolsets() {
+		toolsetPrompts = append(toolsetPrompts, toolset.GetPrompts()...)
+	}
+
+	configPrompts := prompts.ToServerPrompts(s.configuration.Prompts)
+
+	// Merge: config prompts override embedded prompts with same name
+	applicablePrompts := prompts.MergePrompts(toolsetPrompts, configPrompts)
+
+	// Update enabled prompts list
+	s.enabledPrompts = make([]string, 0)
+	for _, prompt := range applicablePrompts {
+		s.enabledPrompts = append(s.enabledPrompts, prompt.Prompt.Name)
+	}
+
+	// Remove prompts that are no longer applicable
+	promptsToRemove := make([]string, 0)
+	for _, oldPrompt := range previousPrompts {
+		if !slices.Contains(s.enabledPrompts, oldPrompt) {
+			promptsToRemove = append(promptsToRemove, oldPrompt)
+		}
+	}
+	s.server.RemovePrompts(promptsToRemove...)
+
+	// Register all applicable prompts
+	for _, prompt := range applicablePrompts {
+		mcpPrompt, promptHandler, err := ServerPromptToGoSdkPrompt(s, prompt)
+		if err != nil {
+			return fmt.Errorf("failed to convert prompt %s: %v", prompt.Prompt.Name, err)
+		}
+		s.server.AddPrompt(mcpPrompt, promptHandler)
+	}
+
+	// start new watch
+	s.p.WatchTargets(s.reloadToolsets)
 	return nil
 }
 
@@ -177,19 +231,15 @@ func (s *Server) ServeHTTP() *mcp.StreamableHTTPHandler {
 	return mcp.NewStreamableHTTPHandler(func(request *http.Request) *mcp.Server {
 		return s.server
 	}, &mcp.StreamableHTTPOptions{
-		// For clients to be able to listen to tool changes, we need to set the server stateful
+		// Stateless mode configuration from server settings.
+		// When Stateless is true, the server will not send notifications to clients
+		// (e.g., tools/list_changed, prompts/list_changed). This disables dynamic
+		// tool and prompt updates but is useful for container deployments, load
+		// balancing, and serverless environments where maintaining client state
+		// is not desired or possible.
 		// https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#listening-for-messages-from-the-server
-		Stateless: false,
+		Stateless: s.configuration.Stateless,
 	})
-}
-
-// KubernetesApiVerifyToken verifies the given token with the audience by
-// sending an TokenReview request to API Server for the specified cluster.
-func (s *Server) KubernetesApiVerifyToken(ctx context.Context, cluster, token, audience string) (*authenticationapiv1.UserInfo, []string, error) {
-	if s.p == nil {
-		return nil, nil, fmt.Errorf("kubernetes cluster provider is not initialized")
-	}
-	return s.p.VerifyToken(ctx, cluster, token, audience)
 }
 
 // GetTargetParameterName returns the parameter name used for target identification in MCP requests
@@ -202,6 +252,11 @@ func (s *Server) GetTargetParameterName() string {
 
 func (s *Server) GetEnabledTools() []string {
 	return s.enabledTools
+}
+
+// GetEnabledPrompts returns the names of the currently enabled prompts
+func (s *Server) GetEnabledPrompts() []string {
+	return s.enabledPrompts
 }
 
 // ReloadConfiguration reloads the configuration and reinitializes the server.

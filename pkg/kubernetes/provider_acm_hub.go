@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	authenticationv1api "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -19,6 +18,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/BurntSushi/toml"
+	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes/watcher"
 )
@@ -76,7 +76,7 @@ func (c *ACMKubeConfigProviderConfig) Validate() error {
 	return err
 }
 
-func parseAcmConfig(ctx context.Context, primitive toml.Primitive, md toml.MetaData) (config.Extended, error) {
+func parseAcmConfig(ctx context.Context, primitive toml.Primitive, md toml.MetaData) (api.ExtendedConfig, error) {
 	cfg := &ACMProviderConfig{}
 	if err := md.PrimitiveDecode(primitive, cfg); err != nil {
 		return nil, err
@@ -87,7 +87,7 @@ func parseAcmConfig(ctx context.Context, primitive toml.Primitive, md toml.MetaD
 	return cfg, nil
 }
 
-func parseAcmKubeConfigConfig(ctx context.Context, primitive toml.Primitive, md toml.MetaData) (config.Extended, error) {
+func parseAcmKubeConfigConfig(ctx context.Context, primitive toml.Primitive, md toml.MetaData) (api.ExtendedConfig, error) {
 	cfg := &ACMKubeConfigProviderConfig{}
 	if err := md.PrimitiveDecode(primitive, &cfg); err != nil {
 		return nil, err
@@ -135,7 +135,7 @@ func init() {
 // This is included here instead of in other files so that it doesn't create conflicts
 // with upstream changes
 func (m *Manager) IsACMHub() bool {
-	discoveryClient := m.accessControlClientset.DiscoveryClient()
+	discoveryClient := m.kubernetes.DiscoveryClient()
 
 	_, apiLists, err := discoveryClient.ServerGroupsAndResources()
 	if err != nil {
@@ -157,7 +157,7 @@ func (m *Manager) IsACMHub() bool {
 	return false
 }
 
-func newACMHubClusterProvider(cfg *config.StaticConfig) (Provider, error) {
+func newACMHubClusterProvider(cfg api.BaseConfig) (Provider, error) {
 	m, err := NewInClusterManager(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create in-cluster Kubernetes Manager for acm-hub cluster provider strategy: %w", err)
@@ -171,7 +171,7 @@ func newACMHubClusterProvider(cfg *config.StaticConfig) (Provider, error) {
 	return newACMClusterProvider(m, providerCfg.(*ACMProviderConfig), false)
 }
 
-func newACMKubeConfigClusterProvider(cfg *config.StaticConfig) (Provider, error) {
+func newACMKubeConfigClusterProvider(cfg api.BaseConfig) (Provider, error) {
 	providerCfg, ok := cfg.GetProviderConfig(ClusterProviderACMKubeConfig)
 	if !ok {
 		return nil, fmt.Errorf("missing required config for strategy '%s'", ClusterProviderACMKubeConfig)
@@ -202,7 +202,7 @@ func discoverClusterProxyHost(m *Manager, isOpenShift bool) (string, error) {
 			Resource: "routes",
 		}
 
-		route, err := m.accessControlClientset.DynamicClient().Resource(routeGVR).Namespace("multicluster-engine").Get(ctx, "cluster-proxy-addon-user", metav1.GetOptions{})
+		route, err := m.kubernetes.DynamicClient().Resource(routeGVR).Namespace("multicluster-engine").Get(ctx, "cluster-proxy-addon-user", metav1.GetOptions{})
 		if err == nil {
 			host, found, err := unstructured.NestedString(route.Object, "spec", "host")
 			if err == nil && found && host != "" {
@@ -213,11 +213,7 @@ func discoverClusterProxyHost(m *Manager, isOpenShift bool) (string, error) {
 	}
 
 	// Fallback: Try to find the service
-	svcClient, err := m.accessControlClientset.Services("multicluster-engine")
-	if err != nil {
-		return "", fmt.Errorf("failed to get services client: %w", err)
-	}
-
+	svcClient := m.kubernetes.CoreV1().Services("multicluster-engine")
 	svc, err := svcClient.Get(ctx, "cluster-proxy-addon-user", metav1.GetOptions{})
 	if err == nil {
 		host := fmt.Sprintf("%s.%s.svc.cluster.local", svc.Name, svc.Namespace)
@@ -258,8 +254,8 @@ func newACMClusterProvider(m *Manager, cfg *ACMProviderConfig, watchKubeConfig b
 		clusterProxyHost:   clusterProxyHost,
 		clusterProxyCAFile: cfg.ClusterProxyAddonCAFile,
 		skipTLSVerify:      cfg.ClusterProxyAddonSkipTLSVerify,
-		kubeConfigWatcher:  watcher.NewKubeconfig(m.accessControlClientset.clientCmdConfig),
-		clusterWatcher:     watcher.NewClusterState(m.accessControlClientset.discoveryClient),
+		kubeConfigWatcher:  watcher.NewKubeconfig(m.kubernetes.clientCmdConfig),
+		clusterWatcher:     watcher.NewClusterState(m.kubernetes.DiscoveryClient()),
 	}
 
 	ctx := context.Background()
@@ -275,14 +271,6 @@ func newACMClusterProvider(m *Manager, cfg *ACMProviderConfig, watchKubeConfig b
 
 func (p *acmHubClusterProvider) IsOpenShift(ctx context.Context) bool {
 	return p.hubManager.IsOpenShift(ctx)
-}
-
-func (p *acmHubClusterProvider) VerifyToken(ctx context.Context, target, token, audience string) (*authenticationv1api.UserInfo, []string, error) {
-	manager, err := p.managerForCluster(target)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get manager for cluster '%s', unable to verify token", target)
-	}
-	return manager.VerifyToken(ctx, token, audience)
 }
 
 func (p *acmHubClusterProvider) GetDerivedKubernetes(ctx context.Context, target string) (*Kubernetes, error) {
@@ -370,7 +358,7 @@ func (p *acmHubClusterProvider) watchManagedClusters(resourceVersion string, onT
 		default:
 		}
 
-		watchInterface, err := p.hubManager.accessControlClientset.DynamicClient().Resource(gvr).Watch(
+		watchInterface, err := p.hubManager.kubernetes.DynamicClient().Resource(gvr).Watch(
 			p.watchCtx,
 			metav1.ListOptions{
 				ResourceVersion: resourceVersion,
@@ -420,7 +408,7 @@ func (p *acmHubClusterProvider) watchManagedClusters(resourceVersion string, onT
 }
 
 func (p *acmHubClusterProvider) refreshClusters(ctx context.Context) (string, error) {
-	dynamicClient := p.hubManager.accessControlClientset.dynamicClient
+	dynamicClient := p.hubManager.kubernetes.DynamicClient()
 
 	gvr := schema.GroupVersionResource{
 		Group:    "cluster.open-cluster-management.io",
@@ -475,7 +463,7 @@ func (p *acmHubClusterProvider) managerForCluster(cluster string) (*Manager, err
 		return nil, fmt.Errorf("cluster %s not found", cluster)
 	}
 
-	proxyConfig := rest.CopyConfig(p.hubManager.accessControlClientset.cfg)
+	proxyConfig := rest.CopyConfig(p.hubManager.kubernetes.restConfig)
 	proxyHost := fmt.Sprintf("https://%s/%s", p.clusterProxyHost, cluster)
 	proxyConfig.Host = proxyHost
 
@@ -489,7 +477,7 @@ func (p *acmHubClusterProvider) managerForCluster(cluster string) (*Manager, err
 		}
 	}
 
-	hubRawConfig, err := p.hubManager.accessControlClientset.clientCmdConfig.RawConfig()
+	hubRawConfig, err := p.hubManager.kubernetes.clientCmdConfig.RawConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get hub kubeconfig: %w", err)
 	}
@@ -510,7 +498,7 @@ func (p *acmHubClusterProvider) managerForCluster(cluster string) (*Manager, err
 	}
 
 	proxyClientCmdConfig := clientcmd.NewDefaultClientConfig(*proxyRawConfig, nil)
-	newManager, err := NewManager(p.hubManager.staticConfig, proxyConfig, proxyClientCmdConfig)
+	newManager, err := NewManager(p.hubManager.config, proxyConfig, proxyClientCmdConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create manager for cluster %s: %w", cluster, err)
 	}

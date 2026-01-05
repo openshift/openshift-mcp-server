@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	internalhttp "github.com/containers/kubernetes-mcp-server/pkg/http"
 	"github.com/containers/kubernetes-mcp-server/pkg/mcp"
@@ -67,9 +68,9 @@ const (
 	flagListOutput           = "list-output"
 	flagReadOnly             = "read-only"
 	flagDisableDestructive   = "disable-destructive"
+	flagStateless            = "stateless"
 	flagRequireOAuth         = "require-oauth"
 	flagOAuthAudience        = "oauth-audience"
-	flagValidateToken        = "validate-token"
 	flagAuthorizationURL     = "authorization-url"
 	flagServerUrl            = "server-url"
 	flagCertificateAuthority = "certificate-authority"
@@ -86,9 +87,9 @@ type MCPServerOptions struct {
 	ListOutput           string
 	ReadOnly             bool
 	DisableDestructive   bool
+	Stateless            bool
 	RequireOAuth         bool
 	OAuthAudience        string
-	ValidateToken        bool
 	AuthorizationURL     string
 	CertificateAuthority string
 	ServerURL            string
@@ -141,12 +142,11 @@ func NewMCPServer(streams genericiooptions.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.ListOutput, flagListOutput, o.ListOutput, "Output format for resource list operations (one of: "+strings.Join(output.Names, ", ")+"). Defaults to "+o.StaticConfig.ListOutput+".")
 	cmd.Flags().BoolVar(&o.ReadOnly, flagReadOnly, o.ReadOnly, "If true, only tools annotated with readOnlyHint=true are exposed")
 	cmd.Flags().BoolVar(&o.DisableDestructive, flagDisableDestructive, o.DisableDestructive, "If true, tools annotated with destructiveHint=true are disabled")
+	cmd.Flags().BoolVar(&o.Stateless, flagStateless, o.Stateless, "If true, run the MCP server in stateless mode (disables tool/prompt change notifications). Useful for container deployments and load balancing. Default is false (stateful mode)")
 	cmd.Flags().BoolVar(&o.RequireOAuth, flagRequireOAuth, o.RequireOAuth, "If true, requires OAuth authorization as defined in the Model Context Protocol (MCP) specification. This flag is ignored if transport type is stdio")
 	_ = cmd.Flags().MarkHidden(flagRequireOAuth)
 	cmd.Flags().StringVar(&o.OAuthAudience, flagOAuthAudience, o.OAuthAudience, "OAuth audience for token claims validation. Optional. If not set, the audience is not validated. Only valid if require-oauth is enabled.")
 	_ = cmd.Flags().MarkHidden(flagOAuthAudience)
-	cmd.Flags().BoolVar(&o.ValidateToken, flagValidateToken, o.ValidateToken, "If true, validates the token against the Kubernetes API Server using TokenReview. Optional. If not set, the token is not validated. Only valid if require-oauth is enabled.")
-	_ = cmd.Flags().MarkHidden(flagValidateToken)
 	cmd.Flags().StringVar(&o.AuthorizationURL, flagAuthorizationURL, o.AuthorizationURL, "OAuth authorization server URL for protected resource endpoint. If not provided, the Kubernetes API server host will be used. Only valid if require-oauth is enabled.")
 	_ = cmd.Flags().MarkHidden(flagAuthorizationURL)
 	cmd.Flags().StringVar(&o.ServerURL, flagServerUrl, o.ServerURL, "Server URL of this application. Optional. If set, this url will be served in protected resource metadata endpoint and tokens will be validated with this audience. If not set, expected audience is kubernetes-mcp-server. Only valid if require-oauth is enabled.")
@@ -201,6 +201,9 @@ func (m *MCPServerOptions) loadFlags(cmd *cobra.Command) {
 	if cmd.Flag(flagDisableDestructive).Changed {
 		m.StaticConfig.DisableDestructive = m.DisableDestructive
 	}
+	if cmd.Flag(flagStateless).Changed {
+		m.StaticConfig.Stateless = m.Stateless
+	}
 	if cmd.Flag(flagToolsets).Changed {
 		m.StaticConfig.Toolsets = m.Toolsets
 	}
@@ -209,9 +212,6 @@ func (m *MCPServerOptions) loadFlags(cmd *cobra.Command) {
 	}
 	if cmd.Flag(flagOAuthAudience).Changed {
 		m.StaticConfig.OAuthAudience = m.OAuthAudience
-	}
-	if cmd.Flag(flagValidateToken).Changed {
-		m.StaticConfig.ValidateToken = m.ValidateToken
 	}
 	if cmd.Flag(flagAuthorizationURL).Changed {
 		m.StaticConfig.AuthorizationURL = m.AuthorizationURL
@@ -223,7 +223,7 @@ func (m *MCPServerOptions) loadFlags(cmd *cobra.Command) {
 		m.StaticConfig.CertificateAuthority = m.CertificateAuthority
 	}
 	if cmd.Flag(flagDisableMultiCluster).Changed && m.DisableMultiCluster {
-		m.StaticConfig.ClusterProviderStrategy = config.ClusterProviderDisabled
+		m.StaticConfig.ClusterProviderStrategy = api.ClusterProviderDisabled
 	}
 }
 
@@ -252,8 +252,8 @@ func (m *MCPServerOptions) Validate() error {
 	if err := toolsets.Validate(m.StaticConfig.Toolsets); err != nil {
 		return err
 	}
-	if !m.StaticConfig.RequireOAuth && (m.StaticConfig.ValidateToken || m.StaticConfig.OAuthAudience != "" || m.StaticConfig.AuthorizationURL != "" || m.StaticConfig.ServerURL != "" || m.StaticConfig.CertificateAuthority != "") {
-		return fmt.Errorf("validate-token, oauth-audience, authorization-url, server-url and certificate-authority are only valid if require-oauth is enabled. Missing --port may implicitly set require-oauth to false")
+	if !m.StaticConfig.RequireOAuth && (m.StaticConfig.OAuthAudience != "" || m.StaticConfig.AuthorizationURL != "" || m.StaticConfig.ServerURL != "" || m.StaticConfig.CertificateAuthority != "") {
+		return fmt.Errorf("oauth-audience, authorization-url, server-url and certificate-authority are only valid if require-oauth is enabled. Missing --port may implicitly set require-oauth to false")
 	}
 	if m.StaticConfig.AuthorizationURL != "" {
 		u, err := url.Parse(m.StaticConfig.AuthorizationURL)
@@ -283,6 +283,7 @@ func (m *MCPServerOptions) Run() error {
 	klog.V(1).Infof(" - ListOutput: %s", m.StaticConfig.ListOutput)
 	klog.V(1).Infof(" - Read-only mode: %t", m.StaticConfig.ReadOnly)
 	klog.V(1).Infof(" - Disable destructive tools: %t", m.StaticConfig.DisableDestructive)
+	klog.V(1).Infof(" - Stateless mode: %t", m.StaticConfig.Stateless)
 
 	strategy := m.StaticConfig.ClusterProviderStrategy
 	if strategy == "" {
@@ -332,7 +333,7 @@ func (m *MCPServerOptions) Run() error {
 
 	mcpServer, err := mcp.NewServer(mcp.Configuration{
 		StaticConfig: m.StaticConfig,
-	})
+	}, oidcProvider, httpClient)
 	if err != nil {
 		return fmt.Errorf("failed to initialize MCP server: %w", err)
 	}

@@ -24,7 +24,7 @@ type PodsExecSuite struct {
 func (s *PodsExecSuite) SetupTest() {
 	s.BaseMcpSuite.SetupTest()
 	s.mockServer = test.NewMockServer()
-	s.mockServer.Handle(&test.DiscoveryClientHandler{})
+	s.mockServer.Handle(test.NewDiscoveryClientHandler())
 	s.Cfg.KubeConfig = s.mockServer.KubeconfigFile(s.T())
 }
 
@@ -131,7 +131,7 @@ func (s *PodsExecSuite) TestPodsExecDenied() {
 			s.Contains(msg, "resource not allowed:")
 			expectedMessage := "failed to exec in pod pod-to-exec in namespace default:(.+:)? resource not allowed: /v1, Kind=Pod"
 			s.Regexpf(expectedMessage, msg,
-				"expected descriptive error '%s', got %v", expectedMessage, toolResult.Content[0].(mcp.TextContent).Text)
+				"expected descriptive error '%s', got %v", expectedMessage, msg)
 		})
 	})
 }
