@@ -183,3 +183,35 @@ keycloak-acm-status: ## Show Keycloak ACM configuration status
 	fi
 	@echo ""
 	@echo "==========================================="
+
+.PHONY: keycloak-acm-add-user
+keycloak-acm-add-user: ## Add a new user to Keycloak (requires: KEYCLOAK_USER, KEYCLOAK_PASS; optional: CLUSTER_NAME for standalone)
+	@if [ -z "$(KEYCLOAK_USER)" ]; then \
+		echo "Error: KEYCLOAK_USER is required"; \
+		echo ""; \
+		echo "Usage (federated user - hub + all managed clusters):"; \
+		echo "  make keycloak-acm-add-user KEYCLOAK_USER=alice KEYCLOAK_PASS=secret"; \
+		echo ""; \
+		echo "Usage (standalone user - specific cluster only, like kubeadmin):"; \
+		echo "  make keycloak-acm-add-user KEYCLOAK_USER=kubeadmin KEYCLOAK_PASS=secret CLUSTER_NAME=my-cluster"; \
+		echo ""; \
+		echo "Optional: KEYCLOAK_USER_ROLE=view (default: cluster-admin)"; \
+		exit 1; \
+	fi
+	@if [ -z "$(KEYCLOAK_PASS)" ]; then \
+		echo "Error: KEYCLOAK_PASS is required"; \
+		echo ""; \
+		echo "Usage (federated user - hub + all managed clusters):"; \
+		echo "  make keycloak-acm-add-user KEYCLOAK_USER=alice KEYCLOAK_PASS=secret"; \
+		echo ""; \
+		echo "Usage (standalone user - specific cluster only, like kubeadmin):"; \
+		echo "  make keycloak-acm-add-user KEYCLOAK_USER=kubeadmin KEYCLOAK_PASS=secret CLUSTER_NAME=my-cluster"; \
+		echo ""; \
+		echo "Optional: KEYCLOAK_USER_ROLE=view (default: cluster-admin)"; \
+		exit 1; \
+	fi
+	@KEYCLOAK_USER="$(KEYCLOAK_USER)" \
+	KEYCLOAK_PASS="$(KEYCLOAK_PASS)" \
+	KEYCLOAK_USER_ROLE="$(or $(KEYCLOAK_USER_ROLE),cluster-admin)" \
+	CLUSTER_NAME="$(CLUSTER_NAME)" \
+	bash ./hack/keycloak-acm/add-user.sh
