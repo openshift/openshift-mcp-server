@@ -1,4 +1,4 @@
-## Kiali integration
+## Kiali/OSSM integration
 
 This server can expose Kiali tools so assistants can query mesh information (e.g., mesh status/graph).
 
@@ -9,7 +9,7 @@ Enable the Kiali tools via the server TOML configuration file.
 Config (TOML):
 
 ```toml
-toolsets = ["core", "kiali"]
+toolsets = ["core", "ossm"]
 
 [toolset_configs.kiali]
 url = "https://kiali.example" # Endpoint/route to reach Kiali console
