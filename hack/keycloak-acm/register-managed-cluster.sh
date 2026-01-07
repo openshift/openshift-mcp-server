@@ -141,6 +141,30 @@ echo ""
 # For MCE 2.11+, use enableImpersonation instead
 echo "Step 3a: Configuring cluster-proxy to disable impersonation..."
 
+# Detect MCE version to determine the correct variable name
+echo "  Detecting MCE version..."
+MCE_VERSION=$(kubectl --kubeconfig="$HUB_KUBECONFIG" get csv -n multicluster-engine \
+    -o jsonpath='{.items[?(@.spec.displayName=="multicluster engine for Kubernetes")].spec.version}' 2>/dev/null || echo "")
+
+if [ -z "$MCE_VERSION" ]; then
+    echo "  ⚠️  Could not detect MCE version, defaulting to 2.11+ behavior"
+    IMPERSONATION_VAR="enableImpersonation"
+else
+    echo "  MCE version detected: $MCE_VERSION"
+    # Extract major.minor version (e.g., "2.11" from "2.11.0")
+    MCE_MAJOR=$(echo "$MCE_VERSION" | cut -d. -f1)
+    MCE_MINOR=$(echo "$MCE_VERSION" | cut -d. -f2)
+
+    # MCE 2.11+ uses enableImpersonation, 2.10 and earlier use impersonatePermissionEnabled
+    if [ "$MCE_MAJOR" -gt 2 ] || { [ "$MCE_MAJOR" -eq 2 ] && [ "$MCE_MINOR" -ge 11 ]; }; then
+        IMPERSONATION_VAR="enableImpersonation"
+        echo "  Using MCE 2.11+ variable: enableImpersonation"
+    else
+        IMPERSONATION_VAR="impersonatePermissionEnabled"
+        echo "  Using MCE 2.10 and earlier variable: impersonatePermissionEnabled"
+    fi
+fi
+
 # Create AddOnDeploymentConfig in open-cluster-management namespace (idempotent)
 cat <<EOF | kubectl --kubeconfig="$HUB_KUBECONFIG" apply -f -
 apiVersion: addon.open-cluster-management.io/v1alpha1
@@ -150,7 +174,7 @@ metadata:
   namespace: open-cluster-management
 spec:
   customizedVariables:
-    - name: impersonatePermissionEnabled
+    - name: $IMPERSONATION_VAR
       value: "false"
 EOF
 
@@ -271,6 +295,20 @@ else
     echo "  ❌ Failed to create managed realm (HTTP $REALM_CODE)"
     exit 1
 fi
+
+# Remove Trusted Hosts policy to allow Dynamic Client Registration (DCR)
+echo ""
+echo "Configuring Dynamic Client Registration (DCR)..."
+TRUSTED_HOSTS_COMPONENT=$(curl $CURL_OPTS "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/components?type=org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" | jq -r '.[] | select(.providerId == "trusted-hosts" and .subType == "anonymous") | .id')
+
+if [ -n "$TRUSTED_HOSTS_COMPONENT" ] && [ "$TRUSTED_HOSTS_COMPONENT" != "null" ]; then
+  curl $CURL_OPTS -X DELETE "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/components/$TRUSTED_HOSTS_COMPONENT" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" > /dev/null
+  echo "  ✅ Removed Trusted Hosts policy (DCR now allowed from any host)"
+else
+  echo "  ✅ Trusted Hosts policy already removed"
+fi
 echo ""
 
 # Step 3: Create client scopes
@@ -294,6 +332,17 @@ SCOPE_RESPONSE=$(curl $CURL_OPTS -w "%{http_code}" -X POST "$KEYCLOAK_URL/admin/
 SCOPE_CODE=$(echo "$SCOPE_RESPONSE" | tail -c 4)
 if [ "$SCOPE_CODE" = "201" ] || [ "$SCOPE_CODE" = "409" ]; then
     echo "  ✅ mcp-server scope created/exists"
+fi
+
+# Add mcp-server as a default client scope (for DCR clients)
+SCOPES_LIST=$(curl $CURL_OPTS -X GET "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/client-scopes" \
+    -H "Authorization: Bearer $ADMIN_TOKEN")
+MCP_SERVER_SCOPE_ID=$(echo "$SCOPES_LIST" | jq -r '.[] | select(.name == "mcp-server") | .id // empty')
+
+if [ -n "$MCP_SERVER_SCOPE_ID" ] && [ "$MCP_SERVER_SCOPE_ID" != "null" ]; then
+    curl $CURL_OPTS -X PUT "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/default-default-client-scopes/$MCP_SERVER_SCOPE_ID" \
+        -H "Authorization: Bearer $ADMIN_TOKEN" > /dev/null 2>&1
+    echo "  ✅ mcp-server added as default scope (for DCR clients)"
 fi
 echo ""
 
@@ -864,7 +913,7 @@ else
     "name":"keycloak",
     "issuer":{
       "issuerURL":"$ISSUER_URL",
-      "audiences":["mcp-server"],
+      "audiences":["openshift","mcp-server"],
       "issuerCertificateAuthority":{"name":"keycloak-oidc-ca"}
     },
     "claimMappings":{

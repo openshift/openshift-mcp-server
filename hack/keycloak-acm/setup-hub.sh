@@ -223,6 +223,20 @@ else
   echo "  ✅ Created hub realm: $HUB_REALM"
 fi
 
+# Remove Trusted Hosts policy to allow Dynamic Client Registration (DCR)
+echo ""
+echo "Configuring Dynamic Client Registration (DCR)..."
+TRUSTED_HOSTS_COMPONENT=$(curl -sk "$KEYCLOAK_URL/admin/realms/$HUB_REALM/components?type=org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" | jq -r '.[] | select(.providerId == "trusted-hosts" and .subType == "anonymous") | .id')
+
+if [ -n "$TRUSTED_HOSTS_COMPONENT" ] && [ "$TRUSTED_HOSTS_COMPONENT" != "null" ]; then
+  curl -sk -X DELETE "$KEYCLOAK_URL/admin/realms/$HUB_REALM/components/$TRUSTED_HOSTS_COMPONENT" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" > /dev/null
+  echo "  ✅ Removed Trusted Hosts policy (DCR now allowed from any host)"
+else
+  echo "  ✅ Trusted Hosts policy already removed"
+fi
+
 # Create client scopes (openid and mcp-server)
 echo ""
 echo "Creating client scopes..."
@@ -301,6 +315,12 @@ if [ -z "$MCP_SERVER_SCOPE_UUID" ] || [ "$MCP_SERVER_SCOPE_UUID" = "null" ]; the
   MCP_SERVER_SCOPE_UUID=$(echo "$SCOPES_RESPONSE" | jq -r '.[] | select(.name == "mcp-server") | .id // empty')
   echo "  ✅ Created mcp-server scope"
 
+  # Add mcp-server as a default client scope (for DCR clients)
+  echo "  Adding mcp-server as default client scope..."
+  curl -sk -X PUT "$KEYCLOAK_URL/admin/realms/$HUB_REALM/default-default-client-scopes/$MCP_SERVER_SCOPE_UUID" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" > /dev/null 2>&1
+  echo "  ✅ mcp-server added as default scope"
+
   # Add audience mapper to mcp-server scope
   echo "  Adding mcp-server-audience mapper..."
   curl -sk -X POST "$KEYCLOAK_URL/admin/realms/$HUB_REALM/client-scopes/$MCP_SERVER_SCOPE_UUID/protocol-mappers/models" \
@@ -319,6 +339,10 @@ if [ -z "$MCP_SERVER_SCOPE_UUID" ] || [ "$MCP_SERVER_SCOPE_UUID" = "null" ]; the
   echo "  ✅ Added mcp-server-audience mapper"
 else
   echo "  ✅ mcp-server scope already exists"
+
+  # Ensure mcp-server is a default client scope (for DCR clients)
+  curl -sk -X PUT "$KEYCLOAK_URL/admin/realms/$HUB_REALM/default-default-client-scopes/$MCP_SERVER_SCOPE_UUID" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" > /dev/null 2>&1
 
   # Check and add audience mapper if missing
   MAPPERS=$(curl -sk "$KEYCLOAK_URL/admin/realms/$HUB_REALM/client-scopes/$MCP_SERVER_SCOPE_UUID/protocol-mappers/models" \
@@ -1024,6 +1048,17 @@ EOF
     echo "  Wait until all conditions show: Available=True, Progressing=False, Degraded=False"
 fi
 
+# Step 16: Save Keycloak CA certificate to _output directory
+echo ""
+echo "Step 16: Saving Keycloak CA certificate for client use..."
+
+CA_OUTPUT_FILE="$REPO_ROOT/_output/keycloak-ca.crt"
+mkdir -p "$REPO_ROOT/_output"
+
+# Save the CA certificate (same one used in keycloak-oidc-ca configmap)
+cp /tmp/keycloak-ca.crt "$CA_OUTPUT_FILE"
+echo "  ✅ Keycloak CA saved to: $CA_OUTPUT_FILE"
+
 echo ""
 echo "=========================================="
 echo "✅ Hub Keycloak Setup Complete!"
@@ -1049,14 +1084,25 @@ echo "  sub Claim Mapper: ✅ Configured"
 echo "  Token Exchange: ✅ Enabled"
 echo "  Same-Realm Exchange: ✅ Configured (mcp-sts → mcp-server)"
 echo ""
+echo "  Keycloak CA Certificate: $CA_OUTPUT_FILE"
+echo ""
+echo "Client Certificate Trust:"
+echo "  If you get TLS errors with 'oc login', the Keycloak CA needs to be trusted."
+echo ""
+echo "  Option 1 - Add to macOS system keychain:"
+echo "    sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain $CA_OUTPUT_FILE"
+echo ""
+echo "  Option 2 - Use SSL_CERT_FILE environment variable:"
+echo "    SSL_CERT_FILE=$CA_OUTPUT_FILE oc login ..."
+echo ""
 echo "Next Steps:"
-echo "  1. Wait for cluster-bot to be ready"
-echo "  2. Register cluster-bot with:"
-echo "     CLUSTER_NAME=cluster-bot MANAGED_KUBECONFIG=/path/to/kubeconfig \\"
-echo "       ./hack/acm/acm-register-managed-cluster.sh"
+echo "  1. Wait for kube-apiserver rollout to complete (10-15 minutes)"
+echo "  2. Register managed clusters with:"
+echo "     CLUSTER_NAME=<name> MANAGED_KUBECONFIG=/path/to/kubeconfig \\"
+echo "       make keycloak-acm-register-managed"
 echo ""
 echo "Test authentication:"
-echo "  curl -sk -X POST \"$KEYCLOAK_URL/realms/$HUB_REALM/protocol/openid-connect/token\" \\"
+echo "  curl --cacert $CA_OUTPUT_FILE -X POST \"$KEYCLOAK_URL/realms/$HUB_REALM/protocol/openid-connect/token\" \\"
 echo "    -d \"grant_type=password\" -d \"client_id=$CLIENT_ID\" \\"
 echo "    -d \"client_secret=$CLIENT_SECRET\" -d \"username=$MCP_USERNAME\" \\"
 echo "    -d \"password=$MCP_PASSWORD\" -d \"scope=openid $CLIENT_ID\""
