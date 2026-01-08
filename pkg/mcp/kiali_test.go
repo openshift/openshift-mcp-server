@@ -10,13 +10,15 @@ import (
 
 	"github.com/containers/kubernetes-mcp-server/internal/test"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	kialiToolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kiali"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/suite"
 )
 
 type KialiSuite struct {
 	BaseMcpSuite
-	mockServer *test.MockServer
+	mockServer  *test.MockServer
+	toolsetName string
 }
 
 func (s *KialiSuite) SetupTest() {
@@ -24,11 +26,12 @@ func (s *KialiSuite) SetupTest() {
 	s.mockServer = test.NewMockServer()
 	s.mockServer.Config().BearerToken = "token-xyz"
 	kubeConfig := s.Cfg.KubeConfig
+	s.toolsetName = (&kialiToolset.Toolset{}).GetName()
 	s.Cfg = test.Must(config.ReadToml([]byte(fmt.Sprintf(`
-		toolsets = ["kiali"]
+		toolsets = ["%s"]
 		[toolset_configs.kiali]
 		url = "%s"
-	`, s.mockServer.Config().Host))))
+	`, s.toolsetName, s.mockServer.Config().Host))))
 	s.Cfg.KubeConfig = kubeConfig
 }
 
@@ -50,7 +53,7 @@ func (s *KialiSuite) TestGetTraces() {
 
 	s.Run("get_traces(traceId = 'test-trace-123')", func() {
 		traceId := "test-trace-123"
-		toolResult, err := s.CallTool("kiali_get_traces", map[string]interface{}{
+		toolResult, err := s.CallTool(fmt.Sprintf("%s_get_traces", s.toolsetName), map[string]interface{}{
 			"traceId": traceId,
 		})
 		s.Run("no error", func() {
@@ -78,7 +81,7 @@ func (s *KialiSuite) TestMeshGraph() {
 	s.InitMcpClient()
 
 	s.Run("mesh_graph() with defaults", func() {
-		toolResult, err := s.CallTool("kiali_mesh_graph", map[string]interface{}{})
+		toolResult, err := s.CallTool(fmt.Sprintf("%s_mesh_graph", s.toolsetName), map[string]interface{}{})
 		s.Run("no error", func() {
 			s.Nilf(err, "call tool failed %v", err)
 			s.Falsef(toolResult.IsError, "call tool failed")
