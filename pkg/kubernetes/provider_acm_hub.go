@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -567,6 +568,12 @@ func (p *acmHubClusterProvider) managerForCluster(cluster string) (*Manager, err
 			CAFile: p.clusterProxyCAFile,
 		}
 	}
+
+	// Configure TCP keep-alive to prevent idle connection closure
+	proxyConfig.Dial = (&net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}).DialContext
 
 	hubRawConfig, err := p.hubManager.kubernetes.clientCmdConfig.RawConfig()
 	if err != nil {
