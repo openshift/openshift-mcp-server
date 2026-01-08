@@ -135,6 +135,97 @@ fi
 
 echo ""
 
+# Step 3a: Disable impersonation for cluster-proxy
+# This allows the MCP server to use its own identity when proxying requests
+# For MCE 2.10 and earlier, use impersonatePermissionEnabled
+# For MCE 2.11+, use enableImpersonation instead
+echo "Step 3a: Configuring cluster-proxy to disable impersonation..."
+
+# Detect MCE version to determine the correct variable name
+echo "  Detecting MCE version..."
+MCE_VERSION=$(kubectl --kubeconfig="$HUB_KUBECONFIG" get csv -n multicluster-engine \
+    -o jsonpath='{.items[?(@.spec.displayName=="multicluster engine for Kubernetes")].spec.version}' 2>/dev/null || echo "")
+
+if [ -z "$MCE_VERSION" ]; then
+    echo "  ⚠️  Could not detect MCE version, defaulting to 2.11+ behavior"
+    IMPERSONATION_VAR="enableImpersonation"
+else
+    echo "  MCE version detected: $MCE_VERSION"
+    # Extract major.minor version (e.g., "2.11" from "2.11.0")
+    MCE_MAJOR=$(echo "$MCE_VERSION" | cut -d. -f1)
+    MCE_MINOR=$(echo "$MCE_VERSION" | cut -d. -f2)
+
+    # MCE 2.11+ uses enableImpersonation, 2.10 and earlier use impersonatePermissionEnabled
+    if [ "$MCE_MAJOR" -gt 2 ] || { [ "$MCE_MAJOR" -eq 2 ] && [ "$MCE_MINOR" -ge 11 ]; }; then
+        IMPERSONATION_VAR="enableImpersonation"
+        echo "  Using MCE 2.11+ variable: enableImpersonation"
+    else
+        IMPERSONATION_VAR="impersonatePermissionEnabled"
+        echo "  Using MCE 2.10 and earlier variable: impersonatePermissionEnabled"
+    fi
+fi
+
+# Create AddOnDeploymentConfig in open-cluster-management namespace (idempotent)
+cat <<EOF | kubectl --kubeconfig="$HUB_KUBECONFIG" apply -f -
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: AddOnDeploymentConfig
+metadata:
+  name: cluster-proxy-config
+  namespace: open-cluster-management
+spec:
+  customizedVariables:
+    - name: $IMPERSONATION_VAR
+      value: "false"
+EOF
+
+if [ $? -eq 0 ]; then
+    echo "  ✅ AddOnDeploymentConfig created/updated"
+else
+    echo "  ⚠️  Failed to create AddOnDeploymentConfig"
+fi
+
+# Configure ManagedClusterAddOn to use the config
+cat <<EOF | kubectl --kubeconfig="$HUB_KUBECONFIG" apply -f -
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: ManagedClusterAddOn
+metadata:
+  name: cluster-proxy
+  namespace: $CLUSTER_NAME
+spec:
+  installNamespace: open-cluster-management-agent-addon
+  configs:
+    - group: addon.open-cluster-management.io
+      resource: addondeploymentconfigs
+      name: cluster-proxy-config
+      namespace: open-cluster-management
+EOF
+
+if [ $? -eq 0 ]; then
+    echo "  ✅ ManagedClusterAddOn cluster-proxy configured with impersonation disabled"
+else
+    echo "  ⚠️  Failed to configure ManagedClusterAddOn"
+fi
+
+# Wait for addon to reconcile
+echo "  Waiting for cluster-proxy addon to reconcile..."
+for i in $(seq 1 12); do
+    CONFIGURED=$(kubectl --kubeconfig="$HUB_KUBECONFIG" get managedclusteraddon cluster-proxy -n "$CLUSTER_NAME" \
+        -o jsonpath='{.status.conditions[?(@.type=="Configured")].status}' 2>/dev/null || echo "")
+    PROGRESSING=$(kubectl --kubeconfig="$HUB_KUBECONFIG" get managedclusteraddon cluster-proxy -n "$CLUSTER_NAME" \
+        -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}' 2>/dev/null || echo "")
+    if [ "$CONFIGURED" = "True" ] && [ "$PROGRESSING" = "False" ]; then
+        echo "  ✅ Cluster-proxy addon reconciled successfully"
+        break
+    fi
+    if [ $i -eq 12 ]; then
+        echo "  ⚠️  Cluster-proxy addon still reconciling (will continue in background)"
+    else
+        sleep 5
+    fi
+done
+
+echo ""
+
 #=============================================================================
 # Keycloak Realm Configuration
 #=============================================================================
@@ -204,6 +295,20 @@ else
     echo "  ❌ Failed to create managed realm (HTTP $REALM_CODE)"
     exit 1
 fi
+
+# Remove Trusted Hosts policy to allow Dynamic Client Registration (DCR)
+echo ""
+echo "Configuring Dynamic Client Registration (DCR)..."
+TRUSTED_HOSTS_COMPONENT=$(curl $CURL_OPTS "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/components?type=org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" | jq -r '.[] | select(.providerId == "trusted-hosts" and .subType == "anonymous") | .id')
+
+if [ -n "$TRUSTED_HOSTS_COMPONENT" ] && [ "$TRUSTED_HOSTS_COMPONENT" != "null" ]; then
+  curl $CURL_OPTS -X DELETE "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/components/$TRUSTED_HOSTS_COMPONENT" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" > /dev/null
+  echo "  ✅ Removed Trusted Hosts policy (DCR now allowed from any host)"
+else
+  echo "  ✅ Trusted Hosts policy already removed"
+fi
 echo ""
 
 # Step 3: Create client scopes
@@ -227,6 +332,17 @@ SCOPE_RESPONSE=$(curl $CURL_OPTS -w "%{http_code}" -X POST "$KEYCLOAK_URL/admin/
 SCOPE_CODE=$(echo "$SCOPE_RESPONSE" | tail -c 4)
 if [ "$SCOPE_CODE" = "201" ] || [ "$SCOPE_CODE" = "409" ]; then
     echo "  ✅ mcp-server scope created/exists"
+fi
+
+# Add mcp-server as a default client scope (for DCR clients)
+SCOPES_LIST=$(curl $CURL_OPTS -X GET "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/client-scopes" \
+    -H "Authorization: Bearer $ADMIN_TOKEN")
+MCP_SERVER_SCOPE_ID=$(echo "$SCOPES_LIST" | jq -r '.[] | select(.name == "mcp-server") | .id // empty')
+
+if [ -n "$MCP_SERVER_SCOPE_ID" ] && [ "$MCP_SERVER_SCOPE_ID" != "null" ]; then
+    curl $CURL_OPTS -X PUT "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/default-default-client-scopes/$MCP_SERVER_SCOPE_ID" \
+        -H "Authorization: Bearer $ADMIN_TOKEN" > /dev/null 2>&1
+    echo "  ✅ mcp-server added as default scope (for DCR clients)"
 fi
 echo ""
 
@@ -314,6 +430,149 @@ else
 fi
 echo ""
 
+# Step 6b: Create openshift-console client (for OpenShift console OAuth)
+echo "Step 6b: Creating openshift-console client (for OpenShift console)..."
+CONSOLE_CLIENT_UUID=$(curl $CURL_OPTS -X GET "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/clients?clientId=openshift-console" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" | jq -r '.[0].id // empty')
+
+if [ -z "$CONSOLE_CLIENT_UUID" ] || [ "$CONSOLE_CLIENT_UUID" = "null" ]; then
+    MANAGED_CONSOLE_CLIENT_SECRET=$(openssl rand -hex 32)
+
+    # Get the managed cluster console route for redirect URI
+    CONSOLE_ROUTE=$(kubectl --kubeconfig="$MANAGED_KUBECONFIG" get route console -n openshift-console -o jsonpath='{.spec.host}' 2>/dev/null || echo "")
+    if [ -n "$CONSOLE_ROUTE" ]; then
+        CONSOLE_REDIRECT_URI="https://$CONSOLE_ROUTE/auth/callback"
+    else
+        CONSOLE_REDIRECT_URI="https://console-openshift-console.apps.*/auth/callback"
+    fi
+
+    curl $CURL_OPTS -X POST "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/clients" \
+        -H "Authorization: Bearer $ADMIN_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "{
+          \"clientId\": \"openshift-console\",
+          \"enabled\": true,
+          \"protocol\": \"openid-connect\",
+          \"publicClient\": false,
+          \"directAccessGrantsEnabled\": false,
+          \"standardFlowEnabled\": true,
+          \"secret\": \"$MANAGED_CONSOLE_CLIENT_SECRET\",
+          \"redirectUris\": [\"$CONSOLE_REDIRECT_URI\", \"https://console-openshift-console.apps.*/auth/callback\"],
+          \"webOrigins\": [\"https://console-openshift-console.apps.*\"]
+        }" > /dev/null
+
+    CONSOLE_CLIENT_UUID=$(curl $CURL_OPTS -X GET "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/clients?clientId=openshift-console" \
+        -H "Authorization: Bearer $ADMIN_TOKEN" | jq -r '.[0].id')
+
+    # Add username mapper for preferred_username claim
+    curl $CURL_OPTS -X POST "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/clients/$CONSOLE_CLIENT_UUID/protocol-mappers/models" \
+        -H "Authorization: Bearer $ADMIN_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "name": "username",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "username",
+            "claim.name": "preferred_username",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }' > /dev/null 2>&1
+
+    # Add audience mapper for 'openshift' (required for kube-apiserver token validation)
+    curl $CURL_OPTS -X POST "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/clients/$CONSOLE_CLIENT_UUID/protocol-mappers/models" \
+        -H "Authorization: Bearer $ADMIN_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "name": "openshift-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "openshift",
+            "id.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        }' > /dev/null 2>&1
+
+    echo "  ✅ Created openshift-console client"
+    echo "  📝 Console Client Secret: $MANAGED_CONSOLE_CLIENT_SECRET"
+else
+    echo "  ✅ openshift-console client already exists"
+    MANAGED_CONSOLE_CLIENT_SECRET=$(curl $CURL_OPTS -X GET "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/clients/$CONSOLE_CLIENT_UUID/client-secret" \
+        -H "Authorization: Bearer $ADMIN_TOKEN" | jq -r '.value')
+    echo "  📝 Console Client Secret: $MANAGED_CONSOLE_CLIENT_SECRET"
+fi
+echo ""
+
+# Step 6c: Create openshift-cli client (for oc login)
+echo "Step 6c: Creating openshift-cli client (for oc login)..."
+CLI_CLIENT_UUID=$(curl $CURL_OPTS -X GET "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/clients?clientId=openshift-cli" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" | jq -r '.[0].id // empty')
+
+if [ -z "$CLI_CLIENT_UUID" ] || [ "$CLI_CLIENT_UUID" = "null" ]; then
+    curl $CURL_OPTS -X POST "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/clients" \
+        -H "Authorization: Bearer $ADMIN_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "clientId": "openshift-cli",
+          "enabled": true,
+          "protocol": "openid-connect",
+          "publicClient": true,
+          "directAccessGrantsEnabled": true,
+          "standardFlowEnabled": true,
+          "redirectUris": ["http://127.0.0.1:*", "http://localhost:*"],
+          "webOrigins": ["*"]
+        }' > /dev/null
+
+    CLI_CLIENT_UUID=$(curl $CURL_OPTS -X GET "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/clients?clientId=openshift-cli" \
+        -H "Authorization: Bearer $ADMIN_TOKEN" | jq -r '.[0].id')
+
+    # Add username mapper for preferred_username claim
+    curl $CURL_OPTS -X POST "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/clients/$CLI_CLIENT_UUID/protocol-mappers/models" \
+        -H "Authorization: Bearer $ADMIN_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "name": "username",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "username",
+            "claim.name": "preferred_username",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }' > /dev/null 2>&1
+
+    # Add audience mapper for 'openshift' (required for kube-apiserver token validation)
+    curl $CURL_OPTS -X POST "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/clients/$CLI_CLIENT_UUID/protocol-mappers/models" \
+        -H "Authorization: Bearer $ADMIN_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "name": "openshift-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "openshift",
+            "id.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        }' > /dev/null 2>&1
+
+    echo "  ✅ Created openshift-cli client (public)"
+else
+    echo "  ✅ openshift-cli client already exists"
+fi
+echo ""
+
 # Step 7: Create identity provider pointing to hub realm
 echo "Step 7: Creating identity provider (hub realm)..."
 
@@ -358,20 +617,53 @@ if [ -z "$HUB_USER_ID" ]; then
     exit 1
 fi
 
-# Get the service account user for mcp-server client (this is the user used in token exchange)
-SERVICE_ACCOUNT_USER=$(curl $CURL_OPTS -X GET "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/clients/$MANAGED_CLIENT_UUID/service-account-user" \
+echo "  ✅ Found hub user: $MCP_USERNAME (ID: $HUB_USER_ID)"
+
+# For V1 cross-realm token exchange, we need a regular user in the managed realm
+# with a federated identity link to the hub user. The sub claim from the hub token
+# must match the userId in the federated identity link.
+
+# Check if user already exists in managed realm
+MANAGED_USERS=$(curl $CURL_OPTS -X GET "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/users?username=$MCP_USERNAME" \
     -H "Authorization: Bearer $ADMIN_TOKEN")
-MANAGED_USER_ID=$(echo "$SERVICE_ACCOUNT_USER" | jq -r '.id // empty')
+MANAGED_USER_ID=$(echo "$MANAGED_USERS" | jq -r '.[0].id // empty')
 
 if [ -z "$MANAGED_USER_ID" ] || [ "$MANAGED_USER_ID" = "null" ]; then
-    echo "  ❌ Service account for mcp-server client not found"
+    # Create user in managed realm
+    echo "  Creating user $MCP_USERNAME in managed realm..."
+    USER_CREATE_RESPONSE=$(curl $CURL_OPTS -w "%{http_code}" -X POST "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/users" \
+        -H "Authorization: Bearer $ADMIN_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "{
+            \"username\": \"$MCP_USERNAME\",
+            \"enabled\": true,
+            \"email\": \"$MCP_USERNAME@example.com\",
+            \"firstName\": \"MCP\",
+            \"lastName\": \"User\"
+        }")
+    USER_CREATE_CODE=$(echo "$USER_CREATE_RESPONSE" | tail -c 4)
+
+    if [ "$USER_CREATE_CODE" = "201" ]; then
+        echo "  ✅ User $MCP_USERNAME created in managed realm"
+    else
+        echo "  ⚠️  User creation returned HTTP $USER_CREATE_CODE"
+    fi
+
+    # Get the new user ID
+    MANAGED_USERS=$(curl $CURL_OPTS -X GET "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/users?username=$MCP_USERNAME" \
+        -H "Authorization: Bearer $ADMIN_TOKEN")
+    MANAGED_USER_ID=$(echo "$MANAGED_USERS" | jq -r '.[0].id // empty')
+else
+    echo "  ✅ User $MCP_USERNAME already exists in managed realm (ID: $MANAGED_USER_ID)"
+fi
+
+if [ -z "$MANAGED_USER_ID" ] || [ "$MANAGED_USER_ID" = "null" ]; then
+    echo "  ❌ Failed to get managed realm user ID"
     exit 1
 fi
 
-SERVICE_ACCOUNT_USERNAME=$(echo "$SERVICE_ACCOUNT_USER" | jq -r '.username // empty')
-echo "  ✅ Found service account: $SERVICE_ACCOUNT_USERNAME (ID: $MANAGED_USER_ID)"
-
-# Create federated identity link between hub user and managed service account
+# Create federated identity link between managed user and hub user
+# The userId here is the hub user's ID - this is how Keycloak matches the sub claim
 FED_IDENTITY_JSON="{
   \"identityProvider\": \"$IDP_ALIAS\",
   \"userId\": \"$HUB_USER_ID\",
@@ -385,10 +677,40 @@ FED_RESPONSE=$(curl $CURL_OPTS -w "%{http_code}" -X POST "$KEYCLOAK_URL/admin/re
 
 FED_CODE=$(echo "$FED_RESPONSE" | tail -c 4)
 if [ "$FED_CODE" = "204" ] || [ "$FED_CODE" = "409" ]; then
-    echo "  ✅ Federated identity link created (hub user: $MCP_USERNAME/$HUB_USER_ID → managed service account: $SERVICE_ACCOUNT_USERNAME/$MANAGED_USER_ID)"
+    echo "  ✅ Federated identity link created (hub: $MCP_USERNAME/$HUB_USER_ID → managed: $MCP_USERNAME/$MANAGED_USER_ID)"
 else
     echo "  ⚠️  Federated identity link returned HTTP $FED_CODE"
 fi
+
+# Remove any federated identity link from service account user to prevent
+# "More results found" error during token exchange. The mcp-server client's
+# service account should NOT have a federated identity link.
+echo "  Checking for service account federated identity..."
+SA_USER=$(curl $CURL_OPTS -X GET "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/clients/$MANAGED_CLIENT_UUID/service-account-user" \
+    -H "Authorization: Bearer $ADMIN_TOKEN")
+SA_USER_ID=$(echo "$SA_USER" | jq -r '.id // empty')
+
+if [ -n "$SA_USER_ID" ] && [ "$SA_USER_ID" != "null" ]; then
+    # Check if service account has a federated identity link
+    SA_FED=$(curl $CURL_OPTS -X GET "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/users/$SA_USER_ID/federated-identity" \
+        -H "Authorization: Bearer $ADMIN_TOKEN")
+    SA_FED_IDP=$(echo "$SA_FED" | jq -r '.[] | select(.identityProvider == "'"$IDP_ALIAS"'") | .identityProvider // empty')
+
+    if [ -n "$SA_FED_IDP" ]; then
+        echo "  Removing federated identity from service account..."
+        curl $CURL_OPTS -X DELETE "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/users/$SA_USER_ID/federated-identity/$IDP_ALIAS" \
+            -H "Authorization: Bearer $ADMIN_TOKEN" > /dev/null
+        echo "  ✅ Removed federated identity from service account"
+    else
+        echo "  ✅ Service account has no conflicting federated identity"
+    fi
+fi
+
+# Clear Keycloak user cache to ensure federated identity changes take effect immediately
+echo "  Clearing Keycloak user cache..."
+curl $CURL_OPTS -X POST "$KEYCLOAK_URL/admin/realms/$MANAGED_REALM/clear-user-cache" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" > /dev/null
+echo "  ✅ User cache cleared"
 echo ""
 
 # Step 9: Configure cross-realm token exchange permissions
@@ -460,6 +782,10 @@ CLIENT_ID="mcp-server"
 CLIENT_SECRET="$MANAGED_CLIENT_SECRET"
 CLIENT_UUID="$MANAGED_CLIENT_UUID"
 
+CONSOLE_CLIENT_ID="openshift-console"
+CONSOLE_CLIENT_SECRET="$MANAGED_CONSOLE_CLIENT_SECRET"
+CLI_CLIENT_ID="openshift-cli"
+
 MCP_USERNAME="$MCP_USERNAME"
 MCP_PASSWORD="$MCP_PASSWORD"
 
@@ -479,18 +805,28 @@ echo "Configuring OIDC on Managed Cluster"
 echo "========================================="
 echo ""
 
-# Step 1: Enable TechPreviewNoUpgrade feature gate
-echo "Step 1: Enabling TechPreviewNoUpgrade feature gate on managed cluster..."
-CURRENT_FEATURE_SET=$(kubectl --kubeconfig="$MANAGED_KUBECONFIG" get featuregate cluster -o jsonpath='{.spec.featureSet}' 2>/dev/null || echo "")
-if [ "$CURRENT_FEATURE_SET" != "TechPreviewNoUpgrade" ]; then
-    kubectl --kubeconfig="$MANAGED_KUBECONFIG" patch featuregate cluster \
-        --type=merge -p='{"spec":{"featureSet":"TechPreviewNoUpgrade"}}'
-    echo "  ✅ TechPreviewNoUpgrade enabled"
-    echo "  ⚠️  Control plane will restart (10-15 minutes)"
-    echo "  ⚠️  Waiting 2 minutes for initial rollout..."
-    sleep 120
+# Step 1: Check ExternalOIDC feature status / Enable TechPreviewNoUpgrade if needed
+echo "Step 1: Checking ExternalOIDC feature status on managed cluster..."
+
+# Check if ExternalOIDC is already enabled (GA in OpenShift 4.20+)
+EXTERNAL_OIDC_ENABLED=$(kubectl --kubeconfig="$MANAGED_KUBECONFIG" get featuregate cluster -o json 2>/dev/null | jq -r '.status.featureGates[0].enabled[] | select(.name == "ExternalOIDC") | .name' 2>/dev/null || echo "")
+
+if [ "$EXTERNAL_OIDC_ENABLED" = "ExternalOIDC" ]; then
+    echo "  ✅ ExternalOIDC feature is already enabled (OpenShift 4.20+ GA)"
+    echo "  No need to enable TechPreviewNoUpgrade feature gate"
 else
-    echo "  ✅ TechPreviewNoUpgrade already enabled"
+    echo "  ExternalOIDC not enabled, checking TechPreviewNoUpgrade feature gate..."
+    CURRENT_FEATURE_SET=$(kubectl --kubeconfig="$MANAGED_KUBECONFIG" get featuregate cluster -o jsonpath='{.spec.featureSet}' 2>/dev/null || echo "")
+    if [ "$CURRENT_FEATURE_SET" != "TechPreviewNoUpgrade" ]; then
+        kubectl --kubeconfig="$MANAGED_KUBECONFIG" patch featuregate cluster \
+            --type=merge -p='{"spec":{"featureSet":"TechPreviewNoUpgrade"}}'
+        echo "  ✅ TechPreviewNoUpgrade enabled"
+        echo "  ⚠️  Control plane will restart (10-15 minutes)"
+        echo "  ⚠️  Waiting 2 minutes for initial rollout..."
+        sleep 120
+    else
+        echo "  ✅ TechPreviewNoUpgrade already enabled"
+    fi
 fi
 
 echo ""
@@ -522,36 +858,78 @@ else
     echo "  ✅ CA certificate ConfigMap created"
 fi
 
-# Step 3: Create RBAC for service-account-mcp-server user
+# Step 3: Create RBAC for mcp user (the user from token exchange)
 echo ""
-echo "Step 3: Creating RBAC for service-account-mcp-server user..."
-kubectl --kubeconfig="$MANAGED_KUBECONFIG" create clusterrolebinding svc-acct-mcp-server-admin \
-    --clusterrole=cluster-admin --user=service-account-mcp-server \
+echo "Step 3: Creating RBAC for $MCP_USERNAME user..."
+kubectl --kubeconfig="$MANAGED_KUBECONFIG" create clusterrolebinding mcp-user-admin \
+    --clusterrole=cluster-admin --user="$MCP_USERNAME" \
     --dry-run=client -o yaml | kubectl --kubeconfig="$MANAGED_KUBECONFIG" apply -f -
-echo "  ✅ RBAC created"
+echo "  ✅ RBAC created for $MCP_USERNAME"
 
-# Step 4: Configure OIDC provider
+# Step 4: Configure OIDC provider with oidcClients
 echo ""
-echo "Step 4: Configuring OIDC provider..."
+echo "Step 4: Configuring OIDC provider with oidcClients..."
 ISSUER_URL="$KEYCLOAK_URL/realms/$MANAGED_REALM"
+
+# Create console client secret in openshift-config namespace
+echo "  Creating console OIDC client secret..."
+kubectl --kubeconfig="$MANAGED_KUBECONFIG" delete secret console-oidc-client-secret -n openshift-config 2>/dev/null || true
+kubectl --kubeconfig="$MANAGED_KUBECONFIG" create secret generic console-oidc-client-secret \
+    -n openshift-config \
+    --from-literal=clientSecret="$MANAGED_CONSOLE_CLIENT_SECRET"
+echo "  ✅ Console client secret created"
 
 CURRENT_ISSUER=$(kubectl --kubeconfig="$MANAGED_KUBECONFIG" get authentication.config.openshift.io/cluster \
     -o jsonpath='{.spec.oidcProviders[0].issuer.issuerURL}' 2>/dev/null || echo "")
 
 if [ "$CURRENT_ISSUER" = "$ISSUER_URL" ]; then
-    echo "  ✅ OIDC provider already configured"
-else
-    if [ -n "$CURRENT_ISSUER" ]; then
-        echo "  Updating existing OIDC provider..."
-        printf '[{"op":"replace","path":"/spec/oidcProviders/0/issuer/issuerURL","value":"%s"},{"op":"replace","path":"/spec/oidcProviders/0/issuer/audiences","value":["mcp-server"]}]' "$ISSUER_URL" > /tmp/oidc-patch-$CLUSTER_NAME.json
+    echo "  ✅ OIDC provider already configured with issuer: $ISSUER_URL"
+    echo "  Checking oidcClients configuration..."
+
+    CURRENT_CONSOLE_CLIENT=$(kubectl --kubeconfig="$MANAGED_KUBECONFIG" get authentication.config.openshift.io/cluster \
+        -o jsonpath='{.spec.oidcProviders[0].oidcClients[?(@.componentName=="console")].clientID}' 2>/dev/null || echo "")
+    if [ "$CURRENT_CONSOLE_CLIENT" = "openshift-console" ]; then
+        echo "  ✅ Console oidcClient already configured"
     else
-        echo "  Creating new OIDC provider..."
-        printf '[{"op":"remove","path":"/spec/webhookTokenAuthenticator"},{"op":"replace","path":"/spec/type","value":"OIDC"},{"op":"add","path":"/spec/oidcProviders","value":[{"name":"keycloak","issuer":{"issuerURL":"%s","audiences":["mcp-server"],"issuerCertificateAuthority":{"name":"keycloak-oidc-ca"}},"claimMappings":{"username":{"claim":"preferred_username","prefixPolicy":"NoPrefix"}}}]}]' "$ISSUER_URL" > /tmp/oidc-patch-$CLUSTER_NAME.json
+        echo "  Updating oidcClients configuration..."
+        kubectl --kubeconfig="$MANAGED_KUBECONFIG" patch authentication.config.openshift.io/cluster --type=json -p='[
+          {"op":"add","path":"/spec/oidcProviders/0/oidcClients","value":[
+            {"componentName":"console","componentNamespace":"openshift-console","clientID":"openshift-console","clientSecret":{"name":"console-oidc-client-secret"}},
+            {"componentName":"cli","componentNamespace":"openshift-console","clientID":"openshift-cli"}
+          ]}
+        ]'
+        echo "  ✅ oidcClients added to existing OIDC provider"
     fi
+else
+    echo "  Creating new OIDC provider with oidcClients..."
+    echo "  Issuer URL: $ISSUER_URL"
+
+    # Build the complete OIDC configuration patch with oidcClients
+    cat > /tmp/oidc-patch-$CLUSTER_NAME.json <<EOF
+[
+  {"op":"remove","path":"/spec/webhookTokenAuthenticator"},
+  {"op":"replace","path":"/spec/type","value":"OIDC"},
+  {"op":"add","path":"/spec/oidcProviders","value":[{
+    "name":"keycloak",
+    "issuer":{
+      "issuerURL":"$ISSUER_URL",
+      "audiences":["openshift","mcp-server"],
+      "issuerCertificateAuthority":{"name":"keycloak-oidc-ca"}
+    },
+    "claimMappings":{
+      "username":{"claim":"preferred_username","prefixPolicy":"NoPrefix"}
+    },
+    "oidcClients":[
+      {"componentName":"console","componentNamespace":"openshift-console","clientID":"openshift-console","clientSecret":{"name":"console-oidc-client-secret"}},
+      {"componentName":"cli","componentNamespace":"openshift-console","clientID":"openshift-cli"}
+    ]
+  }]}
+]
+EOF
 
     kubectl --kubeconfig="$MANAGED_KUBECONFIG" patch authentication.config.openshift.io/cluster \
         --type=json -p="$(cat /tmp/oidc-patch-$CLUSTER_NAME.json)"
-    echo "  ✅ OIDC provider configured"
+    echo "  ✅ OIDC provider configured with oidcClients"
     echo ""
     echo "  Verifying kube-apiserver operator picked up OIDC configuration..."
 
@@ -616,11 +994,18 @@ echo "Cluster: $CLUSTER_NAME"
 echo "Managed Realm: $MANAGED_REALM"
 echo "Identity Provider: $IDP_ALIAS (hub realm)"
 echo "Federated User: $MCP_USERNAME (hub: $HUB_USER_ID → managed: $MANAGED_USER_ID)"
+echo ""
+echo "Keycloak Clients Created:"
+echo "  - mcp-server (confidential): for MCP server token exchange"
+echo "  - openshift-console (confidential): for OpenShift console OAuth"
+echo "  - openshift-cli (public): for oc login"
+echo ""
 echo "ACM ManagedCluster: Created"
 echo "ACM Import Manifests: Applied"
 echo "Cluster-Proxy Agents: Starting"
+echo "Cluster-Proxy Impersonation: Disabled"
 echo "Cross-Realm Exchange: Configured"
-echo "OIDC Authentication: Configured (rolling out)"
+echo "OIDC Authentication: Configured with oidcClients (rolling out)"
 echo ""
 echo "Configuration saved to: $CLUSTER_CONFIG_DIR/$CLUSTER_NAME.env"
 echo ""

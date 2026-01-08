@@ -21,12 +21,14 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes/watcher"
+	"github.com/containers/kubernetes-mcp-server/pkg/tokenexchange"
 )
 
 const (
 	ACMHubTargetParameterName    = "cluster"
 	ClusterProviderACM           = "acm"
 	ClusterProviderACMKubeConfig = "acm-kubeconfig"
+	LocalClusterLabel            = "local-cluster"
 )
 
 // ACMProviderConfig holds ACM-specific configuration that users can set in config.toml
@@ -42,6 +44,15 @@ type ACMProviderConfig struct {
 
 	// The CA file for the cluster proxy addon
 	ClusterProxyAddonCAFile string `toml:"cluster_proxy_addon_ca_file,omitempty"`
+
+	// TokenExchangeStrategy specifies which token exchange protocol to use
+	// Valid values: "keycloak-v1", "rfc8693", ""
+	// Default: "" (no per-cluster token exchange)
+	TokenExchangeStrategy string `toml:"token_exchange_strategy,omitempty"`
+
+	// Clusters holds per-cluster token exchange configuration
+	// The key is the cluster name (e.g. "my-managed-cluster")
+	Clusters map[string]*tokenexchange.TargetTokenExchangeConfig `toml:"clusters,omitempty"`
 }
 
 func (c *ACMProviderConfig) Validate() error {
@@ -105,6 +116,10 @@ type acmHubClusterProvider struct {
 	clusterProxyCAFile string
 	watchKubeConfig    bool // whether or not the kubeconfig should be watched for changes
 
+	// config for token exchange
+	targetTokenConfigs map[string]*tokenexchange.TargetTokenExchangeConfig
+	exchangeStrategy   string
+
 	kubeConfigWatcher *watcher.Kubeconfig
 	clusterWatcher    *watcher.ClusterState
 
@@ -115,9 +130,10 @@ type acmHubClusterProvider struct {
 	// initialResourceVersion is set during init and passed to watchManagedClusters
 	initialResourceVersion string
 
-	// mu protects clusterManagers and watchStarted
+	// mu protects clusterManagers, hubClusterName, and watchStarted
 	mu              sync.RWMutex
 	clusterManagers map[string]*Manager
+	hubClusterName  string
 	watchStarted    bool
 }
 
@@ -248,6 +264,8 @@ func newACMClusterProvider(m *Manager, cfg *ACMProviderConfig, watchKubeConfig b
 	provider := &acmHubClusterProvider{
 		hubManager:         m,
 		clusterManagers:    make(map[string]*Manager),
+		targetTokenConfigs: cfg.Clusters,
+		exchangeStrategy:   cfg.TokenExchangeStrategy,
 		watchKubeConfig:    watchKubeConfig,
 		watchCtx:           watchCtx,
 		watchCancel:        watchCancel,
@@ -274,7 +292,7 @@ func (p *acmHubClusterProvider) IsOpenShift(ctx context.Context) bool {
 }
 
 func (p *acmHubClusterProvider) GetDerivedKubernetes(ctx context.Context, target string) (*Kubernetes, error) {
-	if target == "" || target == "hub" {
+	if target == "" || target == p.GetDefaultTarget() {
 		return p.hubManager.Derived(ctx)
 	}
 
@@ -287,7 +305,13 @@ func (p *acmHubClusterProvider) GetDerivedKubernetes(ctx context.Context, target
 }
 
 func (p *acmHubClusterProvider) GetDefaultTarget() string {
-	return "hub"
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	if p.hubClusterName == "" {
+		return "local-cluster" // fallback if hub not yet discovered
+	}
+	return p.hubClusterName
 }
 
 func (p *acmHubClusterProvider) GetTargets(_ context.Context) ([]string, error) {
@@ -333,6 +357,55 @@ func (p *acmHubClusterProvider) Close() {
 
 	p.clusterWatcher.Close()
 	p.kubeConfigWatcher.Close()
+}
+
+// GetTokenExchangeConfig returns the token exchange configuration for the specified target.
+// Returns nil if no per-target exchange is configured
+func (p *acmHubClusterProvider) GetTokenExchangeConfig(target string) *tokenexchange.TargetTokenExchangeConfig {
+	defaultTarget := p.GetDefaultTarget()
+	if target == "" {
+		target = defaultTarget
+	}
+
+	cfg, ok := p.targetTokenConfigs[target]
+	if !ok {
+		return nil
+	}
+
+	// Auto-detect subject token type if not explicitly configured
+	if cfg.SubjectTokenType == "" {
+		cfg.SubjectTokenType = p.detectSubjectTokenType(target, cfg)
+	}
+
+	return cfg
+}
+
+// detectSubjectTokenType determines whether to use same-realm (access_token) or cross-realm (jwt)
+// token exchange based on comparing token URLs.
+//   - If target's token_url matches the hub cluster's token_url → same-realm (access_token)
+//   - If token_url differs → cross-realm (jwt)
+//   - Fallback: If hub config unavailable, compare target name with hub name
+func (p *acmHubClusterProvider) detectSubjectTokenType(target string, targetCfg *tokenexchange.TargetTokenExchangeConfig) string {
+	defaultTarget := p.GetDefaultTarget()
+
+	hubCfg, hubHasConfig := p.targetTokenConfigs[defaultTarget]
+
+	if hubHasConfig && hubCfg.TokenURL != "" && targetCfg.TokenURL != "" {
+		if targetCfg.TokenURL == hubCfg.TokenURL {
+			return tokenexchange.TokenTypeAccessToken
+		}
+		return tokenexchange.TokenTypeJWT
+	}
+
+	if target == defaultTarget {
+		return tokenexchange.TokenTypeAccessToken
+	}
+	return tokenexchange.TokenTypeJWT
+}
+
+// GetTokenExchangeStrategy returns the token exchange strategy to use (e.g. "keycloak-v1" or "rfc8693").
+func (p *acmHubClusterProvider) GetTokenExchangeStrategy() string {
+	return p.exchangeStrategy
 }
 
 func (p *acmHubClusterProvider) watchManagedClusters(resourceVersion string, onTargetsChanged func() error) {
@@ -388,6 +461,11 @@ func (p *acmHubClusterProvider) watchManagedClusters(resourceVersion string, onT
 			case watch.Added:
 				klog.V(3).Infof("Managed cluster added: %s", clusterName)
 				p.addCluster(clusterName)
+				// Check if this is the hub cluster
+				labels := obj.GetLabels()
+				if labels[LocalClusterLabel] == "true" {
+					p.setHubClusterName(clusterName)
+				}
 				if err := onTargetsChanged(); err != nil {
 					klog.Warningf("Error in onTargetsChanged callback: %v", err)
 				}
@@ -422,8 +500,14 @@ func (p *acmHubClusterProvider) refreshClusters(ctx context.Context) (string, er
 	}
 
 	for _, item := range result.Items {
-		if name := item.GetName(); name != "" {
+		name := item.GetName()
+		if name != "" {
 			p.addCluster(name)
+		}
+
+		labels := item.GetLabels()
+		if labels[LocalClusterLabel] == "true" {
+			p.setHubClusterName(name)
 		}
 	}
 
@@ -432,6 +516,13 @@ func (p *acmHubClusterProvider) refreshClusters(ctx context.Context) (string, er
 	klog.V(3).Infof("discovered %d managed clusters: %v (resourceVersion: %s)", len(clusters), clusters, resourceVersion)
 
 	return resourceVersion, nil
+}
+
+func (p *acmHubClusterProvider) setHubClusterName(name string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.hubClusterName = name
 }
 
 func (p *acmHubClusterProvider) addCluster(name string) {

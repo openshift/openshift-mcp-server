@@ -20,7 +20,12 @@ func (s *ProviderACMHubTestSuite) SetupTest() {
 	s.BaseProviderSuite.SetupTest()
 	s.originalIsInClusterConfig = InClusterConfig
 	s.mockServer = test.NewMockServer()
-	s.mockServer.Handle(test.NewACMHubHandler("cluster-a", "cluster-b", "cluster-c"))
+	s.mockServer.Handle(test.NewACMHubHandler(
+		test.ManagedCluster{Name: "cluster-a"},
+		test.ManagedCluster{Name: "cluster-b"},
+		test.ManagedCluster{Name: "cluster-c"},
+		test.ManagedCluster{Name: "hub", Labels: map[string]string{"local-cluster": "true"}},
+	))
 
 	InClusterConfig = func() (*rest.Config, error) {
 		return s.mockServer.Config(), nil
@@ -64,8 +69,8 @@ func (s *ProviderACMHubTestSuite) TestGetTargets() {
 	s.Run("GetTargets returns managed clusters in sorted order", func() {
 		targets, err := s.provider.GetTargets(s.T().Context())
 		s.Require().NoError(err, "Expected no error from GetTargets")
-		s.Len(targets, 3, "Expected 3 targets from GetTargets")
-		s.Equal([]string{"cluster-a", "cluster-b", "cluster-c"}, targets, "Expected sorted cluster names")
+		s.Len(targets, 4, "Expected 4 targets from GetTargets")
+		s.Equal([]string{"cluster-a", "cluster-b", "cluster-c", "hub"}, targets, "Expected sorted cluster names")
 	})
 }
 
