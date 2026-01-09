@@ -207,11 +207,11 @@ func newACMKubeConfigClusterProvider(cfg api.BaseConfig) (Provider, error) {
 	return newACMClusterProvider(baseManager, &acmKubeConfigProviderCfg.ACMProviderConfig, true)
 }
 
-func discoverClusterProxyHost(m *Manager, isOpenShift bool) (string, error) {
+func discoverClusterProxyHost(m *Manager, isClusterProviderACMKubeConfig bool) (string, error) {
 	ctx := context.Background()
 
-	// Try to discover the cluster-proxy route (OpenShift) or service (vanilla Kubernetes)
-	if isOpenShift {
+	// With ClusterProviderACMKubeConfig we cannot use a vanilla service, since the mcp server is not in the cluster
+	if isClusterProviderACMKubeConfig {
 		// Try OpenShift Route in multicluster-engine namespace
 		routeGVR := schema.GroupVersionResource{
 			Group:    "route.openshift.io",
@@ -246,12 +246,10 @@ func newACMClusterProvider(m *Manager, cfg *ACMProviderConfig, watchKubeConfig b
 		return nil, fmt.Errorf("not deployed in an ACM hub cluster")
 	}
 
-	// Auto-discover cluster-proxy host if not provided
+	// Auto-discover cluster-proxy host if is not provided
 	clusterProxyHost := cfg.ClusterProxyAddonHost
 	if clusterProxyHost == "" {
-		ctx := context.Background()
-		isOpenShift := m.IsOpenShift(ctx)
-		discoveredHost, err := discoverClusterProxyHost(m, isOpenShift)
+		discoveredHost, err := discoverClusterProxyHost(m, watchKubeConfig)
 		if err != nil {
 			return nil, fmt.Errorf("cluster_proxy_addon_host not provided and auto-discovery failed: %w", err)
 		}
