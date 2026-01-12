@@ -232,8 +232,14 @@ func discoverClusterProxyHost(m *Manager, isClusterProviderACMKubeConfig bool) (
 	// Fallback: Try to find the service
 	svcClient := m.kubernetes.CoreV1().Services("multicluster-engine")
 	svc, err := svcClient.Get(ctx, "cluster-proxy-addon-user", metav1.GetOptions{})
-	if err == nil {
-		host := fmt.Sprintf("%s.%s.svc.cluster.local", svc.Name, svc.Namespace)
+	if err == nil && len(svc.Spec.Ports) > 0 {
+		port := svc.Spec.Ports[0].Port // default to first port
+		for _, p := range svc.Spec.Ports {
+			if p.Name == "user-port" { // if we find user port, use this instead
+				port = p.Port
+			}
+		}
+		host := fmt.Sprintf("%s.%s.svc.cluster.local:%d", svc.Name, svc.Namespace, port)
 		klog.V(2).Infof("Auto-discovered cluster-proxy service: %s", host)
 		return host, nil
 	}
