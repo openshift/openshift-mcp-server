@@ -1,123 +1,102 @@
-# Advanced Cluster Management (ACM) Setup
+# Advanced Cluster Management (ACM) Support
 
-This guide shows you how to set up Red Hat Advanced Cluster Management (ACM) and use the OpenShift MCP Server with multiple OpenShift clusters.
+The OpenShift MCP Server supports integration with Advanced Cluster Management (ACM) to manage multiple OpenShift clusters from a single hub cluster, starting from version 2.14.0.
 
-## Overview
+## Identity Provider Integration
 
-Advanced Cluster Management (ACM) allows you to manage multiple OpenShift clusters from a single hub cluster. The OpenShift MCP Server allows interaction with all your managed clusters through a single MCP server instance.
+The OpenShift MCP Server with ACM requires an Identity Provider (IdP) configuration with a separate realm for each cluster (hub and managed clusters).
 
-## Step 1: Install ACM on Hub Cluster
+### User Identity Federation
 
-The hub cluster is the central OpenShift cluster that manages other clusters (managed clusters). You need to install ACM on the dedicated hub cluster first.
+Users must have their identity **federated between all realms** for clusters they should have access to. Without identity federation, users will only be able to authenticate to a single cluster.
 
-### Complete Installation
+### OAuth Scopes for Dynamic Client Registration
 
-Install all ACM components with a single command:
+For clients using Dynamic Client Registration (DCR), such as Claude Code, the required OAuth scopes (e.g., `mcp-server`) must be configured as **default client scopes** in the Identity Provider. This ensures dynamically registered clients automatically include the necessary scopes in their token requests.
 
-```bash
-make acm-install
-```
+## Configuration example
 
-This installs:
-1. MultiCluster Engine (MCE)
-2. ACM Operator
-3. ACM Instance (MultiClusterHub CR)
-
-### Verify Installation
-
-Check ACM installation status:
-
-```bash
-make acm-status
-```
-
-Expected output:
-```
-==========================================
-ACM Installation Status
-==========================================
-
-Namespaces:
-multicluster-engine   Active   5m
-open-cluster-management   Active   5m
-
-Operators:
-NAME                                 DISPLAY                              VERSION   REPLACES   PHASE
-advanced-cluster-management.v2.14.0  Advanced Cluster Management         2.14.0               Succeeded
-
-MultiClusterHub:
-NAME               STATUS    AGE
-multiclusterhub    Running   5m
-
-ManagedClusters:
-NAME           HUB ACCEPTED   MANAGED CLUSTER URLS   JOINED   AVAILABLE   AGE
-local-cluster  true           https://...            True     True        5m
-```
-
-## Step 2: Import Managed Clusters
-
-Once ACM is installed on your hub cluster, you can import additional OpenShift clusters.
-
-### Import a Cluster
-
-```bash
-make acm-import-cluster \
-  CLUSTER_NAME=production-east \
-  MANAGED_KUBECONFIG=/path/to/production-east-kubeconfig
-```
-
-**Parameters**:
-- `CLUSTER_NAME`: Unique name for the managed cluster
-- `MANAGED_KUBECONFIG`: Path to the kubeconfig file for the managed cluster
-
-### What Happens During Import
-
-1. Creates `ManagedCluster` resource on hub
-2. Generates import manifests (CRDs + import YAML)
-3. Applies manifests to managed cluster
-4. Installs klusterlet agent on managed cluster
-5. Waits for cluster to become available
-
-### Verify Import
-
-```bash
-oc get managedclusters
-```
-
-Expected output:
-```
-NAME               HUB ACCEPTED   MANAGED CLUSTER URLS                      JOINED   AVAILABLE   AGE
-local-cluster      true           https://api.hub.example.com:6443         True     True        10m
-production-east    true           https://api.prod-east.example.com:6443   True     True        5m
-```
-
-## Step 3: Run the MCP Server
-
-Start the MCP Server with your ACM configuration
+Below is an example of how your `config.toml` file could look like:
 
 ```toml
-cluster_provider_strategy = "acm-kubeconfig"
-kubeconfig = "/tmp/acm-hub-kubeconfig.yaml"
+# ACM Multi-Cluster Configuration with Single Keycloak
+#
+# This configuration uses:
+#   - Single Keycloak instance on hub cluster
+#   - Multi-realm architecture (hub + managed cluster realms)
+#   - V1 token exchange with subject_issuer parameter
+#   - Full JWKS signature validation (CA trust configured)
 
-[cluster_provider_configs.acm-kubeconfig]
-context_name = "acm-hub"
-cluster_proxy_addon_ca_file = "./openshift-ca.crt"
+cluster_provider_strategy = "acm"
+# In-cluster: kubeconfig is not needed, uses service account credentials
+
+# HTTP server port
+port = "8080"
+
+# Hub OAuth Configuration (MUST be before [[denied_resources]] arrays)
+require_oauth = true
+oauth_audience = "mcp-server"
+oauth_scopes = ["openid", "mcp-server"]
+authorization_url = "https://your-keycloak-route/realms/hub"
+token_url = "https://your-keycloak-route/realms/hub/protocol/openid-connect/token"
+
+# Hub Client Credentials (from .keycloak-config/hub-config.env)
+sts_client_id = "mcp-sts"
+sts_client_secret = "<MCP client secret (from keycloak)>"
+
+# Keycloak CA certificate (OpenShift router CA)
+certificate_authority = "/etc/keycloak-ca/keycloak-ca.crt" # note: this needs to be mounted to the pod at this place
+
+# Deny access to sensitive resources
+[[denied_resources]]
+group = ""
+version = "v1"
+kind = "Secret"
+
+[[denied_resources]]
+group = "rbac.authorization.k8s.io"
+version = "v1"
+kind = "Role"
+
+[[denied_resources]]
+group = "rbac.authorization.k8s.io"
+version = "v1"
+kind = "RoleBinding"
+
+[[denied_resources]]
+group = "rbac.authorization.k8s.io"
+version = "v1"
+kind = "ClusterRole"
+
+[[denied_resources]]
+group = "rbac.authorization.k8s.io"
+version = "v1"
+kind = "ClusterRoleBinding"
+
+# ACM Provider Configuration
+[cluster_provider_configs.acm]
+cluster_proxy_addon_skip_tls_verify = true # alternatively, mount the CA cert for the cluster proxy to the pod
+# Token exchange strategy: keycloak-v1, rfc8693, or external-account
+token_exchange_strategy = "keycloak-v1"
+
+# Managed Clusters
+
+# Cluster: local-cluster (hub itself - same-realm token exchange)
+[cluster_provider_configs.acm.clusters."local-cluster"]
+token_url = "https://your-keycloak-route-url/realms/hub/protocol/openid-connect/token"
+client_id = "mcp-sts"
+client_secret = "<MCP client secret in keycloak>"
+audience = "mcp-server"
+subject_token_type = "urn:ietf:params:oauth:token-type:access_token" # this can also be auto-detected, feel free to omit
+ca_file = "/etc/keycloak-ca/keycloak-ca.crt" # note: this needs to be mounted to the pod
+
+# Cluster: cmurray-managed
+[cluster_provider_configs.acm.clusters."managed-cluster"]
+token_url = "https://your-keycloak-route-url/realms/manager-cluster-realm/protocol/openid-connect/token"
+client_id = "mcp-server"
+client_secret = "<MCP client secret in keycloak for the managed-cluster realm>"
+subject_issuer = "hub-realm"
+audience = "mcp-server"
+subject_token_type = "urn:ietf:params:oauth:token-type:jwt" # this can be also be auto-detected, feel free to omit
+ca_file = "/etc/keycloak-ca/keycloak-ca.crt" # note: this needs to be mounted to the pod
 ```
-Save this configuration as `acm-config.toml` and run the MCP Server:
-
-```bash
-./kubernetes-mcp-server --config acm-config.toml --port 8080
-```
-
-The MCP Server will:
-1. Connect to the hub cluster using the kubeconfig
-2. Discover all managed clusters via ACM
-3. Provide tools to interact with all clusters
-
-## Step 4: Test Multi-Cluster Access
-
-With the MCP inspector you can test the access to the ACM-managed clusters. The MCP Server automatically discovers all ACM-managed clusters and on each tool you can select the one you want. Below is a screenshot of the `namespaces_list` tool:
-
-<a href="images/mcp-inspector-acm-managed-cluster.png">
-  <img src="images/mcp-inspector-acm-managed-cluster.png" alt="MCP Inspector with ACM cluster selection" width="600" />
-</a>

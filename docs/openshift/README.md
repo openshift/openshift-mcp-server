@@ -4,9 +4,10 @@ This directory contains OpenShift-specific documentation for the OpenShift MCP S
 
 ## Available Guides
 
-| Guide | Description |
-|-------|-------------|
-| **[ACM Setup](acm.md)** | Setting up Advanced Cluster Management (ACM) and using the MCP Server with multi-cluster environments |
+| Guide                           | Description                                                                                           |
+|---------------------------------|-------------------------------------------------------------------------------------------------------|
+| **[ACM Support](acm.md)** | Support for ACM and notes on its environment |
+| **[ACM Setup](acm_setup.md)**   | Setting up Advanced Cluster Management (ACM) and using the MCP Server with multi-cluster environments |
 
 ## Overview
 
