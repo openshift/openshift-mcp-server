@@ -1,0 +1,47 @@
+# OpenShift-specific values for kubernetes-mcp-server
+# This file extends the base values.yaml with OpenShift and ACM provider support.
+#
+# Usage:
+#   helm install kubernetes-mcp-server ./charts/kubernetes-mcp-server \
+#     -f ./charts/kubernetes-mcp-server/values.yaml \
+#     -f ./charts/kubernetes-mcp-server/values-openshift.yaml
+
+# -- Enable OpenShift specific features
+openshift: true
+
+# -- RBAC configuration for ACM (Advanced Cluster Management) provider.
+# -- These permissions are the minimum required for the ACM hub provider to function.
+rbac:
+  create: true
+
+  # -- ClusterRole for ACM managed cluster discovery and watching
+  extraClusterRoles:
+    - name: acm-managed-clusters
+      rules:
+        # Required for discovering and watching managed clusters
+        - apiGroups: ["cluster.open-cluster-management.io"]
+          resources: ["managedclusters"]
+          verbs: ["list", "watch"]
+
+  # -- ClusterRoleBinding for the ACM managed clusters role
+  extraClusterRoleBindings:
+    - name: acm-managed-clusters
+      roleRef:
+        name: acm-managed-clusters
+
+  # -- Role for accessing cluster-proxy-addon service in multicluster-engine namespace
+  extraRoles:
+    - name: acm-cluster-proxy-discovery
+      namespace: multicluster-engine
+      rules:
+        # Required for auto-discovering cluster-proxy-addon service
+        - apiGroups: [""]
+          resources: ["services"]
+          verbs: ["get"]
+
+  # -- RoleBinding for the cluster-proxy-discovery role
+  extraRoleBindings:
+    - name: acm-cluster-proxy-discovery
+      namespace: multicluster-engine
+      roleRef:
+        name: acm-cluster-proxy-discovery
