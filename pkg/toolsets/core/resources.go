@@ -11,6 +11,7 @@ import (
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
+	"github.com/containers/kubernetes-mcp-server/pkg/mcplog"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
 )
 
@@ -219,6 +220,7 @@ func resourcesList(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 
 	ret, err := kubernetes.NewCore(params).ResourcesList(params, gvk, ns, resourceListOptions)
 	if err != nil {
+		mcplog.HandleK8sError(params.Context, err, "resource listing")
 		return api.NewToolCallResult("", fmt.Errorf("failed to list resources: %v", err)), nil
 	}
 	return api.NewToolCallResult(params.ListOutput.PrintObj(ret)), nil
@@ -250,6 +252,7 @@ func resourcesGet(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 
 	ret, err := kubernetes.NewCore(params).ResourcesGet(params, gvk, ns, n)
 	if err != nil {
+		mcplog.HandleK8sError(params.Context, err, "resource access")
 		return api.NewToolCallResult("", fmt.Errorf("failed to get resource: %v", err)), nil
 	}
 	return api.NewToolCallResult(output.MarshalYaml(ret)), nil
@@ -268,6 +271,7 @@ func resourcesCreateOrUpdate(params api.ToolHandlerParams) (*api.ToolCallResult,
 
 	resources, err := kubernetes.NewCore(params).ResourcesCreateOrUpdate(params, r)
 	if err != nil {
+		mcplog.HandleK8sError(params.Context, err, "resource creation or update")
 		return api.NewToolCallResult("", fmt.Errorf("failed to create or update resources: %v", err)), nil
 	}
 	marshalledYaml, err := output.MarshalYaml(resources)
@@ -303,6 +307,7 @@ func resourcesDelete(params api.ToolHandlerParams) (*api.ToolCallResult, error) 
 
 	err = kubernetes.NewCore(params).ResourcesDelete(params, gvk, ns, n)
 	if err != nil {
+		mcplog.HandleK8sError(params.Context, err, "resource deletion")
 		return api.NewToolCallResult("", fmt.Errorf("failed to delete resource: %v", err)), nil
 	}
 	return api.NewToolCallResult("Resource deleted successfully", err), nil
@@ -345,6 +350,7 @@ func resourcesScale(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 
 	scale, err := kubernetes.NewCore(params).ResourcesScale(params.Context, gvk, ns, n, desiredScale, shouldScale)
 	if err != nil {
+		mcplog.HandleK8sError(params.Context, err, "resource scaling")
 		return api.NewToolCallResult("", fmt.Errorf("failed to get/update resource scale: %w", err)), nil
 	}
 
