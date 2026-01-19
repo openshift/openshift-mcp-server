@@ -8,7 +8,7 @@ Before deploying the MCP Server with ACM support, ensure you have:
 
 1. **ACM installed** on your hub cluster (version 2.14.0 or higher)
 2. **Managed clusters** imported into ACM
-3. **Identity Provider** (e.g., Keycloak) configured with:
+3. **Identity Provider**: Currently Keycloak (with v1 token exchange) configured with:
    - Separate realm for each cluster (hub + managed clusters)
    - User identity federation between all realms
    - OAuth scopes (e.g., `mcp-server`) configured as default client scopes
