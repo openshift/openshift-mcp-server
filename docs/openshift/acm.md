@@ -117,8 +117,8 @@ config:
           ca_file: /etc/keycloak-ca/keycloak-ca.crt
 
         # Managed cluster - cross-realm token exchange
-        managed-cluster-1:
-          token_url: https://your-keycloak-route/realms/managed-cluster-1/protocol/openid-connect/token
+        managed-cluster:
+          token_url: https://your-keycloak-route/realms/managed-cluster/protocol/openid-connect/token
           client_id: mcp-server
           client_secret: <managed-cluster-client-secret>
           subject_issuer: hub-realm
@@ -238,9 +238,9 @@ audience = "mcp-server"
 subject_token_type = "urn:ietf:params:oauth:token-type:access_token" # this can also be auto-detected, feel free to omit
 ca_file = "/etc/keycloak-ca/keycloak-ca.crt" # note: this needs to be mounted to the pod
 
-# Cluster: cmurray-managed
+# Cluster: managed-cluster
 [cluster_provider_configs.acm.clusters."managed-cluster"]
-token_url = "https://your-keycloak-route-url/realms/manager-cluster-realm/protocol/openid-connect/token"
+token_url = "https://your-keycloak-route-url/realms/managed-cluster/protocol/openid-connect/token"
 client_id = "mcp-server"
 client_secret = "<MCP client secret in keycloak for the managed-cluster realm>"
 subject_issuer = "hub-realm"
