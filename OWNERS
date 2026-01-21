@@ -1,9 +1,11 @@
 reviewers:
   - Cali0707
+  - manusa
   - matzew
   - Kaustubh-pande
 approvers:
   - Cali0707
+  - manusa
   - matzew
   - Kaustubh-pande
 component: "openshift-mcp-server"
