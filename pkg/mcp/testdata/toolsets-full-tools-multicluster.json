@@ -1,6 +1,45 @@
 [
   {
     "annotations": {
+      "title": "Alertmanager: Get Alerts",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "description": "Query active and pending alerts from the cluster's Alertmanager.\nUseful for monitoring cluster health, detecting issues, and incident response.\n\nReturns alerts with their labels, annotations, status, and timing information.\nCan filter by active/silenced/inhibited state.\n\nCommon use cases:\n- Check for critical alerts affecting the cluster\n- Monitor for specific alert types (e.g., high CPU, disk pressure)\n- Verify alert silences are working correctly",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "active": {
+          "default": true,
+          "description": "Filter for active (firing) alerts. Default: true",
+          "type": "boolean"
+        },
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "filter": {
+          "description": "Optional filter using Alertmanager filter syntax. Examples: 'alertname=Watchdog', 'severity=critical', 'namespace=openshift-monitoring'",
+          "type": "string"
+        },
+        "inhibited": {
+          "default": false,
+          "description": "Include inhibited alerts in the results. Default: false",
+          "type": "boolean"
+        },
+        "silenced": {
+          "default": false,
+          "description": "Include silenced alerts in the results. Default: false",
+          "type": "boolean"
+        }
+      }
+    },
+    "name": "alertmanager_alerts"
+  },
+  {
+    "annotations": {
       "title": "Configuration: Contexts List",
       "readOnlyHint": true,
       "destructiveHint": false,
@@ -545,6 +584,79 @@
       }
     },
     "name": "pods_top"
+  },
+  {
+    "annotations": {
+      "title": "Prometheus: Instant Query",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "description": "Execute an instant PromQL query against the cluster's Thanos Querier.\nReturns current metric values at the specified time (or current time if not specified).\nUse this for point-in-time metric values.\n\nCommon queries:\n- up{job=\"apiserver\"} - Check if API server is up\n- sum by(namespace) (container_memory_usage_bytes) - Memory usage by namespace\n- rate(container_cpu_usage_seconds_total[5m]) - CPU usage rate\n- kube_pod_status_phase{phase=\"Running\"} - Running pods count",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "query": {
+          "description": "PromQL query string (e.g., 'up{job=\"apiserver\"}', 'sum by(namespace) (container_memory_usage_bytes)')",
+          "type": "string"
+        },
+        "time": {
+          "description": "Optional evaluation timestamp. Accepts RFC3339 format (e.g., '2024-01-01T12:00:00Z') or Unix timestamp. If not provided, uses current time.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "name": "prometheus_query"
+  },
+  {
+    "annotations": {
+      "title": "Prometheus: Range Query",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "description": "Execute a range PromQL query against the cluster's Thanos Querier.\nReturns metric values over a time range with specified resolution.\nUse this for time-series data, trends, and historical analysis.\n\nSupports relative times:\n- 'now' for current time\n- '-10m', '-1h', '-1d' for relative past times\n\nExample: Get CPU usage over the last hour with 1-minute resolution.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "type": "string"
+        },
+        "end": {
+          "description": "End time. Accepts RFC3339 timestamp, Unix timestamp, 'now', or relative time",
+          "type": "string"
+        },
+        "query": {
+          "description": "PromQL query string (e.g., 'rate(container_cpu_usage_seconds_total[5m])')",
+          "type": "string"
+        },
+        "start": {
+          "description": "Start time. Accepts RFC3339 timestamp (e.g., '2024-01-01T12:00:00Z'), Unix timestamp, or relative time (e.g., '-1h', '-30m', '-1d')",
+          "type": "string"
+        },
+        "step": {
+          "default": "1m",
+          "description": "Query resolution step width (e.g., '15s', '1m', '5m'). Determines the granularity of returned data points. Default: '1m'",
+          "type": "string"
+        }
+      },
+      "required": [
+        "query",
+        "start",
+        "end"
+      ]
+    },
+    "name": "prometheus_query_range"
   },
   {
     "annotations": {

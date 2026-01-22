@@ -18,6 +18,7 @@ import (
 	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/helm"
 	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kiali"
 	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt"
+	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/observability"
 )
 
 type OpenShift struct{}
