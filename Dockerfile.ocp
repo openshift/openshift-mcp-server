@@ -27,17 +27,17 @@ ENV CONFIG_PATH=/mcp_config.toml
 
 # Labels for enterprise contract
 LABEL com.redhat.component=openshift-mcp-server
-LABEL cpe="cpe:/a:redhat:openshift_lightspeed:1::el9"
-LABEL description="Red Hat OpenShift MCP Server"
-LABEL io.k8s.description="Red Hat OpenShift MCP Server"
-LABEL io.k8s.display-name="Red Hat OpenShift MCP Server"
+LABEL cpe="cpe:/a:redhat:openshift_mcp_server:0.1::el9"
+LABEL description="MCP server for Red Hat Openshift"
+LABEL io.k8s.description="MCP server for Red Hat Openshift"
+LABEL io.k8s.display-name="MCP server for Red Hat Openshift"
 LABEL io.openshift.tags="openshift,mcp"
 LABEL name="openshift-lightspeed/openshift-mcp-server-rhel9"
 LABEL release=0.0.1
 LABEL url="https://github.com/openshift/openshift-mcp-server"
 LABEL vendor="Red Hat, Inc."
 LABEL version=0.0.1
-LABEL summary="Red Hat OpenShift MCP Server"
+LABEL summary="MCP server for Red Hat Openshift"
 LABEL konflux.additional-tags="latest"
 
 ENTRYPOINT ["/openshift-mcp-server", "--config", "$CONFIG_PATH"]
