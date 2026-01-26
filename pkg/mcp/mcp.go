@@ -8,7 +8,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -63,8 +62,6 @@ func (c *Configuration) isToolApplicable(tool api.ServerTool) bool {
 
 type Server struct {
 	configuration  *Configuration
-	oidcProvider   *oidc.Provider
-	httpClient     *http.Client
 	server         *mcp.Server
 	enabledTools   []string
 	enabledPrompts []string
@@ -72,11 +69,9 @@ type Server struct {
 	metrics        *metrics.Metrics // Metrics collection system
 }
 
-func NewServer(configuration Configuration, oidcProvider *oidc.Provider, httpClient *http.Client) (*Server, error) {
+func NewServer(configuration Configuration, targetProvider internalk8s.Provider) (*Server, error) {
 	s := &Server{
 		configuration: &configuration,
-		oidcProvider:  oidcProvider,
-		httpClient:    httpClient,
 		server: mcp.NewServer(
 			&mcp.Implementation{
 				Name:       version.BinaryName,
@@ -93,6 +88,7 @@ func NewServer(configuration Configuration, oidcProvider *oidc.Provider, httpCli
 				},
 				Instructions: configuration.ServerInstructions,
 			}),
+		p: targetProvider,
 	}
 
 	// Initialize metrics system
@@ -115,10 +111,6 @@ func NewServer(configuration Configuration, oidcProvider *oidc.Provider, httpCli
 	s.server.AddReceivingMiddleware(s.metricsMiddleware())
 	if configuration.RequireOAuth && false { // TODO: Disabled scope auth validation for now
 		s.server.AddReceivingMiddleware(toolScopedAuthorizationMiddleware)
-	}
-	s.p, err = internalk8s.NewProvider(s.configuration.StaticConfig)
-	if err != nil {
-		return nil, err
 	}
 	err = s.reloadToolsets()
 	if err != nil {
