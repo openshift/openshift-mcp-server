@@ -8,6 +8,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/prometheus"
 )
 
 // initPrometheus returns the Prometheus query tools.
@@ -119,19 +120,20 @@ func prometheusQueryHandler(params api.ToolHandlerParams) (*api.ToolCallResult, 
 		return api.NewToolCallResult("", fmt.Errorf("query exceeds maximum length of %d characters", maxQueryLength)), nil
 	}
 
+	// Validate endpoint (security check)
+	endpoint := "/api/v1/query"
+	if err := validatePrometheusEndpoint(endpoint); err != nil {
+		return api.NewToolCallResult("", err), nil
+	}
+
 	// Get Thanos Querier URL
 	baseURL, err := getRouteURL(params.Context, params, thanosQuerierRoute, getMonitoringNamespace(params))
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get Thanos Querier route: %w", err)), nil
 	}
 
-	// Validate endpoint
-	endpoint := "/api/v1/query"
-	if err := validatePrometheusEndpoint(endpoint); err != nil {
-		return api.NewToolCallResult("", err), nil
-	}
-
-	// Build query parameters
+	// Create client and build query parameters
+	client := newPrometheusClient(baseURL, params)
 	queryParams := url.Values{}
 	queryParams.Set("query", query)
 
@@ -139,9 +141,8 @@ func prometheusQueryHandler(params api.ToolHandlerParams) (*api.ToolCallResult, 
 		queryParams.Set("time", timeParam)
 	}
 
-	// Build URL and execute request
-	requestURL := buildQueryURL(baseURL, endpoint, queryParams)
-	body, err := executeHTTPRequest(params.Context, params, requestURL)
+	// Execute request
+	body, err := client.QueryRaw(params.Context, endpoint, queryParams)
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("prometheus query failed: %w", err)), nil
 	}
@@ -186,14 +187,20 @@ func prometheusQueryRangeHandler(params api.ToolHandlerParams) (*api.ToolCallRes
 	}
 
 	// Convert relative times
-	startTime, err := convertRelativeTime(start)
+	startTime, err := prometheus.ConvertRelativeTime(start)
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("invalid start time: %w", err)), nil
 	}
 
-	endTime, err := convertRelativeTime(end)
+	endTime, err := prometheus.ConvertRelativeTime(end)
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("invalid end time: %w", err)), nil
+	}
+
+	// Validate endpoint (security check)
+	endpoint := "/api/v1/query_range"
+	if err := validatePrometheusEndpoint(endpoint); err != nil {
+		return api.NewToolCallResult("", err), nil
 	}
 
 	// Get Thanos Querier URL
@@ -202,22 +209,16 @@ func prometheusQueryRangeHandler(params api.ToolHandlerParams) (*api.ToolCallRes
 		return api.NewToolCallResult("", fmt.Errorf("failed to get Thanos Querier route: %w", err)), nil
 	}
 
-	// Validate endpoint
-	endpoint := "/api/v1/query_range"
-	if err := validatePrometheusEndpoint(endpoint); err != nil {
-		return api.NewToolCallResult("", err), nil
-	}
-
-	// Build query parameters
+	// Create client and build query parameters
+	client := newPrometheusClient(baseURL, params)
 	queryParams := url.Values{}
 	queryParams.Set("query", query)
 	queryParams.Set("start", startTime)
 	queryParams.Set("end", endTime)
 	queryParams.Set("step", step)
 
-	// Build URL and execute request
-	requestURL := buildQueryURL(baseURL, endpoint, queryParams)
-	body, err := executeHTTPRequest(params.Context, params, requestURL)
+	// Execute request
+	body, err := client.QueryRaw(params.Context, endpoint, queryParams)
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("prometheus range query failed: %w", err)), nil
 	}

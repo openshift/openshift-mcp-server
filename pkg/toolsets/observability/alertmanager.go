@@ -2,7 +2,6 @@ package observability
 
 import (
 	"fmt"
-	"net/url"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"k8s.io/utils/ptr"
@@ -70,54 +69,49 @@ Common use cases:
 
 // alertmanagerAlertsHandler handles Alertmanager alerts queries.
 func alertmanagerAlertsHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
+	// Validate endpoint (security check)
+	endpoint := "/api/v2/alerts"
+	if err := validateAlertmanagerEndpoint(endpoint); err != nil {
+		return api.NewToolCallResult("", err), nil
+	}
+
 	// Get Alertmanager URL
 	baseURL, err := getRouteURL(params.Context, params, alertmanagerRoute, getMonitoringNamespace(params))
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get Alertmanager route: %w", err)), nil
 	}
 
-	// Validate endpoint
-	endpoint := "/api/v2/alerts"
-	if err := validateAlertmanagerEndpoint(endpoint); err != nil {
-		return api.NewToolCallResult("", err), nil
-	}
-
-	// Build query parameters
-	queryParams := url.Values{}
-
 	// Handle active parameter (default: true)
 	active := true
 	if v, ok := params.GetArguments()["active"].(bool); ok {
 		active = v
 	}
-	queryParams.Set("active", fmt.Sprintf("%t", active))
 
 	// Handle silenced parameter (default: false)
 	silenced := false
 	if v, ok := params.GetArguments()["silenced"].(bool); ok {
 		silenced = v
 	}
-	queryParams.Set("silenced", fmt.Sprintf("%t", silenced))
 
 	// Handle inhibited parameter (default: false)
 	inhibited := false
 	if v, ok := params.GetArguments()["inhibited"].(bool); ok {
 		inhibited = v
 	}
-	queryParams.Set("inhibited", fmt.Sprintf("%t", inhibited))
 
 	// Handle optional filter
-	if filter, ok := params.GetArguments()["filter"].(string); ok && filter != "" {
+	filter := ""
+	if f, ok := params.GetArguments()["filter"].(string); ok && f != "" {
 		// Validate filter length
-		if len(filter) > maxQueryLength {
+		if len(f) > maxQueryLength {
 			return api.NewToolCallResult("", fmt.Errorf("filter exceeds maximum length of %d characters", maxQueryLength)), nil
 		}
-		queryParams.Add("filter", filter)
+		filter = f
 	}
 
-	// Build URL and execute request
-	requestURL := buildQueryURL(baseURL, endpoint, queryParams)
-	body, err := executeHTTPRequest(params.Context, params, requestURL)
+	// Create client and execute request
+	client := newPrometheusClient(baseURL, params)
+	body, err := client.GetAlertsRaw(params.Context, active, silenced, inhibited, filter)
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("alertmanager query failed: %w", err)), nil
 	}
