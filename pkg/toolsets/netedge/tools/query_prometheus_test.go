@@ -78,6 +78,12 @@ func TestQueryPrometheusHandler_Diagnostics(t *testing.T) {
 			metricName = "haproxy_server_http_responses_total"
 		} else if strings.Contains(query, "coredns_dns_request_count_total") {
 			metricName = "coredns_dns_request_count_total"
+		} else if strings.Contains(query, "ALERTS") {
+			metricName = "ALERTS"
+		} else if strings.Contains(query, "up") {
+			metricName = "up"
+		} else if strings.Contains(query, "coredns_plugin_rewrite_request_count_total") {
+			metricName = "coredns_plugin_rewrite_request_count_total"
 		} else {
 			metricName = "result"
 		}
@@ -101,6 +107,8 @@ func TestQueryPrometheusHandler_Diagnostics(t *testing.T) {
 			resp.Data.Result[0].Metric["check"] = "ingress-error-rate"
 		} else if strings.Contains(query, "coredns_dns_request_count_total") {
 			resp.Data.Result[0].Metric["check"] = "dns-request-rate"
+		} else if strings.Contains(query, "ALERTS") {
+			resp.Data.Result[0].Metric["check"] = "operators-alerts"
 		}
 
 		json.NewEncoder(w).Encode(resp)
@@ -142,6 +150,7 @@ func TestQueryPrometheusHandler_Diagnostics(t *testing.T) {
 				"ingress_error_rate",
 				"ingress_active_conns",
 				"ingress_reloads_last_day",
+				"ingress_top_error_routes",
 				"check", "ingress-error-rate",
 			},
 		},
@@ -153,7 +162,18 @@ func TestQueryPrometheusHandler_Diagnostics(t *testing.T) {
 				"dns_nxdomain_rate",
 				"dns_servfail_rate",
 				"dns_panic_recovery",
+				"dns_error_breakdown",
+				"dns_rewrite_count",
 				"check", "dns-request-rate",
+			},
+		},
+		{
+			name:       "Operators Diagnostics",
+			diagTarget: "operators",
+			expectedContains: []string{
+				"active_alerts",
+				"operator_up",
+				"check", "operators-alerts",
 			},
 		},
 		{

@@ -44,7 +44,7 @@ func InitQueryPrometheus() []api.ServerTool {
 						"diagnostic_target": {
 							Type:        "string",
 							Description: "Run specialized diagnostics for a specific component.",
-							Enum:        []any{"ingress", "dns"},
+							Enum:        []any{"ingress", "dns", "operators"},
 						},
 					},
 					Required: []string{"diagnostic_target"},
@@ -88,13 +88,21 @@ func handleDiagnosticTarget(params api.ToolHandlerParams, target string) (*api.T
 			"ingress_error_rate":       `sum(rate(haproxy_server_http_responses_total{code!~"2.."}[5m]))`,
 			"ingress_active_conns":     `sum(haproxy_backend_connections_active_total)`,
 			"ingress_reloads_last_day": `changes(haproxy_server_start_time_seconds[1d])`,
+			"ingress_top_error_routes": `topk(5, sum by (route) (rate(haproxy_server_http_responses_total{code!~"2.."}[5m])))`,
 		}
 	case "dns":
 		queries = map[string]string{
-			"dns_request_rate":   `sum(rate(coredns_dns_request_count_total[5m]))`,
-			"dns_nxdomain_rate":  `sum(rate(coredns_dns_request_count_total{rcode="NXDOMAIN"}[5m]))`,
-			"dns_servfail_rate":  `sum(rate(coredns_dns_request_count_total{rcode="SERVFAIL"}[5m]))`,
-			"dns_panic_recovery": `sum(rate(coredns_panic_count_total[5m]))`,
+			"dns_request_rate":    `sum(rate(coredns_dns_request_count_total[5m]))`,
+			"dns_nxdomain_rate":   `sum(rate(coredns_dns_request_count_total{rcode="NXDOMAIN"}[5m]))`,
+			"dns_servfail_rate":   `sum(rate(coredns_dns_request_count_total{rcode="SERVFAIL"}[5m]))`,
+			"dns_panic_recovery":  `sum(rate(coredns_panic_count_total[5m]))`,
+			"dns_error_breakdown": `sum by (rcode) (rate(coredns_dns_request_count_total{rcode!="NOERROR"}[5m]))`,
+			"dns_rewrite_count":   `sum(rate(coredns_plugin_rewrite_request_count_total[5m]))`,
+		}
+	case "operators":
+		queries = map[string]string{
+			"active_alerts": `ALERTS{alertstate="firing", namespace=~"openshift-ingress-operator|openshift-dns"}`,
+			"operator_up":   `up{job=~"cluster-ingress-operator|dns-operator"}`,
 		}
 	default:
 		return api.NewToolCallResult("", fmt.Errorf("unknown diagnostic target: %s", target)), nil
