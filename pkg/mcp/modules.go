@@ -8,4 +8,5 @@ import (
 	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kiali"
 	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt"
 	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/observability"
+	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/openshift"
 )
