@@ -6,10 +6,10 @@ package prometheus
 
 // QueryResult represents a Prometheus API query response.
 type QueryResult struct {
-	Status    string `json:"status"`
-	Data      Data   `json:"data"`
-	ErrorType string `json:"errorType,omitempty"`
-	Error     string `json:"error,omitempty"`
+	Status    string   `json:"status"`
+	Data      Data     `json:"data"`
+	ErrorType string   `json:"errorType,omitempty"`
+	Error     string   `json:"error,omitempty"`
 	Warnings  []string `json:"warnings,omitempty"`
 }
 
