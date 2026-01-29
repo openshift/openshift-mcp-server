@@ -17,3 +17,26 @@ func GetDataProtectionApplication(ctx context.Context, client dynamic.Interface,
 func ListDataProtectionApplications(ctx context.Context, client dynamic.Interface, namespace string, opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
 	return client.Resource(DataProtectionApplicationGVR).Namespace(namespace).List(ctx, opts)
 }
+
+// CreateDataProtectionApplication creates a new DataProtectionApplication
+func CreateDataProtectionApplication(ctx context.Context, client dynamic.Interface, dpa *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	namespace := dpa.GetNamespace()
+	if namespace == "" {
+		namespace = DefaultOADPNamespace
+	}
+	return client.Resource(DataProtectionApplicationGVR).Namespace(namespace).Create(ctx, dpa, metav1.CreateOptions{})
+}
+
+// UpdateDataProtectionApplication updates an existing DataProtectionApplication
+func UpdateDataProtectionApplication(ctx context.Context, client dynamic.Interface, dpa *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	namespace := dpa.GetNamespace()
+	if namespace == "" {
+		namespace = DefaultOADPNamespace
+	}
+	return client.Resource(DataProtectionApplicationGVR).Namespace(namespace).Update(ctx, dpa, metav1.UpdateOptions{})
+}
+
+// DeleteDataProtectionApplication deletes a DataProtectionApplication
+func DeleteDataProtectionApplication(ctx context.Context, client dynamic.Interface, namespace, name string) error {
+	return client.Resource(DataProtectionApplicationGVR).Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+}

@@ -48,9 +48,12 @@ func (s *ToolsetSuite) TestGetTools() {
 	s.Run("returns expected number of tools", func() {
 		tools := s.toolset.GetTools(&mockOpenShift{isOpenShift: true})
 
-		// We expect 21 tools total:
-		// 5 backup, 5 restore, 5 schedule, 4 storage, 2 DPA
-		s.Len(tools, 21, "Expected 21 tools in OADP toolset")
+		// We expect 90 tools total covering all OADP/Velero CRDs:
+		// 5 backup, 5 restore, 6 schedule, 10 storage (BSL/VSL), 5 DPA,
+		// 3 backup repository, 4 pod volume, 4 server status, 6 data mover,
+		// 4 download request, 2 delete backup request, 4 cloud storage,
+		// 4 data protection test, 20 non-admin, 8 VM restore
+		s.Len(tools, 90, "Expected 90 tools in OADP toolset")
 	})
 
 	s.Run("all tools have required fields", func() {
@@ -68,20 +71,69 @@ func (s *ToolsetSuite) TestGetTools() {
 		tools := s.toolset.GetTools(&mockOpenShift{isOpenShift: true})
 
 		readOnlyTools := map[string]bool{
-			"oadp_backup_list":                   true,
-			"oadp_backup_get":                    true,
-			"oadp_backup_logs":                   true,
-			"oadp_restore_list":                  true,
-			"oadp_restore_get":                   true,
-			"oadp_restore_logs":                  true,
-			"oadp_schedule_list":                 true,
-			"oadp_schedule_get":                  true,
+			// Backup tools
+			"oadp_backup_list": true,
+			"oadp_backup_get":  true,
+			"oadp_backup_logs": true,
+			// Restore tools
+			"oadp_restore_list": true,
+			"oadp_restore_get":  true,
+			"oadp_restore_logs": true,
+			// Schedule tools
+			"oadp_schedule_list": true,
+			"oadp_schedule_get":  true,
+			// Storage location tools
 			"oadp_backup_storage_location_list":  true,
 			"oadp_backup_storage_location_get":   true,
 			"oadp_volume_snapshot_location_list": true,
 			"oadp_volume_snapshot_location_get":  true,
-			"oadp_dpa_list":                      true,
-			"oadp_dpa_get":                       true,
+			// DPA tools
+			"oadp_dpa_list": true,
+			"oadp_dpa_get":  true,
+			// Backup repository tools
+			"oadp_backup_repository_list": true,
+			"oadp_backup_repository_get":  true,
+			// Pod volume tools
+			"oadp_pod_volume_backup_list":  true,
+			"oadp_pod_volume_backup_get":   true,
+			"oadp_pod_volume_restore_list": true,
+			"oadp_pod_volume_restore_get":  true,
+			// Server status tools
+			"oadp_server_status_request_list": true,
+			"oadp_server_status_request_get":  true,
+			// Data mover tools
+			"oadp_data_upload_list":   true,
+			"oadp_data_upload_get":    true,
+			"oadp_data_download_list": true,
+			"oadp_data_download_get":  true,
+			// Download request tools
+			"oadp_download_request_list": true,
+			"oadp_download_request_get":  true,
+			// Delete backup request tools
+			"oadp_delete_backup_request_list": true,
+			"oadp_delete_backup_request_get":  true,
+			// Cloud storage tools
+			"oadp_cloud_storage_list": true,
+			"oadp_cloud_storage_get":  true,
+			// Data protection test tools
+			"oadp_data_protection_test_list": true,
+			"oadp_data_protection_test_get":  true,
+			// Non-admin tools
+			"oadp_non_admin_backup_list":           true,
+			"oadp_non_admin_backup_get":            true,
+			"oadp_non_admin_restore_list":          true,
+			"oadp_non_admin_restore_get":           true,
+			"oadp_non_admin_bsl_list":              true,
+			"oadp_non_admin_bsl_get":               true,
+			"oadp_non_admin_bsl_request_list":      true,
+			"oadp_non_admin_bsl_request_get":       true,
+			"oadp_non_admin_download_request_list": true,
+			"oadp_non_admin_download_request_get":  true,
+			// VM restore tools
+			"oadp_vm_backup_discovery_list": true,
+			"oadp_vm_backup_discovery_get":  true,
+			"oadp_vm_file_restore_list":     true,
+			"oadp_vm_file_restore_get":      true,
 		}
 
 		for _, tool := range tools {
@@ -98,10 +150,38 @@ func (s *ToolsetSuite) TestGetTools() {
 		tools := s.toolset.GetTools(&mockOpenShift{isOpenShift: true})
 
 		destructiveTools := map[string]bool{
-			"oadp_backup_delete":   true,
-			"oadp_restore_create":  true,
-			"oadp_restore_delete":  true,
+			// Backup/restore tools
+			"oadp_backup_delete":  true,
+			"oadp_restore_create": true,
+			"oadp_restore_delete": true,
+			// Schedule tools
 			"oadp_schedule_delete": true,
+			// Storage location tools
+			"oadp_backup_storage_location_delete":  true,
+			"oadp_volume_snapshot_location_delete": true,
+			// DPA tools
+			"oadp_dpa_delete": true,
+			// Backup repository tools
+			"oadp_backup_repository_delete": true,
+			// Server status tools
+			"oadp_server_status_request_delete": true,
+			// Data mover tools
+			"oadp_data_upload_cancel":   true,
+			"oadp_data_download_cancel": true,
+			// Download request tools
+			"oadp_download_request_delete": true,
+			// Cloud storage tools
+			"oadp_cloud_storage_delete": true,
+			// Data protection test tools
+			"oadp_data_protection_test_delete": true,
+			// Non-admin tools
+			"oadp_non_admin_backup_delete":           true,
+			"oadp_non_admin_restore_delete":          true,
+			"oadp_non_admin_bsl_delete":              true,
+			"oadp_non_admin_download_request_delete": true,
+			// VM restore tools
+			"oadp_vm_backup_discovery_delete": true,
+			"oadp_vm_file_restore_delete":     true,
 		}
 
 		for _, tool := range tools {

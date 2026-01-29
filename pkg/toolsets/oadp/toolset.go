@@ -31,6 +31,16 @@ func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
 		initScheduleTools(),
 		initStorageTools(),
 		initDPATools(),
+		initBackupRepositoryTools(),
+		initPodVolumeTools(),
+		initServerStatusRequestTools(),
+		initDataMoverTools(),
+		initDownloadRequestTools(),
+		initDeleteBackupRequestTools(),
+		initCloudStorageTools(),
+		initDataProtectionTestTools(),
+		initNonAdminTools(),
+		initVMRestoreTools(),
 	)
 }
 
