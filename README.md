@@ -267,6 +267,7 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 | helm          | Tools for managing Helm charts and releases                                                                                                                     | ✓       |
 | kcp           | Manage kcp workspaces and multi-tenancy features                                                                                                                |         |
 | kubevirt      | KubeVirt virtual machine management tools                                                                                                                       |         |
+| oadp          | OADP (OpenShift API for Data Protection) tools for managing Velero backups, restores, and schedules                                                             |         |
 | observability | Cluster observability tools for querying Prometheus metrics and Alertmanager alerts                                                                             |         |
 | ossm          | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details. |         |
 
@@ -448,6 +449,117 @@ In case multi-cluster support is enabled (default) and you have access to multip
   - `action` (`string`) **(required)** - The lifecycle action to perform: 'start' (changes runStrategy to Always), 'stop' (changes runStrategy to Halted), or 'restart' (stops then starts the VM)
   - `name` (`string`) **(required)** - The name of the virtual machine
   - `namespace` (`string`) **(required)** - The namespace of the virtual machine
+
+</details>
+
+<details>
+
+<summary>oadp</summary>
+
+- **oadp_backup_list** - List all Velero backups in the specified namespace
+  - `namespace` (`string`) - Namespace containing backups (default: openshift-adp)
+
+- **oadp_backup_get** - Get detailed information about a specific Velero backup including status and progress
+  - `namespace` (`string`) - Namespace of the backup (default: openshift-adp)
+  - `name` (`string`) **(required)** - Name of the backup
+
+- **oadp_backup_create** - Create a new Velero backup with specified configuration
+  - `namespace` (`string`) - Namespace where backup will be created (default: openshift-adp)
+  - `name` (`string`) **(required)** - Name of the backup
+  - `includedNamespaces` (`array`) - Namespaces to include in the backup
+  - `excludedNamespaces` (`array`) - Namespaces to exclude from the backup
+  - `includedResources` (`array`) - Resources to include in the backup
+  - `excludedResources` (`array`) - Resources to exclude from the backup
+  - `labelSelector` (`string`) - Label selector to filter resources
+  - `storageLocation` (`string`) - Name of the BackupStorageLocation
+  - `volumeSnapshotLocations` (`array`) - Names of VolumeSnapshotLocations
+  - `ttl` (`string`) - Time to live for the backup (e.g., '720h')
+  - `snapshotVolumes` (`boolean`) - Whether to snapshot volumes
+  - `defaultVolumesToFsBackup` (`boolean`) - Use file system backup for volumes by default
+
+- **oadp_backup_delete** - Delete a Velero backup and optionally its associated data
+  - `namespace` (`string`) - Namespace of the backup (default: openshift-adp)
+  - `name` (`string`) **(required)** - Name of the backup to delete
+
+- **oadp_backup_logs** - Get logs and detailed status information for a backup
+  - `namespace` (`string`) - Namespace of the backup (default: openshift-adp)
+  - `name` (`string`) **(required)** - Name of the backup
+
+- **oadp_restore_list** - List all Velero restores in the specified namespace
+  - `namespace` (`string`) - Namespace containing restores (default: openshift-adp)
+
+- **oadp_restore_get** - Get detailed information about a specific Velero restore including status and progress
+  - `namespace` (`string`) - Namespace of the restore (default: openshift-adp)
+  - `name` (`string`) **(required)** - Name of the restore
+
+- **oadp_restore_create** - Create a new Velero restore from an existing backup
+  - `namespace` (`string`) - Namespace where restore will be created (default: openshift-adp)
+  - `name` (`string`) **(required)** - Name of the restore
+  - `backupName` (`string`) **(required)** - Name of the backup to restore from
+  - `includedNamespaces` (`array`) - Namespaces to include in the restore
+  - `excludedNamespaces` (`array`) - Namespaces to exclude from the restore
+  - `includedResources` (`array`) - Resources to include in the restore
+  - `excludedResources` (`array`) - Resources to exclude from the restore
+  - `labelSelector` (`string`) - Label selector to filter resources
+  - `restorePVs` (`boolean`) - Whether to restore persistent volumes
+  - `preserveNodePorts` (`boolean`) - Whether to preserve node ports for services
+
+- **oadp_restore_delete** - Delete a Velero restore record
+  - `namespace` (`string`) - Namespace of the restore (default: openshift-adp)
+  - `name` (`string`) **(required)** - Name of the restore to delete
+
+- **oadp_restore_logs** - Get logs and detailed status information for a restore
+  - `namespace` (`string`) - Namespace of the restore (default: openshift-adp)
+  - `name` (`string`) **(required)** - Name of the restore
+
+- **oadp_schedule_list** - List all Velero backup schedules in the specified namespace
+  - `namespace` (`string`) - Namespace containing schedules (default: openshift-adp)
+
+- **oadp_schedule_get** - Get detailed information about a specific Velero backup schedule
+  - `namespace` (`string`) - Namespace of the schedule (default: openshift-adp)
+  - `name` (`string`) **(required)** - Name of the schedule
+
+- **oadp_schedule_create** - Create a new Velero backup schedule with cron expression
+  - `namespace` (`string`) - Namespace where schedule will be created (default: openshift-adp)
+  - `name` (`string`) **(required)** - Name of the schedule
+  - `schedule` (`string`) **(required)** - Cron expression for the schedule (e.g., '0 2 * * *' for daily at 2 AM)
+  - `includedNamespaces` (`array`) - Namespaces to include in scheduled backups
+  - `excludedNamespaces` (`array`) - Namespaces to exclude from scheduled backups
+  - `includedResources` (`array`) - Resources to include in scheduled backups
+  - `excludedResources` (`array`) - Resources to exclude from scheduled backups
+  - `labelSelector` (`string`) - Label selector to filter resources
+  - `storageLocation` (`string`) - Name of the BackupStorageLocation
+  - `ttl` (`string`) - Time to live for scheduled backups (e.g., '720h')
+
+- **oadp_schedule_delete** - Delete a Velero backup schedule
+  - `namespace` (`string`) - Namespace of the schedule (default: openshift-adp)
+  - `name` (`string`) **(required)** - Name of the schedule to delete
+
+- **oadp_schedule_pause** - Pause or unpause a Velero backup schedule
+  - `namespace` (`string`) - Namespace of the schedule (default: openshift-adp)
+  - `name` (`string`) **(required)** - Name of the schedule
+  - `paused` (`boolean`) **(required)** - Whether to pause (true) or unpause (false) the schedule
+
+- **oadp_backup_storage_location_list** - List all BackupStorageLocations (where backups are stored)
+  - `namespace` (`string`) - Namespace containing BSLs (default: openshift-adp)
+
+- **oadp_backup_storage_location_get** - Get detailed information about a BackupStorageLocation
+  - `namespace` (`string`) - Namespace of the BSL (default: openshift-adp)
+  - `name` (`string`) **(required)** - Name of the BackupStorageLocation
+
+- **oadp_volume_snapshot_location_list** - List all VolumeSnapshotLocations (where volume snapshots are stored)
+  - `namespace` (`string`) - Namespace containing VSLs (default: openshift-adp)
+
+- **oadp_volume_snapshot_location_get** - Get detailed information about a VolumeSnapshotLocation
+  - `namespace` (`string`) - Namespace of the VSL (default: openshift-adp)
+  - `name` (`string`) **(required)** - Name of the VolumeSnapshotLocation
+
+- **oadp_dpa_list** - List all DataProtectionApplication instances (OADP operator configuration)
+  - `namespace` (`string`) - Namespace containing DPAs (default: openshift-adp)
+
+- **oadp_dpa_get** - Get detailed information about a DataProtectionApplication including configuration and status conditions
+  - `namespace` (`string`) - Namespace of the DPA (default: openshift-adp)
+  - `name` (`string`) **(required)** - Name of the DataProtectionApplication
 
 </details>
 
