@@ -454,112 +454,182 @@ In case multi-cluster support is enabled (default) and you have access to multip
 
 <details>
 
-<summary>oadp</summary>
+<summary>oadp (90 tools)</summary>
+
+**Backup Tools:**
 
 - **oadp_backup_list** - List all Velero backups in the specified namespace
   - `namespace` (`string`) - Namespace containing backups (default: openshift-adp)
 
-- **oadp_backup_get** - Get detailed information about a specific Velero backup including status and progress
+- **oadp_backup_get** - Get detailed information about a specific Velero backup
   - `namespace` (`string`) - Namespace of the backup (default: openshift-adp)
   - `name` (`string`) **(required)** - Name of the backup
 
-- **oadp_backup_create** - Create a new Velero backup with specified configuration
+- **oadp_backup_create** - Create a new Velero backup
   - `namespace` (`string`) - Namespace where backup will be created (default: openshift-adp)
   - `name` (`string`) **(required)** - Name of the backup
-  - `includedNamespaces` (`array`) - Namespaces to include in the backup
-  - `excludedNamespaces` (`array`) - Namespaces to exclude from the backup
-  - `includedResources` (`array`) - Resources to include in the backup
-  - `excludedResources` (`array`) - Resources to exclude from the backup
-  - `labelSelector` (`string`) - Label selector to filter resources
-  - `storageLocation` (`string`) - Name of the BackupStorageLocation
-  - `volumeSnapshotLocations` (`array`) - Names of VolumeSnapshotLocations
-  - `ttl` (`string`) - Time to live for the backup (e.g., '720h')
-  - `snapshotVolumes` (`boolean`) - Whether to snapshot volumes
-  - `defaultVolumesToFsBackup` (`boolean`) - Use file system backup for volumes by default
+  - `includedNamespaces` (`array`) - Namespaces to include
+  - `storageLocation` (`string`) - BackupStorageLocation name
+  - `ttl` (`string`) - Time to live (e.g., '720h')
 
-- **oadp_backup_delete** - Delete a Velero backup and optionally its associated data
-  - `namespace` (`string`) - Namespace of the backup (default: openshift-adp)
-  - `name` (`string`) **(required)** - Name of the backup to delete
-
-- **oadp_backup_logs** - Get logs and detailed status information for a backup
+- **oadp_backup_delete** - Delete a Velero backup
   - `namespace` (`string`) - Namespace of the backup (default: openshift-adp)
   - `name` (`string`) **(required)** - Name of the backup
 
-- **oadp_restore_list** - List all Velero restores in the specified namespace
-  - `namespace` (`string`) - Namespace containing restores (default: openshift-adp)
+- **oadp_backup_logs** - Get logs and status for a backup
+  - `namespace` (`string`) - Namespace of the backup (default: openshift-adp)
+  - `name` (`string`) **(required)** - Name of the backup
 
-- **oadp_restore_get** - Get detailed information about a specific Velero restore including status and progress
-  - `namespace` (`string`) - Namespace of the restore (default: openshift-adp)
-  - `name` (`string`) **(required)** - Name of the restore
+**Restore Tools:**
 
-- **oadp_restore_create** - Create a new Velero restore from an existing backup
-  - `namespace` (`string`) - Namespace where restore will be created (default: openshift-adp)
-  - `name` (`string`) **(required)** - Name of the restore
-  - `backupName` (`string`) **(required)** - Name of the backup to restore from
-  - `includedNamespaces` (`array`) - Namespaces to include in the restore
-  - `excludedNamespaces` (`array`) - Namespaces to exclude from the restore
-  - `includedResources` (`array`) - Resources to include in the restore
-  - `excludedResources` (`array`) - Resources to exclude from the restore
-  - `labelSelector` (`string`) - Label selector to filter resources
-  - `restorePVs` (`boolean`) - Whether to restore persistent volumes
-  - `preserveNodePorts` (`boolean`) - Whether to preserve node ports for services
+- **oadp_restore_list** - List all Velero restores
+- **oadp_restore_get** - Get restore details
+- **oadp_restore_create** - Create a restore from backup
+- **oadp_restore_delete** - Delete a restore record
+- **oadp_restore_logs** - Get restore logs/status
 
-- **oadp_restore_delete** - Delete a Velero restore record
-  - `namespace` (`string`) - Namespace of the restore (default: openshift-adp)
-  - `name` (`string`) **(required)** - Name of the restore to delete
+**Schedule Tools:**
 
-- **oadp_restore_logs** - Get logs and detailed status information for a restore
-  - `namespace` (`string`) - Namespace of the restore (default: openshift-adp)
-  - `name` (`string`) **(required)** - Name of the restore
+- **oadp_schedule_list** - List backup schedules
+- **oadp_schedule_get** - Get schedule details
+- **oadp_schedule_create** - Create a backup schedule
+- **oadp_schedule_update** - Update schedule configuration
+- **oadp_schedule_delete** - Delete a schedule
+- **oadp_schedule_pause** - Pause/unpause a schedule
 
-- **oadp_schedule_list** - List all Velero backup schedules in the specified namespace
-  - `namespace` (`string`) - Namespace containing schedules (default: openshift-adp)
+**BackupStorageLocation Tools:**
 
-- **oadp_schedule_get** - Get detailed information about a specific Velero backup schedule
-  - `namespace` (`string`) - Namespace of the schedule (default: openshift-adp)
-  - `name` (`string`) **(required)** - Name of the schedule
+- **oadp_backup_storage_location_list** - List BSLs
+- **oadp_backup_storage_location_get** - Get BSL details
+- **oadp_backup_storage_location_create** - Create a BSL
+- **oadp_backup_storage_location_update** - Update BSL configuration
+- **oadp_backup_storage_location_delete** - Delete a BSL
 
-- **oadp_schedule_create** - Create a new Velero backup schedule with cron expression
-  - `namespace` (`string`) - Namespace where schedule will be created (default: openshift-adp)
-  - `name` (`string`) **(required)** - Name of the schedule
-  - `schedule` (`string`) **(required)** - Cron expression for the schedule (e.g., '0 2 * * *' for daily at 2 AM)
-  - `includedNamespaces` (`array`) - Namespaces to include in scheduled backups
-  - `excludedNamespaces` (`array`) - Namespaces to exclude from scheduled backups
-  - `includedResources` (`array`) - Resources to include in scheduled backups
-  - `excludedResources` (`array`) - Resources to exclude from scheduled backups
-  - `labelSelector` (`string`) - Label selector to filter resources
-  - `storageLocation` (`string`) - Name of the BackupStorageLocation
-  - `ttl` (`string`) - Time to live for scheduled backups (e.g., '720h')
+**VolumeSnapshotLocation Tools:**
 
-- **oadp_schedule_delete** - Delete a Velero backup schedule
-  - `namespace` (`string`) - Namespace of the schedule (default: openshift-adp)
-  - `name` (`string`) **(required)** - Name of the schedule to delete
+- **oadp_volume_snapshot_location_list** - List VSLs
+- **oadp_volume_snapshot_location_get** - Get VSL details
+- **oadp_volume_snapshot_location_create** - Create a VSL
+- **oadp_volume_snapshot_location_update** - Update VSL configuration
+- **oadp_volume_snapshot_location_delete** - Delete a VSL
 
-- **oadp_schedule_pause** - Pause or unpause a Velero backup schedule
-  - `namespace` (`string`) - Namespace of the schedule (default: openshift-adp)
-  - `name` (`string`) **(required)** - Name of the schedule
-  - `paused` (`boolean`) **(required)** - Whether to pause (true) or unpause (false) the schedule
+**DataProtectionApplication Tools:**
 
-- **oadp_backup_storage_location_list** - List all BackupStorageLocations (where backups are stored)
-  - `namespace` (`string`) - Namespace containing BSLs (default: openshift-adp)
+- **oadp_dpa_list** - List DPA instances
+- **oadp_dpa_get** - Get DPA configuration/status
+- **oadp_dpa_create** - Create a DPA
+- **oadp_dpa_update** - Update DPA configuration
+- **oadp_dpa_delete** - Delete a DPA
 
-- **oadp_backup_storage_location_get** - Get detailed information about a BackupStorageLocation
-  - `namespace` (`string`) - Namespace of the BSL (default: openshift-adp)
-  - `name` (`string`) **(required)** - Name of the BackupStorageLocation
+**BackupRepository Tools:**
 
-- **oadp_volume_snapshot_location_list** - List all VolumeSnapshotLocations (where volume snapshots are stored)
-  - `namespace` (`string`) - Namespace containing VSLs (default: openshift-adp)
+- **oadp_backup_repository_list** - List backup repositories
+- **oadp_backup_repository_get** - Get repository details
+- **oadp_backup_repository_delete** - Delete a repository
 
-- **oadp_volume_snapshot_location_get** - Get detailed information about a VolumeSnapshotLocation
-  - `namespace` (`string`) - Namespace of the VSL (default: openshift-adp)
-  - `name` (`string`) **(required)** - Name of the VolumeSnapshotLocation
+**DeleteBackupRequest Tools:**
 
-- **oadp_dpa_list** - List all DataProtectionApplication instances (OADP operator configuration)
-  - `namespace` (`string`) - Namespace containing DPAs (default: openshift-adp)
+- **oadp_delete_backup_request_list** - List delete requests
+- **oadp_delete_backup_request_get** - Get delete request status
 
-- **oadp_dpa_get** - Get detailed information about a DataProtectionApplication including configuration and status conditions
-  - `namespace` (`string`) - Namespace of the DPA (default: openshift-adp)
-  - `name` (`string`) **(required)** - Name of the DataProtectionApplication
+**DownloadRequest Tools:**
+
+- **oadp_download_request_list** - List download requests
+- **oadp_download_request_get** - Get download request details
+- **oadp_download_request_create** - Create a download request
+- **oadp_download_request_delete** - Delete a download request
+
+**PodVolumeBackup Tools:**
+
+- **oadp_pod_volume_backup_list** - List pod volume backups
+- **oadp_pod_volume_backup_get** - Get pod volume backup details
+
+**PodVolumeRestore Tools:**
+
+- **oadp_pod_volume_restore_list** - List pod volume restores
+- **oadp_pod_volume_restore_get** - Get pod volume restore details
+
+**ServerStatusRequest Tools:**
+
+- **oadp_server_status_request_list** - List server status requests
+- **oadp_server_status_request_get** - Get server status
+- **oadp_server_status_request_create** - Create server status request
+- **oadp_server_status_request_delete** - Delete server status request
+
+**DataUpload Tools (v2alpha1):**
+
+- **oadp_data_upload_list** - List data uploads
+- **oadp_data_upload_get** - Get data upload details
+- **oadp_data_upload_cancel** - Cancel a data upload
+
+**DataDownload Tools (v2alpha1):**
+
+- **oadp_data_download_list** - List data downloads
+- **oadp_data_download_get** - Get data download details
+- **oadp_data_download_cancel** - Cancel a data download
+
+**CloudStorage Tools:**
+
+- **oadp_cloud_storage_list** - List cloud storage configurations
+- **oadp_cloud_storage_get** - Get cloud storage details
+- **oadp_cloud_storage_create** - Create cloud storage configuration
+- **oadp_cloud_storage_delete** - Delete cloud storage
+
+**DataProtectionTest Tools:**
+
+- **oadp_data_protection_test_list** - List data protection tests
+- **oadp_data_protection_test_get** - Get test details
+- **oadp_data_protection_test_create** - Create a data protection test
+- **oadp_data_protection_test_delete** - Delete a test
+
+**NonAdminBackup Tools:**
+
+- **oadp_non_admin_backup_list** - List non-admin backups
+- **oadp_non_admin_backup_get** - Get non-admin backup details
+- **oadp_non_admin_backup_create** - Create a non-admin backup
+- **oadp_non_admin_backup_delete** - Delete a non-admin backup
+
+**NonAdminRestore Tools:**
+
+- **oadp_non_admin_restore_list** - List non-admin restores
+- **oadp_non_admin_restore_get** - Get non-admin restore details
+- **oadp_non_admin_restore_create** - Create a non-admin restore
+- **oadp_non_admin_restore_delete** - Delete a non-admin restore
+
+**NonAdminBackupStorageLocation Tools:**
+
+- **oadp_non_admin_bsl_list** - List non-admin BSLs
+- **oadp_non_admin_bsl_get** - Get non-admin BSL details
+- **oadp_non_admin_bsl_create** - Create a non-admin BSL
+- **oadp_non_admin_bsl_update** - Update a non-admin BSL
+- **oadp_non_admin_bsl_delete** - Delete a non-admin BSL
+
+**NonAdminBackupStorageLocationRequest Tools:**
+
+- **oadp_non_admin_bsl_request_list** - List BSL requests
+- **oadp_non_admin_bsl_request_get** - Get BSL request details
+- **oadp_non_admin_bsl_request_approve** - Approve/reject a BSL request
+
+**NonAdminDownloadRequest Tools:**
+
+- **oadp_non_admin_download_request_list** - List non-admin download requests
+- **oadp_non_admin_download_request_get** - Get download request details
+- **oadp_non_admin_download_request_create** - Create a download request
+- **oadp_non_admin_download_request_delete** - Delete a download request
+
+**VirtualMachineBackupsDiscovery Tools:**
+
+- **oadp_vm_backup_discovery_list** - List VM backup discoveries
+- **oadp_vm_backup_discovery_get** - Get VM backup discovery details
+- **oadp_vm_backup_discovery_create** - Create VM backup discovery
+- **oadp_vm_backup_discovery_delete** - Delete VM backup discovery
+
+**VirtualMachineFileRestore Tools:**
+
+- **oadp_vm_file_restore_list** - List VM file restores
+- **oadp_vm_file_restore_get** - Get VM file restore details
+- **oadp_vm_file_restore_create** - Create VM file restore
+- **oadp_vm_file_restore_delete** - Delete VM file restore
 
 </details>
 
