@@ -86,6 +86,10 @@ type StaticConfig struct {
 	// This can be used to provide specific instructions on how the client should use the server
 	ServerInstructions string `toml:"server_instructions,omitempty"`
 
+	// Telemetry contains OpenTelemetry configuration options.
+	// These can also be configured via OTEL_* environment variables.
+	Telemetry TelemetryConfig `toml:"telemetry,omitempty"`
+
 	// Internal: parsed provider configs (not exposed to TOML package)
 	parsedClusterProviderConfigs map[string]api.ExtendedConfig
 	// Internal: parsed toolset configs (not exposed to TOML package)
@@ -320,4 +324,20 @@ func (c *StaticConfig) GetToolsetConfig(name string) (api.ExtendedConfig, bool) 
 
 func (c *StaticConfig) IsRequireOAuth() bool {
 	return c.RequireOAuth
+}
+
+func (c *StaticConfig) GetStsClientId() string {
+	return c.StsClientId
+}
+
+func (c *StaticConfig) GetStsClientSecret() string {
+	return c.StsClientSecret
+}
+
+func (c *StaticConfig) GetStsAudience() string {
+	return c.StsAudience
+}
+
+func (c *StaticConfig) GetStsScopes() []string {
+	return c.StsScopes
 }

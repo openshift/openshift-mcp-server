@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"os"
 	"slices"
+	"time"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -15,6 +15,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	internalk8s "github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
+	"github.com/containers/kubernetes-mcp-server/pkg/metrics"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
 	"github.com/containers/kubernetes-mcp-server/pkg/prompts"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
@@ -61,19 +62,16 @@ func (c *Configuration) isToolApplicable(tool api.ServerTool) bool {
 
 type Server struct {
 	configuration  *Configuration
-	oidcProvider   *oidc.Provider
-	httpClient     *http.Client
 	server         *mcp.Server
 	enabledTools   []string
 	enabledPrompts []string
 	p              internalk8s.Provider
+	metrics        *metrics.Metrics // Metrics collection system
 }
 
-func NewServer(configuration Configuration, oidcProvider *oidc.Provider, httpClient *http.Client) (*Server, error) {
+func NewServer(configuration Configuration, targetProvider internalk8s.Provider) (*Server, error) {
 	s := &Server{
 		configuration: &configuration,
-		oidcProvider:  oidcProvider,
-		httpClient:    httpClient,
 		server: mcp.NewServer(
 			&mcp.Implementation{
 				Name:       version.BinaryName,
@@ -86,19 +84,31 @@ func NewServer(configuration Configuration, oidcProvider *oidc.Provider, httpCli
 					Resources: nil,
 					Prompts:   &mcp.PromptCapabilities{ListChanged: !configuration.Stateless},
 					Tools:     &mcp.ToolCapabilities{ListChanged: !configuration.Stateless},
+					Logging:   &mcp.LoggingCapabilities{},
 				},
 				Instructions: configuration.ServerInstructions,
 			}),
+		p: targetProvider,
 	}
 
+	// Initialize metrics system
+	metricsInstance, err := metrics.New(metrics.Config{
+		TracerName:     version.BinaryName + "/mcp",
+		ServiceName:    version.BinaryName,
+		ServiceVersion: version.Version,
+		Telemetry:      &configuration.Telemetry,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize metrics: %w", err)
+	}
+	s.metrics = metricsInstance
+
+	s.server.AddReceivingMiddleware(sessionInjectionMiddleware)
+	s.server.AddReceivingMiddleware(traceContextPropagationMiddleware)
+	s.server.AddReceivingMiddleware(tracingMiddleware(version.BinaryName + "/mcp"))
 	s.server.AddReceivingMiddleware(authHeaderPropagationMiddleware)
 	s.server.AddReceivingMiddleware(toolCallLoggingMiddleware)
-
-	var err error
-	s.p, err = internalk8s.NewProvider(s.configuration.StaticConfig)
-	if err != nil {
-		return nil, err
-	}
+	s.server.AddReceivingMiddleware(s.metricsMiddleware())
 	err = s.reloadToolsets()
 	if err != nil {
 		return nil, err
@@ -160,7 +170,7 @@ func (s *Server) reloadToolsets() error {
 	for _, tool := range applicableTools {
 		goSdkTool, goSdkToolHandler, err := ServerToolToGoSdkTool(s, tool)
 		if err != nil {
-			return fmt.Errorf("failed to convert tool %s: %v", tool.Tool.Name, err)
+			return fmt.Errorf("failed to convert tool %s: %w", tool.Tool.Name, err)
 		}
 		s.server.AddTool(goSdkTool, goSdkToolHandler)
 	}
@@ -199,7 +209,7 @@ func (s *Server) reloadToolsets() error {
 	for _, prompt := range applicablePrompts {
 		mcpPrompt, promptHandler, err := ServerPromptToGoSdkPrompt(s, prompt)
 		if err != nil {
-			return fmt.Errorf("failed to convert prompt %s: %v", prompt.Prompt.Name, err)
+			return fmt.Errorf("failed to convert prompt %s: %w", prompt.Prompt.Name, err)
 		}
 		s.server.AddPrompt(mcpPrompt, promptHandler)
 	}
@@ -207,6 +217,36 @@ func (s *Server) reloadToolsets() error {
 	// start new watch
 	s.p.WatchTargets(s.reloadToolsets)
 	return nil
+}
+
+// metricsMiddleware returns a metrics middleware with access to the server's metrics system
+func (s *Server) metricsMiddleware() func(mcp.MethodHandler) mcp.MethodHandler {
+	return func(next mcp.MethodHandler) mcp.MethodHandler {
+		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+			start := time.Now()
+			result, err := next(ctx, method, req)
+			duration := time.Since(start)
+
+			toolName := method
+			if method == "tools/call" {
+				if params, ok := req.GetParams().(*mcp.CallToolParamsRaw); ok {
+					if toolReq, _ := GoSdkToolCallParamsToToolCallRequest(params); toolReq != nil {
+						toolName = toolReq.Name
+					}
+				}
+			}
+
+			// Record to all collectors
+			s.metrics.RecordToolCall(ctx, toolName, duration, err)
+
+			return result, err
+		}
+	}
+}
+
+// GetMetrics returns the metrics system for use by the HTTP server.
+func (s *Server) GetMetrics() *metrics.Metrics {
+	return s.metrics
 }
 
 func (s *Server) ServeStdio(ctx context.Context) error {
@@ -276,6 +316,17 @@ func (s *Server) Close() {
 	if s.p != nil {
 		s.p.Close()
 	}
+}
+
+// Shutdown gracefully shuts down the server, flushing any pending metrics.
+func (s *Server) Shutdown(ctx context.Context) error {
+	if s.metrics != nil {
+		if err := s.metrics.Shutdown(ctx); err != nil {
+			return fmt.Errorf("failed to shutdown metrics: %w", err)
+		}
+	}
+	s.Close()
+	return nil
 }
 
 func NewTextResult(content string, err error) *mcp.CallToolResult {

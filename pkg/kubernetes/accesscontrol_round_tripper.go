@@ -13,7 +13,7 @@ import (
 type AccessControlRoundTripper struct {
 	delegate                http.RoundTripper
 	deniedResourcesProvider api.DeniedResourcesProvider
-	restMapper              meta.RESTMapper
+	restMapperProvider      func() meta.RESTMapper
 }
 
 func (rt *AccessControlRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -23,7 +23,15 @@ func (rt *AccessControlRoundTripper) RoundTrip(req *http.Request) (*http.Respons
 		return rt.delegate.RoundTrip(req)
 	}
 
-	gvk, err := rt.restMapper.KindFor(gvr)
+	// Get restMapper at request time (lazy evaluation)
+	// This ensures we get the initialized restMapper even if the wrapper
+	// was created before restMapper was set (fixes issue #688)
+	restMapper := rt.restMapperProvider()
+	if restMapper == nil {
+		return nil, fmt.Errorf("failed to make request: AccessControlRoundTripper restMapper not initialized")
+	}
+
+	gvk, err := restMapper.KindFor(gvr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: AccessControlRoundTripper failed to get kind for gvr %v: %w", gvr, err)
 	}
