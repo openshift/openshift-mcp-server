@@ -1,0 +1,52 @@
+[
+  {
+    "name": "plan_mustgather",
+    "description": "Plan for collecting a must-gather archive from an OpenShift cluster. Must-gather is a tool for collecting cluster data related to debugging and troubleshooting like logs, kubernetes resources, etc.",
+    "arguments": [
+      {
+        "name": "node_name",
+        "description": "Specific node name to run must-gather pod on"
+      },
+      {
+        "name": "node_selector",
+        "description": "Node selector in key=value,key2=value2 format to filter nodes for the pod"
+      },
+      {
+        "name": "source_dir",
+        "description": "Custom gather directory inside pod (default: /must-gather)"
+      },
+      {
+        "name": "namespace",
+        "description": "Privileged namespace to use for must-gather (auto-generated if not specified)"
+      },
+      {
+        "name": "gather_command",
+        "description": "Custom gather command eg. /usr/bin/gather_audit_logs (default: /usr/bin/gather)"
+      },
+      {
+        "name": "timeout",
+        "description": "Timeout duration for gather command (eg. 30m, 1h)"
+      },
+      {
+        "name": "since",
+        "description": "Only gather data newer than this duration (eg. 5s, 2m5s, or 3h6m10s) defaults to all data."
+      },
+      {
+        "name": "host_network",
+        "description": "Use host network for must-gather pod (true/false)"
+      },
+      {
+        "name": "keep_resources",
+        "description": "Keep pod resources after collection (true/false, default: false)"
+      },
+      {
+        "name": "all_component_images",
+        "description": "Include must-gather images from all installed operators (true/false)"
+      },
+      {
+        "name": "images",
+        "description": "Comma-separated list of custom must-gather container images"
+      }
+    ]
+  }
+]
