@@ -1,0 +1,218 @@
+package tools
+
+// ListMetricsOutput defines the output schema for the list_metrics tool.
+type ListMetricsOutput struct {
+	Metrics []string `json:"metrics" jsonschema:"description=List of all available metric names"`
+}
+
+// InstantQueryOutput defines the output schema for the execute_instant_query tool.
+type InstantQueryOutput struct {
+	ResultType string          `json:"resultType" jsonschema:"description=The type of result returned (e.g. vector, scalar, string)"`
+	Result     []InstantResult `json:"result" jsonschema:"description=The query results as an array of instant values"`
+	Warnings   []string        `json:"warnings,omitempty" jsonschema:"description=Any warnings generated during query execution"`
+}
+
+// InstantResult represents a single instant query result.
+type InstantResult struct {
+	Metric map[string]string `json:"metric" jsonschema:"description=The metric labels"`
+	Value  []any             `json:"value" jsonschema:"description=[timestamp, value] pair for the instant query"`
+}
+
+// LabelNamesOutput defines the output schema for the get_label_names tool.
+type LabelNamesOutput struct {
+	Labels []string `json:"labels" jsonschema:"description=List of label names available for the specified metric or all metrics"`
+}
+
+// LabelValuesOutput defines the output schema for the get_label_values tool.
+type LabelValuesOutput struct {
+	Values []string `json:"values" jsonschema:"description=List of unique values for the specified label"`
+}
+
+// SeriesOutput defines the output schema for the get_series tool.
+type SeriesOutput struct {
+	Series      []map[string]string `json:"series" jsonschema:"description=List of time series matching the selector, each series is a map of label names to values"`
+	Cardinality int                 `json:"cardinality" jsonschema:"description=Total number of series matching the selector"`
+}
+
+// RangeQueryOutput defines the output schema for the execute_range_query tool.
+type RangeQueryOutput struct {
+	ResultType string                `json:"resultType" jsonschema:"description=The type of result returned: matrix or vector or scalar"`
+	Result     []SeriesResult        `json:"result,omitempty" jsonschema:"description=The query results as an array of time series"`
+	Summary    []SeriesResultSummary `json:"summary,omitempty" jsonschema:"description=Summary statistics for each time series (when summarize flag is enabled)"`
+	Warnings   []string              `json:"warnings,omitempty" jsonschema:"description=Any warnings generated during query execution"`
+}
+
+// SeriesResult represents a single time series result from a range query.
+type SeriesResult struct {
+	Metric map[string]string `json:"metric" jsonschema:"description=The metric labels"`
+	Values [][]any           `json:"values" jsonschema:"description=Array of [timestamp, value] pairs"`
+}
+
+// SeriesResultSummary represents a summary of a time series result from a range query.
+type SeriesResultSummary struct {
+	Series         map[string]string `json:"series" jsonschema:"description=The query result series labelset as a map of label names to values"`
+	Max            float64           `json:"max" jsonschema:"description=Maximum value in the series (excluding NaN/Inf)"`
+	Min            float64           `json:"min" jsonschema:"description=Minimum value in the series (excluding NaN/Inf)"`
+	Avg            float64           `json:"avg" jsonschema:"description=Average value of all finite samples in the series"`
+	Count          int               `json:"count" jsonschema:"description=Total number of samples in the series"`
+	FirstTimestamp float64           `json:"firstTimestamp" jsonschema:"description=Timestamp of the first sample (Unix seconds)"`
+	LastTimestamp  float64           `json:"lastTimestamp" jsonschema:"description=Timestamp of the last sample (Unix seconds)"`
+	FirstValue     float64           `json:"firstValue" jsonschema:"description=Value of the first sample"`
+	LastValue      float64           `json:"lastValue" jsonschema:"description=Value of the last sample"`
+	Delta          float64           `json:"delta" jsonschema:"description=Difference between last and first values (lastValue - firstValue)"`
+	HasNaN         bool              `json:"hasNaN" jsonschema:"description=Whether the series contains any NaN values"`
+	HasInf         bool              `json:"hasInf" jsonschema:"description=Whether the series contains any Inf values"`
+	NonFiniteCount int               `json:"nonFiniteCount" jsonschema:"description=Count of NaN and Inf values in the series"`
+}
+
+// AlertsOutput defines the output schema for the get_alerts tool.
+type AlertsOutput struct {
+	Alerts []Alert `json:"alerts" jsonschema:"description=List of alerts from Alertmanager"`
+}
+
+// Alert represents a single alert from Alertmanager.
+type Alert struct {
+	Labels      map[string]string `json:"labels" jsonschema:"description=Labels of the alert"`
+	Annotations map[string]string `json:"annotations" jsonschema:"description=Annotations of the alert"`
+	StartsAt    string            `json:"startsAt" jsonschema:"description=Start time of the alert"`
+	EndsAt      string            `json:"endsAt,omitempty" jsonschema:"description=End time of the alert (if resolved)"`
+	Status      AlertStatus       `json:"status" jsonschema:"description=Current status of the alert"`
+}
+
+// AlertStatus represents the status of an alert.
+type AlertStatus struct {
+	State       string   `json:"state" jsonschema:"description=State of the alert (active, suppressed, unprocessed)"`
+	SilencedBy  []string `json:"silencedBy,omitempty" jsonschema:"description=List of silences that are silencing this alert"`
+	InhibitedBy []string `json:"inhibitedBy,omitempty" jsonschema:"description=List of alerts that are inhibiting this alert"`
+}
+
+// SilencesOutput defines the output schema for the get_silences tool.
+type SilencesOutput struct {
+	Silences []Silence `json:"silences" jsonschema:"description=List of silences from Alertmanager"`
+}
+
+// Silence represents a single silence from Alertmanager.
+type Silence struct {
+	ID        string        `json:"id" jsonschema:"description=Unique identifier of the silence"`
+	Status    SilenceStatus `json:"status" jsonschema:"description=Current status of the silence"`
+	Matchers  []Matcher     `json:"matchers" jsonschema:"description=Label matchers for this silence"`
+	StartsAt  string        `json:"startsAt" jsonschema:"description=Start time of the silence"`
+	EndsAt    string        `json:"endsAt" jsonschema:"description=End time of the silence"`
+	CreatedBy string        `json:"createdBy" jsonschema:"description=Creator of the silence"`
+	Comment   string        `json:"comment" jsonschema:"description=Comment describing the silence"`
+}
+
+// SilenceStatus represents the status of a silence.
+type SilenceStatus struct {
+	State string `json:"state" jsonschema:"description=State of the silence (active, pending, expired)"`
+}
+
+// Matcher represents a label matcher for a silence.
+type Matcher struct {
+	Name    string `json:"name" jsonschema:"description=Label name to match"`
+	Value   string `json:"value" jsonschema:"description=Label value to match"`
+	IsRegex bool   `json:"isRegex" jsonschema:"description=Whether the match is a regex match"`
+	IsEqual bool   `json:"isEqual" jsonschema:"description=Whether the match is an equality match (true) or inequality match (false)"`
+}
+
+// Input structs for handler parameters
+
+// ListMetricsInput defines the input parameters for ListMetricsHandler.
+type ListMetricsInput struct {
+	NameRegex string `json:"name_regex"`
+}
+
+// RangeQueryInput defines the input parameters for ExecuteRangeQueryHandler.
+type RangeQueryInput struct {
+	Query    string `json:"query"`
+	Step     string `json:"step"`
+	Start    string `json:"start,omitempty"`
+	End      string `json:"end,omitempty"`
+	Duration string `json:"duration,omitempty"`
+}
+
+// InstantQueryInput defines the input parameters for ExecuteInstantQueryHandler.
+type InstantQueryInput struct {
+	Query string `json:"query"`
+	Time  string `json:"time,omitempty"`
+}
+
+// LabelNamesInput defines the input parameters for GetLabelNamesHandler.
+type LabelNamesInput struct {
+	Metric string `json:"metric,omitempty"`
+	Start  string `json:"start,omitempty"`
+	End    string `json:"end,omitempty"`
+}
+
+// LabelValuesInput defines the input parameters for GetLabelValuesHandler.
+type LabelValuesInput struct {
+	Label  string `json:"label"`
+	Metric string `json:"metric,omitempty"`
+	Start  string `json:"start,omitempty"`
+	End    string `json:"end,omitempty"`
+}
+
+// SeriesInput defines the input parameters for GetSeriesHandler.
+type SeriesInput struct {
+	Matches string `json:"matches"`
+	Start   string `json:"start,omitempty"`
+	End     string `json:"end,omitempty"`
+}
+
+// AlertsInput defines the input parameters for GetAlertsHandler.
+type AlertsInput struct {
+	Active      *bool  `json:"active,omitempty"`
+	Silenced    *bool  `json:"silenced,omitempty"`
+	Inhibited   *bool  `json:"inhibited,omitempty"`
+	Unprocessed *bool  `json:"unprocessed,omitempty"`
+	Filter      string `json:"filter,omitempty"`
+	Receiver    string `json:"receiver,omitempty"`
+}
+
+// SilencesInput defines the input parameters for GetSilencesHandler.
+type SilencesInput struct {
+	Filter string `json:"filter,omitempty"`
+}
+
+// GenerateSLOInput defines the input parameters for GenerateSLOHandler.
+type GenerateSLOInput struct {
+	Target                   string `json:"target"`
+	Window                   string `json:"window,omitempty"`
+	AvailabilityTarget       string `json:"availability_target,omitempty"`
+	LatencyTargetDuration    string `json:"latency_target_duration,omitempty"`
+	LatencyTargetPercentile  string `json:"latency_target_percentile,omitempty"`
+}
+
+// GenerateSLOOutput defines the output schema for the generate_slo tool.
+type GenerateSLOOutput struct {
+	Target              string         `json:"target" jsonschema:"description=The target being monitored"`
+	Window              string         `json:"window" jsonschema:"description=SLO window duration"`
+	AvailabilityTarget  string         `json:"availability_target" jsonschema:"description=Availability target percentage"`
+	ErrorRateSLO        *SLOExpression `json:"error_rate_slo,omitempty" jsonschema:"description=Error rate SLO expressions and metrics"`
+	LatencySLO          *SLOExpression `json:"latency_slo,omitempty" jsonschema:"description=Latency SLO expressions and metrics"`
+	ErrorBudget         *ErrorBudget   `json:"error_budget,omitempty" jsonschema:"description=Error budget calculations"`
+	DiscoveredMetrics   []string       `json:"discovered_metrics" jsonschema:"description=Metrics discovered for this target"`
+	Recommendations     []string       `json:"recommendations,omitempty" jsonschema:"description=Recommendations for improving SLO monitoring"`
+}
+
+// SLOExpression represents a complete SLO with queries and explanations.
+type SLOExpression struct {
+	Type               string   `json:"type" jsonschema:"description=Type of SLO (availability or latency)"`
+	SuccessMetric      string   `json:"success_metric,omitempty" jsonschema:"description=Metric name for successful requests"`
+	TotalMetric        string   `json:"total_metric,omitempty" jsonschema:"description=Metric name for total requests"`
+	LatencyMetric      string   `json:"latency_metric,omitempty" jsonschema:"description=Metric name for latency measurements"`
+	SLOQuery           string   `json:"slo_query" jsonschema:"description=PromQL query to calculate current SLO compliance"`
+	BurnRateQuery      string   `json:"burn_rate_query" jsonschema:"description=PromQL query to calculate error budget burn rate"`
+	AlertQuery         string   `json:"alert_query,omitempty" jsonschema:"description=Suggested PromQL query for alerting on SLO violations"`
+	Explanation        string   `json:"explanation" jsonschema:"description=Explanation of the SLO and queries"`
+	Labels             []string `json:"labels,omitempty" jsonschema:"description=Relevant labels for filtering the SLO"`
+}
+
+// ErrorBudget represents error budget calculations.
+type ErrorBudget struct {
+	TotalBudget        string `json:"total_budget" jsonschema:"description=Total error budget for the window (e.g., 0.1% for 99.9% target)"`
+	AllowedDowntime    string `json:"allowed_downtime" jsonschema:"description=Allowed downtime for the window"`
+	RemainingQuery     string `json:"remaining_query" jsonschema:"description=PromQL query to calculate remaining error budget"`
+	BurnRateQuery      string `json:"burn_rate_query" jsonschema:"description=PromQL query to calculate current burn rate"`
+	Explanation        string `json:"explanation" jsonschema:"description=Explanation of error budget concept"`
+}
