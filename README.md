@@ -255,6 +255,7 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 | core          | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                             | ✓       |
 | helm          | Tools for managing Helm charts and releases                                                                                                                     | ✓       |
 | kcp           | Manage kcp workspaces and multi-tenancy features                                                                                                                |         |
+| openshift     | OpenShift-specific tools for cluster management and troubleshooting, check the [OpenShift documentation](docs/OPENSHIFT.md) for more details.                   |         |
 | kubevirt      | KubeVirt virtual machine management tools                                                                                                                       |         |
 | observability | Cluster observability tools for querying Prometheus metrics and Alertmanager alerts                                                                             | ✓       |
 | ossm          | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details. |         |
@@ -550,6 +551,25 @@ Common use cases:
   - `startMicros` (`string`) - Start time for traces in microseconds since epoch (optional, defaults to 10 minutes before current time if not provided, only used when traceId is not provided)
   - `tags` (`string`) - JSON string of tags to filter traces (optional, only used when traceId is not provided)
   - `traceId` (`string`) - Unique identifier of the trace to retrieve detailed information for. If provided, this will return detailed trace information and other parameters (resource_type, namespace, resource_name) are not required.
+
+</details>
+
+<details>
+
+<summary>openshift</summary>
+
+- **plan_mustgather** - Plan for collecting a must-gather archive from an OpenShift cluster, must-gather is a tool for collecting cluster data related to debugging and troubleshooting like logs, kubernetes resources, etc.
+  - `node_name` (`string`) - Optional node to run the mustgather pod. If not provided, a random control-plane node will be selected automatically
+  - `node_selector` (`string`) - Optional node label selector to use, only relevant when specifying a command and image which needs to capture data on a set of cluster nodes simultaneously
+  - `host_network` (`boolean`) - Optionally run the must-gather pods in the host network of the node. This is only relevant if a specific gather image needs to capture host-level data
+  - `gather_command` (`string`) - Optionally specify a custom gather command to run a specialized script, eg. /usr/bin/gather_audit_logs (default: /usr/bin/gather)
+  - `all_component_images` (`boolean`) - Optional when enabled, collects and runs multiple must gathers for all operators and components on the cluster that have an annotated must-gather image available
+  - `images` (`array`) - Optional list of images to use for gathering custom information about specific operators or cluster components. If not specified, OpenShift's default must-gather image will be used by default
+  - `source_dir` (`string`) - Optional to set a specific directory where the pod will copy gathered data from (default: /must-gather)
+  - `timeout` (`string`) - Timeout of the gather process eg. 30s, 6m20s, or 2h10m30s
+  - `namespace` (`string`) - Optional to specify an existing privileged namespace where must-gather pods should run. If not provided, a temporary namespace will be created
+  - `keep_resources` (`boolean`) - Optional to retain all temporary resources when the mustgather completes, otherwise temporary resources created will be advised to be cleaned up
+  - `since` (`string`) - Optional to collect logs newer than a relative duration like 5s, 2m5s, or 3h6m10s. If unspecified, all available logs will be collected
 
 </details>
 
