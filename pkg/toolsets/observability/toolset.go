@@ -1,8 +1,6 @@
 package observability
 
 import (
-	"slices"
-
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
 )
@@ -19,15 +17,12 @@ func (t *Toolset) GetName() string {
 
 // GetDescription returns a human-readable description of the toolset.
 func (t *Toolset) GetDescription() string {
-	return "Cluster observability tools for querying Prometheus metrics and Alertmanager alerts"
+	return "Cluster observability tools for querying Alertmanager alerts"
 }
 
 // GetTools returns all tools provided by this toolset.
 func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
-	return slices.Concat(
-		initPrometheus(),
-		initAlertmanager(),
-	)
+	return initAlertmanager()
 }
 
 // GetPrompts returns prompts provided by this toolset.

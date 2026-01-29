@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"sync"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,9 +18,6 @@ import (
 const (
 	// defaultMonitoringNamespace is the default namespace for OpenShift monitoring components
 	defaultMonitoringNamespace = "openshift-monitoring"
-
-	// thanosQuerierRoute is the route name for Thanos Querier
-	thanosQuerierRoute = "thanos-querier"
 
 	// alertmanagerRoute is the route name for Alertmanager
 	alertmanagerRoute = "alertmanager-main"
@@ -42,17 +38,6 @@ var routeGVR = schema.GroupVersionResource{
 // Key format: "apiServerHost/namespace/routeName", value: URL string.
 // The API server host is included to support multi-cluster (ACM) environments.
 var routeURLCache sync.Map
-
-// allowedPrometheusEndpoints is a whitelist of allowed Prometheus API endpoints
-var allowedPrometheusEndpoints = map[string]bool{
-	"/api/v1/query":       true,
-	"/api/v1/query_range": true,
-	"/api/v1/series":      true,
-	"/api/v1/labels":      true,
-}
-
-// allowedPrometheusLabelPattern matches /api/v1/label/<label>/values endpoints
-var allowedPrometheusLabelPattern = regexp.MustCompile(`^/api/v1/label/[^/]+/values$`)
 
 // allowedAlertmanagerEndpoints is a whitelist of allowed Alertmanager API endpoints
 var allowedAlertmanagerEndpoints = map[string]bool{
@@ -108,32 +93,12 @@ func getRouteURL(ctx context.Context, params api.ToolHandlerParams, routeName, n
 }
 
 // newPrometheusClient creates a new Prometheus client configured with auth and TLS from the REST config.
+// This client is used for both Prometheus and Alertmanager API access.
 func newPrometheusClient(baseURL string, params api.ToolHandlerParams) *prometheus.Client {
 	return prometheus.NewClient(baseURL,
 		prometheus.WithBearerTokenFromRESTConfig(params.RESTConfig()),
 		prometheus.WithTLSFromRESTConfig(params.RESTConfig()),
 	)
-}
-
-// validatePrometheusEndpoint checks if the endpoint is allowed.
-func validatePrometheusEndpoint(endpoint string) error {
-	if allowedPrometheusEndpoints[endpoint] {
-		return nil
-	}
-	if allowedPrometheusLabelPattern.MatchString(endpoint) {
-		return nil
-	}
-	return fmt.Errorf("endpoint %s is not allowed; allowed endpoints: %v", endpoint, getAllowedPrometheusEndpoints())
-}
-
-// getAllowedPrometheusEndpoints returns a list of allowed endpoints for error messages.
-func getAllowedPrometheusEndpoints() []string {
-	endpoints := make([]string, 0, len(allowedPrometheusEndpoints)+1)
-	for ep := range allowedPrometheusEndpoints {
-		endpoints = append(endpoints, ep)
-	}
-	endpoints = append(endpoints, "/api/v1/label/<name>/values")
-	return endpoints
 }
 
 // validateAlertmanagerEndpoint checks if the endpoint is allowed.
