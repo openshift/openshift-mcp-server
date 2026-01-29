@@ -1,0 +1,66 @@
+[
+  {
+    "annotations": {
+      "title": "MustGather: Plan",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": true
+    },
+    "description": "Plan for collecting a must-gather archive from an OpenShift cluster, must-gather is a tool for collecting cluster data related to debugging and troubleshooting like logs, kubernetes resources, etc.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "all_component_images": {
+          "description": "Optional when enabled, collects and runs multiple must gathers for all operators and components on the cluster that have an annotated must-gather image available",
+          "type": "boolean"
+        },
+        "gather_command": {
+          "default": "/usr/bin/gather",
+          "description": "Optionally specify a custom gather command to run a specialized script, eg. /usr/bin/gather_audit_logs",
+          "type": "string"
+        },
+        "host_network": {
+          "description": "Optionally run the must-gather pods in the host network of the node. This is only relevant if a specific gather image needs to capture host-level data",
+          "type": "boolean"
+        },
+        "images": {
+          "description": "Optional list of images to use for gathering custom information about specific operators or cluster components. If not specified, OpenShift's default must-gather image will be used by default",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "keep_resources": {
+          "description": "Optional to retain all temporary resources when the mustgather completes, otherwise temporary resources created will be advised to be cleaned up",
+          "type": "boolean"
+        },
+        "namespace": {
+          "description": "Optional to specify an existing privileged namespace where must-gather pods should run. If not provided, a temporary namespace will be created",
+          "type": "string"
+        },
+        "node_name": {
+          "description": "Optional node to run the mustgather pod. If not provided, a random control-plane node will be selected automatically",
+          "type": "string"
+        },
+        "node_selector": {
+          "description": "Optional node label selector to use, only relevant when specifying a command and image which needs to capture data on a set of cluster nodes simultaneously",
+          "type": "string"
+        },
+        "since": {
+          "description": "Optional to collect logs newer than a relative duration like 5s, 2m5s, or 3h6m10s. If unspecified, all available logs will be collected",
+          "type": "string"
+        },
+        "source_dir": {
+          "default": "/must-gather",
+          "description": "Optional to set a specific directory where the pod will copy gathered data from",
+          "type": "string"
+        },
+        "timeout": {
+          "description": "Timeout of the gather process eg. 30s, 6m20s, or 2h10m30s",
+          "type": "string"
+        }
+      }
+    },
+    "name": "plan_mustgather"
+  }
+]
