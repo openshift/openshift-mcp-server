@@ -1,10 +1,12 @@
 package openshift
 
 import (
+	"context"
 	"slices"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/openshift/mustgather"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/openshift/nodes"
 )
 
@@ -17,16 +19,23 @@ func (t *Toolset) GetName() string {
 }
 
 func (t *Toolset) GetDescription() string {
-	return "Core OpenShift-specific tools (Node debugging, etc.)"
+	return "OpenShift-specific tools for cluster debugging and troubleshooting."
 }
 
 func (t *Toolset) GetTools(o api.Openshift) []api.ServerTool {
+	// OpenShift tools are only available when an OpenShift cluster is detected.
+	if !o.IsOpenShift(context.Background()) {
+		return []api.ServerTool{}
+	}
+
 	return slices.Concat(
+		mustgather.Tools(),
 		nodes.NodeTools(),
 	)
 }
 
 func (t *Toolset) GetPrompts() []api.ServerPrompt {
+	// OpenShift toolset does not provide prompts
 	return nil
 }
 
