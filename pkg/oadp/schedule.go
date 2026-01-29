@@ -33,6 +33,15 @@ func DeleteSchedule(ctx context.Context, client dynamic.Interface, namespace, na
 	return client.Resource(ScheduleGVR).Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 }
 
+// UpdateSchedule updates an existing schedule
+func UpdateSchedule(ctx context.Context, client dynamic.Interface, schedule *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	namespace := schedule.GetNamespace()
+	if namespace == "" {
+		namespace = DefaultOADPNamespace
+	}
+	return client.Resource(ScheduleGVR).Namespace(namespace).Update(ctx, schedule, metav1.UpdateOptions{})
+}
+
 // PauseSchedule pauses or unpauses a schedule
 func PauseSchedule(ctx context.Context, client dynamic.Interface, namespace, name string, paused bool) (*unstructured.Unstructured, error) {
 	schedule, err := GetSchedule(ctx, client, namespace, name)

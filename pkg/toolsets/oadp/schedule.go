@@ -16,6 +16,7 @@ func initScheduleTools() []api.ServerTool {
 		initScheduleList(),
 		initScheduleGet(),
 		initScheduleCreate(),
+		initScheduleUpdate(),
 		initScheduleDelete(),
 		initSchedulePause(),
 	}
@@ -226,6 +227,82 @@ func scheduleCreateHandler(params api.ToolHandlerParams) (*api.ToolCallResult, e
 	}
 
 	return api.NewToolCallResult(params.ListOutput.PrintObj(created)), nil
+}
+
+func initScheduleUpdate() api.ServerTool {
+	return api.ServerTool{
+		Tool: api.Tool{
+			Name:        "oadp_schedule_update",
+			Description: "Update a backup schedule's cron expression or backup template",
+			InputSchema: &jsonschema.Schema{
+				Type: "object",
+				Properties: map[string]*jsonschema.Schema{
+					"namespace": {
+						Type:        "string",
+						Description: "Namespace of the schedule (default: openshift-adp)",
+					},
+					"name": {
+						Type:        "string",
+						Description: "Name of the schedule to update",
+					},
+					"schedule": {
+						Type:        "string",
+						Description: "New cron expression (e.g., '0 1 * * *' for daily at 1am)",
+					},
+					"ttl": {
+						Type:        "string",
+						Description: "New backup TTL duration (e.g., '720h' for 30 days)",
+					},
+				},
+				Required: []string{"name"},
+			},
+			Annotations: api.ToolAnnotations{
+				Title:           "OADP: Update Schedule",
+				ReadOnlyHint:    ptr.To(false),
+				DestructiveHint: ptr.To(false),
+				IdempotentHint:  ptr.To(true),
+			},
+		},
+		Handler: scheduleUpdateHandler,
+	}
+}
+
+func scheduleUpdateHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
+	namespace := oadp.DefaultOADPNamespace
+	if v, ok := params.GetArguments()["namespace"].(string); ok && v != "" {
+		namespace = v
+	}
+
+	name, ok := params.GetArguments()["name"].(string)
+	if !ok || name == "" {
+		return api.NewToolCallResult("", fmt.Errorf("name is required")), nil
+	}
+
+	// Get the existing schedule
+	schedule, err := oadp.GetSchedule(params.Context, params.DynamicClient(), namespace, name)
+	if err != nil {
+		return api.NewToolCallResult("", fmt.Errorf("failed to get schedule: %w", err)), nil
+	}
+
+	// Apply updates
+	if cronSchedule, ok := params.GetArguments()["schedule"].(string); ok && cronSchedule != "" {
+		if err := unstructured.SetNestedField(schedule.Object, cronSchedule, "spec", "schedule"); err != nil {
+			return api.NewToolCallResult("", fmt.Errorf("failed to set schedule field: %w", err)), nil
+		}
+	}
+
+	if ttl, ok := params.GetArguments()["ttl"].(string); ok && ttl != "" {
+		if err := unstructured.SetNestedField(schedule.Object, ttl, "spec", "template", "ttl"); err != nil {
+			return api.NewToolCallResult("", fmt.Errorf("failed to set ttl field: %w", err)), nil
+		}
+	}
+
+	updated, err := oadp.UpdateSchedule(params.Context, params.DynamicClient(), schedule)
+	if err != nil {
+		return api.NewToolCallResult("", fmt.Errorf("failed to update schedule: %w", err)), nil
+	}
+
+	return api.NewToolCallResult(params.ListOutput.PrintObj(updated)), nil
 }
 
 func initScheduleDelete() api.ServerTool {
