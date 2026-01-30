@@ -18,7 +18,9 @@ Choose the guide that matches your needs:
 
 ## Other toolsets
 
+- **[OADP](OADP.md)** - Tools for OpenShift API for Data Protection (Velero backups, restores, schedules)
 - **[Kiali](KIALI.md)** - Tools for Kiali ServiceMesh with Istio
+- **[Observability](OBSERVABILITY.md)** - Tools for Prometheus metrics and Alertmanager alerts
 
 ## Additional Documentation
 
