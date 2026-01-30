@@ -33,10 +33,10 @@ LABEL io.k8s.description="MCP server for Red Hat Openshift"
 LABEL io.k8s.display-name="MCP server for Red Hat Openshift"
 LABEL io.openshift.tags="openshift,mcp"
 LABEL name="openshift-lightspeed/openshift-mcp-server-rhel9"
-LABEL release=0.0.1
+LABEL release=0.1.0
 LABEL url="https://github.com/openshift/openshift-mcp-server"
 LABEL vendor="Red Hat, Inc."
-LABEL version=0.0.1
+LABEL version=0.1.0
 LABEL summary="MCP server for Red Hat Openshift"
 LABEL konflux.additional-tags="latest"
 
