@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -198,6 +199,29 @@ func (s *ResourcesSuite) TestResourcesListDenied() {
 	})
 }
 
+func (s *ResourcesSuite) TestResourcesListForbidden() {
+	s.InitMcpClient()
+	defer restoreAuth(s.T().Context())
+	client := kubernetes.NewForConfigOrDie(envTestRestConfig)
+	// Remove all permissions - user will have forbidden access
+	_ = client.RbacV1().ClusterRoles().Delete(s.T().Context(), "allow-all", metav1.DeleteOptions{})
+
+	s.Run("resources_list (forbidden)", func() {
+		capture := s.StartCapturingLogNotifications()
+		toolResult, _ := s.CallTool("resources_list", map[string]interface{}{"apiVersion": "v1", "kind": "ConfigMap"})
+		s.Run("returns error", func() {
+			s.Truef(toolResult.IsError, "call tool should fail")
+			s.Contains(toolResult.Content[0].(mcp.TextContent).Text, "forbidden",
+				"error message should indicate forbidden")
+		})
+		s.Run("sends log notification", func() {
+			logNotification := capture.RequireLogNotification(s.T(), 2*time.Second)
+			s.Equal("error", logNotification.Level, "forbidden errors should log at error level")
+			s.Contains(logNotification.Data, "Permission denied", "log message should indicate permission denied")
+		})
+	})
+}
+
 func (s *ResourcesSuite) TestResourcesListAsTable() {
 	s.Cfg.ListOutput = "table"
 	s.Require().NoError(EnvTestInOpenShift(s.T().Context()), "Expected to configure test for OpenShift")
@@ -308,6 +332,20 @@ func (s *ResourcesSuite) TestResourcesGet() {
 		s.Truef(toolResult.IsError, "call tool should fail")
 		s.Equalf("failed to get resource, missing argument name", toolResult.Content[0].(mcp.TextContent).Text,
 			"invalid error message, got %v", toolResult.Content[0].(mcp.TextContent).Text)
+	})
+	s.Run("resources_get with nonexistent resource", func() {
+		capture := s.StartCapturingLogNotifications()
+		toolResult, _ := s.CallTool("resources_get", map[string]interface{}{"apiVersion": "v1", "kind": "ConfigMap", "name": "nonexistent-configmap"})
+		s.Run("returns error", func() {
+			s.Truef(toolResult.IsError, "call tool should fail")
+			s.Equalf(`failed to get resource: configmaps "nonexistent-configmap" not found`,
+				toolResult.Content[0].(mcp.TextContent).Text, "invalid error message, got %v", toolResult.Content[0].(mcp.TextContent).Text)
+		})
+		s.Run("sends log notification", func() {
+			logNotification := capture.RequireLogNotification(s.T(), 2*time.Second)
+			s.Equal("info", logNotification.Level, "not found errors should log at info level")
+			s.Contains(logNotification.Data, "Resource not found", "log message should indicate resource not found")
+		})
 	})
 	s.Run("resources_get returns namespace", func() {
 		namespace, err := s.CallTool("resources_get", map[string]interface{}{"apiVersion": "v1", "kind": "Namespace", "name": "default"})
@@ -543,6 +581,30 @@ func (s *ResourcesSuite) TestResourcesCreateOrUpdateDenied() {
 	})
 }
 
+func (s *ResourcesSuite) TestResourcesCreateOrUpdateForbidden() {
+	s.InitMcpClient()
+	defer restoreAuth(s.T().Context())
+	client := kubernetes.NewForConfigOrDie(envTestRestConfig)
+	// Remove all permissions - user will have forbidden access
+	_ = client.RbacV1().ClusterRoles().Delete(s.T().Context(), "allow-all", metav1.DeleteOptions{})
+
+	s.Run("resources_create_or_update (forbidden)", func() {
+		capture := s.StartCapturingLogNotifications()
+		configMapYaml := "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: a-forbidden-configmap\n  namespace: default\n"
+		toolResult, _ := s.CallTool("resources_create_or_update", map[string]interface{}{"resource": configMapYaml})
+		s.Run("returns error", func() {
+			s.Truef(toolResult.IsError, "call tool should fail")
+			s.Contains(toolResult.Content[0].(mcp.TextContent).Text, "forbidden",
+				"error message should indicate forbidden")
+		})
+		s.Run("sends log notification", func() {
+			logNotification := capture.RequireLogNotification(s.T(), 2*time.Second)
+			s.Equal("error", logNotification.Level, "forbidden errors should log at error level")
+			s.Contains(logNotification.Data, "Permission denied", "log message should indicate permission denied")
+		})
+	})
+}
+
 func (s *ResourcesSuite) TestResourcesDelete() {
 	s.InitMcpClient()
 	client := kubernetes.NewForConfigOrDie(envTestRestConfig)
@@ -577,11 +639,19 @@ func (s *ResourcesSuite) TestResourcesDelete() {
 		s.Equalf("failed to delete resource, missing argument name", toolResult.Content[0].(mcp.TextContent).Text,
 			"invalid error message, got %v", toolResult.Content[0].(mcp.TextContent).Text)
 	})
-	s.Run("resources_delete with nonexistent resource returns error", func() {
+	s.Run("resources_delete with nonexistent resource", func() {
+		capture := s.StartCapturingLogNotifications()
 		toolResult, _ := s.CallTool("resources_delete", map[string]interface{}{"apiVersion": "v1", "kind": "ConfigMap", "name": "nonexistent-configmap"})
-		s.Truef(toolResult.IsError, "call tool should fail")
-		s.Equalf(`failed to delete resource: configmaps "nonexistent-configmap" not found`,
-			toolResult.Content[0].(mcp.TextContent).Text, "invalid error message, got %v", toolResult.Content[0].(mcp.TextContent).Text)
+		s.Run("returns error", func() {
+			s.Truef(toolResult.IsError, "call tool should fail")
+			s.Equalf(`failed to delete resource: configmaps "nonexistent-configmap" not found`,
+				toolResult.Content[0].(mcp.TextContent).Text, "invalid error message, got %v", toolResult.Content[0].(mcp.TextContent).Text)
+		})
+		s.Run("sends log notification", func() {
+			logNotification := capture.RequireLogNotification(s.T(), 2*time.Second)
+			s.Equal("info", logNotification.Level, "not found errors should log at info level")
+			s.Contains(logNotification.Data, "Resource not found", "log message should indicate resource not found")
+		})
 	})
 
 	s.Run("resources_delete with valid namespaced resource", func() {
@@ -747,16 +817,24 @@ func (s *ResourcesSuite) TestResourcesScale() {
 			s.Equalf(int32(5), *deployment.Spec.Replicas, "expected 5 replicas in deployment, got %d", *deployment.Spec.Replicas)
 		})
 	})
-	s.Run("resources_scale with nonexistent resource returns error", func() {
+	s.Run("resources_scale with nonexistent resource", func() {
+		capture := s.StartCapturingLogNotifications()
 		toolResult, _ := s.CallTool("resources_scale", map[string]interface{}{
 			"apiVersion": "apps/v1",
 			"kind":       "Deployment",
 			"namespace":  "default",
 			"name":       "nonexistent-deployment",
 		})
-		s.Truef(toolResult.IsError, "call tool should fail")
-		s.Containsf(toolResult.Content[0].(mcp.TextContent).Text, "not found",
-			"expected not found error, got %v", toolResult.Content[0].(mcp.TextContent).Text)
+		s.Run("returns error", func() {
+			s.Truef(toolResult.IsError, "call tool should fail")
+			s.Containsf(toolResult.Content[0].(mcp.TextContent).Text, "not found",
+				"expected not found error, got %v", toolResult.Content[0].(mcp.TextContent).Text)
+		})
+		s.Run("sends log notification", func() {
+			logNotification := capture.RequireLogNotification(s.T(), 2*time.Second)
+			s.Equal("info", logNotification.Level, "not found errors should log at info level")
+			s.Contains(logNotification.Data, "Resource not found", "log message should indicate resource not found")
+		})
 	})
 	s.Run("resources_scale with resource that does not support scale subresource returns error", func() {
 		configMapName := "configmap-without-scale"

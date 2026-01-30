@@ -1,0 +1,267 @@
+name: mcpchecker MCP Evaluation
+
+on:
+  # Weekly schedule - runs every Monday at 9 AM UTC
+  schedule:
+    - cron: '0 9 * * 1'
+
+  # Manual trigger via PR comments
+  issue_comment:
+    types: [created]
+
+  # Allow manual workflow dispatch for testing
+  workflow_dispatch:
+    inputs:
+      task-filter:
+        description: 'Regular expression to filter tasks (optional)'
+        required: false
+        default: ''
+      verbose:
+        description: 'Enable verbose output'
+        required: false
+        type: boolean
+        default: false
+
+# Minimal permissions - no write access to PRs/issues
+# This workflow checks out and runs potentially untrusted PR code
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  # Only run once for latest commit per ref and cancel other (previous) runs.
+  # For issue_comment events, use PR number as group to avoid different PRs canceling each other.
+  group: ${{ github.workflow }}-${{ github.event_name == 'issue_comment' && format('pr-{0}', github.event.issue.number) || github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: 1.25
+  KIND_CLUSTER_NAME: mcp-eval-cluster
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Check if workflow should run based on trigger
+  check-trigger:
+    name: Check if evaluation should run
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       contains(github.event.comment.body, '/run-mcpchecker'))
+    outputs:
+      should-run: ${{ steps.check.outputs.should-run }}
+      kiali-run: ${{ steps.check.outputs.kiali-run }}
+      pr-number: ${{ steps.check.outputs.pr-number }}
+      pr-sha: ${{ steps.check.outputs.pr-sha }}
+      is-pr: ${{ steps.check.outputs.is-pr }}
+    steps:
+      - name: Check trigger conditions
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "${{ github.event_name }}" == "issue_comment" ]]; then
+            # Check if commenter has write access
+            PERMISSION=$(gh api "repos/${{ github.repository }}/collaborators/${{ github.event.comment.user.login }}/permission" --jq '.permission')
+
+            if [[ "$PERMISSION" == "admin" || "$PERMISSION" == "write" ]]; then
+              echo "should-run=true" >> $GITHUB_OUTPUT
+              echo "is-pr=true" >> $GITHUB_OUTPUT
+              PR_NUMBER="${{ github.event.issue.number }}"
+              echo "pr-number=$PR_NUMBER" >> $GITHUB_OUTPUT
+
+              # Capture SHA at trigger time to prevent TOCTOU race condition
+              # This ensures we run the exact code the maintainer reviewed
+              PR_SHA=$(gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" --json headRefOid --jq '.headRefOid')
+              echo "pr-sha=$PR_SHA" >> $GITHUB_OUTPUT
+              echo "Pinned to SHA: $PR_SHA"
+            else
+              echo "should-run=false" >> $GITHUB_OUTPUT
+              echo "User ${{ github.event.comment.user.login }} does not have permission to trigger evaluations"
+            fi
+          else
+            echo "should-run=true" >> $GITHUB_OUTPUT
+            echo "is-pr=false" >> $GITHUB_OUTPUT
+            echo "pr-sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+
+          TASK_FILTER="${{ github.event.inputs.task-filter || '' }}"
+          if [[ "$TASK_FILTER" =~ kiali ]]; then
+            echo "kiali-run=true" >> $GITHUB_OUTPUT
+          else
+            echo "kiali-run=false" >> $GITHUB_OUTPUT
+          fi
+
+  # Run gevals evaluation with Kind cluster
+  run-evaluation:
+    name: Run MCP Evaluation
+    needs: check-trigger
+    if: needs.check-trigger.outputs.should-run == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # Use pinned SHA to prevent TOCTOU attacks
+          # For PRs: the SHA captured when maintainer commented
+          # For other triggers: the current commit SHA
+          ref: ${{ needs.check-trigger.outputs.pr-sha }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Setup Kind cluster
+        run: make kind-create-cluster KIND_CLUSTER_NAME=${{ env.KIND_CLUSTER_NAME }}
+
+      - name: Install Istio/Kiali and bookinfo demo
+        if: needs.check-trigger.outputs.kiali-run == 'true'
+        run: make setup-kiali
+
+      - name: Start MCP server
+        run: make run-server
+        env:
+          TOOLSETS: ${{ needs.check-trigger.outputs.kiali-run == 'true' && 'kiali' || '' }}
+
+      - name: Run mcpchecker evaluation
+        id: mcpchecker
+        uses: mcpchecker/mcpchecker/.github/actions/mcpchecker-action@v0.0.3
+        with:
+          eval-config: 'evals/openai-agent/eval.yaml'
+          mcpchecker-version: 'latest'
+          task-filter: ${{ github.event.inputs.task-filter || '' }}
+          output-format: 'json'
+          verbose: ${{ github.event.inputs.verbose || 'false' }}
+          upload-artifacts: 'true'
+          artifact-name: 'mcpchecker-results'
+          fail-on-error: 'false'
+          task-pass-threshold: '0.8'
+          assertion-pass-threshold: '0.8'
+          working-directory: '.'
+        env:
+          # OpenAI Agent configuration
+          MODEL_BASE_URL: ${{ secrets.MODEL_BASE_URL }}
+          MODEL_KEY: ${{ secrets.MODEL_KEY }}
+          # LLM Judge configuration
+          JUDGE_BASE_URL: ${{ secrets.JUDGE_BASE_URL }}
+          JUDGE_API_KEY: ${{ secrets.JUDGE_API_KEY }}
+          JUDGE_MODEL_NAME: ${{ secrets.JUDGE_MODEL_NAME }}
+
+      - name: Cleanup
+        if: always()
+        run: |
+          make stop-server || true
+          make kind-delete-cluster KIND_CLUSTER_NAME=${{ env.KIND_CLUSTER_NAME }} || true
+
+      # Save context and results for the reporting workflow
+      - name: Save evaluation context
+        if: always() && needs.check-trigger.outputs.is-pr == 'true'
+        run: |
+          mkdir -p eval-context
+          cat > eval-context/context.json << EOF
+          {
+            "pr_number": "${{ needs.check-trigger.outputs.pr-number }}",
+            "pr_sha": "${{ needs.check-trigger.outputs.pr-sha }}",
+            "tasks_passed": "${{ steps.mcpchecker.outputs.tasks-passed }}",
+            "tasks_total": "${{ steps.mcpchecker.outputs.tasks-total }}",
+            "task_pass_rate": "${{ steps.mcpchecker.outputs.task-pass-rate }}",
+            "assertions_passed": "${{ steps.mcpchecker.outputs.assertions-passed }}",
+            "assertions_total": "${{ steps.mcpchecker.outputs.assertions-total }}",
+            "passed": "${{ steps.mcpchecker.outputs.passed }}"
+          }
+          EOF
+
+      - name: Upload PR context
+        if: always() && needs.check-trigger.outputs.is-pr == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: eval-context
+          path: eval-context/
+          retention-days: 1
+
+  # Create PR with results (scheduled runs only)
+  commit-results:
+    name: Commit Evaluation Results
+    needs: [check-trigger, run-evaluation]
+    # Only commit results on scheduled runs, not manual dispatch or PR comments
+    if: always() && github.event_name == 'schedule' && needs.run-evaluation.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Download mcpchecker results
+        uses: actions/download-artifact@v7
+        with:
+          name: mcpchecker-results
+          path: mcpchecker-results/
+
+      - name: Copy results to evals/results
+        env:
+          EVAL_CONFIG: 'evals/openai-agent/eval.yaml'
+        run: |
+          # Extract agent name from eval-config path
+          AGENT_NAME=$(echo "$EVAL_CONFIG" | sed 's|evals/||; s|/eval\.yaml||')
+
+          mkdir -p evals/results
+          # Copy the mcpchecker results file with agent-specific name
+          cp mcpchecker-results/results.json "evals/results/${AGENT_NAME}-latest.json"
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TRIGGER: ${{ github.event_name }}
+          COMMIT_SHA: ${{ needs.check-trigger.outputs.pr-sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          BRANCH="chore/update-eval-results"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Create or reset the branch
+          git checkout -B "$BRANCH"
+          git add evals/results/*-latest.json
+          git commit -m "chore(evals): update mcpchecker evaluation results"
+          git push -f origin "$BRANCH"
+
+          # Check if PR already exists
+          EXISTING_PR=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' || echo "")
+
+          PR_BODY=$(cat <<EOF
+          ## Automated Evaluation Results Update
+
+          This PR updates the mcpchecker evaluation results from the weekly scheduled run.
+
+          **Run details:**
+          - Trigger: $TRIGGER
+          - Commit: $COMMIT_SHA
+          - Workflow run: $RUN_URL
+
+          ---
+          This PR was automatically generated by the mcpchecker workflow.
+          EOF
+          )
+
+          if [ -n "$EXISTING_PR" ]; then
+            echo "Updating existing PR #$EXISTING_PR"
+            gh pr edit "$EXISTING_PR" --body "$PR_BODY"
+          else
+            echo "Creating new PR"
+            gh pr create \
+              --title "chore: update mcpchecker evaluation results" \
+              --body "$PR_BODY" \
+              --base main \
+              --head "$BRANCH"
+          fi

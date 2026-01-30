@@ -62,12 +62,12 @@ func NewKubernetes(config api.BaseConfig, clientCmdConfig clientcmd.ClientConfig
 		return &AccessControlRoundTripper{
 			delegate:                original,
 			deniedResourcesProvider: config,
-			restMapper:              k.restMapper,
+			restMapperProvider:      func() meta.RESTMapper { return k.restMapper },
 		}
 	})
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(k.restConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create discovery client: %v", err)
+		return nil, fmt.Errorf("failed to create discovery client: %w", err)
 	}
 	k.discoveryClient = memory.NewMemCacheClient(discoveryClient)
 	k.restMapper = restmapper.NewDeferredDiscoveryRESTMapper(k.discoveryClient)

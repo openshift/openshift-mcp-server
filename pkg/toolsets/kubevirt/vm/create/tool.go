@@ -66,6 +66,38 @@ func Tools() []api.ServerTool {
 							Description: "Optional storage size for the VM's root disk when using DataSources (e.g., '30Gi', '50Gi', '100Gi'). Defaults to 30Gi. Ignored when using container disks.",
 							Examples:    []any{"30Gi", "50Gi", "100Gi"},
 						},
+						"networks": {
+							Type:        "array",
+							Description: "Optional secondary network interfaces to attach to the VM. Each item specifies a Multus NetworkAttachmentDefinition to attach. Accepts either simple strings (NetworkAttachmentDefinition names) or objects with 'name' (interface name in VM) and 'networkName' (NetworkAttachmentDefinition name) properties. Each network creates a bridge interface on the VM.",
+							Items: &jsonschema.Schema{
+								OneOf: []*jsonschema.Schema{
+									{
+										Type:        "string",
+										Description: "NetworkAttachmentDefinition name (used as both interface name and network name)",
+									},
+									{
+										Type:        "object",
+										Description: "Network configuration with custom interface name",
+										Properties: map[string]*jsonschema.Schema{
+											"name": {
+												Type:        "string",
+												Description: "Interface name in the VM (optional, defaults to networkName)",
+											},
+											"networkName": {
+												Type:        "string",
+												Description: "Multus NetworkAttachmentDefinition name (required)",
+											},
+										},
+										Required: []string{"networkName"},
+									},
+								},
+							},
+							Examples: []any{
+								[]string{"vlan-network"},
+								[]string{"vlan-network", "storage-network"},
+								[]map[string]string{{"name": "vlan100", "networkName": "vlan-network"}},
+							},
+						},
 					},
 					Required: []string{"namespace", "name"},
 				},
@@ -82,6 +114,12 @@ func Tools() []api.ServerTool {
 	}
 }
 
+// NetworkConfig represents a secondary network interface configuration
+type NetworkConfig struct {
+	Name        string `json:"name"`        // Interface name in the VM
+	NetworkName string `json:"networkName"` // Multus NetworkAttachmentDefinition name
+}
+
 type vmParams struct {
 	Namespace           string
 	Name                string
@@ -95,6 +133,7 @@ type vmParams struct {
 	DataSourceNamespace string
 	Storage             string
 	RunStrategy         string
+	Networks            []NetworkConfig
 }
 
 func create(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -157,6 +196,7 @@ type createParameters struct {
 	Performance  string
 	Storage      string
 	Autostart    bool
+	Networks     []NetworkConfig
 }
 
 // parseCreateParameters parses and validates input parameters
@@ -171,6 +211,12 @@ func parseCreateParameters(params api.ToolHandlerParams) (*createParameters, err
 		return nil, err
 	}
 
+	networksInput := optionalArray(params, "networks")
+	networks, err := parseNetworks(networksInput)
+	if err != nil {
+		return nil, fmt.Errorf("invalid networks parameter: %w", err)
+	}
+
 	return &createParameters{
 		Namespace:    namespace,
 		Name:         name,
@@ -181,7 +227,64 @@ func parseCreateParameters(params api.ToolHandlerParams) (*createParameters, err
 		Performance:  normalizePerformance(api.OptionalString(params, "performance", "")),
 		Storage:      api.OptionalString(params, "storage", "30Gi"),
 		Autostart:    api.OptionalBool(params, "autostart", false),
+		Networks:     networks,
 	}, nil
+}
+
+// optionalArray extracts an optional array parameter from tool arguments.
+// Returns the array value if present and valid, or nil if missing or not an array.
+func optionalArray(params api.ToolHandlerParams, key string) []any {
+	args := params.GetArguments()
+	val, ok := args[key]
+	if !ok {
+		return nil
+	}
+	arr, ok := val.([]any)
+	if !ok {
+		return nil
+	}
+	return arr
+}
+
+// parseNetworks parses the networks input which is an array of either:
+// - Strings (NetworkAttachmentDefinition names)
+// - Objects with 'name' and 'networkName' properties
+func parseNetworks(input []any) ([]NetworkConfig, error) {
+	if len(input) == 0 {
+		return nil, nil
+	}
+
+	networks := make([]NetworkConfig, 0, len(input))
+	for i, item := range input {
+		switch v := item.(type) {
+		case string:
+			// Simple string: use as both name and networkName
+			if v == "" {
+				continue
+			}
+			networks = append(networks, NetworkConfig{
+				Name:        v,
+				NetworkName: v,
+			})
+		case map[string]any:
+			// Object with name and networkName properties
+			networkName, ok := v["networkName"].(string)
+			if !ok || networkName == "" {
+				return nil, fmt.Errorf("network at index %d missing required 'networkName' field", i)
+			}
+			name, _ := v["name"].(string)
+			if name == "" {
+				name = networkName
+			}
+			networks = append(networks, NetworkConfig{
+				Name:        name,
+				NetworkName: networkName,
+			})
+		default:
+			return nil, fmt.Errorf("network at index %d has invalid type: expected string or object", i)
+		}
+	}
+	return networks, nil
 }
 
 // buildTemplateParams constructs the template parameters for VM creation
@@ -197,6 +300,7 @@ func buildTemplateParams(createParams *createParameters, matchedDataSource *kube
 		Name:        createParams.Name,
 		Storage:     createParams.Storage,
 		RunStrategy: runStrategy,
+		Networks:    createParams.Networks,
 	}
 
 	// Set instancetype and kind if available

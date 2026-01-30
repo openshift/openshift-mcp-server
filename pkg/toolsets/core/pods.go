@@ -11,6 +11,7 @@ import (
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
+	"github.com/containers/kubernetes-mcp-server/pkg/mcplog"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
 )
 
@@ -273,7 +274,8 @@ func podsListInAllNamespaces(params api.ToolHandlerParams) (*api.ToolCallResult,
 	}
 	ret, err := kubernetes.NewCore(params).PodsListInAllNamespaces(params, resourceListOptions)
 	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to list pods in all namespaces: %v", err)), nil
+		mcplog.HandleK8sError(params.Context, err, "pod listing")
+		return api.NewToolCallResult("", fmt.Errorf("failed to list pods in all namespaces: %w", err)), nil
 	}
 	return api.NewToolCallResult(params.ListOutput.PrintObj(ret)), nil
 }
@@ -296,7 +298,8 @@ func podsListInNamespace(params api.ToolHandlerParams) (*api.ToolCallResult, err
 	}
 	ret, err := kubernetes.NewCore(params).PodsListInNamespace(params, ns.(string), resourceListOptions)
 	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to list pods in namespace %s: %v", ns, err)), nil
+		mcplog.HandleK8sError(params.Context, err, "pod listing")
+		return api.NewToolCallResult("", fmt.Errorf("failed to list pods in namespace %s: %w", ns, err)), nil
 	}
 	return api.NewToolCallResult(params.ListOutput.PrintObj(ret)), nil
 }
@@ -312,7 +315,8 @@ func podsGet(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	}
 	ret, err := kubernetes.NewCore(params).PodsGet(params, ns.(string), name.(string))
 	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to get pod %s in namespace %s: %v", name, ns, err)), nil
+		mcplog.HandleK8sError(params.Context, err, "pod access")
+		return api.NewToolCallResult("", fmt.Errorf("failed to get pod %s in namespace %s: %w", name, ns, err)), nil
 	}
 	return api.NewToolCallResult(output.MarshalYaml(ret)), nil
 }
@@ -328,7 +332,8 @@ func podsDelete(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	}
 	ret, err := kubernetes.NewCore(params).PodsDelete(params, ns.(string), name.(string))
 	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to delete pod %s in namespace %s: %v", name, ns, err)), nil
+		mcplog.HandleK8sError(params.Context, err, "pod deletion")
+		return api.NewToolCallResult("", fmt.Errorf("failed to delete pod %s in namespace %s: %w", name, ns, err)), nil
 	}
 	return api.NewToolCallResult(ret, err), nil
 }
@@ -349,13 +354,13 @@ func podsTop(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	}
 	ret, err := kubernetes.NewCore(params).PodsTop(params, podsTopOptions)
 	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to get pods top: %v", err)), nil
+		return api.NewToolCallResult("", fmt.Errorf("failed to get pods top: %w", err)), nil
 	}
 	buf := new(bytes.Buffer)
 	printer := metricsutil.NewTopCmdPrinter(buf, true)
 	err = printer.PrintPodMetrics(ret.Items, true, true, false, "", true)
 	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to get pods top: %v", err)), nil
+		return api.NewToolCallResult("", fmt.Errorf("failed to get pods top: %w", err)), nil
 	}
 	return api.NewToolCallResult(buf.String(), nil), nil
 }
@@ -386,7 +391,7 @@ func podsExec(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	}
 	ret, err := kubernetes.NewCore(params).PodsExec(params, ns.(string), name.(string), container.(string), command)
 	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to exec in pod %s in namespace %s: %v", name, ns, err)), nil
+		return api.NewToolCallResult("", fmt.Errorf("failed to exec in pod %s in namespace %s: %w", name, ns, err)), nil
 	} else if ret == "" {
 		ret = fmt.Sprintf("The executed command in pod %s in namespace %s has not produced any output", name, ns)
 	}
@@ -424,7 +429,7 @@ func podsLog(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 
 	ret, err := kubernetes.NewCore(params).PodsLog(params.Context, ns.(string), name.(string), container.(string), previousBool, tailInt)
 	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to get pod %s log in namespace %s: %v", name, ns, err)), nil
+		return api.NewToolCallResult("", fmt.Errorf("failed to get pod %s log in namespace %s: %w", name, ns, err)), nil
 	} else if ret == "" {
 		ret = fmt.Sprintf("The pod %s in namespace %s has not logged any message yet", name, ns)
 	}
@@ -450,11 +455,11 @@ func podsRun(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	}
 	resources, err := kubernetes.NewCore(params).PodsRun(params, ns.(string), name.(string), image.(string), int32(port.(float64)))
 	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to run pod %s in namespace %s: %v", name, ns, err)), nil
+		return api.NewToolCallResult("", fmt.Errorf("failed to run pod %s in namespace %s: %w", name, ns, err)), nil
 	}
 	marshalledYaml, err := output.MarshalYaml(resources)
 	if err != nil {
-		err = fmt.Errorf("failed to run pod: %v", err)
+		err = fmt.Errorf("failed to run pod: %w", err)
 	}
 	return api.NewToolCallResult("# The following resources (YAML) have been created or updated successfully\n"+marshalledYaml, err), nil
 }
