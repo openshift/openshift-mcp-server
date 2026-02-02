@@ -111,7 +111,7 @@ func TestQueryPrometheusHandler_Diagnostics(t *testing.T) {
 			resp.Data.Result[0].Metric["check"] = "operators-alerts"
 		}
 
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer ts.Close()
 

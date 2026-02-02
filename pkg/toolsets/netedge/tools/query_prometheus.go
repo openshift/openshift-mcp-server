@@ -120,7 +120,7 @@ func handleDiagnosticTarget(params api.ToolHandlerParams, target string) (*api.T
 	}
 
 	// Explicitly handle insecure config since WithTLSFromRESTConfig might not cover it strictly if CAs fail to load but system pool works
-	if params.RESTConfig().TLSClientConfig.Insecure {
+	if params.RESTConfig().Insecure {
 		opts = append(opts, prometheus.WithInsecure(true))
 	}
 
