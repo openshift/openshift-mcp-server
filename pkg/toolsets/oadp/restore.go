@@ -11,49 +11,121 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+// RestoreAction represents the action to perform on restores
+type RestoreAction string
+
+const (
+	RestoreActionList   RestoreAction = "list"
+	RestoreActionGet    RestoreAction = "get"
+	RestoreActionCreate RestoreAction = "create"
+	RestoreActionDelete RestoreAction = "delete"
+	RestoreActionLogs   RestoreAction = "logs"
+)
+
 func initRestoreTools() []api.ServerTool {
 	return []api.ServerTool{
-		initRestoreList(),
-		initRestoreGet(),
-		initRestoreCreate(),
-		initRestoreDelete(),
-		initRestoreLogs(),
-	}
-}
-
-func initRestoreList() api.ServerTool {
-	return api.ServerTool{
-		Tool: api.Tool{
-			Name:        "oadp_restore_list",
-			Description: "List all Velero/OADP restore operations in the specified namespace",
-			InputSchema: &jsonschema.Schema{
-				Type: "object",
-				Properties: map[string]*jsonschema.Schema{
-					"namespace": {
-						Type:        "string",
-						Description: "Namespace containing restores (default: openshift-adp)",
+		{
+			Tool: api.Tool{
+				Name:        "oadp_restore",
+				Description: "Manage Velero/OADP restore operations: list, get, create, delete, or retrieve logs",
+				InputSchema: &jsonschema.Schema{
+					Type: "object",
+					Properties: map[string]*jsonschema.Schema{
+						"action": {
+							Type:        "string",
+							Enum:        []any{string(RestoreActionList), string(RestoreActionGet), string(RestoreActionCreate), string(RestoreActionDelete), string(RestoreActionLogs)},
+							Description: "Action to perform: 'list' (list all restores), 'get' (get restore details), 'create' (create new restore), 'delete' (delete restore), 'logs' (get restore logs)",
+						},
+						"namespace": {
+							Type:        "string",
+							Description: "Namespace containing restores (default: openshift-adp)",
+						},
+						"name": {
+							Type:        "string",
+							Description: "Name of the restore (required for get, create, delete, logs)",
+						},
+						"labelSelector": {
+							Type:        "string",
+							Description: "Label selector to filter restores (for list action)",
+						},
+						"backupName": {
+							Type:        "string",
+							Description: "Name of the backup to restore from (required for create action)",
+						},
+						"includedNamespaces": {
+							Type:        "array",
+							Description: "Namespaces to restore (for create action)",
+							Items:       &jsonschema.Schema{Type: "string"},
+						},
+						"excludedNamespaces": {
+							Type:        "array",
+							Description: "Namespaces to exclude from restore (for create action)",
+							Items:       &jsonschema.Schema{Type: "string"},
+						},
+						"includedResources": {
+							Type:        "array",
+							Description: "Resource types to restore (for create action)",
+							Items:       &jsonschema.Schema{Type: "string"},
+						},
+						"excludedResources": {
+							Type:        "array",
+							Description: "Resource types to exclude (for create action)",
+							Items:       &jsonschema.Schema{Type: "string"},
+						},
+						"namespaceMapping": {
+							Type:        "object",
+							Description: "Map source namespaces to target namespaces (for create action)",
+						},
+						"restorePVs": {
+							Type:        "boolean",
+							Description: "Whether to restore persistent volumes (for create action)",
+						},
+						"preserveNodePorts": {
+							Type:        "boolean",
+							Description: "Preserve service node ports during restore (for create action)",
+						},
 					},
-					"labelSelector": {
-						Type:        "string",
-						Description: "Label selector to filter restores",
-					},
+					Required: []string{"action"},
+				},
+				Annotations: api.ToolAnnotations{
+					Title:           "OADP: Restore",
+					ReadOnlyHint:    ptr.To(false),
+					DestructiveHint: ptr.To(false),
 				},
 			},
-			Annotations: api.ToolAnnotations{
-				Title:        "OADP: List Restores",
-				ReadOnlyHint: ptr.To(true),
-			},
+			Handler: restoreHandler,
 		},
-		Handler: restoreListHandler,
 	}
 }
 
-func restoreListHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
+func restoreHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
+	action, err := api.RequiredString(params, "action")
+	if err != nil {
+		return api.NewToolCallResult("", err), nil
+	}
+
 	namespace := oadp.DefaultOADPNamespace
 	if v, ok := params.GetArguments()["namespace"].(string); ok && v != "" {
 		namespace = v
 	}
 
+	switch RestoreAction(action) {
+	case RestoreActionList:
+		return handleRestoreList(params, namespace)
+	case RestoreActionGet:
+		return handleRestoreGet(params, namespace)
+	case RestoreActionCreate:
+		return handleRestoreCreate(params, namespace)
+	case RestoreActionDelete:
+		return handleRestoreDelete(params, namespace)
+	case RestoreActionLogs:
+		return handleRestoreLogs(params, namespace)
+	default:
+		return api.NewToolCallResult("", fmt.Errorf("invalid action '%s': must be one of 'list', 'get', 'create', 'delete', 'logs'", action)), nil
+	}
+}
+
+func handleRestoreList(params api.ToolHandlerParams, namespace string) (*api.ToolCallResult, error) {
 	labelSelector := ""
 	if v, ok := params.GetArguments()["labelSelector"].(string); ok {
 		labelSelector = v
@@ -69,43 +141,10 @@ func restoreListHandler(params api.ToolHandlerParams) (*api.ToolCallResult, erro
 	return api.NewToolCallResult(params.ListOutput.PrintObj(restores)), nil
 }
 
-func initRestoreGet() api.ServerTool {
-	return api.ServerTool{
-		Tool: api.Tool{
-			Name:        "oadp_restore_get",
-			Description: "Get detailed information about a specific restore operation including status, warnings, and errors",
-			InputSchema: &jsonschema.Schema{
-				Type: "object",
-				Properties: map[string]*jsonschema.Schema{
-					"namespace": {
-						Type:        "string",
-						Description: "Namespace of the restore (default: openshift-adp)",
-					},
-					"name": {
-						Type:        "string",
-						Description: "Name of the restore",
-					},
-				},
-				Required: []string{"name"},
-			},
-			Annotations: api.ToolAnnotations{
-				Title:        "OADP: Get Restore",
-				ReadOnlyHint: ptr.To(true),
-			},
-		},
-		Handler: restoreGetHandler,
-	}
-}
-
-func restoreGetHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	namespace := oadp.DefaultOADPNamespace
-	if v, ok := params.GetArguments()["namespace"].(string); ok && v != "" {
-		namespace = v
-	}
-
+func handleRestoreGet(params api.ToolHandlerParams, namespace string) (*api.ToolCallResult, error) {
 	name, ok := params.GetArguments()["name"].(string)
 	if !ok || name == "" {
-		return api.NewToolCallResult("", fmt.Errorf("name is required")), nil
+		return api.NewToolCallResult("", fmt.Errorf("name is required for get action")), nil
 	}
 
 	restore, err := oadp.GetRestore(params.Context, params.DynamicClient(), namespace, name)
@@ -116,106 +155,34 @@ func restoreGetHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error
 	return api.NewToolCallResult(params.ListOutput.PrintObj(restore)), nil
 }
 
-func initRestoreCreate() api.ServerTool {
-	return api.ServerTool{
-		Tool: api.Tool{
-			Name:        "oadp_restore_create",
-			Description: "Create a restore operation from an existing backup. Supports selective restoration of namespaces and resources.",
-			InputSchema: &jsonschema.Schema{
-				Type: "object",
-				Properties: map[string]*jsonschema.Schema{
-					"namespace": {
-						Type:        "string",
-						Description: "OADP namespace where the restore CR will be created (default: openshift-adp)",
-					},
-					"name": {
-						Type:        "string",
-						Description: "Name for the restore",
-					},
-					"backupName": {
-						Type:        "string",
-						Description: "Name of the backup to restore from",
-					},
-					"includedNamespaces": {
-						Type:        "array",
-						Description: "Namespaces to restore (default: all from backup)",
-						Items:       &jsonschema.Schema{Type: "string"},
-					},
-					"excludedNamespaces": {
-						Type:        "array",
-						Description: "Namespaces to exclude from restore",
-						Items:       &jsonschema.Schema{Type: "string"},
-					},
-					"includedResources": {
-						Type:        "array",
-						Description: "Resource types to restore",
-						Items:       &jsonschema.Schema{Type: "string"},
-					},
-					"excludedResources": {
-						Type:        "array",
-						Description: "Resource types to exclude",
-						Items:       &jsonschema.Schema{Type: "string"},
-					},
-					"namespaceMapping": {
-						Type:        "object",
-						Description: "Map source namespaces to target namespaces (e.g., {'old-ns': 'new-ns'})",
-					},
-					"restorePVs": {
-						Type:        "boolean",
-						Description: "Whether to restore persistent volumes (default: true)",
-					},
-					"preserveNodePorts": {
-						Type:        "boolean",
-						Description: "Preserve service node ports during restore",
-					},
-				},
-				Required: []string{"name", "backupName"},
-			},
-			Annotations: api.ToolAnnotations{
-				Title:           "OADP: Create Restore",
-				ReadOnlyHint:    ptr.To(false),
-				DestructiveHint: ptr.To(true),
-				IdempotentHint:  ptr.To(false),
-			},
-		},
-		Handler: restoreCreateHandler,
-	}
-}
-
-func restoreCreateHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	namespace := oadp.DefaultOADPNamespace
-	if v, ok := params.GetArguments()["namespace"].(string); ok && v != "" {
-		namespace = v
-	}
-
+func handleRestoreCreate(params api.ToolHandlerParams, namespace string) (*api.ToolCallResult, error) {
 	name, ok := params.GetArguments()["name"].(string)
 	if !ok || name == "" {
-		return api.NewToolCallResult("", fmt.Errorf("name is required")), nil
+		return api.NewToolCallResult("", fmt.Errorf("name is required for create action")), nil
 	}
 
 	backupName, ok := params.GetArguments()["backupName"].(string)
 	if !ok || backupName == "" {
-		return api.NewToolCallResult("", fmt.Errorf("backupName is required")), nil
+		return api.NewToolCallResult("", fmt.Errorf("backupName is required for create action")), nil
 	}
 
-	// Build the restore spec
-	spec := map[string]interface{}{
+	spec := map[string]any{
 		"backupName": backupName,
 	}
 
-	if v, ok := params.GetArguments()["includedNamespaces"].([]interface{}); ok {
+	if v, ok := params.GetArguments()["includedNamespaces"].([]any); ok {
 		spec["includedNamespaces"] = v
 	}
-	if v, ok := params.GetArguments()["excludedNamespaces"].([]interface{}); ok {
+	if v, ok := params.GetArguments()["excludedNamespaces"].([]any); ok {
 		spec["excludedNamespaces"] = v
 	}
-	if v, ok := params.GetArguments()["includedResources"].([]interface{}); ok {
+	if v, ok := params.GetArguments()["includedResources"].([]any); ok {
 		spec["includedResources"] = v
 	}
-	if v, ok := params.GetArguments()["excludedResources"].([]interface{}); ok {
+	if v, ok := params.GetArguments()["excludedResources"].([]any); ok {
 		spec["excludedResources"] = v
 	}
-	if v, ok := params.GetArguments()["namespaceMapping"].(map[string]interface{}); ok {
+	if v, ok := params.GetArguments()["namespaceMapping"].(map[string]any); ok {
 		spec["namespaceMapping"] = v
 	}
 	if v, ok := params.GetArguments()["restorePVs"].(bool); ok {
@@ -226,10 +193,10 @@ func restoreCreateHandler(params api.ToolHandlerParams) (*api.ToolCallResult, er
 	}
 
 	restore := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": oadp.VeleroGroup + "/" + oadp.VeleroVersion,
 			"kind":       "Restore",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      name,
 				"namespace": namespace,
 			},
@@ -245,45 +212,10 @@ func restoreCreateHandler(params api.ToolHandlerParams) (*api.ToolCallResult, er
 	return api.NewToolCallResult(params.ListOutput.PrintObj(created)), nil
 }
 
-func initRestoreDelete() api.ServerTool {
-	return api.ServerTool{
-		Tool: api.Tool{
-			Name:        "oadp_restore_delete",
-			Description: "Delete a Velero/OADP restore operation record",
-			InputSchema: &jsonschema.Schema{
-				Type: "object",
-				Properties: map[string]*jsonschema.Schema{
-					"namespace": {
-						Type:        "string",
-						Description: "Namespace of the restore (default: openshift-adp)",
-					},
-					"name": {
-						Type:        "string",
-						Description: "Name of the restore to delete",
-					},
-				},
-				Required: []string{"name"},
-			},
-			Annotations: api.ToolAnnotations{
-				Title:           "OADP: Delete Restore",
-				ReadOnlyHint:    ptr.To(false),
-				DestructiveHint: ptr.To(true),
-				IdempotentHint:  ptr.To(true),
-			},
-		},
-		Handler: restoreDeleteHandler,
-	}
-}
-
-func restoreDeleteHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	namespace := oadp.DefaultOADPNamespace
-	if v, ok := params.GetArguments()["namespace"].(string); ok && v != "" {
-		namespace = v
-	}
-
+func handleRestoreDelete(params api.ToolHandlerParams, namespace string) (*api.ToolCallResult, error) {
 	name, ok := params.GetArguments()["name"].(string)
 	if !ok || name == "" {
-		return api.NewToolCallResult("", fmt.Errorf("name is required")), nil
+		return api.NewToolCallResult("", fmt.Errorf("name is required for delete action")), nil
 	}
 
 	err := oadp.DeleteRestore(params.Context, params.DynamicClient(), namespace, name)
@@ -294,43 +226,10 @@ func restoreDeleteHandler(params api.ToolHandlerParams) (*api.ToolCallResult, er
 	return api.NewToolCallResult(fmt.Sprintf("Restore %s/%s deleted", namespace, name), nil), nil
 }
 
-func initRestoreLogs() api.ServerTool {
-	return api.ServerTool{
-		Tool: api.Tool{
-			Name:        "oadp_restore_logs",
-			Description: "Retrieve logs for a specific restore operation to troubleshoot issues",
-			InputSchema: &jsonschema.Schema{
-				Type: "object",
-				Properties: map[string]*jsonschema.Schema{
-					"namespace": {
-						Type:        "string",
-						Description: "Namespace of the restore (default: openshift-adp)",
-					},
-					"name": {
-						Type:        "string",
-						Description: "Name of the restore",
-					},
-				},
-				Required: []string{"name"},
-			},
-			Annotations: api.ToolAnnotations{
-				Title:        "OADP: Restore Logs",
-				ReadOnlyHint: ptr.To(true),
-			},
-		},
-		Handler: restoreLogsHandler,
-	}
-}
-
-func restoreLogsHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	namespace := oadp.DefaultOADPNamespace
-	if v, ok := params.GetArguments()["namespace"].(string); ok && v != "" {
-		namespace = v
-	}
-
+func handleRestoreLogs(params api.ToolHandlerParams, namespace string) (*api.ToolCallResult, error) {
 	name, ok := params.GetArguments()["name"].(string)
 	if !ok || name == "" {
-		return api.NewToolCallResult("", fmt.Errorf("name is required")), nil
+		return api.NewToolCallResult("", fmt.Errorf("name is required for logs action")), nil
 	}
 
 	logs, err := oadp.GetRestoreLogs(params.Context, params.DynamicClient(), namespace, name)
