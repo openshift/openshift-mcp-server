@@ -59,7 +59,7 @@ func getCoreDNSConfig(params api.ToolHandlerParams) (*api.ToolCallResult, error)
 
 	corefile, ok := cm.Data["Corefile"]
 	if !ok {
-		return api.NewToolCallResult("", fmt.Errorf("Corefile not found in dns-default ConfigMap")), nil
+		return api.NewToolCallResult("", fmt.Errorf("corefile not found in dns-default ConfigMap")), nil
 	}
 
 	return api.NewToolCallResult(corefile, nil), nil
