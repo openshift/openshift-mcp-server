@@ -4,31 +4,46 @@ This toolset provides tools for managing OpenShift API for Data Protection (OADP
 
 ## Overview
 
-The OADP toolset covers all 23 CRDs shipped by OADP with 90 tools organized into these categories:
+The OADP toolset provides 8 consolidated tools with action-based parameters covering all core OADP functionality:
 
-| Category | CRDs | Tools |
-|----------|------|-------|
-| Velero Core | Backup, Restore, Schedule | 17 |
-| Storage Locations | BackupStorageLocation, VolumeSnapshotLocation | 10 |
-| Velero Internal | BackupRepository, DeleteBackupRequest, DownloadRequest, PodVolumeBackup, PodVolumeRestore, ServerStatusRequest | 15 |
-| Data Mover (v2alpha1) | DataUpload, DataDownload | 6 |
-| OADP | DataProtectionApplication, CloudStorage, DataProtectionTest | 13 |
-| Non-Admin Controller | NonAdminBackup, NonAdminRestore, NonAdminBSL, NonAdminBSLRequest, NonAdminDownloadRequest | 20 |
-| VM Restore | VirtualMachineBackupsDiscovery, VirtualMachineFileRestore | 8 |
+| Tool | CRDs Covered | Actions |
+|------|--------------|---------|
+| `oadp_backup` | Backup | list, get, create, delete, logs |
+| `oadp_restore` | Restore | list, get, create, delete, logs |
+| `oadp_schedule` | Schedule | list, get, create, update, delete, pause |
+| `oadp_dpa` | DataProtectionApplication | list, get, create, update, delete |
+| `oadp_storage_location` | BackupStorageLocation, VolumeSnapshotLocation | list, get, create, update, delete |
+| `oadp_data_mover` | DataUpload, DataDownload | list, get, cancel |
+| `oadp_repository` | BackupRepository | list, get, delete |
+| `oadp_data_protection_test` | DataProtectionTest | list, get, create, delete |
 
 ## Tools
 
-### Backup Tools
+### oadp_backup
 
-- **oadp_backup_list** - List all Velero backups
-- **oadp_backup_get** - Get backup details and status
-- **oadp_backup_create** - Create a new backup
-- **oadp_backup_delete** - Delete a backup
-- **oadp_backup_logs** - Get backup logs and status information
+Manage Velero/OADP backups: list, get, create, delete, or retrieve logs.
+
+**Parameters:**
+- `action` (required): One of `list`, `get`, `create`, `delete`, `logs`
+- `namespace`: Namespace containing backups (default: openshift-adp)
+- `name`: Name of the backup (required for get, create, delete, logs)
+- `includedNamespaces`: Namespaces to include in backup (for create)
+- `excludedNamespaces`: Namespaces to exclude (for create)
+- `storageLocation`: BackupStorageLocation name (for create)
+- `ttl`: Backup TTL duration e.g., '720h' (for create)
+
+**Example - List Backups:**
+```json
+{
+  "action": "list",
+  "namespace": "openshift-adp"
+}
+```
 
 **Example - Create a Backup:**
 ```json
 {
+  "action": "create",
   "name": "my-app-backup",
   "includedNamespaces": ["my-app"],
   "storageLocation": "default",
@@ -36,35 +51,44 @@ The OADP toolset covers all 23 CRDs shipped by OADP with 90 tools organized into
 }
 ```
 
-### Restore Tools
+### oadp_restore
 
-- **oadp_restore_list** - List all restores
-- **oadp_restore_get** - Get restore details and status
-- **oadp_restore_create** - Create a restore from backup
-- **oadp_restore_delete** - Delete a restore record
-- **oadp_restore_logs** - Get restore logs and status information
+Manage Velero/OADP restore operations: list, get, create, delete, or retrieve logs.
+
+**Parameters:**
+- `action` (required): One of `list`, `get`, `create`, `delete`, `logs`
+- `namespace`: Namespace containing restores (default: openshift-adp)
+- `name`: Name of the restore (required for get, create, delete, logs)
+- `backupName`: Name of the backup to restore from (required for create)
+- `includedNamespaces`: Namespaces to restore (for create)
+- `namespaceMapping`: Map source namespaces to target namespaces (for create)
 
 **Example - Create a Restore:**
 ```json
 {
+  "action": "create",
   "name": "my-app-restore",
-  "backupName": "my-app-backup",
-  "includedNamespaces": ["my-app"]
+  "backupName": "my-app-backup"
 }
 ```
 
-### Schedule Tools
+### oadp_schedule
 
-- **oadp_schedule_list** - List backup schedules
-- **oadp_schedule_get** - Get schedule details
-- **oadp_schedule_create** - Create a backup schedule
-- **oadp_schedule_update** - Update schedule configuration
-- **oadp_schedule_delete** - Delete a schedule
-- **oadp_schedule_pause** - Pause or unpause a schedule
+Manage Velero/OADP backup schedules: list, get, create, update, delete, or pause/unpause.
+
+**Parameters:**
+- `action` (required): One of `list`, `get`, `create`, `update`, `delete`, `pause`
+- `namespace`: Namespace containing schedules (default: openshift-adp)
+- `name`: Name of the schedule (required for get, create, update, delete, pause)
+- `schedule`: Cron expression e.g., '0 1 * * *' (for create/update)
+- `includedNamespaces`: Namespaces to include in scheduled backups (for create)
+- `ttl`: Backup TTL duration (for create/update)
+- `paused`: Set to true to pause, false to unpause (for pause action)
 
 **Example - Create a Daily Schedule:**
 ```json
 {
+  "action": "create",
   "name": "daily-backup",
   "schedule": "0 2 * * *",
   "includedNamespaces": ["production"],
@@ -72,65 +96,69 @@ The OADP toolset covers all 23 CRDs shipped by OADP with 90 tools organized into
 }
 ```
 
-### Storage Location Tools
+### oadp_dpa
 
-- **oadp_backup_storage_location_list** - List BackupStorageLocations
-- **oadp_backup_storage_location_get** - Get BSL details
-- **oadp_backup_storage_location_create** - Create a BSL
-- **oadp_backup_storage_location_update** - Update BSL configuration
-- **oadp_backup_storage_location_delete** - Delete a BSL
-- **oadp_volume_snapshot_location_list** - List VolumeSnapshotLocations
-- **oadp_volume_snapshot_location_get** - Get VSL details
-- **oadp_volume_snapshot_location_create** - Create a VSL
-- **oadp_volume_snapshot_location_update** - Update VSL configuration
-- **oadp_volume_snapshot_location_delete** - Delete a VSL
+Manage OADP DataProtectionApplication resources: list, get, create, update, or delete.
 
-### DataProtectionApplication Tools
+**Parameters:**
+- `action` (required): One of `list`, `get`, `create`, `update`, `delete`
+- `namespace`: Namespace containing DPAs (default: openshift-adp)
+- `name`: Name of the DPA (required for get, create, update, delete)
+- `backupLocationProvider`: Provider for backup storage e.g., aws, azure, gcp (for create)
+- `backupLocationBucket`: Bucket name for backup storage (for create)
+- `enableNodeAgent`: Enable NodeAgent for file-system backups (for create/update)
 
-- **oadp_dpa_list** - List DPA instances
-- **oadp_dpa_get** - Get DPA configuration and status
-- **oadp_dpa_create** - Create a DPA
-- **oadp_dpa_update** - Update DPA configuration
-- **oadp_dpa_delete** - Delete a DPA
+### oadp_storage_location
 
-### Repository and Request Tools
+Manage Velero storage locations (BackupStorageLocation and VolumeSnapshotLocation): list, get, create, update, or delete.
 
-- **oadp_backup_repository_list/get/delete** - Manage backup repositories
-- **oadp_delete_backup_request_list/get** - View delete backup requests
-- **oadp_download_request_list/get/create/delete** - Manage download requests
-- **oadp_server_status_request_list/get/create/delete** - Check Velero server status
+**Parameters:**
+- `action` (required): One of `list`, `get`, `create`, `update`, `delete`
+- `type` (required): Storage location type: `bsl` (BackupStorageLocation) or `vsl` (VolumeSnapshotLocation)
+- `namespace`: Namespace containing storage locations (default: openshift-adp)
+- `name`: Name of the storage location (required for get, create, update, delete)
+- `provider`: Storage provider e.g., aws, azure, gcp (for create)
+- `bucket`: Bucket name for object storage (for BSL create)
+- `region`: Region for the storage (for create/update)
 
-### Data Mover Tools (v2alpha1)
+**Example - List Backup Storage Locations:**
+```json
+{
+  "action": "list",
+  "type": "bsl"
+}
+```
 
-- **oadp_data_upload_list/get/cancel** - Manage data uploads
-- **oadp_data_download_list/get/cancel** - Manage data downloads
+### oadp_data_mover
 
-### Pod Volume Tools
+Manage Velero data mover resources (DataUpload and DataDownload for CSI snapshots): list, get, or cancel.
 
-- **oadp_pod_volume_backup_list/get** - View pod volume backup status
-- **oadp_pod_volume_restore_list/get** - View pod volume restore status
+**Parameters:**
+- `action` (required): One of `list`, `get`, `cancel`
+- `type` (required): Resource type: `upload` (DataUpload) or `download` (DataDownload)
+- `namespace`: Namespace containing resources (default: openshift-adp)
+- `name`: Name of the resource (required for get, cancel)
+- `labelSelector`: Label selector to filter resources (for list)
 
-### OADP-Specific Tools
+### oadp_repository
 
-- **oadp_cloud_storage_list/get/create/delete** - Manage cloud storage configurations
-- **oadp_data_protection_test_list/get/create/delete** - Run data protection tests
+Manage Velero BackupRepository resources (connections to backup storage): list, get, or delete.
 
-### Non-Admin Controller Tools
+**Parameters:**
+- `action` (required): One of `list`, `get`, `delete`
+- `namespace`: Namespace containing repositories (default: openshift-adp)
+- `name`: Name of the repository (required for get, delete)
 
-For multi-tenant backup scenarios:
+### oadp_data_protection_test
 
-- **oadp_non_admin_backup_list/get/create/delete** - Non-admin backup operations
-- **oadp_non_admin_restore_list/get/create/delete** - Non-admin restore operations
-- **oadp_non_admin_bsl_list/get/create/update/delete** - Non-admin BSL management
-- **oadp_non_admin_bsl_request_list/get/approve** - BSL request approval workflow
-- **oadp_non_admin_download_request_list/get/create/delete** - Non-admin downloads
+Manage OADP DataProtectionTest resources for validating storage connectivity: list, get, create, or delete.
 
-### VM Restore Tools
-
-For KubeVirt virtual machine backup/restore:
-
-- **oadp_vm_backup_discovery_list/get/create/delete** - Discover VM backups
-- **oadp_vm_file_restore_list/get/create/delete** - Restore individual VM files
+**Parameters:**
+- `action` (required): One of `list`, `get`, `create`, `delete`
+- `namespace`: Namespace containing resources (default: openshift-adp)
+- `name`: Name of the test (required for get, create, delete)
+- `backupLocationName`: Name of the BackupStorageLocation to test (for create)
+- `uploadTestFileSize`: Size of test file for upload speed test e.g., '100MB' (for create)
 
 ## Enable the OADP Toolset
 
@@ -186,8 +214,8 @@ All OADP tools default to the `openshift-adp` namespace. Override with the `name
 
 ```json
 {
-  "namespace": "custom-oadp-namespace",
-  "name": "my-backup"
+  "action": "list",
+  "namespace": "custom-oadp-namespace"
 }
 ```
 
@@ -195,35 +223,45 @@ All OADP tools default to the `openshift-adp` namespace. Override with the `name
 
 ### Check OADP Health
 
-1. List DPAs: `oadp_dpa_list`
-2. Get DPA status: `oadp_dpa_get` with name
-3. Check BSL availability: `oadp_backup_storage_location_list`
+```json
+{"action": "list"}  // oadp_dpa
+{"action": "get", "name": "velero-sample"}  // oadp_dpa
+{"action": "list", "type": "bsl"}  // oadp_storage_location
+```
 
 ### Create and Monitor a Backup
 
-1. Create backup: `oadp_backup_create`
-2. Check status: `oadp_backup_get`
-3. View logs: `oadp_backup_logs`
+```json
+{"action": "create", "name": "my-backup", "includedNamespaces": ["my-app"]}  // oadp_backup
+{"action": "get", "name": "my-backup"}  // oadp_backup
+{"action": "logs", "name": "my-backup"}  // oadp_backup
+```
 
 ### Restore from Backup
 
-1. List backups: `oadp_backup_list`
-2. Create restore: `oadp_restore_create` with `backupName`
-3. Monitor: `oadp_restore_get` and `oadp_restore_logs`
+```json
+{"action": "list"}  // oadp_backup
+{"action": "create", "name": "my-restore", "backupName": "my-backup"}  // oadp_restore
+{"action": "get", "name": "my-restore"}  // oadp_restore
+```
 
 ### Set Up Scheduled Backups
 
-1. Create schedule: `oadp_schedule_create` with cron expression
-2. Verify: `oadp_schedule_get`
-3. Pause if needed: `oadp_schedule_pause`
+```json
+{"action": "create", "name": "daily", "schedule": "0 2 * * *", "includedNamespaces": ["prod"]}  // oadp_schedule
+{"action": "get", "name": "daily"}  // oadp_schedule
+{"action": "pause", "name": "daily", "paused": true}  // oadp_schedule
+```
 
 ### Check Data Mover Status
 
 For CSI volume backups:
 
-1. List uploads: `oadp_data_upload_list`
-2. Check progress: `oadp_data_upload_get`
-3. Cancel if stuck: `oadp_data_upload_cancel`
+```json
+{"action": "list", "type": "upload"}  // oadp_data_mover
+{"action": "get", "type": "upload", "name": "my-upload"}  // oadp_data_mover
+{"action": "cancel", "type": "upload", "name": "my-upload"}  // oadp_data_mover
+```
 
 ## Troubleshooting
 
@@ -249,35 +287,12 @@ oc get secret -n openshift-adp cloud-credentials
 oc get bsl -n openshift-adp -o yaml
 ```
 
-### Non-Admin Tools Return Empty
-
-Non-Admin Controller must be enabled in the DPA:
-```yaml
-spec:
-  nonAdmin:
-    enable: true
-```
-
-### VM Tools Not Working
-
-VM backup/restore requires OADP with KubeVirt integration enabled.
-
 ## Security Considerations
 
-### Read-Only Tools
+All tools use the `action` parameter pattern, making it clear what operation will be performed:
 
-These tools only read data and are safe for monitoring:
-- All `*_list` and `*_get` tools
-- `*_logs` tools
-
-### Destructive Tools
-
-These tools modify cluster state and require appropriate permissions:
-- `*_create` tools
-- `*_update` tools
-- `*_delete` tools
-- `*_cancel` tools
-- `oadp_restore_create` (modifies cluster resources)
+- **Read-only actions**: `list`, `get`, `logs`
+- **Mutating actions**: `create`, `update`, `delete`, `cancel`, `pause`
 
 Use `--read-only` or `--disable-destructive` flags to restrict access:
 ```bash

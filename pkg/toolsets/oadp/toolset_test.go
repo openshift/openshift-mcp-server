@@ -48,12 +48,16 @@ func (s *ToolsetSuite) TestGetTools() {
 	s.Run("returns expected number of tools", func() {
 		tools := s.toolset.GetTools(&mockOpenShift{isOpenShift: true})
 
-		// We expect 90 tools total covering all OADP/Velero CRDs:
-		// 5 backup, 5 restore, 6 schedule, 10 storage (BSL/VSL), 5 DPA,
-		// 3 backup repository, 4 pod volume, 4 server status, 6 data mover,
-		// 4 download request, 2 delete backup request, 4 cloud storage,
-		// 4 data protection test, 20 non-admin, 8 VM restore
-		s.Len(tools, 90, "Expected 90 tools in OADP toolset")
+		// We expect 8 consolidated tools:
+		// 1. oadp_backup - Backup operations
+		// 2. oadp_restore - Restore operations
+		// 3. oadp_schedule - Schedule operations
+		// 4. oadp_dpa - DataProtectionApplication operations
+		// 5. oadp_storage_location - BSL/VSL operations
+		// 6. oadp_data_mover - DataUpload/DataDownload operations
+		// 7. oadp_repository - BackupRepository operations
+		// 8. oadp_data_protection_test - DataProtectionTest operations
+		s.Len(tools, 8, "Expected 8 consolidated tools in OADP toolset")
 	})
 
 	s.Run("all tools have required fields", func() {
@@ -67,246 +71,139 @@ func (s *ToolsetSuite) TestGetTools() {
 		}
 	})
 
-	s.Run("read-only tools are marked correctly", func() {
+	s.Run("all tools have action parameter in schema", func() {
 		tools := s.toolset.GetTools(&mockOpenShift{isOpenShift: true})
 
-		readOnlyTools := map[string]bool{
-			// Backup tools
-			"oadp_backup_list": true,
-			"oadp_backup_get":  true,
-			"oadp_backup_logs": true,
-			// Restore tools
-			"oadp_restore_list": true,
-			"oadp_restore_get":  true,
-			"oadp_restore_logs": true,
-			// Schedule tools
-			"oadp_schedule_list": true,
-			"oadp_schedule_get":  true,
-			// Storage location tools
-			"oadp_backup_storage_location_list":  true,
-			"oadp_backup_storage_location_get":   true,
-			"oadp_volume_snapshot_location_list": true,
-			"oadp_volume_snapshot_location_get":  true,
-			// DPA tools
-			"oadp_dpa_list": true,
-			"oadp_dpa_get":  true,
-			// Backup repository tools
-			"oadp_backup_repository_list": true,
-			"oadp_backup_repository_get":  true,
-			// Pod volume tools
-			"oadp_pod_volume_backup_list":  true,
-			"oadp_pod_volume_backup_get":   true,
-			"oadp_pod_volume_restore_list": true,
-			"oadp_pod_volume_restore_get":  true,
-			// Server status tools
-			"oadp_server_status_request_list": true,
-			"oadp_server_status_request_get":  true,
-			// Data mover tools
-			"oadp_data_upload_list":   true,
-			"oadp_data_upload_get":    true,
-			"oadp_data_download_list": true,
-			"oadp_data_download_get":  true,
-			// Download request tools
-			"oadp_download_request_list": true,
-			"oadp_download_request_get":  true,
-			// Delete backup request tools
-			"oadp_delete_backup_request_list": true,
-			"oadp_delete_backup_request_get":  true,
-			// Cloud storage tools
-			"oadp_cloud_storage_list": true,
-			"oadp_cloud_storage_get":  true,
-			// Data protection test tools
-			"oadp_data_protection_test_list": true,
-			"oadp_data_protection_test_get":  true,
-			// Non-admin tools
-			"oadp_non_admin_backup_list":           true,
-			"oadp_non_admin_backup_get":            true,
-			"oadp_non_admin_restore_list":          true,
-			"oadp_non_admin_restore_get":           true,
-			"oadp_non_admin_bsl_list":              true,
-			"oadp_non_admin_bsl_get":               true,
-			"oadp_non_admin_bsl_request_list":      true,
-			"oadp_non_admin_bsl_request_get":       true,
-			"oadp_non_admin_download_request_list": true,
-			"oadp_non_admin_download_request_get":  true,
-			// VM restore tools
-			"oadp_vm_backup_discovery_list": true,
-			"oadp_vm_backup_discovery_get":  true,
-			"oadp_vm_file_restore_list":     true,
-			"oadp_vm_file_restore_get":      true,
-		}
-
 		for _, tool := range tools {
-			if readOnlyTools[tool.Tool.Name] {
-				s.NotNil(tool.Tool.Annotations.ReadOnlyHint,
-					"Tool %s should have ReadOnlyHint set", tool.Tool.Name)
-				s.True(*tool.Tool.Annotations.ReadOnlyHint,
-					"Tool %s should be marked as read-only", tool.Tool.Name)
-			}
+			s.Contains(tool.Tool.InputSchema.Required, "action",
+				"Tool %s should require 'action' parameter", tool.Tool.Name)
+			s.Contains(tool.Tool.InputSchema.Properties, "action",
+				"Tool %s should have 'action' in properties", tool.Tool.Name)
 		}
 	})
 
-	s.Run("destructive tools are marked correctly", func() {
-		tools := s.toolset.GetTools(&mockOpenShift{isOpenShift: true})
-
-		destructiveTools := map[string]bool{
-			// Backup/restore tools
-			"oadp_backup_delete":  true,
-			"oadp_restore_create": true,
-			"oadp_restore_delete": true,
-			// Schedule tools
-			"oadp_schedule_delete": true,
-			// Storage location tools
-			"oadp_backup_storage_location_delete":  true,
-			"oadp_volume_snapshot_location_delete": true,
-			// DPA tools
-			"oadp_dpa_delete": true,
-			// Backup repository tools
-			"oadp_backup_repository_delete": true,
-			// Server status tools
-			"oadp_server_status_request_delete": true,
-			// Data mover tools
-			"oadp_data_upload_cancel":   true,
-			"oadp_data_download_cancel": true,
-			// Download request tools
-			"oadp_download_request_delete": true,
-			// Cloud storage tools
-			"oadp_cloud_storage_delete": true,
-			// Data protection test tools
-			"oadp_data_protection_test_delete": true,
-			// Non-admin tools
-			"oadp_non_admin_backup_delete":           true,
-			"oadp_non_admin_restore_delete":          true,
-			"oadp_non_admin_bsl_delete":              true,
-			"oadp_non_admin_download_request_delete": true,
-			// VM restore tools
-			"oadp_vm_backup_discovery_delete": true,
-			"oadp_vm_file_restore_delete":     true,
-		}
-
-		for _, tool := range tools {
-			if destructiveTools[tool.Tool.Name] {
-				s.NotNil(tool.Tool.Annotations.DestructiveHint,
-					"Tool %s should have DestructiveHint set", tool.Tool.Name)
-				s.True(*tool.Tool.Annotations.DestructiveHint,
-					"Tool %s should be marked as destructive", tool.Tool.Name)
-			}
-		}
-	})
-
-	s.Run("backup tools exist", func() {
+	s.Run("expected tools exist", func() {
 		tools := s.toolset.GetTools(&mockOpenShift{isOpenShift: true})
 		toolNames := make(map[string]bool)
 		for _, tool := range tools {
 			toolNames[tool.Tool.Name] = true
 		}
 
-		s.True(toolNames["oadp_backup_list"], "oadp_backup_list should exist")
-		s.True(toolNames["oadp_backup_get"], "oadp_backup_get should exist")
-		s.True(toolNames["oadp_backup_create"], "oadp_backup_create should exist")
-		s.True(toolNames["oadp_backup_delete"], "oadp_backup_delete should exist")
-		s.True(toolNames["oadp_backup_logs"], "oadp_backup_logs should exist")
-	})
-
-	s.Run("restore tools exist", func() {
-		tools := s.toolset.GetTools(&mockOpenShift{isOpenShift: true})
-		toolNames := make(map[string]bool)
-		for _, tool := range tools {
-			toolNames[tool.Tool.Name] = true
+		expectedTools := []string{
+			"oadp_backup",
+			"oadp_restore",
+			"oadp_schedule",
+			"oadp_dpa",
+			"oadp_storage_location",
+			"oadp_data_mover",
+			"oadp_repository",
+			"oadp_data_protection_test",
 		}
 
-		s.True(toolNames["oadp_restore_list"], "oadp_restore_list should exist")
-		s.True(toolNames["oadp_restore_get"], "oadp_restore_get should exist")
-		s.True(toolNames["oadp_restore_create"], "oadp_restore_create should exist")
-		s.True(toolNames["oadp_restore_delete"], "oadp_restore_delete should exist")
-		s.True(toolNames["oadp_restore_logs"], "oadp_restore_logs should exist")
-	})
-
-	s.Run("schedule tools exist", func() {
-		tools := s.toolset.GetTools(&mockOpenShift{isOpenShift: true})
-		toolNames := make(map[string]bool)
-		for _, tool := range tools {
-			toolNames[tool.Tool.Name] = true
+		for _, expected := range expectedTools {
+			s.True(toolNames[expected], "%s should exist", expected)
 		}
-
-		s.True(toolNames["oadp_schedule_list"], "oadp_schedule_list should exist")
-		s.True(toolNames["oadp_schedule_get"], "oadp_schedule_get should exist")
-		s.True(toolNames["oadp_schedule_create"], "oadp_schedule_create should exist")
-		s.True(toolNames["oadp_schedule_delete"], "oadp_schedule_delete should exist")
-		s.True(toolNames["oadp_schedule_pause"], "oadp_schedule_pause should exist")
 	})
 
-	s.Run("storage location tools exist", func() {
-		tools := s.toolset.GetTools(&mockOpenShift{isOpenShift: true})
-		toolNames := make(map[string]bool)
-		for _, tool := range tools {
-			toolNames[tool.Tool.Name] = true
-		}
-
-		s.True(toolNames["oadp_backup_storage_location_list"], "oadp_backup_storage_location_list should exist")
-		s.True(toolNames["oadp_backup_storage_location_get"], "oadp_backup_storage_location_get should exist")
-		s.True(toolNames["oadp_volume_snapshot_location_list"], "oadp_volume_snapshot_location_list should exist")
-		s.True(toolNames["oadp_volume_snapshot_location_get"], "oadp_volume_snapshot_location_get should exist")
-	})
-
-	s.Run("DPA tools exist", func() {
-		tools := s.toolset.GetTools(&mockOpenShift{isOpenShift: true})
-		toolNames := make(map[string]bool)
-		for _, tool := range tools {
-			toolNames[tool.Tool.Name] = true
-		}
-
-		s.True(toolNames["oadp_dpa_list"], "oadp_dpa_list should exist")
-		s.True(toolNames["oadp_dpa_get"], "oadp_dpa_get should exist")
-	})
-
-	s.Run("oadp_backup_create has correct required fields", func() {
+	s.Run("oadp_backup has correct action enum", func() {
 		tools := s.toolset.GetTools(&mockOpenShift{isOpenShift: true})
 
-		var found bool
 		for _, tool := range tools {
-			if tool.Tool.Name == "oadp_backup_create" {
-				found = true
-				s.Contains(tool.Tool.InputSchema.Required, "name",
-					"oadp_backup_create should require 'name' parameter")
+			if tool.Tool.Name == "oadp_backup" {
+				actionProp := tool.Tool.InputSchema.Properties["action"]
+				s.NotNil(actionProp.Enum, "oadp_backup action should have enum values")
+				s.Contains(actionProp.Enum, "list", "oadp_backup should support 'list' action")
+				s.Contains(actionProp.Enum, "get", "oadp_backup should support 'get' action")
+				s.Contains(actionProp.Enum, "create", "oadp_backup should support 'create' action")
+				s.Contains(actionProp.Enum, "delete", "oadp_backup should support 'delete' action")
+				s.Contains(actionProp.Enum, "logs", "oadp_backup should support 'logs' action")
 				break
 			}
 		}
-		s.True(found, "oadp_backup_create tool should exist")
 	})
 
-	s.Run("oadp_restore_create has correct required fields", func() {
+	s.Run("oadp_restore has correct action enum", func() {
 		tools := s.toolset.GetTools(&mockOpenShift{isOpenShift: true})
 
-		var found bool
 		for _, tool := range tools {
-			if tool.Tool.Name == "oadp_restore_create" {
-				found = true
-				s.Contains(tool.Tool.InputSchema.Required, "name",
-					"oadp_restore_create should require 'name' parameter")
-				s.Contains(tool.Tool.InputSchema.Required, "backupName",
-					"oadp_restore_create should require 'backupName' parameter")
+			if tool.Tool.Name == "oadp_restore" {
+				actionProp := tool.Tool.InputSchema.Properties["action"]
+				s.NotNil(actionProp.Enum, "oadp_restore action should have enum values")
+				s.Contains(actionProp.Enum, "list", "oadp_restore should support 'list' action")
+				s.Contains(actionProp.Enum, "get", "oadp_restore should support 'get' action")
+				s.Contains(actionProp.Enum, "create", "oadp_restore should support 'create' action")
+				s.Contains(actionProp.Enum, "delete", "oadp_restore should support 'delete' action")
+				s.Contains(actionProp.Enum, "logs", "oadp_restore should support 'logs' action")
 				break
 			}
 		}
-		s.True(found, "oadp_restore_create tool should exist")
 	})
 
-	s.Run("oadp_schedule_create has correct required fields", func() {
+	s.Run("oadp_schedule has correct action enum", func() {
 		tools := s.toolset.GetTools(&mockOpenShift{isOpenShift: true})
 
-		var found bool
 		for _, tool := range tools {
-			if tool.Tool.Name == "oadp_schedule_create" {
-				found = true
-				s.Contains(tool.Tool.InputSchema.Required, "name",
-					"oadp_schedule_create should require 'name' parameter")
-				s.Contains(tool.Tool.InputSchema.Required, "schedule",
-					"oadp_schedule_create should require 'schedule' parameter")
+			if tool.Tool.Name == "oadp_schedule" {
+				actionProp := tool.Tool.InputSchema.Properties["action"]
+				s.NotNil(actionProp.Enum, "oadp_schedule action should have enum values")
+				s.Contains(actionProp.Enum, "list", "oadp_schedule should support 'list' action")
+				s.Contains(actionProp.Enum, "get", "oadp_schedule should support 'get' action")
+				s.Contains(actionProp.Enum, "create", "oadp_schedule should support 'create' action")
+				s.Contains(actionProp.Enum, "update", "oadp_schedule should support 'update' action")
+				s.Contains(actionProp.Enum, "delete", "oadp_schedule should support 'delete' action")
+				s.Contains(actionProp.Enum, "pause", "oadp_schedule should support 'pause' action")
 				break
 			}
 		}
-		s.True(found, "oadp_schedule_create tool should exist")
+	})
+
+	s.Run("oadp_dpa has correct action enum", func() {
+		tools := s.toolset.GetTools(&mockOpenShift{isOpenShift: true})
+
+		for _, tool := range tools {
+			if tool.Tool.Name == "oadp_dpa" {
+				actionProp := tool.Tool.InputSchema.Properties["action"]
+				s.NotNil(actionProp.Enum, "oadp_dpa action should have enum values")
+				s.Contains(actionProp.Enum, "list", "oadp_dpa should support 'list' action")
+				s.Contains(actionProp.Enum, "get", "oadp_dpa should support 'get' action")
+				s.Contains(actionProp.Enum, "create", "oadp_dpa should support 'create' action")
+				s.Contains(actionProp.Enum, "update", "oadp_dpa should support 'update' action")
+				s.Contains(actionProp.Enum, "delete", "oadp_dpa should support 'delete' action")
+				break
+			}
+		}
+	})
+
+	s.Run("oadp_storage_location has type parameter", func() {
+		tools := s.toolset.GetTools(&mockOpenShift{isOpenShift: true})
+
+		for _, tool := range tools {
+			if tool.Tool.Name == "oadp_storage_location" {
+				s.Contains(tool.Tool.InputSchema.Required, "type",
+					"oadp_storage_location should require 'type' parameter")
+				typeProp := tool.Tool.InputSchema.Properties["type"]
+				s.NotNil(typeProp.Enum, "oadp_storage_location type should have enum values")
+				s.Contains(typeProp.Enum, "bsl", "oadp_storage_location should support 'bsl' type")
+				s.Contains(typeProp.Enum, "vsl", "oadp_storage_location should support 'vsl' type")
+				break
+			}
+		}
+	})
+
+	s.Run("oadp_data_mover has type parameter", func() {
+		tools := s.toolset.GetTools(&mockOpenShift{isOpenShift: true})
+
+		for _, tool := range tools {
+			if tool.Tool.Name == "oadp_data_mover" {
+				s.Contains(tool.Tool.InputSchema.Required, "type",
+					"oadp_data_mover should require 'type' parameter")
+				typeProp := tool.Tool.InputSchema.Properties["type"]
+				s.NotNil(typeProp.Enum, "oadp_data_mover type should have enum values")
+				s.Contains(typeProp.Enum, "upload", "oadp_data_mover should support 'upload' type")
+				s.Contains(typeProp.Enum, "download", "oadp_data_mover should support 'download' type")
+				break
+			}
+		}
 	})
 }
 

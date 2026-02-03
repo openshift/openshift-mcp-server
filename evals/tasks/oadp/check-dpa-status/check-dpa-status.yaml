@@ -1,0 +1,13 @@
+kind: Task
+metadata:
+  name: "check-oadp-dpa-status"
+  difficulty: easy
+steps:
+  setup:
+    file: setup.sh
+  verify:
+    file: verify.sh
+  cleanup:
+    file: cleanup.sh
+  prompt:
+    inline: Check the status of the OADP DataProtectionApplication (DPA) in the openshift-adp namespace and tell me if it's ready

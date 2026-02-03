@@ -11,46 +11,120 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+// ScheduleAction represents the action to perform on schedules
+type ScheduleAction string
+
+const (
+	ScheduleActionList   ScheduleAction = "list"
+	ScheduleActionGet    ScheduleAction = "get"
+	ScheduleActionCreate ScheduleAction = "create"
+	ScheduleActionUpdate ScheduleAction = "update"
+	ScheduleActionDelete ScheduleAction = "delete"
+	ScheduleActionPause  ScheduleAction = "pause"
+)
+
 func initScheduleTools() []api.ServerTool {
 	return []api.ServerTool{
-		initScheduleList(),
-		initScheduleGet(),
-		initScheduleCreate(),
-		initScheduleUpdate(),
-		initScheduleDelete(),
-		initSchedulePause(),
-	}
-}
-
-func initScheduleList() api.ServerTool {
-	return api.ServerTool{
-		Tool: api.Tool{
-			Name:        "oadp_schedule_list",
-			Description: "List all Velero/OADP backup schedules",
-			InputSchema: &jsonschema.Schema{
-				Type: "object",
-				Properties: map[string]*jsonschema.Schema{
-					"namespace": {
-						Type:        "string",
-						Description: "Namespace containing schedules (default: openshift-adp)",
+		{
+			Tool: api.Tool{
+				Name:        "oadp_schedule",
+				Description: "Manage Velero/OADP backup schedules: list, get, create, update, delete, or pause/unpause",
+				InputSchema: &jsonschema.Schema{
+					Type: "object",
+					Properties: map[string]*jsonschema.Schema{
+						"action": {
+							Type:        "string",
+							Enum:        []any{string(ScheduleActionList), string(ScheduleActionGet), string(ScheduleActionCreate), string(ScheduleActionUpdate), string(ScheduleActionDelete), string(ScheduleActionPause)},
+							Description: "Action to perform: 'list', 'get', 'create', 'update', 'delete', or 'pause' (toggle pause state)",
+						},
+						"namespace": {
+							Type:        "string",
+							Description: "Namespace containing schedules (default: openshift-adp)",
+						},
+						"name": {
+							Type:        "string",
+							Description: "Name of the schedule (required for get, create, update, delete, pause)",
+						},
+						"schedule": {
+							Type:        "string",
+							Description: "Cron expression e.g., '0 1 * * *' for daily at 1am (for create/update action)",
+						},
+						"includedNamespaces": {
+							Type:        "array",
+							Description: "Namespaces to include in scheduled backups (for create action)",
+							Items:       &jsonschema.Schema{Type: "string"},
+						},
+						"excludedNamespaces": {
+							Type:        "array",
+							Description: "Namespaces to exclude from scheduled backups (for create action)",
+							Items:       &jsonschema.Schema{Type: "string"},
+						},
+						"includedResources": {
+							Type:        "array",
+							Description: "Resource types to include (for create action)",
+							Items:       &jsonschema.Schema{Type: "string"},
+						},
+						"excludedResources": {
+							Type:        "array",
+							Description: "Resource types to exclude (for create action)",
+							Items:       &jsonschema.Schema{Type: "string"},
+						},
+						"storageLocation": {
+							Type:        "string",
+							Description: "BackupStorageLocation name (for create action)",
+						},
+						"ttl": {
+							Type:        "string",
+							Description: "Backup TTL duration e.g., '720h' for 30 days (for create/update action)",
+						},
+						"paused": {
+							Type:        "boolean",
+							Description: "Set to true to pause, false to unpause (for pause action)",
+						},
 					},
+					Required: []string{"action"},
+				},
+				Annotations: api.ToolAnnotations{
+					Title:           "OADP: Schedule",
+					ReadOnlyHint:    ptr.To(false),
+					DestructiveHint: ptr.To(false),
 				},
 			},
-			Annotations: api.ToolAnnotations{
-				Title:        "OADP: List Schedules",
-				ReadOnlyHint: ptr.To(true),
-			},
+			Handler: scheduleHandler,
 		},
-		Handler: scheduleListHandler,
 	}
 }
 
-func scheduleListHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
+func scheduleHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
+	action, err := api.RequiredString(params, "action")
+	if err != nil {
+		return api.NewToolCallResult("", err), nil
+	}
+
 	namespace := oadp.DefaultOADPNamespace
 	if v, ok := params.GetArguments()["namespace"].(string); ok && v != "" {
 		namespace = v
 	}
 
+	switch ScheduleAction(action) {
+	case ScheduleActionList:
+		return handleScheduleList(params, namespace)
+	case ScheduleActionGet:
+		return handleScheduleGet(params, namespace)
+	case ScheduleActionCreate:
+		return handleScheduleCreate(params, namespace)
+	case ScheduleActionUpdate:
+		return handleScheduleUpdate(params, namespace)
+	case ScheduleActionDelete:
+		return handleScheduleDelete(params, namespace)
+	case ScheduleActionPause:
+		return handleSchedulePause(params, namespace)
+	default:
+		return api.NewToolCallResult("", fmt.Errorf("invalid action '%s': must be one of 'list', 'get', 'create', 'update', 'delete', 'pause'", action)), nil
+	}
+}
+
+func handleScheduleList(params api.ToolHandlerParams, namespace string) (*api.ToolCallResult, error) {
 	schedules, err := oadp.ListSchedules(params.Context, params.DynamicClient(), namespace, metav1.ListOptions{})
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to list schedules: %w", err)), nil
@@ -59,43 +133,10 @@ func scheduleListHandler(params api.ToolHandlerParams) (*api.ToolCallResult, err
 	return api.NewToolCallResult(params.ListOutput.PrintObj(schedules)), nil
 }
 
-func initScheduleGet() api.ServerTool {
-	return api.ServerTool{
-		Tool: api.Tool{
-			Name:        "oadp_schedule_get",
-			Description: "Get detailed information about a specific backup schedule including cron expression, last backup time, and template",
-			InputSchema: &jsonschema.Schema{
-				Type: "object",
-				Properties: map[string]*jsonschema.Schema{
-					"namespace": {
-						Type:        "string",
-						Description: "Namespace of the schedule (default: openshift-adp)",
-					},
-					"name": {
-						Type:        "string",
-						Description: "Name of the schedule",
-					},
-				},
-				Required: []string{"name"},
-			},
-			Annotations: api.ToolAnnotations{
-				Title:        "OADP: Get Schedule",
-				ReadOnlyHint: ptr.To(true),
-			},
-		},
-		Handler: scheduleGetHandler,
-	}
-}
-
-func scheduleGetHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	namespace := oadp.DefaultOADPNamespace
-	if v, ok := params.GetArguments()["namespace"].(string); ok && v != "" {
-		namespace = v
-	}
-
+func handleScheduleGet(params api.ToolHandlerParams, namespace string) (*api.ToolCallResult, error) {
 	name, ok := params.GetArguments()["name"].(string)
 	if !ok || name == "" {
-		return api.NewToolCallResult("", fmt.Errorf("name is required")), nil
+		return api.NewToolCallResult("", fmt.Errorf("name is required for get action")), nil
 	}
 
 	schedule, err := oadp.GetSchedule(params.Context, params.DynamicClient(), namespace, name)
@@ -106,97 +147,29 @@ func scheduleGetHandler(params api.ToolHandlerParams) (*api.ToolCallResult, erro
 	return api.NewToolCallResult(params.ListOutput.PrintObj(schedule)), nil
 }
 
-func initScheduleCreate() api.ServerTool {
-	return api.ServerTool{
-		Tool: api.Tool{
-			Name:        "oadp_schedule_create",
-			Description: "Create a new backup schedule with a cron expression",
-			InputSchema: &jsonschema.Schema{
-				Type: "object",
-				Properties: map[string]*jsonschema.Schema{
-					"namespace": {
-						Type:        "string",
-						Description: "OADP namespace (default: openshift-adp)",
-					},
-					"name": {
-						Type:        "string",
-						Description: "Name for the schedule",
-					},
-					"schedule": {
-						Type:        "string",
-						Description: "Cron expression (e.g., '0 1 * * *' for daily at 1am, '@every 6h' for every 6 hours)",
-					},
-					"includedNamespaces": {
-						Type:        "array",
-						Description: "Namespaces to include in scheduled backups",
-						Items:       &jsonschema.Schema{Type: "string"},
-					},
-					"excludedNamespaces": {
-						Type:        "array",
-						Description: "Namespaces to exclude from scheduled backups",
-						Items:       &jsonschema.Schema{Type: "string"},
-					},
-					"includedResources": {
-						Type:        "array",
-						Description: "Resource types to include",
-						Items:       &jsonschema.Schema{Type: "string"},
-					},
-					"excludedResources": {
-						Type:        "array",
-						Description: "Resource types to exclude",
-						Items:       &jsonschema.Schema{Type: "string"},
-					},
-					"storageLocation": {
-						Type:        "string",
-						Description: "BackupStorageLocation name",
-					},
-					"ttl": {
-						Type:        "string",
-						Description: "Backup TTL duration (e.g., '720h' for 30 days)",
-					},
-				},
-				Required: []string{"name", "schedule"},
-			},
-			Annotations: api.ToolAnnotations{
-				Title:           "OADP: Create Schedule",
-				ReadOnlyHint:    ptr.To(false),
-				DestructiveHint: ptr.To(false),
-				IdempotentHint:  ptr.To(false),
-			},
-		},
-		Handler: scheduleCreateHandler,
-	}
-}
-
-func scheduleCreateHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	namespace := oadp.DefaultOADPNamespace
-	if v, ok := params.GetArguments()["namespace"].(string); ok && v != "" {
-		namespace = v
-	}
-
+func handleScheduleCreate(params api.ToolHandlerParams, namespace string) (*api.ToolCallResult, error) {
 	name, ok := params.GetArguments()["name"].(string)
 	if !ok || name == "" {
-		return api.NewToolCallResult("", fmt.Errorf("name is required")), nil
+		return api.NewToolCallResult("", fmt.Errorf("name is required for create action")), nil
 	}
 
 	cronSchedule, ok := params.GetArguments()["schedule"].(string)
 	if !ok || cronSchedule == "" {
-		return api.NewToolCallResult("", fmt.Errorf("schedule is required")), nil
+		return api.NewToolCallResult("", fmt.Errorf("schedule (cron expression) is required for create action")), nil
 	}
 
-	// Build the backup template spec
-	template := map[string]interface{}{}
+	template := map[string]any{}
 
-	if v, ok := params.GetArguments()["includedNamespaces"].([]interface{}); ok {
+	if v, ok := params.GetArguments()["includedNamespaces"].([]any); ok {
 		template["includedNamespaces"] = v
 	}
-	if v, ok := params.GetArguments()["excludedNamespaces"].([]interface{}); ok {
+	if v, ok := params.GetArguments()["excludedNamespaces"].([]any); ok {
 		template["excludedNamespaces"] = v
 	}
-	if v, ok := params.GetArguments()["includedResources"].([]interface{}); ok {
+	if v, ok := params.GetArguments()["includedResources"].([]any); ok {
 		template["includedResources"] = v
 	}
-	if v, ok := params.GetArguments()["excludedResources"].([]interface{}); ok {
+	if v, ok := params.GetArguments()["excludedResources"].([]any); ok {
 		template["excludedResources"] = v
 	}
 	if v, ok := params.GetArguments()["storageLocation"].(string); ok && v != "" {
@@ -207,14 +180,14 @@ func scheduleCreateHandler(params api.ToolHandlerParams) (*api.ToolCallResult, e
 	}
 
 	schedule := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": oadp.VeleroGroup + "/" + oadp.VeleroVersion,
 			"kind":       "Schedule",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      name,
 				"namespace": namespace,
 			},
-			"spec": map[string]interface{}{
+			"spec": map[string]any{
 				"schedule": cronSchedule,
 				"template": template,
 			},
@@ -229,62 +202,17 @@ func scheduleCreateHandler(params api.ToolHandlerParams) (*api.ToolCallResult, e
 	return api.NewToolCallResult(params.ListOutput.PrintObj(created)), nil
 }
 
-func initScheduleUpdate() api.ServerTool {
-	return api.ServerTool{
-		Tool: api.Tool{
-			Name:        "oadp_schedule_update",
-			Description: "Update a backup schedule's cron expression or backup template",
-			InputSchema: &jsonschema.Schema{
-				Type: "object",
-				Properties: map[string]*jsonschema.Schema{
-					"namespace": {
-						Type:        "string",
-						Description: "Namespace of the schedule (default: openshift-adp)",
-					},
-					"name": {
-						Type:        "string",
-						Description: "Name of the schedule to update",
-					},
-					"schedule": {
-						Type:        "string",
-						Description: "New cron expression (e.g., '0 1 * * *' for daily at 1am)",
-					},
-					"ttl": {
-						Type:        "string",
-						Description: "New backup TTL duration (e.g., '720h' for 30 days)",
-					},
-				},
-				Required: []string{"name"},
-			},
-			Annotations: api.ToolAnnotations{
-				Title:           "OADP: Update Schedule",
-				ReadOnlyHint:    ptr.To(false),
-				DestructiveHint: ptr.To(false),
-				IdempotentHint:  ptr.To(true),
-			},
-		},
-		Handler: scheduleUpdateHandler,
-	}
-}
-
-func scheduleUpdateHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	namespace := oadp.DefaultOADPNamespace
-	if v, ok := params.GetArguments()["namespace"].(string); ok && v != "" {
-		namespace = v
-	}
-
+func handleScheduleUpdate(params api.ToolHandlerParams, namespace string) (*api.ToolCallResult, error) {
 	name, ok := params.GetArguments()["name"].(string)
 	if !ok || name == "" {
-		return api.NewToolCallResult("", fmt.Errorf("name is required")), nil
+		return api.NewToolCallResult("", fmt.Errorf("name is required for update action")), nil
 	}
 
-	// Get the existing schedule
 	schedule, err := oadp.GetSchedule(params.Context, params.DynamicClient(), namespace, name)
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get schedule: %w", err)), nil
 	}
 
-	// Apply updates
 	if cronSchedule, ok := params.GetArguments()["schedule"].(string); ok && cronSchedule != "" {
 		if err := unstructured.SetNestedField(schedule.Object, cronSchedule, "spec", "schedule"); err != nil {
 			return api.NewToolCallResult("", fmt.Errorf("failed to set schedule field: %w", err)), nil
@@ -305,45 +233,10 @@ func scheduleUpdateHandler(params api.ToolHandlerParams) (*api.ToolCallResult, e
 	return api.NewToolCallResult(params.ListOutput.PrintObj(updated)), nil
 }
 
-func initScheduleDelete() api.ServerTool {
-	return api.ServerTool{
-		Tool: api.Tool{
-			Name:        "oadp_schedule_delete",
-			Description: "Delete a backup schedule. Existing backups created by this schedule are not affected.",
-			InputSchema: &jsonschema.Schema{
-				Type: "object",
-				Properties: map[string]*jsonschema.Schema{
-					"namespace": {
-						Type:        "string",
-						Description: "Namespace of the schedule (default: openshift-adp)",
-					},
-					"name": {
-						Type:        "string",
-						Description: "Name of the schedule to delete",
-					},
-				},
-				Required: []string{"name"},
-			},
-			Annotations: api.ToolAnnotations{
-				Title:           "OADP: Delete Schedule",
-				ReadOnlyHint:    ptr.To(false),
-				DestructiveHint: ptr.To(true),
-				IdempotentHint:  ptr.To(true),
-			},
-		},
-		Handler: scheduleDeleteHandler,
-	}
-}
-
-func scheduleDeleteHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	namespace := oadp.DefaultOADPNamespace
-	if v, ok := params.GetArguments()["namespace"].(string); ok && v != "" {
-		namespace = v
-	}
-
+func handleScheduleDelete(params api.ToolHandlerParams, namespace string) (*api.ToolCallResult, error) {
 	name, ok := params.GetArguments()["name"].(string)
 	if !ok || name == "" {
-		return api.NewToolCallResult("", fmt.Errorf("name is required")), nil
+		return api.NewToolCallResult("", fmt.Errorf("name is required for delete action")), nil
 	}
 
 	err := oadp.DeleteSchedule(params.Context, params.DynamicClient(), namespace, name)
@@ -354,54 +247,15 @@ func scheduleDeleteHandler(params api.ToolHandlerParams) (*api.ToolCallResult, e
 	return api.NewToolCallResult(fmt.Sprintf("Schedule %s/%s deleted", namespace, name), nil), nil
 }
 
-func initSchedulePause() api.ServerTool {
-	return api.ServerTool{
-		Tool: api.Tool{
-			Name:        "oadp_schedule_pause",
-			Description: "Pause or unpause a backup schedule",
-			InputSchema: &jsonschema.Schema{
-				Type: "object",
-				Properties: map[string]*jsonschema.Schema{
-					"namespace": {
-						Type:        "string",
-						Description: "Namespace of the schedule (default: openshift-adp)",
-					},
-					"name": {
-						Type:        "string",
-						Description: "Name of the schedule",
-					},
-					"paused": {
-						Type:        "boolean",
-						Description: "Set to true to pause, false to unpause",
-					},
-				},
-				Required: []string{"name", "paused"},
-			},
-			Annotations: api.ToolAnnotations{
-				Title:           "OADP: Pause/Unpause Schedule",
-				ReadOnlyHint:    ptr.To(false),
-				DestructiveHint: ptr.To(false),
-				IdempotentHint:  ptr.To(true),
-			},
-		},
-		Handler: schedulePauseHandler,
-	}
-}
-
-func schedulePauseHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	namespace := oadp.DefaultOADPNamespace
-	if v, ok := params.GetArguments()["namespace"].(string); ok && v != "" {
-		namespace = v
-	}
-
+func handleSchedulePause(params api.ToolHandlerParams, namespace string) (*api.ToolCallResult, error) {
 	name, ok := params.GetArguments()["name"].(string)
 	if !ok || name == "" {
-		return api.NewToolCallResult("", fmt.Errorf("name is required")), nil
+		return api.NewToolCallResult("", fmt.Errorf("name is required for pause action")), nil
 	}
 
 	paused, ok := params.GetArguments()["paused"].(bool)
 	if !ok {
-		return api.NewToolCallResult("", fmt.Errorf("paused is required")), nil
+		return api.NewToolCallResult("", fmt.Errorf("paused (true/false) is required for pause action")), nil
 	}
 
 	updated, err := oadp.PauseSchedule(params.Context, params.DynamicClient(), namespace, name, paused)
