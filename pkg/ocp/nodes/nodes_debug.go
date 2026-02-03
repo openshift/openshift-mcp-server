@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
+	"github.com/containers/kubernetes-mcp-server/pkg/ocp"
 	"github.com/containers/kubernetes-mcp-server/pkg/version"
 
 	corev1 "k8s.io/api/core/v1"
@@ -36,7 +37,7 @@ const (
 // default debug image is used. Timeout controls how long we wait for the pod to complete.
 func NodesDebugExec(
 	ctx context.Context,
-	k OpenshiftClient,
+	k ocp.OpenshiftClient,
 	namespace string,
 	nodeName string,
 	image string,
@@ -97,7 +98,7 @@ func NodesDebugExec(
 // createDebugPod creates a privileged pod on the target node to run debug commands.
 func createDebugPod(
 	ctx context.Context,
-	k OpenshiftClient,
+	k ocp.OpenshiftClient,
 	nodeName string,
 	namespace string,
 	image string,
@@ -188,7 +189,7 @@ func createDebugPod(
 // pollForCompletion polls the debug pod until it completes or times out.
 func pollForCompletion(
 	ctx context.Context,
-	k OpenshiftClient,
+	k ocp.OpenshiftClient,
 	namespace string,
 	podName string,
 	timeout time.Duration,
@@ -248,7 +249,7 @@ func pollForCompletion(
 }
 
 // retrieveLogs retrieves the logs from the debug pod.
-func retrieveLogs(ctx context.Context, k OpenshiftClient, namespace, podName string) (string, error) {
+func retrieveLogs(ctx context.Context, k ocp.OpenshiftClient, namespace, podName string) (string, error) {
 	logCtx, logCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer logCancel()
 	logs, logErr := k.PodsLog(logCtx, namespace, podName, NodeDebugContainerName, false, 0)

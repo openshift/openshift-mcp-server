@@ -9,6 +9,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/ocp"
 	"github.com/containers/kubernetes-mcp-server/pkg/ocp/nodes"
 )
 
@@ -96,7 +97,7 @@ func nodesDebugExec(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		}
 	}
 
-	output, execErr := nodes.NodesDebugExec(params.Context, nodes.NewOpenshiftClient(params.KubernetesClient), namespace, nodeName, image, command, timeout)
+	output, execErr := nodes.NodesDebugExec(params.Context, ocp.NewOpenshiftClient(params.KubernetesClient), namespace, nodeName, image, command, timeout)
 	if output == "" && execErr == nil {
 		output = fmt.Sprintf("Command executed successfully on node %s but produced no output.", nodeName)
 	}

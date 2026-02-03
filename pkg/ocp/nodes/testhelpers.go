@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/containers/kubernetes-mcp-server/pkg/ocp"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,14 +42,14 @@ func NewNodeDebugTestEnv(t *testing.T) *NodeDebugTestEnv {
 	}
 }
 
-// FakeKubernetesClient implements the OpenshiftClient interface for testing
+// FakeKubernetesClient implements the ocp.OpenshiftClient interface for testing
 type FakeKubernetesClient struct {
 	pods      *FakePodInterface
 	namespace string
 }
 
 // AccessControlClientset returns a fake clientset for testing
-func (f *FakeKubernetesClient) AccessControlClientset() ClientsetInterface {
+func (f *FakeKubernetesClient) AccessControlClientset() ocp.ClientsetInterface {
 	return &FakeAccessControlClientset{pods: f.pods}
 }
 
@@ -71,7 +73,7 @@ func (f *FakeKubernetesClient) PodsLog(ctx context.Context, namespace, name, con
 	return string(rawData), nil
 }
 
-// FakeAccessControlClientset mimics kubernetes.AccessControlClientset for testing
+// FakeAccessControlClientset mimics ocp.ClientsetInterface for testing
 type FakeAccessControlClientset struct {
 	pods *FakePodInterface
 }
