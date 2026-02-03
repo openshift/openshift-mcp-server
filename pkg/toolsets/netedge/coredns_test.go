@@ -67,7 +67,7 @@ func TestGetCoreDNSConfig(t *testing.T) {
 			},
 			expectedOutput: "",
 			expectError:    true,
-			errorContains:  "Corefile not found",
+			errorContains:  "corefile not found",
 		},
 	}
 
