@@ -96,7 +96,7 @@ func nodesDebugExec(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		}
 	}
 
-	output, execErr := ocp.NodesDebugExec(params.Context, ocp.NewOpenshiftClient(params.Kubernetes), namespace, nodeName, image, command, timeout)
+	output, execErr := ocp.NodesDebugExec(params.Context, ocp.NewOpenshiftClient(params.KubernetesClient), namespace, nodeName, image, command, timeout)
 	if output == "" && execErr == nil {
 		output = fmt.Sprintf("Command executed successfully on node %s but produced no output.", nodeName)
 	}
