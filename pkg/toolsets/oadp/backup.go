@@ -11,49 +11,126 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+// BackupAction represents the action to perform on backups
+type BackupAction string
+
+const (
+	BackupActionList   BackupAction = "list"
+	BackupActionGet    BackupAction = "get"
+	BackupActionCreate BackupAction = "create"
+	BackupActionDelete BackupAction = "delete"
+	BackupActionLogs   BackupAction = "logs"
+)
+
 func initBackupTools() []api.ServerTool {
 	return []api.ServerTool{
-		initBackupList(),
-		initBackupGet(),
-		initBackupCreate(),
-		initBackupDelete(),
-		initBackupLogs(),
-	}
-}
-
-func initBackupList() api.ServerTool {
-	return api.ServerTool{
-		Tool: api.Tool{
-			Name:        "oadp_backup_list",
-			Description: "List all Velero/OADP backups in the specified namespace or across all namespaces",
-			InputSchema: &jsonschema.Schema{
-				Type: "object",
-				Properties: map[string]*jsonschema.Schema{
-					"namespace": {
-						Type:        "string",
-						Description: "Namespace containing backups (default: openshift-adp)",
+		{
+			Tool: api.Tool{
+				Name:        "oadp_backup",
+				Description: "Manage Velero/OADP backups: list, get, create, delete, or retrieve logs",
+				InputSchema: &jsonschema.Schema{
+					Type: "object",
+					Properties: map[string]*jsonschema.Schema{
+						"action": {
+							Type:        "string",
+							Enum:        []any{string(BackupActionList), string(BackupActionGet), string(BackupActionCreate), string(BackupActionDelete), string(BackupActionLogs)},
+							Description: "Action to perform: 'list' (list all backups), 'get' (get backup details), 'create' (create new backup), 'delete' (delete backup), 'logs' (get backup logs)",
+						},
+						"namespace": {
+							Type:        "string",
+							Description: "Namespace containing backups (default: openshift-adp)",
+						},
+						"name": {
+							Type:        "string",
+							Description: "Name of the backup (required for get, create, delete, logs)",
+						},
+						"labelSelector": {
+							Type:        "string",
+							Description: "Label selector to filter backups (for list action)",
+						},
+						"includedNamespaces": {
+							Type:        "array",
+							Description: "Namespaces to include in the backup (for create action)",
+							Items:       &jsonschema.Schema{Type: "string"},
+						},
+						"excludedNamespaces": {
+							Type:        "array",
+							Description: "Namespaces to exclude from the backup (for create action)",
+							Items:       &jsonschema.Schema{Type: "string"},
+						},
+						"includedResources": {
+							Type:        "array",
+							Description: "Resource types to include (for create action)",
+							Items:       &jsonschema.Schema{Type: "string"},
+						},
+						"excludedResources": {
+							Type:        "array",
+							Description: "Resource types to exclude (for create action)",
+							Items:       &jsonschema.Schema{Type: "string"},
+						},
+						"storageLocation": {
+							Type:        "string",
+							Description: "BackupStorageLocation name to use (for create action)",
+						},
+						"volumeSnapshotLocations": {
+							Type:        "array",
+							Description: "VolumeSnapshotLocation names to use (for create action)",
+							Items:       &jsonschema.Schema{Type: "string"},
+						},
+						"snapshotVolumes": {
+							Type:        "boolean",
+							Description: "Whether to snapshot persistent volumes (for create action)",
+						},
+						"defaultVolumesToFsBackup": {
+							Type:        "boolean",
+							Description: "Use file system backup for volumes instead of snapshots (for create action)",
+						},
+						"ttl": {
+							Type:        "string",
+							Description: "Backup TTL duration e.g., '720h' for 30 days (for create action)",
+						},
 					},
-					"labelSelector": {
-						Type:        "string",
-						Description: "Label selector to filter backups (e.g., 'app=myapp')",
-					},
+					Required: []string{"action"},
+				},
+				Annotations: api.ToolAnnotations{
+					Title:           "OADP: Backup",
+					ReadOnlyHint:    ptr.To(false),
+					DestructiveHint: ptr.To(false),
 				},
 			},
-			Annotations: api.ToolAnnotations{
-				Title:        "OADP: List Backups",
-				ReadOnlyHint: ptr.To(true),
-			},
+			Handler: backupHandler,
 		},
-		Handler: backupListHandler,
 	}
 }
 
-func backupListHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
+func backupHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
+	action, err := api.RequiredString(params, "action")
+	if err != nil {
+		return api.NewToolCallResult("", err), nil
+	}
+
 	namespace := oadp.DefaultOADPNamespace
 	if v, ok := params.GetArguments()["namespace"].(string); ok && v != "" {
 		namespace = v
 	}
 
+	switch BackupAction(action) {
+	case BackupActionList:
+		return handleBackupList(params, namespace)
+	case BackupActionGet:
+		return handleBackupGet(params, namespace)
+	case BackupActionCreate:
+		return handleBackupCreate(params, namespace)
+	case BackupActionDelete:
+		return handleBackupDelete(params, namespace)
+	case BackupActionLogs:
+		return handleBackupLogs(params, namespace)
+	default:
+		return api.NewToolCallResult("", fmt.Errorf("invalid action '%s': must be one of 'list', 'get', 'create', 'delete', 'logs'", action)), nil
+	}
+}
+
+func handleBackupList(params api.ToolHandlerParams, namespace string) (*api.ToolCallResult, error) {
 	labelSelector := ""
 	if v, ok := params.GetArguments()["labelSelector"].(string); ok {
 		labelSelector = v
@@ -69,43 +146,10 @@ func backupListHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error
 	return api.NewToolCallResult(params.ListOutput.PrintObj(backups)), nil
 }
 
-func initBackupGet() api.ServerTool {
-	return api.ServerTool{
-		Tool: api.Tool{
-			Name:        "oadp_backup_get",
-			Description: "Get detailed information about a specific backup including status, included/excluded resources, and storage location",
-			InputSchema: &jsonschema.Schema{
-				Type: "object",
-				Properties: map[string]*jsonschema.Schema{
-					"namespace": {
-						Type:        "string",
-						Description: "Namespace of the backup (default: openshift-adp)",
-					},
-					"name": {
-						Type:        "string",
-						Description: "Name of the backup",
-					},
-				},
-				Required: []string{"name"},
-			},
-			Annotations: api.ToolAnnotations{
-				Title:        "OADP: Get Backup",
-				ReadOnlyHint: ptr.To(true),
-			},
-		},
-		Handler: backupGetHandler,
-	}
-}
-
-func backupGetHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	namespace := oadp.DefaultOADPNamespace
-	if v, ok := params.GetArguments()["namespace"].(string); ok && v != "" {
-		namespace = v
-	}
-
+func handleBackupGet(params api.ToolHandlerParams, namespace string) (*api.ToolCallResult, error) {
 	name, ok := params.GetArguments()["name"].(string)
 	if !ok || name == "" {
-		return api.NewToolCallResult("", fmt.Errorf("name is required")), nil
+		return api.NewToolCallResult("", fmt.Errorf("name is required for get action")), nil
 	}
 
 	backup, err := oadp.GetBackup(params.Context, params.DynamicClient(), namespace, name)
@@ -116,116 +160,35 @@ func backupGetHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error)
 	return api.NewToolCallResult(params.ListOutput.PrintObj(backup)), nil
 }
 
-func initBackupCreate() api.ServerTool {
-	return api.ServerTool{
-		Tool: api.Tool{
-			Name:        "oadp_backup_create",
-			Description: "Create a new Velero/OADP backup with specified configuration. Supports namespace selection, label selectors, and volume snapshot options.",
-			InputSchema: &jsonschema.Schema{
-				Type: "object",
-				Properties: map[string]*jsonschema.Schema{
-					"namespace": {
-						Type:        "string",
-						Description: "OADP namespace where the backup CR will be created (default: openshift-adp)",
-					},
-					"name": {
-						Type:        "string",
-						Description: "Name for the backup",
-					},
-					"includedNamespaces": {
-						Type:        "array",
-						Description: "Namespaces to include in the backup",
-						Items:       &jsonschema.Schema{Type: "string"},
-					},
-					"excludedNamespaces": {
-						Type:        "array",
-						Description: "Namespaces to exclude from the backup",
-						Items:       &jsonschema.Schema{Type: "string"},
-					},
-					"includedResources": {
-						Type:        "array",
-						Description: "Resource types to include (e.g., ['pods', 'deployments'])",
-						Items:       &jsonschema.Schema{Type: "string"},
-					},
-					"excludedResources": {
-						Type:        "array",
-						Description: "Resource types to exclude",
-						Items:       &jsonschema.Schema{Type: "string"},
-					},
-					"labelSelector": {
-						Type:        "string",
-						Description: "Label selector to filter resources (e.g., 'app=myapp')",
-					},
-					"storageLocation": {
-						Type:        "string",
-						Description: "BackupStorageLocation name to use",
-					},
-					"volumeSnapshotLocations": {
-						Type:        "array",
-						Description: "VolumeSnapshotLocation names to use",
-						Items:       &jsonschema.Schema{Type: "string"},
-					},
-					"snapshotVolumes": {
-						Type:        "boolean",
-						Description: "Whether to snapshot persistent volumes (default: true)",
-					},
-					"defaultVolumesToFsBackup": {
-						Type:        "boolean",
-						Description: "Use file system backup for volumes instead of snapshots",
-					},
-					"ttl": {
-						Type:        "string",
-						Description: "Backup TTL duration (e.g., '720h' for 30 days)",
-					},
-				},
-				Required: []string{"name"},
-			},
-			Annotations: api.ToolAnnotations{
-				Title:           "OADP: Create Backup",
-				ReadOnlyHint:    ptr.To(false),
-				DestructiveHint: ptr.To(false),
-				IdempotentHint:  ptr.To(false),
-			},
-		},
-		Handler: backupCreateHandler,
-	}
-}
-
-func backupCreateHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	namespace := oadp.DefaultOADPNamespace
-	if v, ok := params.GetArguments()["namespace"].(string); ok && v != "" {
-		namespace = v
-	}
-
+func handleBackupCreate(params api.ToolHandlerParams, namespace string) (*api.ToolCallResult, error) {
 	name, ok := params.GetArguments()["name"].(string)
 	if !ok || name == "" {
-		return api.NewToolCallResult("", fmt.Errorf("name is required")), nil
+		return api.NewToolCallResult("", fmt.Errorf("name is required for create action")), nil
 	}
 
-	// Build the backup spec
-	spec := map[string]interface{}{}
+	spec := map[string]any{}
 
-	if v, ok := params.GetArguments()["includedNamespaces"].([]interface{}); ok {
+	if v, ok := params.GetArguments()["includedNamespaces"].([]any); ok {
 		spec["includedNamespaces"] = v
 	}
-	if v, ok := params.GetArguments()["excludedNamespaces"].([]interface{}); ok {
+	if v, ok := params.GetArguments()["excludedNamespaces"].([]any); ok {
 		spec["excludedNamespaces"] = v
 	}
-	if v, ok := params.GetArguments()["includedResources"].([]interface{}); ok {
+	if v, ok := params.GetArguments()["includedResources"].([]any); ok {
 		spec["includedResources"] = v
 	}
-	if v, ok := params.GetArguments()["excludedResources"].([]interface{}); ok {
+	if v, ok := params.GetArguments()["excludedResources"].([]any); ok {
 		spec["excludedResources"] = v
 	}
 	if v, ok := params.GetArguments()["labelSelector"].(string); ok && v != "" {
-		spec["labelSelector"] = map[string]interface{}{
+		spec["labelSelector"] = map[string]any{
 			"matchLabels": parseLabelSelector(v),
 		}
 	}
 	if v, ok := params.GetArguments()["storageLocation"].(string); ok && v != "" {
 		spec["storageLocation"] = v
 	}
-	if v, ok := params.GetArguments()["volumeSnapshotLocations"].([]interface{}); ok {
+	if v, ok := params.GetArguments()["volumeSnapshotLocations"].([]any); ok {
 		spec["volumeSnapshotLocations"] = v
 	}
 	if v, ok := params.GetArguments()["snapshotVolumes"].(bool); ok {
@@ -240,10 +203,10 @@ func backupCreateHandler(params api.ToolHandlerParams) (*api.ToolCallResult, err
 	}
 
 	backup := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": oadp.VeleroGroup + "/" + oadp.VeleroVersion,
 			"kind":       "Backup",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      name,
 				"namespace": namespace,
 			},
@@ -259,45 +222,10 @@ func backupCreateHandler(params api.ToolHandlerParams) (*api.ToolCallResult, err
 	return api.NewToolCallResult(params.ListOutput.PrintObj(created)), nil
 }
 
-func initBackupDelete() api.ServerTool {
-	return api.ServerTool{
-		Tool: api.Tool{
-			Name:        "oadp_backup_delete",
-			Description: "Delete a Velero/OADP backup. This creates a DeleteBackupRequest which will also delete backup data from object storage.",
-			InputSchema: &jsonschema.Schema{
-				Type: "object",
-				Properties: map[string]*jsonschema.Schema{
-					"namespace": {
-						Type:        "string",
-						Description: "Namespace of the backup (default: openshift-adp)",
-					},
-					"name": {
-						Type:        "string",
-						Description: "Name of the backup to delete",
-					},
-				},
-				Required: []string{"name"},
-			},
-			Annotations: api.ToolAnnotations{
-				Title:           "OADP: Delete Backup",
-				ReadOnlyHint:    ptr.To(false),
-				DestructiveHint: ptr.To(true),
-				IdempotentHint:  ptr.To(true),
-			},
-		},
-		Handler: backupDeleteHandler,
-	}
-}
-
-func backupDeleteHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	namespace := oadp.DefaultOADPNamespace
-	if v, ok := params.GetArguments()["namespace"].(string); ok && v != "" {
-		namespace = v
-	}
-
+func handleBackupDelete(params api.ToolHandlerParams, namespace string) (*api.ToolCallResult, error) {
 	name, ok := params.GetArguments()["name"].(string)
 	if !ok || name == "" {
-		return api.NewToolCallResult("", fmt.Errorf("name is required")), nil
+		return api.NewToolCallResult("", fmt.Errorf("name is required for delete action")), nil
 	}
 
 	err := oadp.DeleteBackup(params.Context, params.DynamicClient(), namespace, name)
@@ -308,43 +236,10 @@ func backupDeleteHandler(params api.ToolHandlerParams) (*api.ToolCallResult, err
 	return api.NewToolCallResult(fmt.Sprintf("DeleteBackupRequest created for backup %s/%s", namespace, name), nil), nil
 }
 
-func initBackupLogs() api.ServerTool {
-	return api.ServerTool{
-		Tool: api.Tool{
-			Name:        "oadp_backup_logs",
-			Description: "Retrieve logs for a specific backup operation to troubleshoot issues",
-			InputSchema: &jsonschema.Schema{
-				Type: "object",
-				Properties: map[string]*jsonschema.Schema{
-					"namespace": {
-						Type:        "string",
-						Description: "Namespace of the backup (default: openshift-adp)",
-					},
-					"name": {
-						Type:        "string",
-						Description: "Name of the backup",
-					},
-				},
-				Required: []string{"name"},
-			},
-			Annotations: api.ToolAnnotations{
-				Title:        "OADP: Backup Logs",
-				ReadOnlyHint: ptr.To(true),
-			},
-		},
-		Handler: backupLogsHandler,
-	}
-}
-
-func backupLogsHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	namespace := oadp.DefaultOADPNamespace
-	if v, ok := params.GetArguments()["namespace"].(string); ok && v != "" {
-		namespace = v
-	}
-
+func handleBackupLogs(params api.ToolHandlerParams, namespace string) (*api.ToolCallResult, error) {
 	name, ok := params.GetArguments()["name"].(string)
 	if !ok || name == "" {
-		return api.NewToolCallResult("", fmt.Errorf("name is required")), nil
+		return api.NewToolCallResult("", fmt.Errorf("name is required for logs action")), nil
 	}
 
 	logs, err := oadp.GetBackupLogs(params.Context, params.DynamicClient(), namespace, name)
