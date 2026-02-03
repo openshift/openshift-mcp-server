@@ -6,6 +6,9 @@ config:
     type: "file"
     path: agent.yaml
   mcpConfigFile: ../mcp-config.yaml
+  extensions:
+    kubernetes:
+      package: https://github.com/mcpchecker/kubernetes-extension@v0.0.3
   llmJudge:
     env:
       baseUrlKey: JUDGE_BASE_URL
@@ -20,3 +23,10 @@ config:
             toolPattern: ".*"
         minToolCalls: 1
         maxToolCalls: 20
+    - glob: ../tasks/config/*/*.yaml
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            toolPattern: "configuration_.*"
+        minToolCalls: 1
+        maxToolCalls: 10
