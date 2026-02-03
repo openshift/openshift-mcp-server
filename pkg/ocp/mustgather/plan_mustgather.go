@@ -1,6 +1,7 @@
 package mustgather
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/yaml"
 )
 
@@ -26,94 +28,71 @@ const (
 	maxConcurrentGathers   = 8
 )
 
-func PlanMustGather(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	args := params.GetArguments()
-	k8sCore := kubernetes.NewCore(params)
+// PlanMustGatherParams contains the parameters for planning a must-gather collection.
+type PlanMustGatherParams struct {
+	NodeName      string
+	NodeSelector  map[string]string
+	HostNetwork   bool
+	SourceDir     string // custom gather directory inside pod, default is "/must-gather"
+	Namespace     string
+	KeepResources bool
+	GatherCommand string   // custom gather command, default is "/usr/bin/gather"
+	AllImages     bool     // whether to use custom gather images from installed operators on cluster
+	Images        []string // custom list of must-gather images
+	Timeout       string
+	Since         string
+}
 
-	var nodeName, sourceDir, namespace, gatherCmd, timeout, since string
-	var hostNetwork, keepResources, allImages bool
-	var images []string
-	var nodeSelector map[string]string
+// PlanMustGather generates a must-gather plan with YAML manifests for creating the required resources.
+// It returns the plan as a string containing YAML manifests and instructions.
+func PlanMustGather(ctx context.Context, k api.KubernetesClient, params PlanMustGatherParams) (string, error) {
+	dynamicClient := k.DynamicClient()
+	k8sCore := kubernetes.NewCore(k)
 
-	if args["node_name"] != nil {
-		nodeName = args["node_name"].(string)
+	sourceDir := params.SourceDir
+	if sourceDir == "" {
+		sourceDir = defaultGatherSourceDir
+	} else {
+		sourceDir = path.Clean(sourceDir)
 	}
 
-	if args["node_selector"] != nil {
-		nodeSelector = parseNodeSelector(args["node_selector"].(string))
+	namespace := params.Namespace
+	if namespace == "" {
+		namespace = fmt.Sprintf("openshift-must-gather-%s", rand.String(6))
 	}
 
-	if args["host_network"] != nil {
-		hostNetwork = args["host_network"].(bool)
+	gatherCmd := params.GatherCommand
+	if gatherCmd == "" {
+		gatherCmd = defaultGatherCmd
 	}
 
-	sourceDir = defaultGatherSourceDir
-	if args["source_dir"] != nil {
-		sourceDir = path.Clean(args["source_dir"].(string))
-	}
-
-	namespace = fmt.Sprintf("openshift-must-gather-%s", rand.String(6))
-	if args["namespace"] != nil {
-		namespace = args["namespace"].(string)
-	}
-
-	if args["keep_resources"] != nil {
-		keepResources = args["keep_resources"].(bool)
-	}
-
-	gatherCmd = defaultGatherCmd
-	if args["gather_command"] != nil {
-		gatherCmd = args["gather_command"].(string)
-	}
-
-	if args["all_component_images"] != nil {
-		allImages = args["all_component_images"].(bool)
-	}
-
-	if args["images"] != nil {
-		if imagesArg, ok := args["images"].([]interface{}); ok {
-			for _, img := range imagesArg {
-				if imgStr, ok := img.(string); ok {
-					images = append(images, imgStr)
-				}
-			}
-		}
-	}
-
-	if allImages {
-		componentImages, err := getComponentImages(params)
+	images := params.Images
+	if params.AllImages {
+		componentImages, err := getComponentImages(ctx, dynamicClient)
 		if err != nil {
-			return api.NewToolCallResult("",
-				fmt.Errorf("failed to get operator images: %v", err),
-			), nil
+			return "", fmt.Errorf("failed to get operator images: %v", err)
 		}
-
 		images = append(images, componentImages...)
 	}
 
 	if len(images) > maxConcurrentGathers {
-		return api.NewToolCallResult("",
-			fmt.Errorf("more than %d gather images are not supported", maxConcurrentGathers),
-		), nil
+		return "", fmt.Errorf("more than %d gather images are not supported", maxConcurrentGathers)
 	}
 
-	if args["timeout"] != nil {
-		timeout = args["timeout"].(string)
-
+	timeout := params.Timeout
+	if timeout != "" {
 		_, err := time.ParseDuration(timeout)
 		if err != nil {
-			return api.NewToolCallResult("", fmt.Errorf("timeout duration is not valid")), nil
+			return "", fmt.Errorf("timeout duration is not valid")
 		}
-
 		gatherCmd = fmt.Sprintf("/usr/bin/timeout %s %s", timeout, gatherCmd)
 	}
 
-	if args["since"] != nil {
-		since = args["since"].(string)
-
+	since := params.Since
+	if since != "" {
 		_, err := time.ParseDuration(since)
 		if err != nil {
-			return api.NewToolCallResult("", fmt.Errorf("since duration is not valid")), nil
+			return "", fmt.Errorf("since duration is not valid")
 		}
 	}
 
@@ -174,7 +153,7 @@ func PlanMustGather(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		},
 		Spec: corev1.PodSpec{
 			ServiceAccountName: serviceAccountName,
-			NodeName:           nodeName,
+			NodeName:           params.NodeName,
 			PriorityClassName:  "system-cluster-critical",
 			RestartPolicy:      corev1.RestartPolicyNever,
 			Volumes: []corev1.Volume{
@@ -197,8 +176,8 @@ func PlanMustGather(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 					},
 				},
 			}),
-			HostNetwork:  hostNetwork,
-			NodeSelector: nodeSelector,
+			HostNetwork:  params.HostNetwork,
+			NodeSelector: params.NodeSelector,
 			Tolerations: []corev1.Toleration{
 				{
 					Operator: "Exists",
@@ -208,8 +187,7 @@ func PlanMustGather(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	}
 
 	namespaceExists := false
-
-	_, err := k8sCore.ResourcesGet(params, &schema.GroupVersionKind{
+	_, err := k8sCore.ResourcesGet(ctx, &schema.GroupVersionKind{
 		Group:   "",
 		Version: "v1",
 		Kind:    "Namespace",
@@ -294,8 +272,8 @@ func PlanMustGather(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	}
 	isAllowed := make(map[string]bool)
 
-	for k, check := range allowChecks {
-		isAllowed[k] = k8sCore.CanIUse(params, &check.GroupVersionResource, "", check.verb)
+	for key, check := range allowChecks {
+		isAllowed[key] = k8sCore.CanIUse(ctx, &check.GroupVersionResource, "", check.verb)
 	}
 
 	var result strings.Builder
@@ -307,7 +285,7 @@ func PlanMustGather(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		"- alternatively, advise the user to execute `oc apply` / `kubectl apply` instead. \n\n",
 	)
 
-	if !keepResources {
+	if !params.KeepResources {
 		result.WriteString("Once the must-gather collection is completed, the user may wish to cleanup the created resources. \n" +
 			"- use the resources_delete tool to delete the namespace and the clusterrolebinding \n" +
 			"- or, execute cleanup using `kubectl delete`. \n\n")
@@ -316,7 +294,7 @@ func PlanMustGather(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	if !namespaceExists && isAllowed["create_namespace"] {
 		namespaceYaml, err := yaml.Marshal(namespaceObj)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal namespace to yaml: %w", err)
+			return "", fmt.Errorf("failed to marshal namespace to yaml: %w", err)
 		}
 
 		result.WriteString("```yaml\n")
@@ -334,7 +312,7 @@ func PlanMustGather(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 
 	serviceAccountYaml, err := yaml.Marshal(serviceAccount)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal service account to yaml: %w", err)
+		return "", fmt.Errorf("failed to marshal service account to yaml: %w", err)
 	}
 	result.WriteString("```yaml\n")
 	result.Write(serviceAccountYaml)
@@ -346,7 +324,7 @@ func PlanMustGather(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 
 	clusterRoleBindingYaml, err := yaml.Marshal(clusterRoleBinding)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal cluster role binding to yaml: %w", err)
+		return "", fmt.Errorf("failed to marshal cluster role binding to yaml: %w", err)
 	}
 
 	result.WriteString("```yaml\n")
@@ -359,7 +337,7 @@ func PlanMustGather(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 
 	podYaml, err := yaml.Marshal(pod)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal pod to yaml: %w", err)
+		return "", fmt.Errorf("failed to marshal pod to yaml: %w", err)
 	}
 
 	result.WriteString("```yaml\n")
@@ -370,16 +348,15 @@ func PlanMustGather(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		result.WriteString("WARNING: The resources_create_or_update call does not have permission to create pod(s).\n")
 	}
 
-	if hostNetwork && !isAllowed["use_scc_hostnetwork"] {
+	if params.HostNetwork && !isAllowed["use_scc_hostnetwork"] {
 		result.WriteString("WARNING: The resources_create_or_update call does not have permission to create pod(s) with hostNetwork: true.\n")
 	}
 
-	return api.NewToolCallResult(result.String(), nil), nil
+	return result.String(), nil
 }
 
-func getComponentImages(params api.ToolHandlerParams) ([]string, error) {
+func getComponentImages(ctx context.Context, dynamicClient dynamic.Interface) ([]string, error) {
 	var images []string
-	k8sCore := kubernetes.NewCore(params)
 
 	appendImageFromAnnotation := func(obj runtime.Object) error {
 		unstruct, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
@@ -396,11 +373,13 @@ func getComponentImages(params api.ToolHandlerParams) ([]string, error) {
 		return nil
 	}
 
-	clusterOperatorsList, err := k8sCore.ResourcesList(params, &schema.GroupVersionKind{
-		Group:   "config.openshift.io",
-		Version: "v1",
-		Kind:    "ClusterOperator",
-	}, "", api.ListOptions{})
+	// List ClusterOperators
+	clusterOperatorGVR := schema.GroupVersionResource{
+		Group:    "config.openshift.io",
+		Version:  "v1",
+		Resource: "clusteroperators",
+	}
+	clusterOperatorsList, err := dynamicClient.Resource(clusterOperatorGVR).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -409,11 +388,13 @@ func getComponentImages(params api.ToolHandlerParams) ([]string, error) {
 		return images, err
 	}
 
-	csvList, err := k8sCore.ResourcesList(params, &schema.GroupVersionKind{
-		Group:   "operators.coreos.com",
-		Version: "v1alpha1",
-		Kind:    "ClusterServiceVersion",
-	}, "", api.ListOptions{})
+	// List ClusterServiceVersions
+	csvGVR := schema.GroupVersionResource{
+		Group:    "operators.coreos.com",
+		Version:  "v1alpha1",
+		Resource: "clusterserviceversions",
+	}
+	csvList, err := dynamicClient.Resource(csvGVR).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return images, err
 	}
@@ -422,7 +403,8 @@ func getComponentImages(params api.ToolHandlerParams) ([]string, error) {
 	return images, err
 }
 
-func parseNodeSelector(selector string) map[string]string {
+// ParseNodeSelector parses a comma-separated key=value selector string into a map.
+func ParseNodeSelector(selector string) map[string]string {
 	result := make(map[string]string)
 	pairs := strings.Split(selector, ",")
 	for _, pair := range pairs {

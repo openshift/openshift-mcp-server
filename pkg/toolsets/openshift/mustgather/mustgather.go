@@ -1,6 +1,8 @@
 package mustgather
 
 import (
+	"context"
+
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
 	"github.com/google/jsonschema-go/jsonschema"
@@ -75,6 +77,73 @@ func Tools() []api.ServerTool {
 			},
 		},
 
-		Handler: mustgather.PlanMustGather,
+		Handler: planMustGather,
 	}}
+}
+
+// planMustGather is the handler that parses arguments and calls the core
+// PlanMustGather tool.
+func planMustGather(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
+	args := params.GetArguments()
+	ctx := context.Background()
+
+	mgParams := mustgather.PlanMustGatherParams{}
+
+	if args["node_name"] != nil {
+		mgParams.NodeName = args["node_name"].(string)
+	}
+
+	if args["node_selector"] != nil {
+		mgParams.NodeSelector = mustgather.ParseNodeSelector(args["node_selector"].(string))
+	}
+
+	if args["host_network"] != nil {
+		mgParams.HostNetwork = args["host_network"].(bool)
+	}
+
+	if args["source_dir"] != nil {
+		mgParams.SourceDir = args["source_dir"].(string)
+	}
+
+	if args["namespace"] != nil {
+		mgParams.Namespace = args["namespace"].(string)
+	}
+
+	if args["keep_resources"] != nil {
+		mgParams.KeepResources = args["keep_resources"].(bool)
+	}
+
+	if args["gather_command"] != nil {
+		mgParams.GatherCommand = args["gather_command"].(string)
+	}
+
+	if args["all_component_images"] != nil {
+		mgParams.AllImages = args["all_component_images"].(bool)
+	}
+
+	if args["images"] != nil {
+		if imagesArg, ok := args["images"].([]interface{}); ok {
+			for _, img := range imagesArg {
+				if imgStr, ok := img.(string); ok {
+					mgParams.Images = append(mgParams.Images, imgStr)
+				}
+			}
+		}
+	}
+
+	if args["timeout"] != nil {
+		mgParams.Timeout = args["timeout"].(string)
+	}
+
+	if args["since"] != nil {
+		mgParams.Since = args["since"].(string)
+	}
+
+	// params implements api.KubernetesClient
+	result, err := mustgather.PlanMustGather(ctx, params, mgParams)
+	if err != nil {
+		return api.NewToolCallResult("", err), nil
+	}
+
+	return api.NewToolCallResult(result, nil), nil
 }
