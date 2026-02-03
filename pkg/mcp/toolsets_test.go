@@ -18,6 +18,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/helm"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kiali"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/openshift"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/suite"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -177,6 +178,24 @@ func (s *ToolsetsSuite) TestGranularToolsetsTools() {
 			})
 		})
 	}
+}
+
+func (s *ToolsetsSuite) TestOpenShiftToolset() {
+	s.Run("OpenShift toolset in OpenShift cluster", func() {
+		s.Handle(test.NewInOpenShiftHandler())
+		toolsets.Clear()
+		toolsets.Register(&openshift.Toolset{})
+		s.Cfg.Toolsets = []string{"openshift"}
+		s.InitMcpClient()
+		tools, err := s.ListTools(s.T().Context(), mcp.ListToolsRequest{})
+		s.Run("ListTools returns tools", func() {
+			s.NotNil(tools, "Expected tools from ListTools")
+			s.NoError(err, "Expected no error from ListTools")
+		})
+		s.Run("ListTools returns correct Tool metadata", func() {
+			s.assertJsonSnapshot("toolsets-openshift-tools.json", tools.Tools)
+		})
+	})
 }
 
 func (s *ToolsetsSuite) TestInputSchemaEdgeCases() {
