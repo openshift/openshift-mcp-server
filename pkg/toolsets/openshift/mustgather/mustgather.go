@@ -12,6 +12,23 @@ import (
 func Tools() []api.ServerTool {
 	return []api.ServerTool{{
 		Tool: api.Tool{
+			Name:        "cluster_state_summary",
+			Description: "Get a human-readable summary of the OpenShift cluster state with health of cluster operators",
+			InputSchema: &jsonschema.Schema{
+				Type:       "object",
+				Properties: map[string]*jsonschema.Schema{},
+			},
+			Annotations: api.ToolAnnotations{
+				Title:           "MustGather: Cluster State Summary",
+				ReadOnlyHint:    ptr.To(true),
+				DestructiveHint: ptr.To(false),
+				IdempotentHint:  ptr.To(true),
+				OpenWorldHint:   ptr.To(true),
+			},
+		},
+		Handler: clusterStateSummary,
+	}, {
+		Tool: api.Tool{
 			Name:        "plan_mustgather",
 			Description: "Plan for collecting a must-gather archive from an OpenShift cluster, must-gather is a tool for collecting cluster data related to debugging and troubleshooting like logs, kubernetes resources, etc.",
 			InputSchema: &jsonschema.Schema{
@@ -79,6 +96,18 @@ func Tools() []api.ServerTool {
 
 		Handler: planMustGather,
 	}}
+}
+
+// clusterStateSummary is the handler that calls the core GetClusterStateSummary tool.
+func clusterStateSummary(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
+	ctx := context.Background()
+
+	result, err := mustgather.GetClusterStateSummary(ctx, params)
+	if err != nil {
+		return api.NewToolCallResult("", err), nil
+	}
+
+	return api.NewToolCallResult(result, nil), nil
 }
 
 // planMustGather is the handler that parses arguments and calls the core
