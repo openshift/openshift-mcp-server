@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 
+	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
 )
 
@@ -300,6 +301,9 @@ func TestToolsets(t *testing.T) {
 		}
 	})
 	t.Run("default", func(t *testing.T) {
+		if config.HasDefaultOverrides() {
+			t.Skip("Skipping test because default configuration overrides are present (this is a downstream fork)")
+		}
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1"})
@@ -351,6 +355,9 @@ func TestListOutput(t *testing.T) {
 
 func TestReadOnly(t *testing.T) {
 	t.Run("defaults to false", func(t *testing.T) {
+		if config.HasDefaultOverrides() {
+			t.Skip("Skipping test because default configuration overrides are present (this is a downstream fork)")
+		}
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1"})
