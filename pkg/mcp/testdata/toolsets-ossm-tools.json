@@ -170,53 +170,6 @@
   },
   {
     "annotations": {
-      "destructiveHint": true,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "title": "Manage Istio Config: Create, Patch, Delete"
-    },
-    "description": "Creates, patches, or deletes Istio configuration objects (Gateways, VirtualServices, etc.)",
-    "inputSchema": {
-      "properties": {
-        "action": {
-          "description": "Action to perform: create, patch, or delete",
-          "type": "string"
-        },
-        "group": {
-          "description": "API group of the Istio object (e.g., 'networking.istio.io', 'gateway.networking.k8s.io')",
-          "type": "string"
-        },
-        "json_data": {
-          "description": "JSON data to apply or create the object",
-          "type": "string"
-        },
-        "kind": {
-          "description": "Kind of the Istio object (e.g., 'DestinationRule', 'VirtualService', 'HTTPRoute', 'Gateway')",
-          "type": "string"
-        },
-        "name": {
-          "description": "Name of the Istio object",
-          "type": "string"
-        },
-        "namespace": {
-          "description": "Namespace containing the Istio object",
-          "type": "string"
-        },
-        "version": {
-          "description": "API version of the Istio object (e.g., 'v1', 'v1beta1')",
-          "type": "string"
-        }
-      },
-      "required": [
-        "action"
-      ],
-      "type": "object"
-    },
-    "name": "ossm_manage_istio_config",
-    "title": "Manage Istio Config: Create, Patch, Delete"
-  },
-  {
-    "annotations": {
       "destructiveHint": false,
       "idempotentHint": true,
       "openWorldHint": true,
