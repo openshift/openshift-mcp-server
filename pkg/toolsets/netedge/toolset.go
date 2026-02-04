@@ -9,6 +9,7 @@ import (
 	netedgeTools "github.com/containers/kubernetes-mcp-server/pkg/toolsets/netedge/tools"
 )
 
+// Toolset implements the netedge toolset for Network Ingress & DNS troubleshooting.
 type Toolset struct{}
 
 var _ api.Toolset = (*Toolset)(nil)
@@ -24,10 +25,12 @@ func (t *Toolset) GetDescription() string {
 func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
 	return slices.Concat(
 		netedgeTools.InitQueryPrometheus(),
+		initCoreDNS(),
 	)
 }
 
 func (t *Toolset) GetPrompts() []api.ServerPrompt {
+	// NetEdge toolset presently does not provide prompts
 	return nil
 }
 

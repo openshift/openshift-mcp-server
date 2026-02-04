@@ -16,8 +16,8 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  id-token: write  # Required for OIDC authentication
-  contents: read
+  id-token: write   # Required for OIDC authentication to MCP Registry
+  contents: read    # Required for checkout (read-only, no write access)
 
 jobs:
   publish:
@@ -28,23 +28,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.tag || github.event.workflow_run.head_branch }}
+          # Use head_sha (not head_branch) to checkout the exact commit that Release validated
+          ref: ${{ inputs.tag || github.event.workflow_run.head_sha }}
+          # Prevent token persistence to reduce attack surface (security best practice)
+          persist-credentials: false
 
       - name: Get version
         id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ inputs.tag }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            TAG="$INPUT_TAG"
           else
-            TAG="${{ github.event.workflow_run.head_branch }}"
+            TAG="$HEAD_BRANCH"
           fi
           # Strip the v prefix
           echo "version=${TAG#v}" >> $GITHUB_OUTPUT
 
       - name: Update server.json version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          jq --arg v "${{ steps.version.outputs.version }}" \
-            '.version = $v | .packages[].version = $v | .packages[] |= if .registryType == "oci" then .identifier = (.identifier | sub(":[^:]+$"; ":" + $v)) else . end' \
+          jq --arg v "$VERSION" \
+            '.version = $v | .packages[] |= if .registryType == "oci" then .identifier = (.identifier | sub(":[^:]+$"; ":" + $v)) else .version = $v end' \
             server.json > server.json.tmp && mv server.json.tmp server.json
           echo "Updated server.json:"
           cat server.json

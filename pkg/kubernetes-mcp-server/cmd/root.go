@@ -11,9 +11,11 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/spf13/cobra"
@@ -27,8 +29,10 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	internalhttp "github.com/containers/kubernetes-mcp-server/pkg/http"
+	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/mcp"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
+	"github.com/containers/kubernetes-mcp-server/pkg/telemetry"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
 	"github.com/containers/kubernetes-mcp-server/pkg/version"
 )
@@ -53,6 +57,12 @@ kubernetes-mcp-server --port 8443 --sse-base-url https://example.com:8443
 
 # start a SSE server on port 8080 with multi-cluster tools disabled
 kubernetes-mcp-server --port 8080 --disable-multi-cluster
+
+# start with explicit cluster provider strategy (kubeconfig, in-cluster, kcp, or disabled)
+kubernetes-mcp-server --cluster-provider kubeconfig
+
+# start with kcp cluster provider for multi-workspace support
+kubernetes-mcp-server --cluster-provider kcp
 `))
 )
 
@@ -75,6 +85,7 @@ const (
 	flagServerUrl            = "server-url"
 	flagCertificateAuthority = "certificate-authority"
 	flagDisableMultiCluster  = "disable-multi-cluster"
+	flagClusterProvider      = "cluster-provider"
 )
 
 type MCPServerOptions struct {
@@ -94,6 +105,7 @@ type MCPServerOptions struct {
 	CertificateAuthority string
 	ServerURL            string
 	DisableMultiCluster  bool
+	ClusterProvider      string
 
 	ConfigPath   string
 	ConfigDir    string
@@ -154,6 +166,7 @@ func NewMCPServer(streams genericiooptions.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.CertificateAuthority, flagCertificateAuthority, o.CertificateAuthority, "Certificate authority path to verify certificates. Optional. Only valid if require-oauth is enabled.")
 	_ = cmd.Flags().MarkHidden(flagCertificateAuthority)
 	cmd.Flags().BoolVar(&o.DisableMultiCluster, flagDisableMultiCluster, o.DisableMultiCluster, "Disable multi cluster tools. Optional. If true, all tools will be run against the default cluster/context.")
+	cmd.Flags().StringVar(&o.ClusterProvider, flagClusterProvider, o.ClusterProvider, "Cluster provider strategy to use (one of: kubeconfig, in-cluster, kcp, disabled). If not set, the server will auto-detect based on the environment.")
 
 	return cmd
 }
@@ -222,6 +235,9 @@ func (m *MCPServerOptions) loadFlags(cmd *cobra.Command) {
 	if cmd.Flag(flagCertificateAuthority).Changed {
 		m.StaticConfig.CertificateAuthority = m.CertificateAuthority
 	}
+	if cmd.Flag(flagClusterProvider).Changed {
+		m.StaticConfig.ClusterProviderStrategy = m.ClusterProvider
+	}
 	if cmd.Flag(flagDisableMultiCluster).Changed && m.DisableMultiCluster {
 		m.StaticConfig.ClusterProviderStrategy = api.ClusterProviderDisabled
 	}
@@ -252,6 +268,13 @@ func (m *MCPServerOptions) Validate() error {
 	if err := toolsets.Validate(m.StaticConfig.Toolsets); err != nil {
 		return err
 	}
+	// Validate cluster provider strategy
+	if m.StaticConfig.ClusterProviderStrategy != "" {
+		validStrategies := []string{api.ClusterProviderKubeConfig, api.ClusterProviderInCluster, api.ClusterProviderKcp, api.ClusterProviderDisabled}
+		if !slices.Contains(validStrategies, m.StaticConfig.ClusterProviderStrategy) {
+			return fmt.Errorf("invalid cluster-provider: %s, valid values are: %s", m.StaticConfig.ClusterProviderStrategy, strings.Join(validStrategies, ", "))
+		}
+	}
 	if !m.StaticConfig.RequireOAuth && (m.StaticConfig.OAuthAudience != "" || m.StaticConfig.AuthorizationURL != "" || m.StaticConfig.ServerURL != "" || m.StaticConfig.CertificateAuthority != "") {
 		return fmt.Errorf("oauth-audience, authorization-url, server-url and certificate-authority are only valid if require-oauth is enabled. Missing --port may implicitly set require-oauth to false")
 	}
@@ -277,6 +300,10 @@ func (m *MCPServerOptions) Validate() error {
 }
 
 func (m *MCPServerOptions) Run() error {
+	// Initialize OpenTelemetry tracing with config (env vars take precedence)
+	cleanup, _ := telemetry.InitTracerWithConfig(&m.StaticConfig.Telemetry, version.BinaryName, version.Version)
+	defer cleanup()
+
 	klog.V(1).Info("Starting kubernetes-mcp-server")
 	klog.V(1).Infof(" - Config: %s", m.ConfigPath)
 	klog.V(1).Infof(" - Toolsets: %s", strings.Join(m.StaticConfig.Toolsets, ", "))
@@ -284,6 +311,7 @@ func (m *MCPServerOptions) Run() error {
 	klog.V(1).Infof(" - Read-only mode: %t", m.StaticConfig.ReadOnly)
 	klog.V(1).Infof(" - Disable destructive tools: %t", m.StaticConfig.DisableDestructive)
 	klog.V(1).Infof(" - Stateless mode: %t", m.StaticConfig.Stateless)
+	klog.V(1).Infof(" - Telemetry enabled: %t", m.StaticConfig.Telemetry.IsEnabled())
 
 	strategy := m.StaticConfig.ClusterProviderStrategy
 	if strategy == "" {
@@ -331,13 +359,24 @@ func (m *MCPServerOptions) Run() error {
 		oidcProvider = provider
 	}
 
+	provider, err := kubernetes.NewProvider(m.StaticConfig, kubernetes.WithTokenExchange(oidcProvider, httpClient))
+	if err != nil {
+		return fmt.Errorf("unable to create kubernetes target provider: %w", err)
+	}
+
 	mcpServer, err := mcp.NewServer(mcp.Configuration{
 		StaticConfig: m.StaticConfig,
-	}, oidcProvider, httpClient)
+	}, provider)
 	if err != nil {
 		return fmt.Errorf("failed to initialize MCP server: %w", err)
 	}
-	defer mcpServer.Close()
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := mcpServer.Shutdown(shutdownCtx); err != nil {
+			klog.Errorf("MCP server shutdown error: %v", err)
+		}
+	}()
 
 	// Set up SIGHUP handler for configuration reload
 	if m.ConfigPath != "" || m.ConfigDir != "" {
