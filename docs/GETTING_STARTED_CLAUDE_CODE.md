@@ -92,6 +92,13 @@ Common command-line flags you can add to the `args` array:
 |------|-------------|
 | `--read-only` | Enable read-only mode (recommended) |
 | `--kubeconfig <path>` | Path to kubeconfig file (or use `KUBECONFIG` env var) |
+| `--config <path>` | Path to TOML config file (for advanced options like `server_instructions`) |
+
+## MCP Tool Search
+
+Claude Code supports [**MCP Tool Search**](https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool), a feature that dynamically loads tools based on relevance to your query. This helps when you have many MCP servers connected.
+
+You can configure `server_instructions` to help Claude know when to use this server's tools. See the [Server Instructions](../README.md#server-instructions) section in the main README for details.
 
 ## Next Steps
 

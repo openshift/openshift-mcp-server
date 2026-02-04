@@ -201,6 +201,37 @@ uvx kubernetes-mcp-server@latest --help
 | `--disable-multi-cluster` | If set, the MCP server will disable multi-cluster support and will only use the current context from the kubeconfig file. This is useful if you want to restrict the MCP server to a single cluster.                                                                                          |
 | `--cluster-provider`.     | Cluster provider strategy to use (one of: kubeconfig, in-cluster, kcp, disabled). If not set, the server will auto-detect based on the environment.                                                                                                                                           |
 
+### Server Instructions (for MCP Tool Search) <a id="server-instructions"></a>
+
+The `server_instructions` configuration option allows you to provide hints to MCP clients about when to use this server's tools. This is particularly useful for clients that support **MCP Tool Search** (like Claude Code), which dynamically loads tools based on relevance to the user's query.
+
+**How it works:**
+- When an MCP client has many tools available, it may defer loading tool definitions to save context space
+- Server instructions help the client know when to search this server for relevant tools
+- The instructions are matched against user queries to determine tool relevance
+
+**Example TOML configuration:**
+
+```toml
+server_instructions = """
+Use this server for Kubernetes and OpenShift cluster management tasks including:
+- Pods: list, get details, logs, exec commands, delete
+- Resources: get, list, create, update, delete any Kubernetes resource (deployments, services, configmaps, secrets, etc.)
+- Namespaces and projects: list, create, switch context
+- Nodes: list, view logs, get resource usage statistics
+- Events: view cluster events for debugging
+- Helm: install (deploy), upgrade, uninstall, list charts and releases
+- KubeVirt: create and manage virtual machines
+- Cluster config: view and switch kubeconfig contexts
+"""
+```
+
+**Recommended keywords to include:**
+- Resource types: pods, deployments, services, configmaps, secrets, namespaces, nodes
+- Actions: list, get, create, update, delete, logs, exec, scale
+- Tools: Helm, KubeVirt, OpenShift
+- Use cases: debugging, troubleshooting, cluster management
+
 ### Drop-in Configuration <a id="drop-in-configuration"></a>
 
 The Kubernetes MCP server supports flexible configuration through both a main config file and drop-in files. **Both are optional** - you can use either, both, or neither (server will use built-in defaults).
@@ -433,7 +464,7 @@ In case multi-cluster support is enabled (default) and you have access to multip
 
 <summary>core</summary>
 
-- **events_list** - List all the Kubernetes events in the current cluster from all namespaces
+- **events_list** - List Kubernetes events (warnings, errors, state changes) for debugging and troubleshooting in the current cluster from all namespaces
   - `namespace` (`string`) - Optional Namespace to retrieve the events from. If not provided, will list events from all namespaces
 
 - **namespaces_list** - List all the Kubernetes namespaces in the current cluster
@@ -475,7 +506,7 @@ In case multi-cluster support is enabled (default) and you have access to multip
   - `name` (`string`) - Name of the Pod to get the resource consumption from (Optional, all Pods in the namespace if not provided)
   - `namespace` (`string`) - Namespace to get the Pods resource consumption from (Optional, current namespace if not provided and all_namespaces is false)
 
-- **pods_exec** - Execute a command in a Kubernetes Pod in the current or provided namespace with the provided name and command
+- **pods_exec** - Execute a command in a Kubernetes Pod (shell access, run commands in container) in the current or provided namespace with the provided name and command
   - `command` (`array`) **(required)** - Command to execute in the Pod container. The first item is the command to be run, and the rest are the arguments to that command. Example: ["ls", "-l", "/tmp"]
   - `container` (`string`) - Name of the Pod container where the command will be executed (Optional)
   - `name` (`string`) **(required)** - Name of the Pod where the command will be executed
@@ -680,7 +711,7 @@ Common use cases:
 
 <summary>helm</summary>
 
-- **helm_install** - Install a Helm chart in the current or provided namespace
+- **helm_install** - Install (deploy) a Helm chart to create a release in the current or provided namespace
   - `chart` (`string`) **(required)** - Chart reference to install (for example: stable/grafana, oci://ghcr.io/nginxinc/charts/nginx-ingress)
   - `name` (`string`) - Name of the Helm release (Optional, random name if not provided)
   - `namespace` (`string`) - Namespace to install the Helm chart in (Optional, current namespace if not provided)
@@ -710,6 +741,16 @@ Common use cases:
 - **cluster-health-check** - Perform comprehensive health assessment of Kubernetes/OpenShift cluster
   - `namespace` (`string`) - Optional namespace to limit health check scope (default: all namespaces)
   - `check_events` (`string`) - Include recent warning/error events (true/false, default: true)
+
+</details>
+
+<details>
+
+<summary>kubevirt</summary>
+
+- **vm-troubleshoot** - Generate a step-by-step troubleshooting guide for diagnosing VirtualMachine issues
+  - `namespace` (`string`) **(required)** - The namespace of the VirtualMachine to troubleshoot
+  - `name` (`string`) **(required)** - The name of the VirtualMachine to troubleshoot
 
 </details>
 
