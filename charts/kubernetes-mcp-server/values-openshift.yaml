@@ -9,6 +9,12 @@
 # -- Enable OpenShift specific features
 openshift: true
 
+# -- OpenShift-specific image
+image:
+  registry: quay.io
+  repository: redhat-user-workloads/ocp-mcp-server-tenant/openshift-mcp-server-release-010
+  version: latest
+
 # -- RBAC configuration for ACM (Advanced Cluster Management) provider.
 # -- These permissions are the minimum required for the ACM hub provider to function.
 rbac:
