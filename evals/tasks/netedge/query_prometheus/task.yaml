@@ -1,0 +1,14 @@
+kind: Task
+metadata:
+  name: query-prometheus-ingress
+steps:
+  verify:
+    contains: "ingress_error_rate"
+  prompt:
+    inline: Run specialized diagnostic queries for the ingress component.
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "netedge__query_prometheus"
+        args:
+          diagnostic_target: "ingress"

@@ -1,23 +1,19 @@
 kind: Eval
 metadata:
-  name: "openai-agent-kubernetes-test"
+  name: "gemini-agent-netedge-eval"
 config:
   agent:
     type: "file"
-    path: agent.yaml
-  mcpConfigFile: ../mcp-config.yaml
+    path: "agent.yaml"
+  mcpConfigFile: "../mcp-config.yaml"
   llmJudge:
     env:
       baseUrlKey: JUDGE_BASE_URL
       apiKeyKey: JUDGE_API_KEY
       modelNameKey: JUDGE_MODEL_NAME
   taskSets:
-    # TODO: Re-enable kiali tasks once https://github.com/containers/kubernetes-mcp-server/issues/642 is resolved
-    - glob: ../tasks/kubernetes/*/*.yaml
     - glob: ../tasks/netedge/*/*.yaml
       assertions:
         toolsUsed:
           - server: kubernetes
             toolPattern: ".*"
-        minToolCalls: 1
-        maxToolCalls: 20

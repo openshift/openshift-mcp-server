@@ -55,7 +55,8 @@ jobs:
        contains(github.event.comment.body, '/run-mcpchecker'))
     outputs:
       should-run: ${{ steps.check.outputs.should-run }}
-      kiali-run: ${{ steps.check.outputs.kiali-run }}
+      should-run: ${{ steps.check.outputs.should-run }}
+      toolsets: ${{ steps.check.outputs.toolsets }}
       pr-number: ${{ steps.check.outputs.pr-number }}
       pr-sha: ${{ steps.check.outputs.pr-sha }}
       is-pr: ${{ steps.check.outputs.is-pr }}
@@ -90,12 +91,22 @@ jobs:
             echo "pr-sha=${{ github.sha }}" >> $GITHUB_OUTPUT
           fi
 
+
           TASK_FILTER="${{ github.event.inputs.task-filter || '' }}"
+          TOOLSETS=""
           if [[ "$TASK_FILTER" =~ kiali ]]; then
-            echo "kiali-run=true" >> $GITHUB_OUTPUT
-          else
-            echo "kiali-run=false" >> $GITHUB_OUTPUT
+             TOOLSETS="kiali"
           fi
+          
+          # Always include netedge for now as we are rolling it out
+          if [[ -z "$TOOLSETS" ]]; then
+            TOOLSETS="netedge"
+          else
+            TOOLSETS="$TOOLSETS,netedge"
+          fi
+          
+          echo "toolsets=$TOOLSETS" >> $GITHUB_OUTPUT
+
 
   # Run gevals evaluation with Kind cluster
   run-evaluation:
@@ -121,13 +132,13 @@ jobs:
         run: make kind-create-cluster KIND_CLUSTER_NAME=${{ env.KIND_CLUSTER_NAME }}
 
       - name: Install Istio/Kiali and bookinfo demo
-        if: needs.check-trigger.outputs.kiali-run == 'true'
+        if: contains(needs.check-trigger.outputs.toolsets, 'kiali')
         run: make setup-kiali
 
       - name: Start MCP server
         run: make run-server
         env:
-          TOOLSETS: ${{ needs.check-trigger.outputs.kiali-run == 'true' && 'kiali' || '' }}
+          TOOLSETS: ${{ needs.check-trigger.outputs.toolsets }}
 
       - name: Run mcpchecker evaluation
         id: mcpchecker
