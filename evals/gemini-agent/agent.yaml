@@ -1,0 +1,84 @@
+kind: Agent
+metadata:
+  name: "gemini-command-agent"
+commands:
+  useVirtualHome: false
+  argTemplateMcpServer: "{{ .File }}"
+  argTemplateAllowedTools: "mcp__{{ .ServerName }}__{{ .ToolName }}"
+  allowedToolsJoinSeparator: ","
+  runPrompt: |-
+    set -euo pipefail
+
+    if ! command -v jq >/dev/null 2>&1; then
+      echo "jq is required to extract MCP server details" >&2
+      exit 1
+    fi
+    
+    # Check for gemini CLI - naive check first, then fallback to known path if needed
+    if ! command -v gemini >/dev/null 2>&1; then
+       # Try to find it in common npm location if not in PATH
+       NPM_PREFIX="$(npm prefix -g 2>/dev/null || echo "")"
+       if [[ -n "${NPM_PREFIX}" && -x "${NPM_PREFIX}/bin/gemini" ]]; then
+          export PATH="${NPM_PREFIX}/bin:${PATH}"
+       else
+          echo "gemini CLI not found. Please install it: npm install -g @google/gemini-cli" >&2
+          exit 1
+       fi
+    fi
+
+    MCP_SERVER_FILE="{{ .McpServerFileArgs }}"
+    if [[ ! -f "${MCP_SERVER_FILE}" ]]; then
+      echo "MCP server file not found: ${MCP_SERVER_FILE}" >&2
+      exit 1
+    fi
+
+    # Extract the MCP server URL for 'netedge' from the config file
+    NETEDGE_URL="$(jq -r '.mcpServers.kubernetes.url' "${MCP_SERVER_FILE}")"
+    if [[ -z "${NETEDGE_URL}" || "${NETEDGE_URL}" == "null" ]]; then
+      echo "Unable to parse netedge MCP URL from ${MCP_SERVER_FILE}" >&2
+      exit 1
+    fi
+
+    PROMPT_FILE="$(mktemp)"
+    printf '%b' {{ printf "%q" .Prompt }} > "${PROMPT_FILE}"
+
+    TMP_HOME="$(mktemp -d)"
+    mkdir -p "${TMP_HOME}"
+    
+    # Copy kubeconfig if available to allow oc/kubectl commands to work if the agent uses them (optional but good practice)
+    if [[ -n "${KUBECONFIG:-}" ]]; then
+       export KUBECONFIG="${KUBECONFIG}"
+    fi
+
+    export HOME="${TMP_HOME}"
+    cd "${TMP_HOME}"
+
+    # Configure the Gemini CLI to use the MCP server
+    # We use 'netedge' as the server name in the gemini config
+    gemini mcp add netedge "${NETEDGE_URL}" --transport http >/dev/null
+
+    PROMPT_CONTENT="$(cat "${PROMPT_FILE}")"
+    
+    # Construct arguments for gemini
+    # usage: gemini [prompt] [flags]
+    # We use YOLO mode to avoid interactive prompts during CI/demo
+    GEMINI_ARGS=("--approval-mode" "yolo" "--output-format" "stream-json")
+    
+    # Use the API key provided in the environment
+    if [[ -z "${RH_GEMINI_API_KEY:-}" ]]; then
+        echo "Error: RH_GEMINI_API_KEY is not set." >&2
+        exit 1
+    fi
+    # The gemini CLI uses GOOGLE_API_KEY by default
+    export GOOGLE_API_KEY="${RH_GEMINI_API_KEY}"
+
+    if [[ -n "${GEMINI_MODEL:-}" ]]; then
+        GEMINI_ARGS+=(--model "${GEMINI_MODEL}")
+    fi
+
+    # Execute Gemini
+    gemini "${PROMPT_CONTENT}" "${GEMINI_ARGS[@]}"
+
+    # Cleanup
+    rm -rf "${TMP_HOME}"
+    rm -f "${PROMPT_FILE}"
