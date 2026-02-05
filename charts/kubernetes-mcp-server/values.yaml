@@ -7,7 +7,7 @@ replicaCount: 1
 # -- This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
 image:
   registry: quay.io
-  repository: containers/kubernetes_mcp_server
+  repository: redhat-user-workloads/ocp-mcp-server-tenant/openshift-mcp-server-release-010
   # -- This sets the tag or sha digest for the image.
   version: latest
   # -- This sets the pull policy for images.
