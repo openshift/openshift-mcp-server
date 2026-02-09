@@ -248,7 +248,7 @@ func (s *ConfigSuite) TestReadConfigValidPreservesDefaultsForMissingFields() {
 	})
 	s.Run("toolsets defaulted correctly", func() {
 		s.Require().Lenf(config.Toolsets, 4, "Expected 4 toolsets, got %d", len(config.Toolsets))
-		for _, toolset := range []string{"core", "config", "helm", "observability"} {
+		for _, toolset := range []string{"core", "config", "helm", "obs-mcp"} {
 			s.Containsf(config.Toolsets, toolset, "Expected toolsets to contain %s", toolset)
 		}
 	})
@@ -568,7 +568,7 @@ func (s *ConfigSuite) TestStandaloneConfigDirPreservesDefaults() {
 	s.Run("preserves default values", func() {
 		s.Equal("9999", config.Port, "port should be from drop-in")
 		s.Equal("table", config.ListOutput, "list_output should be default")
-		s.Equal([]string{"core", "config", "helm", "observability"}, config.Toolsets, "toolsets should be default")
+		s.Equal([]string{"core", "config", "helm", "obs-mcp"}, config.Toolsets, "toolsets should be default")
 	})
 }
 
@@ -585,7 +585,7 @@ func (s *ConfigSuite) TestStandaloneConfigDirEmpty() {
 
 	s.Run("returns defaults for empty directory", func() {
 		s.Equal("table", config.ListOutput, "list_output should be default")
-		s.Equal([]string{"core", "config", "helm", "observability"}, config.Toolsets, "toolsets should be default")
+		s.Equal([]string{"core", "config", "helm", "obs-mcp"}, config.Toolsets, "toolsets should be default")
 	})
 }
 
@@ -914,7 +914,7 @@ func (s *ConfigSuite) TestBothConfigAndConfigDirEmpty() {
 
 	s.Run("returns default configuration", func() {
 		s.Equal("table", config.ListOutput)
-		s.Equal([]string{"core", "config", "helm", "observability"}, config.Toolsets)
+		s.Equal([]string{"core", "config", "helm", "obs-mcp"}, config.Toolsets)
 		s.Equal(0, config.LogLevel)
 	})
 }
@@ -1034,7 +1034,7 @@ func (s *ConfigSuite) TestEmptyConfigFile() {
 		s.Equal("9999", config.Port, "port should be from drop-in")
 		// Defaults should still be applied for unset values
 		s.Equal("table", config.ListOutput, "list_output should be default")
-		s.Equal([]string{"core", "config", "helm", "observability"}, config.Toolsets, "toolsets should be default")
+		s.Equal([]string{"core", "config", "helm", "obs-mcp"}, config.Toolsets, "toolsets should be default")
 	})
 }
 

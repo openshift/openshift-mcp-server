@@ -398,15 +398,52 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 
 <!-- AVAILABLE-TOOLSETS-START -->
 
-| Toolset       | Description                                                                                                                                                     | Default |
-|---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| config        | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                         | ✓       |
-| core          | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                             | ✓       |
-| kcp           | Manage kcp workspaces and multi-tenancy features                                                                                                                |         |
-| ossm          | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details. |         |
-| kubevirt      | KubeVirt virtual machine management tools                                                                                                                       |         |
-| observability | Cluster observability tools for querying Prometheus metrics and Alertmanager alerts                                                                             | ✓       |
-| helm          | Tools for managing Helm charts and releases                                                                                                                     | ✓       |
+| Toolset  | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Default |
+|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| config   | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | ✓       |
+| core     | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | ✓       |
+| kcp      | Manage kcp workspaces and multi-tenancy features                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |         |
+| ossm     | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |         |
+| kubevirt | KubeVirt virtual machine management tools                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |         |
+| obs-mcp  | You are an expert Kubernetes and OpenShift observability assistant with direct access to Prometheus metrics and Alertmanager alerts through this MCP server.
+
+## INVESTIGATION STARTING POINT
+
+When the user asks about issues, errors, failures, outages, or things going wrong - consider calling get_alerts first to see what's currently firing. Alert labels provide exact identifiers (namespaces, pods, services) useful for targeted metric queries.
+
+If the user mentions a specific alert by name, use get_alerts with a filter to retrieve its full labels before investigating further.
+
+## MANDATORY WORKFLOW FOR QUERYING - ALWAYS FOLLOW THIS ORDER
+
+**STEP 1: ALWAYS call list_metrics FIRST**
+- This is NON-NEGOTIABLE for EVERY question
+- NEVER skip this step, even if you think you know the metric name
+- NEVER guess metric names - they vary between environments
+- Search the returned list to find the exact metric name that exists
+
+**STEP 2: Call get_label_names for the metric you found**
+- Discover available labels for filtering (namespace, pod, service, etc.)
+
+**STEP 3: Call get_label_values if you need specific filter values**
+- Find exact label values (e.g., actual namespace names, pod names)
+
+**STEP 4: Execute your query using the EXACT metric name from Step 1**
+- Use execute_instant_query for current state questions
+- Use execute_range_query for trends/historical analysis
+
+## CRITICAL RULES
+
+1. **NEVER query a metric without first calling list_metrics** - You must verify the metric exists
+2. **Use EXACT metric names from list_metrics output** - Do not modify or guess metric names
+3. **If list_metrics doesn't return a relevant metric, tell the user** - Don't fabricate queries
+4. **BE PROACTIVE** - Complete all steps automatically without asking for confirmation. When you find a relevant metric, proceed to query.
+5. **UNDERSTAND TIME FRAMES** - Use the start and end parameters to specify the time frame for your queries. You can use NOW for current time liberally across parameters, and NOW±duration for relative time frames.
+
+## Query Type Selection
+
+- **execute_instant_query**: Current values, point-in-time snapshots, "right now" questions
+- **execute_range_query**: Trends over time, rate calculations, historical analysis  |         |
+| helm     | Tools for managing Helm charts and releases                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | ✓       |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -631,48 +668,134 @@ In case multi-cluster support is enabled (default) and you have access to multip
 
 <details>
 
-<summary>observability</summary>
+<summary>obs-mcp</summary>
 
-- **prometheus_query** - Execute an instant PromQL query against the cluster's Thanos Querier.
-Returns current metric values at the specified time (or current time if not specified).
-Use this for point-in-time metric values.
+- **list_metrics** - MANDATORY FIRST STEP: List all available metric names in Prometheus.
 
-Common queries:
-- up{job="apiserver"} - Check if API server is up
-- sum by(namespace) (container_memory_usage_bytes) - Memory usage by namespace
-- rate(container_cpu_usage_seconds_total[5m]) - CPU usage rate
-- kube_pod_status_phase{phase="Running"} - Running pods count
-  - `query` (`string`) **(required)** - PromQL query string (e.g., 'up{job="apiserver"}', 'sum by(namespace) (container_memory_usage_bytes)')
-  - `time` (`string`) - Optional evaluation timestamp. Accepts RFC3339 format (e.g., '2024-01-01T12:00:00Z') or Unix timestamp. If not provided, uses current time.
+YOU MUST CALL THIS TOOL BEFORE ANY OTHER QUERY TOOL
 
-- **prometheus_query_range** - Execute a range PromQL query against the cluster's Thanos Querier.
-Returns metric values over a time range with specified resolution.
-Use this for time-series data, trends, and historical analysis.
+This tool MUST be called first for EVERY observability question to:
+1. Discover what metrics actually exist in this environment
+2. Find the EXACT metric name to use in queries
+3. Avoid querying non-existent metrics
 
-Supports relative times:
-- 'now' for current time
-- '-10m', '-1h', '-1d' for relative past times
+NEVER skip this step. NEVER guess metric names. Metric names vary between environments.
 
-Example: Get CPU usage over the last hour with 1-minute resolution.
-  - `end` (`string`) **(required)** - End time. Accepts RFC3339 timestamp, Unix timestamp, 'now', or relative time
-  - `query` (`string`) **(required)** - PromQL query string (e.g., 'rate(container_cpu_usage_seconds_total[5m])')
-  - `start` (`string`) **(required)** - Start time. Accepts RFC3339 timestamp (e.g., '2024-01-01T12:00:00Z'), Unix timestamp, or relative time (e.g., '-1h', '-30m', '-1d')
-  - `step` (`string`) - Query resolution step width (e.g., '15s', '1m', '5m'). Determines the granularity of returned data points. Default: '1m'
+After calling this tool:
+1. Search the returned list for relevant metrics
+2. Use the EXACT metric name found in subsequent queries
+3. If no relevant metric exists, inform the user
 
-- **alertmanager_alerts** - Query active and pending alerts from the cluster's Alertmanager.
-Useful for monitoring cluster health, detecting issues, and incident response.
+- **execute_instant_query** - Execute a PromQL instant query to get current/point-in-time values.
 
-Returns alerts with their labels, annotations, status, and timing information.
-Can filter by active/silenced/inhibited state.
+PREREQUISITE: You MUST call list_metrics first to verify the metric exists
 
-Common use cases:
-- Check for critical alerts affecting the cluster
-- Monitor for specific alert types (e.g., high CPU, disk pressure)
-- Verify alert silences are working correctly
-  - `active` (`boolean`) - Filter for active (firing) alerts. Default: true
-  - `filter` (`string`) - Optional filter using Alertmanager filter syntax. Examples: 'alertname=Watchdog', 'severity=critical', 'namespace=openshift-monitoring'
-  - `inhibited` (`boolean`) - Include inhibited alerts in the results. Default: false
-  - `silenced` (`boolean`) - Include silenced alerts in the results. Default: false
+WHEN TO USE:
+- Current state questions: "What is the current error rate?"
+- Point-in-time snapshots: "How many pods are running?"
+- Latest values: "Which pods are in Pending state?"
+
+The 'query' parameter MUST use metric names that were returned by list_metrics.
+  - `query` (`string`) **(required)** - PromQL query string using metric names verified via list_metrics
+  - `time` (`string`) - Evaluation time as RFC3339 or Unix timestamp. Omit or use 'NOW' for current time.
+
+- **execute_range_query** - Execute a PromQL range query to get time-series data over a period.
+
+PREREQUISITE: You MUST call list_metrics first to verify the metric exists
+
+WHEN TO USE:
+- Trends over time: "What was CPU usage over the last hour?"
+- Rate calculations: "How many requests per second?"
+- Historical analysis: "Were there any restarts in the last 5 minutes?"
+
+TIME PARAMETERS:
+- 'duration': Look back from now (e.g., "5m", "1h", "24h")
+- 'step': Data point resolution (e.g., "1m" for 1-hour duration, "5m" for 24-hour duration)
+
+The 'query' parameter MUST use metric names that were returned by list_metrics.
+  - `duration` (`string`) - Duration to look back from now (e.g., '1h', '30m', '1d', '2w') (optional)
+  - `end` (`string`) - End time as RFC3339 or Unix timestamp (optional). Use `NOW` for current time.
+  - `query` (`string`) **(required)** - PromQL query string using metric names verified via list_metrics
+  - `start` (`string`) - Start time as RFC3339 or Unix timestamp (optional)
+  - `step` (`string`) **(required)** - Query resolution step width (e.g., '15s', '1m', '1h'). Choose based on time range: shorter ranges use smaller steps.
+
+- **get_label_names** - Get all label names (dimensions) available for filtering a metric.
+
+WHEN TO USE (after calling list_metrics):
+- To discover how to filter metrics (by namespace, pod, service, etc.)
+- Before constructing label matchers in PromQL queries
+
+The 'metric' parameter should use a metric name from list_metrics output.
+  - `end` (`string`) - End time for label discovery as RFC3339 or Unix timestamp (optional, defaults to now)
+  - `metric` (`string`) - Metric name (from list_metrics) to get label names for. Leave empty for all metrics.
+  - `start` (`string`) - Start time for label discovery as RFC3339 or Unix timestamp (optional, defaults to 1 hour ago)
+
+- **get_label_values** - Get all unique values for a specific label.
+
+WHEN TO USE (after calling list_metrics and get_label_names):
+- To find exact label values for filtering (namespace names, pod names, etc.)
+- To see what values exist before constructing queries
+
+The 'metric' parameter should use a metric name from list_metrics output.
+  - `end` (`string`) - End time for label value discovery as RFC3339 or Unix timestamp (optional, defaults to now)
+  - `label` (`string`) **(required)** - Label name (from get_label_names) to get values for
+  - `metric` (`string`) - Metric name (from list_metrics) to scope the label values to. Leave empty for all metrics.
+  - `start` (`string`) - Start time for label value discovery as RFC3339 or Unix timestamp (optional, defaults to 1 hour ago)
+
+- **get_series** - Get time series matching selectors and preview cardinality.
+
+WHEN TO USE (optional, after calling list_metrics):
+- To verify label filters match expected series before querying
+- To check cardinality and avoid slow queries
+
+CARDINALITY GUIDANCE:
+- <100 series: Safe
+- 100-1000: Usually fine
+- >1000: Add more label filters
+
+The selector should use metric names from list_metrics output.
+  - `end` (`string`) - End time for series discovery as RFC3339 or Unix timestamp (optional, defaults to now)
+  - `matches` (`string`) **(required)** - PromQL series selector using metric names from list_metrics
+  - `start` (`string`) - Start time for series discovery as RFC3339 or Unix timestamp (optional, defaults to 1 hour ago)
+
+- **get_alerts** - Get alerts from Alertmanager.
+
+WHEN TO USE:
+- START HERE when investigating issues: if the user asks about things breaking, errors, failures, outages, services being down, or anything going wrong in the cluster
+- When the user mentions a specific alert name - use this tool to get the alert's full labels (namespace, pod, service, etc.) which are essential for further investigation with other tools
+- To see currently firing alerts in the cluster
+- To check which alerts are active, silenced, or inhibited
+- To understand what's happening before diving into metrics or logs
+
+INVESTIGATION TIP: Alert labels often contain the exact identifiers (pod names, namespaces, job names) needed for targeted queries with prometheus tools.
+
+FILTERING:
+- Use 'active' to filter for only active alerts (not resolved)
+- Use 'silenced' to filter for silenced alerts
+- Use 'inhibited' to filter for inhibited alerts
+- Use 'filter' to apply label matchers (e.g., "alertname=HighCPU")
+- Use 'receiver' to filter alerts by receiver name
+
+All filter parameters are optional. Without filters, all alerts are returned.
+  - `active` (`boolean`) - Filter for active alerts only (true/false, optional)
+  - `filter` (`string`) - Label matchers to filter alerts (e.g., 'alertname=HighCPU', optional)
+  - `inhibited` (`boolean`) - Filter for inhibited alerts only (true/false, optional)
+  - `receiver` (`string`) - Receiver name to filter alerts (optional)
+  - `silenced` (`boolean`) - Filter for silenced alerts only (true/false, optional)
+  - `unprocessed` (`boolean`) - Filter for unprocessed alerts only (true/false, optional)
+
+- **get_silences** - Get silences from Alertmanager.
+
+WHEN TO USE:
+- To see which alerts are currently silenced
+- To check active, pending, or expired silences
+- To investigate why certain alerts are not firing notifications
+
+FILTERING:
+- Use 'filter' to apply label matchers to find specific silences
+
+Silences are used to temporarily mute alerts based on label matchers. This tool helps you understand what is currently silenced in your environment.
+  - `filter` (`string`) - Label matchers to filter silences (e.g., 'alertname=HighCPU', optional)
 
 </details>
 
