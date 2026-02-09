@@ -49,8 +49,11 @@ This tool MUST be called first for EVERY observability question to:
 1. Discover what metrics actually exist in this environment
 2. Find the EXACT metric name to use in queries
 3. Avoid querying non-existent metrics
+<<<<<<< HEAD
 4. The 'name_regex' parameter should always be provided, and be a best guess of what the metric would be named like.
 5. Do not use a blanket regex like .* or .+ in the 'name_regex' parameter. Use specific ones like kube.*, node.*, etc.
+=======
+>>>>>>> 0d6b5897 (Update to use commit)
 
 NEVER skip this step. NEVER guess metric names. Metric names vary between environments.
 
