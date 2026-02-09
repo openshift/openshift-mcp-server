@@ -1,17 +1,11 @@
 package tools
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"log/slog"
-	"net/http"
-	"os"
-	"strings"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	promapi "github.com/prometheus/client_golang/api"
-	promcfg "github.com/prometheus/common/config"
 	"k8s.io/client-go/rest"
 
 	"github.com/rhobs/obs-mcp/pkg/alertmanager"
