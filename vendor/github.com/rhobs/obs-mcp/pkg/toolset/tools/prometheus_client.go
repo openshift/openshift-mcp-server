@@ -1,17 +1,11 @@
 package tools
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"log/slog"
-	"net/http"
-	"os"
-	"strings"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	promapi "github.com/prometheus/client_golang/api"
-	promcfg "github.com/prometheus/common/config"
 	"k8s.io/client-go/rest"
 
 	"github.com/rhobs/obs-mcp/pkg/alertmanager"
@@ -20,8 +14,7 @@ import (
 )
 
 const (
-	defaultServiceAccountCAPath = "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
-	defaultPrometheusURL        = "http://localhost:9090"
+	defaultPrometheusURL = "http://localhost:9090"
 )
 
 // getConfig retrieves the obs-mcp toolset configuration from params.
@@ -90,52 +83,6 @@ func createAPIConfigFromRESTConfig(params api.ToolHandlerParams, prometheusURL s
 		Address:      prometheusURL,
 		RoundTripper: rt,
 	}, nil
-}
-
-// createAPIConfigWithToken creates a Prometheus API config with a bearer token.
-func createAPIConfigWithToken(prometheusURL, token string, insecure bool) (promapi.Config, error) {
-	apiConfig := promapi.Config{
-		Address: prometheusURL,
-	}
-
-	useTLS := strings.HasPrefix(prometheusURL, "https://")
-	if useTLS {
-		defaultRt := promapi.DefaultRoundTripper.(*http.Transport)
-
-		if insecure {
-			defaultRt.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-		} else {
-			certs, err := createCertPool()
-			if err != nil {
-				return promapi.Config{}, err
-			}
-			defaultRt.TLSClientConfig = &tls.Config{RootCAs: certs}
-		}
-
-		if token != "" {
-			apiConfig.RoundTripper = promcfg.NewAuthorizationCredentialsRoundTripper(
-				"Bearer", promcfg.NewInlineSecret(token), defaultRt)
-		} else {
-			apiConfig.RoundTripper = defaultRt
-		}
-	} else {
-		slog.Warn("Connecting to Prometheus without TLS")
-	}
-
-	return apiConfig, nil
-}
-
-// createCertPool creates a certificate pool from the service account CA.
-func createCertPool() (*x509.CertPool, error) {
-	certs := x509.NewCertPool()
-
-	pemData, err := os.ReadFile(defaultServiceAccountCAPath)
-	if err != nil {
-		slog.Error("Failed to read the CA certificate", "err", err)
-		return nil, err
-	}
-	certs.AppendCertsFromPEM(pemData)
-	return certs, nil
 }
 
 // getAlertmanagerClient creates an Alertmanager client using the toolset configuration.
