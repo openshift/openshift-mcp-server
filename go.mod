@@ -12,7 +12,7 @@ require (
 	github.com/google/jsonschema-go v0.4.2
 	github.com/modelcontextprotocol/go-sdk v1.4.0
 	github.com/prometheus/client_golang v1.23.2
-	github.com/rhobs/obs-mcp v0.0.0-00010101000000-000000000000
+	github.com/rhobs/obs-mcp v0.0.0-20260209124232-171c4ad9b649
 	github.com/spf13/afero v1.15.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
@@ -188,5 +188,3 @@ require (
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2-0.20260122202528-d9cc6641c482 // indirect
 )
-
-replace github.com/rhobs/obs-mcp => /Users/samukher/web/obs-mcp
