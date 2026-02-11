@@ -19,7 +19,7 @@ const (
 	RestoreActionGet    RestoreAction = "get"
 	RestoreActionCreate RestoreAction = "create"
 	RestoreActionDelete RestoreAction = "delete"
-	RestoreActionLogs   RestoreAction = "logs"
+	RestoreActionStatus RestoreAction = "status"
 )
 
 func initRestoreTools() []api.ServerTool {
@@ -27,14 +27,14 @@ func initRestoreTools() []api.ServerTool {
 		{
 			Tool: api.Tool{
 				Name:        "oadp_restore",
-				Description: "Manage Velero/OADP restore operations: list, get, create, delete, or retrieve logs",
+				Description: "Manage Velero/OADP restore operations: list, get, create, delete, or get status",
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
 						"action": {
 							Type:        "string",
-							Enum:        []any{string(RestoreActionList), string(RestoreActionGet), string(RestoreActionCreate), string(RestoreActionDelete), string(RestoreActionLogs)},
-							Description: "Action to perform: 'list' (list all restores), 'get' (get restore details), 'create' (create new restore), 'delete' (delete restore), 'logs' (get restore logs)",
+							Enum:        []any{string(RestoreActionList), string(RestoreActionGet), string(RestoreActionCreate), string(RestoreActionDelete), string(RestoreActionStatus)},
+							Description: "Action to perform: 'list' (list all restores), 'get' (get restore details), 'create' (create new restore), 'delete' (delete restore), 'status' (get detailed restore status)",
 						},
 						"namespace": {
 							Type:        "string",
@@ -42,7 +42,7 @@ func initRestoreTools() []api.ServerTool {
 						},
 						"name": {
 							Type:        "string",
-							Description: "Name of the restore (required for get, create, delete, logs)",
+							Description: "Name of the restore (required for get, create, delete, status)",
 						},
 						"labelSelector": {
 							Type:        "string",
@@ -104,10 +104,7 @@ func restoreHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		return api.NewToolCallResult("", err), nil
 	}
 
-	namespace := oadp.DefaultOADPNamespace
-	if v, ok := params.GetArguments()["namespace"].(string); ok && v != "" {
-		namespace = v
-	}
+	namespace := api.OptionalString(params, "namespace", oadp.DefaultOADPNamespace)
 
 	switch RestoreAction(action) {
 	case RestoreActionList:
@@ -118,18 +115,15 @@ func restoreHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		return handleRestoreCreate(params, namespace)
 	case RestoreActionDelete:
 		return handleRestoreDelete(params, namespace)
-	case RestoreActionLogs:
-		return handleRestoreLogs(params, namespace)
+	case RestoreActionStatus:
+		return handleRestoreStatus(params, namespace)
 	default:
-		return api.NewToolCallResult("", fmt.Errorf("invalid action '%s': must be one of 'list', 'get', 'create', 'delete', 'logs'", action)), nil
+		return api.NewToolCallResult("", fmt.Errorf("invalid action '%s': must be one of 'list', 'get', 'create', 'delete', 'status'", action)), nil
 	}
 }
 
 func handleRestoreList(params api.ToolHandlerParams, namespace string) (*api.ToolCallResult, error) {
-	labelSelector := ""
-	if v, ok := params.GetArguments()["labelSelector"].(string); ok {
-		labelSelector = v
-	}
+	labelSelector := api.OptionalString(params, "labelSelector", "")
 
 	restores, err := oadp.ListRestores(params.Context, params.DynamicClient(), namespace, metav1.ListOptions{
 		LabelSelector: labelSelector,
@@ -226,16 +220,16 @@ func handleRestoreDelete(params api.ToolHandlerParams, namespace string) (*api.T
 	return api.NewToolCallResult(fmt.Sprintf("Restore %s/%s deleted", namespace, name), nil), nil
 }
 
-func handleRestoreLogs(params api.ToolHandlerParams, namespace string) (*api.ToolCallResult, error) {
+func handleRestoreStatus(params api.ToolHandlerParams, namespace string) (*api.ToolCallResult, error) {
 	name, ok := params.GetArguments()["name"].(string)
 	if !ok || name == "" {
-		return api.NewToolCallResult("", fmt.Errorf("name is required for logs action")), nil
+		return api.NewToolCallResult("", fmt.Errorf("name is required for status action")), nil
 	}
 
-	logs, err := oadp.GetRestoreLogs(params.Context, params.DynamicClient(), namespace, name)
+	status, err := oadp.GetRestoreStatus(params.Context, params.DynamicClient(), namespace, name)
 	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to get restore logs: %w", err)), nil
+		return api.NewToolCallResult("", fmt.Errorf("failed to get restore status: %w", err)), nil
 	}
 
-	return api.NewToolCallResult(logs, nil), nil
+	return api.NewToolCallResult(status, nil), nil
 }

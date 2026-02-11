@@ -56,10 +56,8 @@ func GetBackupPhase(backup *unstructured.Unstructured) (string, bool, error) {
 	return unstructured.NestedString(backup.Object, "status", "phase")
 }
 
-// GetBackupLogs retrieves backup logs
-// Note: In a real implementation, this would create a DownloadRequest and fetch logs from object storage
-// For now, we return the backup's status information as a simplified version
-func GetBackupLogs(ctx context.Context, client dynamic.Interface, namespace, name string) (string, error) {
+// GetBackupStatus retrieves detailed backup status information including phase, errors, warnings, and timestamps
+func GetBackupStatus(ctx context.Context, client dynamic.Interface, namespace, name string) (string, error) {
 	backup, err := GetBackup(ctx, client, namespace, name)
 	if err != nil {
 		return "", fmt.Errorf("failed to get backup: %w", err)

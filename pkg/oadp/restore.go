@@ -38,9 +38,8 @@ func GetRestorePhase(restore *unstructured.Unstructured) (string, bool, error) {
 	return unstructured.NestedString(restore.Object, "status", "phase")
 }
 
-// GetRestoreLogs retrieves restore logs
-// Note: Similar to backup logs, this returns status information
-func GetRestoreLogs(ctx context.Context, client dynamic.Interface, namespace, name string) (string, error) {
+// GetRestoreStatus retrieves detailed restore status information including phase, errors, warnings, and timestamps
+func GetRestoreStatus(ctx context.Context, client dynamic.Interface, namespace, name string) (string, error) {
 	restore, err := GetRestore(ctx, client, namespace, name)
 	if err != nil {
 		return "", fmt.Errorf("failed to get restore: %w", err)

@@ -2,6 +2,7 @@ package oadp
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/oadp"
@@ -19,7 +20,7 @@ const (
 	BackupActionGet    BackupAction = "get"
 	BackupActionCreate BackupAction = "create"
 	BackupActionDelete BackupAction = "delete"
-	BackupActionLogs   BackupAction = "logs"
+	BackupActionStatus BackupAction = "status"
 )
 
 func initBackupTools() []api.ServerTool {
@@ -27,14 +28,14 @@ func initBackupTools() []api.ServerTool {
 		{
 			Tool: api.Tool{
 				Name:        "oadp_backup",
-				Description: "Manage Velero/OADP backups: list, get, create, delete, or retrieve logs",
+				Description: "Manage Velero/OADP backups: list, get, create, delete, or get status",
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
 						"action": {
 							Type:        "string",
-							Enum:        []any{string(BackupActionList), string(BackupActionGet), string(BackupActionCreate), string(BackupActionDelete), string(BackupActionLogs)},
-							Description: "Action to perform: 'list' (list all backups), 'get' (get backup details), 'create' (create new backup), 'delete' (delete backup), 'logs' (get backup logs)",
+							Enum:        []any{string(BackupActionList), string(BackupActionGet), string(BackupActionCreate), string(BackupActionDelete), string(BackupActionStatus)},
+							Description: "Action to perform: 'list' (list all backups), 'get' (get backup details), 'create' (create new backup), 'delete' (delete backup), 'status' (get detailed backup status)",
 						},
 						"namespace": {
 							Type:        "string",
@@ -42,7 +43,7 @@ func initBackupTools() []api.ServerTool {
 						},
 						"name": {
 							Type:        "string",
-							Description: "Name of the backup (required for get, create, delete, logs)",
+							Description: "Name of the backup (required for get, create, delete, status)",
 						},
 						"labelSelector": {
 							Type:        "string",
@@ -109,10 +110,7 @@ func backupHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		return api.NewToolCallResult("", err), nil
 	}
 
-	namespace := oadp.DefaultOADPNamespace
-	if v, ok := params.GetArguments()["namespace"].(string); ok && v != "" {
-		namespace = v
-	}
+	namespace := api.OptionalString(params, "namespace", oadp.DefaultOADPNamespace)
 
 	switch BackupAction(action) {
 	case BackupActionList:
@@ -123,18 +121,15 @@ func backupHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		return handleBackupCreate(params, namespace)
 	case BackupActionDelete:
 		return handleBackupDelete(params, namespace)
-	case BackupActionLogs:
-		return handleBackupLogs(params, namespace)
+	case BackupActionStatus:
+		return handleBackupStatus(params, namespace)
 	default:
-		return api.NewToolCallResult("", fmt.Errorf("invalid action '%s': must be one of 'list', 'get', 'create', 'delete', 'logs'", action)), nil
+		return api.NewToolCallResult("", fmt.Errorf("invalid action '%s': must be one of 'list', 'get', 'create', 'delete', 'status'", action)), nil
 	}
 }
 
 func handleBackupList(params api.ToolHandlerParams, namespace string) (*api.ToolCallResult, error) {
-	labelSelector := ""
-	if v, ok := params.GetArguments()["labelSelector"].(string); ok {
-		labelSelector = v
-	}
+	labelSelector := api.OptionalString(params, "labelSelector", "")
 
 	backups, err := oadp.ListBackups(params.Context, params.DynamicClient(), namespace, metav1.ListOptions{
 		LabelSelector: labelSelector,
@@ -181,8 +176,12 @@ func handleBackupCreate(params api.ToolHandlerParams, namespace string) (*api.To
 		spec["excludedResources"] = v
 	}
 	if v, ok := params.GetArguments()["labelSelector"].(string); ok && v != "" {
+		matchLabels, err := parseLabelSelector(v)
+		if err != nil {
+			return api.NewToolCallResult("", fmt.Errorf("invalid labelSelector: %w", err)), nil
+		}
 		spec["labelSelector"] = map[string]any{
-			"matchLabels": parseLabelSelector(v),
+			"matchLabels": matchLabels,
 		}
 	}
 	if v, ok := params.GetArguments()["storageLocation"].(string); ok && v != "" {
@@ -236,25 +235,32 @@ func handleBackupDelete(params api.ToolHandlerParams, namespace string) (*api.To
 	return api.NewToolCallResult(fmt.Sprintf("DeleteBackupRequest created for backup %s/%s", namespace, name), nil), nil
 }
 
-func handleBackupLogs(params api.ToolHandlerParams, namespace string) (*api.ToolCallResult, error) {
+func handleBackupStatus(params api.ToolHandlerParams, namespace string) (*api.ToolCallResult, error) {
 	name, ok := params.GetArguments()["name"].(string)
 	if !ok || name == "" {
-		return api.NewToolCallResult("", fmt.Errorf("name is required for logs action")), nil
+		return api.NewToolCallResult("", fmt.Errorf("name is required for status action")), nil
 	}
 
-	logs, err := oadp.GetBackupLogs(params.Context, params.DynamicClient(), namespace, name)
+	status, err := oadp.GetBackupStatus(params.Context, params.DynamicClient(), namespace, name)
 	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to get backup logs: %w", err)), nil
+		return api.NewToolCallResult("", fmt.Errorf("failed to get backup status: %w", err)), nil
 	}
 
-	return api.NewToolCallResult(logs, nil), nil
+	return api.NewToolCallResult(status, nil), nil
 }
 
 // parseLabelSelector parses a label selector string like "app=myapp,env=prod" into a map
-func parseLabelSelector(selector string) map[string]string {
+// Returns an error if the selector contains non-equality expressions (!=, in, notin)
+func parseLabelSelector(selector string) (map[string]string, error) {
 	result := make(map[string]string)
 	if selector == "" {
-		return result
+		return result, nil
+	}
+
+	// Check for unsupported selector syntax
+	if strings.Contains(selector, "!=") || strings.Contains(selector, " in ") ||
+		strings.Contains(selector, " notin ") || strings.Contains(selector, "(") {
+		return nil, fmt.Errorf("only equality-based selectors (key=value) are supported; got: %s", selector)
 	}
 
 	pairs := splitIgnoreEmpty(selector, ',')
@@ -262,9 +268,11 @@ func parseLabelSelector(selector string) map[string]string {
 		kv := splitIgnoreEmpty(pair, '=')
 		if len(kv) == 2 {
 			result[kv[0]] = kv[1]
+		} else {
+			return nil, fmt.Errorf("invalid label selector format: %s (expected key=value)", pair)
 		}
 	}
-	return result
+	return result, nil
 }
 
 // splitIgnoreEmpty splits a string by separator and ignores empty parts

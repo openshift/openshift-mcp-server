@@ -101,10 +101,7 @@ func scheduleHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) 
 		return api.NewToolCallResult("", err), nil
 	}
 
-	namespace := oadp.DefaultOADPNamespace
-	if v, ok := params.GetArguments()["namespace"].(string); ok && v != "" {
-		namespace = v
-	}
+	namespace := api.OptionalString(params, "namespace", oadp.DefaultOADPNamespace)
 
 	switch ScheduleAction(action) {
 	case ScheduleActionList:
