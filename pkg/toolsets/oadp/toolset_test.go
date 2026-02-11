@@ -116,7 +116,7 @@ func (s *ToolsetSuite) TestGetTools() {
 				s.Contains(actionProp.Enum, "get", "oadp_backup should support 'get' action")
 				s.Contains(actionProp.Enum, "create", "oadp_backup should support 'create' action")
 				s.Contains(actionProp.Enum, "delete", "oadp_backup should support 'delete' action")
-				s.Contains(actionProp.Enum, "logs", "oadp_backup should support 'logs' action")
+				s.Contains(actionProp.Enum, "status", "oadp_backup should support 'status' action")
 				break
 			}
 		}
@@ -133,7 +133,7 @@ func (s *ToolsetSuite) TestGetTools() {
 				s.Contains(actionProp.Enum, "get", "oadp_restore should support 'get' action")
 				s.Contains(actionProp.Enum, "create", "oadp_restore should support 'create' action")
 				s.Contains(actionProp.Enum, "delete", "oadp_restore should support 'delete' action")
-				s.Contains(actionProp.Enum, "logs", "oadp_restore should support 'logs' action")
+				s.Contains(actionProp.Enum, "status", "oadp_restore should support 'status' action")
 				break
 			}
 		}

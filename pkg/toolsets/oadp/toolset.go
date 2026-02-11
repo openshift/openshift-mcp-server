@@ -24,14 +24,14 @@ func (t *Toolset) GetDescription() string {
 }
 
 // GetTools returns all tools provided by this toolset.
-// The toolset provides 10 consolidated tools covering all OADP CRDs:
-//  1. oadp_backup - Manage backups (list, get, create, delete, logs)
-//  2. oadp_restore - Manage restores (list, get, create, delete, logs)
-//  3. oadp_schedule - Manage schedules (list, get, create, update, delete, pause)
-//  4. oadp_dpa - Manage DataProtectionApplication (list, get, create, update, delete)
-//  5. oadp_storage_location - Manage BSL/VSL (list, get, create, update, delete)
-//  6. oadp_data_mover - Manage DataUpload/DataDownload (list, get, cancel)
-//  7. oadp_repository - Manage BackupRepository (list, get, delete)
+// The toolset provides 8 consolidated tools covering OADP CRDs:
+//  1. oadp_backup - Manage backups (list, get, create, delete, status)
+//  2. oadp_restore - Manage restores (list, get, create, delete, status)
+//  3. oadp_schedule - Manage schedules (list, get, create, delete, pause, unpause)
+//  4. oadp_dpa - Manage DataProtectionApplication (list, get)
+//  5. oadp_storage_location - Manage BSL/VSL (list, get)
+//  6. oadp_data_mover - Manage DataUpload/DataDownload (list, get)
+//  7. oadp_repository - Manage BackupRepository (list, get)
 //  8. oadp_data_protection_test - Manage DataProtectionTest (list, get, create, delete)
 func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
 	return slices.Concat(
