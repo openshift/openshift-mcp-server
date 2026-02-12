@@ -1,0 +1,12 @@
+kind: Task
+metadata:
+  name: get-router-info
+steps:
+  verify:
+    contains: "HAProxy Version"
+  prompt:
+    inline: Retrieve and display HAProxy runtime information and statistics from the OpenShift router.
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "netedge__get_router_info"
