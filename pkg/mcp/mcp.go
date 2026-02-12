@@ -330,6 +330,10 @@ func (s *Server) Shutdown(ctx context.Context) error {
 }
 
 func NewTextResult(content string, err error) *mcp.CallToolResult {
+	return NewTextResultWithStructuredContent(content, nil, err)
+}
+
+func NewTextResultWithStructuredContent(content string, structuredContent any, err error) *mcp.CallToolResult {
 	if err != nil {
 		return &mcp.CallToolResult{
 			IsError: true,
@@ -340,11 +344,15 @@ func NewTextResult(content string, err error) *mcp.CallToolResult {
 			},
 		}
 	}
-	return &mcp.CallToolResult{
+	result := &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{
 				Text: content,
 			},
 		},
 	}
+	if structuredContent != nil {
+		result.StructuredContent = structuredContent
+	}
+	return result
 }
