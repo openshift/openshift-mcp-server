@@ -1,0 +1,12 @@
+kind: Task
+metadata:
+  name: get-router-config
+steps:
+  verify:
+    contains: "frontend public"
+  prompt:
+    inline: Retrieve and display the current HAProxy configuration from the OpenShift router.
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "netedge__get_router_config"
