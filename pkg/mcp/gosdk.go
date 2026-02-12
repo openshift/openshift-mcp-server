@@ -16,6 +16,7 @@ func ServerToolToGoSdkTool(s *Server, tool api.ServerTool) (*mcp.Tool, mcp.ToolH
 		Name:        tool.Tool.Name,
 		Description: tool.Tool.Description,
 		Title:       tool.Tool.Annotations.Title,
+		Meta:        mcp.Meta(tool.Tool.Meta),
 		Annotations: &mcp.ToolAnnotations{
 			Title:           tool.Tool.Annotations.Title,
 			ReadOnlyHint:    ptr.Deref(tool.Tool.Annotations.ReadOnlyHint, false),
@@ -47,7 +48,7 @@ func ServerToolToGoSdkTool(s *Server, tool api.ServerTool) (*mcp.Tool, mcp.ToolH
 		if err != nil {
 			return nil, err
 		}
-		return NewTextResult(result.Content, result.Error), nil
+		return NewTextResultWithStructuredContent(result.Content, result.StructuredContent, result.Error), nil
 	}
 	return goSdkTool, goSdkHandler, nil
 }
