@@ -15,6 +15,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	internalk8s "github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
+	mcpapp "github.com/containers/kubernetes-mcp-server/mcp-app"
 	"github.com/containers/kubernetes-mcp-server/pkg/metrics"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
 	"github.com/containers/kubernetes-mcp-server/pkg/prompts"
@@ -81,7 +82,7 @@ func NewServer(configuration Configuration, targetProvider internalk8s.Provider)
 			},
 			&mcp.ServerOptions{
 				Capabilities: &mcp.ServerCapabilities{
-					Resources: nil,
+					Resources: &mcp.ResourceCapabilities{},
 					Prompts:   &mcp.PromptCapabilities{ListChanged: !configuration.Stateless},
 					Tools:     &mcp.ToolCapabilities{ListChanged: !configuration.Stateless},
 					Logging:   &mcp.LoggingCapabilities{},
@@ -109,6 +110,7 @@ func NewServer(configuration Configuration, targetProvider internalk8s.Provider)
 	s.server.AddReceivingMiddleware(authHeaderPropagationMiddleware)
 	s.server.AddReceivingMiddleware(toolCallLoggingMiddleware)
 	s.server.AddReceivingMiddleware(s.metricsMiddleware())
+	s.registerMCPAppResources()
 	err = s.reloadToolsets()
 	if err != nil {
 		return nil, err
@@ -217,6 +219,31 @@ func (s *Server) reloadToolsets() error {
 	// start new watch
 	s.p.WatchTargets(s.reloadToolsets)
 	return nil
+}
+
+// registerMCPAppResources registers embedded MCP App HTML resources.
+func (s *Server) registerMCPAppResources() {
+	for _, res := range mcpapp.Resources() {
+		res := res
+		s.server.AddResource(
+			&mcp.Resource{
+				URI:      res.URI,
+				Name:     res.Name,
+				MIMEType: mcpapp.ResourceMIMEType,
+			},
+			func(_ context.Context, _ *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+				return &mcp.ReadResourceResult{
+					Contents: []*mcp.ResourceContents{
+						{
+							URI:      res.URI,
+							MIMEType: mcpapp.ResourceMIMEType,
+							Text:     res.HTML,
+						},
+					},
+				}, nil
+			},
+		)
+	}
 }
 
 // metricsMiddleware returns a metrics middleware with access to the server's metrics system

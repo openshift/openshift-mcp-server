@@ -45,8 +45,12 @@ help: ## Display this help
 clean: ## Clean up all build artifacts
 	rm -rf $(CLEAN_TARGETS)
 
+.PHONY: build-mcp-app
+build-mcp-app: ## Build the MCP App frontend UIs
+	cd mcp-app && npm install && npm run build
+
 .PHONY: build
-build: clean tidy format lint ## Build the project
+build: clean tidy format lint build-mcp-app ## Build the project
 	go build $(COMMON_BUILD_ARGS) -o $(BINARY_NAME) ./cmd/kubernetes-mcp-server
 
 
