@@ -6,11 +6,12 @@ import (
 	"testing"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
-	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -18,15 +19,11 @@ import (
 )
 
 func TestGetServiceEndpoints(t *testing.T) {
-	scheme := kubernetes.Scheme
-	// Ensure discoveryv1 is registered
-	_ = discoveryv1.AddToScheme(scheme)
-
 	tests := []struct {
 		name          string
 		namespace     string
 		service       string
-		existingObjs  []client.Object
+		existingObjs  []runtime.Object
 		expectedError string
 		validate      func(t *testing.T, result string)
 	}{
@@ -34,7 +31,7 @@ func TestGetServiceEndpoints(t *testing.T) {
 			name:      "successful retrieval",
 			namespace: "default",
 			service:   "myservice",
-			existingObjs: []client.Object{
+			existingObjs: []runtime.Object{
 				&discoveryv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "myservice-1",
@@ -68,7 +65,7 @@ func TestGetServiceEndpoints(t *testing.T) {
 			name:          "endpoints not found",
 			namespace:     "default",
 			service:       "missing",
-			existingObjs:  []client.Object{},
+			existingObjs:  []runtime.Object{},
 			expectedError: "no EndpointSlices found",
 		},
 		{
@@ -84,7 +81,10 @@ func TestGetServiceEndpoints(t *testing.T) {
 			// Override the client creation function
 			oldNewClientFunc := newClientFunc
 			newClientFunc = func(config *rest.Config, options client.Options) (client.Client, error) {
-				return fake.NewClientBuilder().WithScheme(scheme).WithObjects(tt.existingObjs...).Build(), nil
+				s := runtime.NewScheme()
+				_ = clientgoscheme.AddToScheme(s)
+				_ = discoveryv1.AddToScheme(s)
+				return fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tt.existingObjs...).Build(), nil
 			}
 			defer func() { newClientFunc = oldNewClientFunc }()
 
