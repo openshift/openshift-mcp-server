@@ -7,8 +7,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/google/jsonschema-go/jsonschema"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -18,7 +17,7 @@ func initEndpoints() []api.ServerTool {
 		{
 			Tool: api.Tool{
 				Name:        "get_service_endpoints",
-				Description: "Return Endpoints object for a Service to verify backend pod availability.",
+				Description: "Return EndpointSlice objects for a Service to verify backend pod availability.",
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
@@ -65,15 +64,24 @@ func getServiceEndpoints(params api.ToolHandlerParams) (*api.ToolCallResult, err
 		return api.NewToolCallResult("", fmt.Errorf("failed to create controller-runtime client: %w", err)), nil
 	}
 
-	endpoints := &corev1.Endpoints{}
-	err = cl.Get(params.Context, types.NamespacedName{Name: serviceName, Namespace: namespace}, endpoints)
+	// Use EndpointSlices as Endpoints is deprecated
+	endpointSlices := &discoveryv1.EndpointSliceList{}
+	// EndpointSlices are linked to a service via the "kubernetes.io/service-name" label
+	labelSelector := client.MatchingLabels{
+		"kubernetes.io/service-name": serviceName,
+	}
+	err = cl.List(params.Context, endpointSlices, client.InNamespace(namespace), labelSelector)
 	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to get Endpoints for service %s/%s: %w", namespace, serviceName, err)), nil
+		return api.NewToolCallResult("", fmt.Errorf("failed to list EndpointSlices for service %s/%s: %w", namespace, serviceName, err)), nil
 	}
 
-	data, err := json.MarshalIndent(endpoints, "", "  ")
+	if len(endpointSlices.Items) == 0 {
+		return api.NewToolCallResult("", fmt.Errorf("no EndpointSlices found for service %s/%s", namespace, serviceName)), nil
+	}
+
+	data, err := json.MarshalIndent(endpointSlices.Items, "", "  ")
 	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to marshal endpoints: %w", err)), nil
+		return api.NewToolCallResult("", fmt.Errorf("failed to marshal endpoint slices: %w", err)), nil
 	}
 
 	return api.NewToolCallResult(string(data), nil), nil

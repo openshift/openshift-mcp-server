@@ -9,17 +9,18 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func TestGetServiceEndpoints(t *testing.T) {
 	scheme := kubernetes.Scheme
-	// Ensure corev1 is registered
-	_ = corev1.AddToScheme(scheme)
+	// Ensure discoveryv1 is registered
+	_ = discoveryv1.AddToScheme(scheme)
 
 	tests := []struct {
 		name          string
@@ -34,25 +35,33 @@ func TestGetServiceEndpoints(t *testing.T) {
 			namespace: "default",
 			service:   "myservice",
 			existingObjs: []client.Object{
-				&corev1.Endpoints{
+				&discoveryv1.EndpointSlice{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "myservice",
+						Name:      "myservice-1",
 						Namespace: "default",
+						Labels: map[string]string{
+							"kubernetes.io/service-name": "myservice",
+						},
 					},
-					Subsets: []corev1.EndpointSubset{
+					Endpoints: []discoveryv1.Endpoint{
 						{
-							Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-							Ports:     []corev1.EndpointPort{{Port: 80}},
+							Addresses: []string{"1.2.3.4"},
+						},
+					},
+					Ports: []discoveryv1.EndpointPort{
+						{
+							Port: ptr.To(int32(80)),
 						},
 					},
 				},
 			},
 			validate: func(t *testing.T, result string) {
-				var ep corev1.Endpoints
-				err := json.Unmarshal([]byte(result), &ep)
+				var eps []discoveryv1.EndpointSlice
+				err := json.Unmarshal([]byte(result), &eps)
 				require.NoError(t, err)
-				assert.Equal(t, "myservice", ep.Name)
-				assert.Equal(t, "1.2.3.4", ep.Subsets[0].Addresses[0].IP)
+				assert.Len(t, eps, 1)
+				assert.Equal(t, "myservice-1", eps[0].Name)
+				assert.Equal(t, "1.2.3.4", eps[0].Endpoints[0].Addresses[0])
 			},
 		},
 		{
@@ -60,7 +69,7 @@ func TestGetServiceEndpoints(t *testing.T) {
 			namespace:     "default",
 			service:       "missing",
 			existingObjs:  []client.Object{},
-			expectedError: "failed to get Endpoints",
+			expectedError: "no EndpointSlices found",
 		},
 		{
 			name:          "missing arguments",
