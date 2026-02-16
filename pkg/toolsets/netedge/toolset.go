@@ -26,6 +26,7 @@ func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
 	return slices.Concat(
 		netedgeTools.InitQueryPrometheus(),
 		initCoreDNS(),
+		initRoutes(),
 	)
 }
 
