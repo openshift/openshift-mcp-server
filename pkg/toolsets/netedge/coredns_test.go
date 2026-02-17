@@ -15,16 +15,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-// mockKubernetesClient implements api.KubernetesClient for testing
-type mockKubernetesClient struct {
-	api.KubernetesClient
-	restConfig *rest.Config
-}
-
-func (m *mockKubernetesClient) RESTConfig() *rest.Config {
-	return m.restConfig
-}
-
 func TestGetCoreDNSConfig(t *testing.T) {
 	tests := []struct {
 		name           string
