@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pods Resource Usage</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 16px;
+      background: var(--color-background-primary, #ffffff);
+      color: var(--color-text-primary, #1a1a1a);
+    }
+    body.dark {
+      --bg-primary: #1a1a2e;
+      --bg-secondary: #16213e;
+      --bg-row-hover: #1a1a3e;
+      --text-primary: #e0e0e0;
+      --text-secondary: #a0a0a0;
+      --border-color: #2a2a4a;
+      --bar-bg: #2a2a4a;
+      --cpu-color: #4dabf7;
+      --mem-color: #ffa94d;
+      --error-bg: #3d1c1c;
+      --error-text: #ff8080;
+    }
+    body.light, body:not(.dark) {
+      --bg-primary: #ffffff;
+      --bg-secondary: #f8f9fa;
+      --bg-row-hover: #f0f4ff;
+      --text-primary: #1a1a1a;
+      --text-secondary: #666666;
+      --border-color: #e0e0e0;
+      --bar-bg: #e9ecef;
+      --cpu-color: #1971c2;
+      --mem-color: #e67700;
+      --error-bg: #ffeeee;
+      --error-text: #cc0000;
+    }
+    body {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    h1 {
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .pod-count {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    .refresh-btn {
+      padding: 4px 12px;
+      font-size: 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      cursor: pointer;
+    }
+    .refresh-btn:hover {
+      background: var(--bg-row-hover);
+    }
+    .refresh-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .legend {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+    }
+    .legend-dot.cpu { background: var(--cpu-color); }
+    .legend-dot.mem { background: var(--mem-color); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    th {
+      text-align: left;
+      padding: 6px 8px;
+      border-bottom: 2px solid var(--border-color);
+      color: var(--text-secondary);
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+    th:hover {
+      color: var(--text-primary);
+    }
+    th .sort-arrow {
+      font-size: 10px;
+      margin-left: 2px;
+    }
+    td {
+      padding: 5px 8px;
+      border-bottom: 1px solid var(--border-color);
+      vertical-align: middle;
+    }
+    tr:hover td {
+      background: var(--bg-row-hover);
+    }
+    .name-cell {
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ns-cell {
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text-secondary);
+    }
+    .metric-cell {
+      width: 30%;
+    }
+    .bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .bar-track {
+      flex: 1;
+      height: 14px;
+      background: var(--bar-bg);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      min-width: 2px;
+      transition: width 0.3s ease;
+    }
+    .bar-fill.cpu { background: var(--cpu-color); }
+    .bar-fill.mem { background: var(--mem-color); }
+    .bar-value {
+      font-size: 11px;
+      min-width: 52px;
+      text-align: right;
+      white-space: nowrap;
+      color: var(--text-secondary);
+    }
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-secondary);
+    }
+    .error {
+      padding: 12px;
+      background: var(--error-bg);
+      color: var(--error-text);
+      border-radius: 6px;
+    }
+    .empty {
+      text-align: center;
+      padding: 32px;
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="loading">Loading pod metrics...</div>
+  </div>
+  <script type="module" src="/src/pods-top-app.ts"></script>
+</body>
+</html>

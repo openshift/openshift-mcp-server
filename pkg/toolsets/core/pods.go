@@ -11,6 +11,7 @@ import (
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
+	mcpapp "github.com/containers/kubernetes-mcp-server/mcp-app"
 	"github.com/containers/kubernetes-mcp-server/pkg/mcplog"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
 )
@@ -123,6 +124,7 @@ func initPods() []api.ServerTool {
 		{Tool: api.Tool{
 			Name:        "pods_top",
 			Description: "List the resource consumption (CPU and memory) as recorded by the Kubernetes Metrics Server for the specified Kubernetes Pods in the all namespaces, the provided namespace, or the current namespace",
+			Meta:        mcpapp.ToolMeta(mcpapp.PodsTopResourceURI),
 			InputSchema: &jsonschema.Schema{
 				Type: "object",
 				Properties: map[string]*jsonschema.Schema{
@@ -338,6 +340,20 @@ func podsDelete(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	return api.NewToolCallResult(ret, err), nil
 }
 
+type podsTopContainerMetric struct {
+	Name        string `json:"name"`
+	CPUMillis   int64  `json:"cpuMillicores"`
+	MemoryBytes int64  `json:"memoryBytes"`
+}
+
+type podsTopPodMetric struct {
+	Name           string                   `json:"name"`
+	Namespace      string                   `json:"namespace"`
+	Containers     []podsTopContainerMetric `json:"containers"`
+	TotalCPUMillis int64                    `json:"totalCpuMillicores"`
+	TotalMemBytes  int64                    `json:"totalMemoryBytes"`
+}
+
 func podsTop(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	podsTopOptions := api.PodsTopOptions{AllNamespaces: true}
 	if v, ok := params.GetArguments()["namespace"].(string); ok {
@@ -362,7 +378,29 @@ func podsTop(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get pods top: %w", err)), nil
 	}
-	return api.NewToolCallResult(buf.String(), nil), nil
+
+	pods := make([]podsTopPodMetric, 0, len(ret.Items))
+	for _, item := range ret.Items {
+		pod := podsTopPodMetric{
+			Name:      item.Name,
+			Namespace: item.Namespace,
+		}
+		for _, container := range item.Containers {
+			cpuMillis := container.Usage.Cpu().MilliValue()
+			memBytes := container.Usage.Memory().Value()
+			pod.Containers = append(pod.Containers, podsTopContainerMetric{
+				Name:        container.Name,
+				CPUMillis:   cpuMillis,
+				MemoryBytes: memBytes,
+			})
+			pod.TotalCPUMillis += cpuMillis
+			pod.TotalMemBytes += memBytes
+		}
+		pods = append(pods, pod)
+	}
+	structured := map[string]any{"pods": pods}
+
+	return api.NewToolCallResultWithStructuredContent(buf.String(), structured, nil), nil
 }
 
 func podsExec(params api.ToolHandlerParams) (*api.ToolCallResult, error) {

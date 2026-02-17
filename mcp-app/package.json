@@ -1,0 +1,19 @@
+{
+  "name": "kubernetes-mcp-server-apps",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP App UIs for kubernetes-mcp-server",
+  "scripts": {
+    "build": "rm -rf dist && npm run build:pods-top",
+    "build:pods-top": "INPUT=pods-top-app.html vite build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vite": "^5.0.12",
+    "vite-plugin-singlefile": "^2.0.3"
+  }
+}

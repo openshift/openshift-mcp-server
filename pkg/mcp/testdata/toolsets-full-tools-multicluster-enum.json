@@ -651,6 +651,11 @@
         }
       }
     },
+    "_meta": {
+      "ui": {
+        "resourceUri": "ui://kubernetes-mcp-server/pods-top.html"
+      }
+    },
     "name": "pods_top"
   },
   {
