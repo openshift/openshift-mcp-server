@@ -1,27 +1,22 @@
 package netedge
 
 import (
-	"context"
 	"encoding/json"
-	"testing"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/api"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/rest"
 )
 
-func TestInspectRoute(t *testing.T) {
+func (s *NetEdgeTestSuite) TestInspectRoute() {
+
 	tests := []struct {
 		name          string
 		namespace     string
 		route         string
 		existingObjs  []runtime.Object
 		expectedError string
-		validate      func(t *testing.T, result string)
+		validate      func(result string)
 	}{
 		{
 			name:      "successful retrieval",
@@ -42,12 +37,12 @@ func TestInspectRoute(t *testing.T) {
 					},
 				},
 			},
-			validate: func(t *testing.T, result string) {
+			validate: func(result string) {
 				var r map[string]interface{}
 				err := json.Unmarshal([]byte(result), &r)
-				require.NoError(t, err)
-				assert.Equal(t, "my-route", r["metadata"].(map[string]interface{})["name"])
-				assert.Equal(t, "example.com", r["spec"].(map[string]interface{})["host"])
+				s.Require().NoError(err)
+				s.Assert().Equal("my-route", r["metadata"].(map[string]interface{})["name"])
+				s.Assert().Equal("example.com", r["spec"].(map[string]interface{})["host"])
 			},
 		},
 		{
@@ -66,7 +61,7 @@ func TestInspectRoute(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			// Create fake dynamic client
 			scheme := runtime.NewScheme()
 			dynClient := fake.NewSimpleDynamicClient(scheme, tt.existingObjs...)
@@ -80,32 +75,23 @@ func TestInspectRoute(t *testing.T) {
 				args["route"] = tt.route
 			}
 
-			// Mock ToolHandlerParams
-			mockReq := &mockToolCallRequest{args: args}
+			// Set args using suite helper
+			s.SetArgs(args)
+			s.SetDynamicClient(dynClient)
 
-			// We need a non-nil RESTConfig to pass the check in the handler
-			params := api.ToolHandlerParams{
-				Context:         context.Background(),
-				ToolCallRequest: mockReq,
-				KubernetesClient: &mockKubernetesClient{
-					restConfig:    &rest.Config{},
-					dynamicClient: dynClient,
-				},
-			}
-
-			result, err := inspectRoute(params)
+			result, err := inspectRoute(s.params)
 
 			if tt.expectedError != "" {
-				assert.NoError(t, err)
-				require.NotNil(t, result)
-				require.Error(t, result.Error)
-				assert.Contains(t, result.Error.Error(), tt.expectedError)
+				s.Assert().NoError(err)
+				s.Require().NotNil(result)
+				s.Require().Error(result.Error)
+				s.Assert().Contains(result.Error.Error(), tt.expectedError)
 			} else {
-				assert.NoError(t, err)
-				require.NotNil(t, result)
-				assert.NoError(t, result.Error)
+				s.Assert().NoError(err)
+				s.Require().NotNil(result)
+				s.Assert().NoError(result.Error)
 				if tt.validate != nil {
-					tt.validate(t, result.Content)
+					tt.validate(result.Content)
 				}
 			}
 		})
