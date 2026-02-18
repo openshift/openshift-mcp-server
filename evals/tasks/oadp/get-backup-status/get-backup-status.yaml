@@ -1,0 +1,13 @@
+kind: Task
+metadata:
+  name: "get-oadp-backup-status"
+  difficulty: easy
+steps:
+  setup:
+    file: setup.sh
+  verify:
+    file: verify.sh
+  cleanup:
+    file: cleanup.sh
+  prompt:
+    inline: Get the status and details of the OADP backup named 'status-check-backup' in the openshift-adp namespace

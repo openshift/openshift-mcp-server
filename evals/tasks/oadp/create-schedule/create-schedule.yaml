@@ -1,0 +1,13 @@
+kind: Task
+metadata:
+  name: "create-oadp-schedule"
+  difficulty: medium
+steps:
+  setup:
+    file: setup.sh
+  verify:
+    file: verify.sh
+  cleanup:
+    file: cleanup.sh
+  prompt:
+    inline: Create an OADP backup schedule named 'nightly-backup' that runs every night at 3 AM (cron '0 3 * * *') and backs up the 'production' namespace with a 30-day (720h) TTL

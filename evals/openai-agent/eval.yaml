@@ -21,3 +21,11 @@ config:
             toolPattern: ".*"
         minToolCalls: 1
         maxToolCalls: 20
+    # OADP tasks - requires OADP operator installed on cluster
+    - glob: ../tasks/oadp/*/*.yaml
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            toolPattern: "oadp_.*"
+        minToolCalls: 1
+        maxToolCalls: 10
