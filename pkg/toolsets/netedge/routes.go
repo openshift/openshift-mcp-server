@@ -5,12 +5,10 @@ import (
 	"fmt"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
-	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/google/jsonschema-go/jsonschema"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func initRoutes() []api.ServerTool {
@@ -18,7 +16,7 @@ func initRoutes() []api.ServerTool {
 		{
 			Tool: api.Tool{
 				Name:        "inspect_route",
-				Description: "Inspect an OpenShift Route to view its configuration, status, and related services.",
+				Description: "Inspect an OpenShift Route to view its full configuration and status.",
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
@@ -55,25 +53,13 @@ func inspectRoute(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		return api.NewToolCallResult("", err), nil
 	}
 
-	cfg := params.RESTConfig()
-	if cfg == nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to get REST config")), nil
+	gvr := schema.GroupVersionResource{
+		Group:    "route.openshift.io",
+		Version:  "v1",
+		Resource: "routes",
 	}
 
-	cl, err := newClientFunc(cfg, client.Options{Scheme: kubernetes.Scheme})
-	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to create controller-runtime client: %w", err)), nil
-	}
-
-	// Use Unstructured for Route
-	route := &unstructured.Unstructured{}
-	route.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   "route.openshift.io",
-		Version: "v1",
-		Kind:    "Route",
-	})
-
-	err = cl.Get(params.Context, client.ObjectKey{Namespace: namespace, Name: routeName}, route)
+	route, err := params.DynamicClient().Resource(gvr).Namespace(namespace).Get(params.Context, routeName, metav1.GetOptions{})
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get route %s/%s: %w", namespace, routeName, err)), nil
 	}

@@ -10,9 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func TestInspectRoute(t *testing.T) {
@@ -68,12 +67,9 @@ func TestInspectRoute(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Override the client creation function
-			oldNewClientFunc := newClientFunc
-			newClientFunc = func(config *rest.Config, options client.Options) (client.Client, error) {
-				return fake.NewClientBuilder().WithRuntimeObjects(tt.existingObjs...).Build(), nil
-			}
-			defer func() { newClientFunc = oldNewClientFunc }()
+			// Create fake dynamic client
+			scheme := runtime.NewScheme()
+			dynClient := fake.NewSimpleDynamicClient(scheme, tt.existingObjs...)
 
 			// Create mock params
 			args := make(map[string]any)
@@ -89,9 +85,12 @@ func TestInspectRoute(t *testing.T) {
 
 			// We need a non-nil RESTConfig to pass the check in the handler
 			params := api.ToolHandlerParams{
-				Context:          context.Background(),
-				ToolCallRequest:  mockReq,
-				KubernetesClient: &mockKubernetesClient{restConfig: &rest.Config{}},
+				Context:         context.Background(),
+				ToolCallRequest: mockReq,
+				KubernetesClient: &mockKubernetesClient{
+					restConfig:    &rest.Config{},
+					dynamicClient: dynClient,
+				},
 			}
 
 			result, err := inspectRoute(params)
