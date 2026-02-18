@@ -2,6 +2,7 @@ package netedge
 
 import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
 
@@ -20,9 +21,14 @@ func (m *mockToolCallRequest) GetName() string {
 
 type mockKubernetesClient struct {
 	api.KubernetesClient
-	restConfig *rest.Config
+	restConfig    *rest.Config
+	dynamicClient dynamic.Interface
 }
 
 func (m *mockKubernetesClient) RESTConfig() *rest.Config {
 	return m.restConfig
+}
+
+func (m *mockKubernetesClient) DynamicClient() dynamic.Interface {
+	return m.dynamicClient
 }

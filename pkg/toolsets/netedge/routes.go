@@ -16,7 +16,7 @@ func initRoutes() []api.ServerTool {
 		{
 			Tool: api.Tool{
 				Name:        "inspect_route",
-				Description: "Inspect an OpenShift Route to view its configuration, status, and related services.",
+				Description: "Inspect an OpenShift Route to view its full configuration and status.",
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
