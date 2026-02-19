@@ -1,49 +1,6 @@
 [
   {
     "annotations": {
-      "title": "Alertmanager: Get Alerts",
-      "readOnlyHint": true,
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true
-    },
-    "description": "Query active and pending alerts from the cluster's Alertmanager.\nUseful for monitoring cluster health, detecting issues, and incident response.\n\nReturns alerts with their labels, annotations, status, and timing information.\nCan filter by active/silenced/inhibited state.\n\nCommon use cases:\n- Check for critical alerts affecting the cluster\n- Monitor for specific alert types (e.g., high CPU, disk pressure)\n- Verify alert silences are working correctly",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "active": {
-          "default": true,
-          "description": "Filter for active (firing) alerts. Default: true",
-          "type": "boolean"
-        },
-        "context": {
-          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
-          "enum": [
-            "extra-cluster",
-            "fake-context"
-          ],
-          "type": "string"
-        },
-        "filter": {
-          "description": "Optional filter using Alertmanager filter syntax. Examples: 'alertname=Watchdog', 'severity=critical', 'namespace=openshift-monitoring'",
-          "type": "string"
-        },
-        "inhibited": {
-          "default": false,
-          "description": "Include inhibited alerts in the results. Default: false",
-          "type": "boolean"
-        },
-        "silenced": {
-          "default": false,
-          "description": "Include silenced alerts in the results. Default: false",
-          "type": "boolean"
-        }
-      }
-    },
-    "name": "alertmanager_alerts"
-  },
-  {
-    "annotations": {
       "title": "Configuration: Contexts List",
       "readOnlyHint": true,
       "destructiveHint": false,
@@ -101,6 +58,285 @@
       }
     },
     "name": "events_list"
+  },
+  {
+    "annotations": {
+      "title": "Execute Instant Query",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "description": "Execute a PromQL instant query to get current/point-in-time values.\n\nPREREQUISITE: You MUST call list_metrics first to verify the metric exists\n\nWHEN TO USE:\n- Current state questions: \"What is the current error rate?\"\n- Point-in-time snapshots: \"How many pods are running?\"\n- Latest values: \"Which pods are in Pending state?\"\n\nThe 'query' parameter MUST use metric names that were returned by list_metrics.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "enum": [
+            "extra-cluster",
+            "fake-context"
+          ],
+          "type": "string"
+        },
+        "query": {
+          "description": "PromQL query string using metric names verified via list_metrics",
+          "type": "string"
+        },
+        "time": {
+          "description": "Evaluation time as RFC3339 or Unix timestamp. Omit or use 'NOW' for current time.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "name": "execute_instant_query"
+  },
+  {
+    "annotations": {
+      "title": "Execute Range Query",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "description": "Execute a PromQL range query to get time-series data over a period.\n\nPREREQUISITE: You MUST call list_metrics first to verify the metric exists\n\nWHEN TO USE:\n- Trends over time: \"What was CPU usage over the last hour?\"\n- Rate calculations: \"How many requests per second?\"\n- Historical analysis: \"Were there any restarts in the last 5 minutes?\"\n\nTIME PARAMETERS:\n- 'duration': Look back from now (e.g., \"5m\", \"1h\", \"24h\")\n- 'step': Data point resolution (e.g., \"1m\" for 1-hour duration, \"5m\" for 24-hour duration)\n\nThe 'query' parameter MUST use metric names that were returned by list_metrics.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "enum": [
+            "extra-cluster",
+            "fake-context"
+          ],
+          "type": "string"
+        },
+        "duration": {
+          "description": "Duration to look back from now (e.g., '1h', '30m', '1d', '2w') (optional)",
+          "pattern": "^\\d+[smhdwy]$",
+          "type": "string"
+        },
+        "end": {
+          "description": "End time as RFC3339 or Unix timestamp (optional). Use `NOW` for current time.",
+          "type": "string"
+        },
+        "query": {
+          "description": "PromQL query string using metric names verified via list_metrics",
+          "type": "string"
+        },
+        "start": {
+          "description": "Start time as RFC3339 or Unix timestamp (optional)",
+          "type": "string"
+        },
+        "step": {
+          "description": "Query resolution step width (e.g., '15s', '1m', '1h'). Choose based on time range: shorter ranges use smaller steps.",
+          "pattern": "^\\d+[smhdwy]$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "query",
+        "step"
+      ]
+    },
+    "name": "execute_range_query"
+  },
+  {
+    "annotations": {
+      "title": "Get Alerts",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "description": "Get alerts from Alertmanager.\n\nWHEN TO USE:\n- START HERE when investigating issues: if the user asks about things breaking, errors, failures, outages, services being down, or anything going wrong in the cluster\n- When the user mentions a specific alert name - use this tool to get the alert's full labels (namespace, pod, service, etc.) which are essential for further investigation with other tools\n- To see currently firing alerts in the cluster\n- To check which alerts are active, silenced, or inhibited\n- To understand what's happening before diving into metrics or logs\n\nINVESTIGATION TIP: Alert labels often contain the exact identifiers (pod names, namespaces, job names) needed for targeted queries with prometheus tools.\n\nFILTERING:\n- Use 'active' to filter for only active alerts (not resolved)\n- Use 'silenced' to filter for silenced alerts\n- Use 'inhibited' to filter for inhibited alerts\n- Use 'filter' to apply label matchers (e.g., \"alertname=HighCPU\")\n- Use 'receiver' to filter alerts by receiver name\n\nAll filter parameters are optional. Without filters, all alerts are returned.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "active": {
+          "description": "Filter for active alerts only (true/false, optional)",
+          "type": "boolean"
+        },
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "enum": [
+            "extra-cluster",
+            "fake-context"
+          ],
+          "type": "string"
+        },
+        "filter": {
+          "description": "Label matchers to filter alerts (e.g., 'alertname=HighCPU', optional)",
+          "type": "string"
+        },
+        "inhibited": {
+          "description": "Filter for inhibited alerts only (true/false, optional)",
+          "type": "boolean"
+        },
+        "receiver": {
+          "description": "Receiver name to filter alerts (optional)",
+          "type": "string"
+        },
+        "silenced": {
+          "description": "Filter for silenced alerts only (true/false, optional)",
+          "type": "boolean"
+        },
+        "unprocessed": {
+          "description": "Filter for unprocessed alerts only (true/false, optional)",
+          "type": "boolean"
+        }
+      }
+    },
+    "name": "get_alerts"
+  },
+  {
+    "annotations": {
+      "title": "Get Label Names",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "description": "Get all label names (dimensions) available for filtering a metric.\n\nWHEN TO USE (after calling list_metrics):\n- To discover how to filter metrics (by namespace, pod, service, etc.)\n- Before constructing label matchers in PromQL queries\n\nThe 'metric' parameter should use a metric name from list_metrics output.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "enum": [
+            "extra-cluster",
+            "fake-context"
+          ],
+          "type": "string"
+        },
+        "end": {
+          "description": "End time for label discovery as RFC3339 or Unix timestamp (optional, defaults to now)",
+          "type": "string"
+        },
+        "metric": {
+          "description": "Metric name (from list_metrics) to get label names for. Leave empty for all metrics.",
+          "type": "string"
+        },
+        "start": {
+          "description": "Start time for label discovery as RFC3339 or Unix timestamp (optional, defaults to 1 hour ago)",
+          "type": "string"
+        }
+      }
+    },
+    "name": "get_label_names"
+  },
+  {
+    "annotations": {
+      "title": "Get Label Values",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "description": "Get all unique values for a specific label.\n\nWHEN TO USE (after calling list_metrics and get_label_names):\n- To find exact label values for filtering (namespace names, pod names, etc.)\n- To see what values exist before constructing queries\n\nThe 'metric' parameter should use a metric name from list_metrics output.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "enum": [
+            "extra-cluster",
+            "fake-context"
+          ],
+          "type": "string"
+        },
+        "end": {
+          "description": "End time for label value discovery as RFC3339 or Unix timestamp (optional, defaults to now)",
+          "type": "string"
+        },
+        "label": {
+          "description": "Label name (from get_label_names) to get values for",
+          "type": "string"
+        },
+        "metric": {
+          "description": "Metric name (from list_metrics) to scope the label values to. Leave empty for all metrics.",
+          "type": "string"
+        },
+        "start": {
+          "description": "Start time for label value discovery as RFC3339 or Unix timestamp (optional, defaults to 1 hour ago)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label"
+      ]
+    },
+    "name": "get_label_values"
+  },
+  {
+    "annotations": {
+      "title": "Get Series",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "description": "Get time series matching selectors and preview cardinality.\n\nWHEN TO USE (optional, after calling list_metrics):\n- To verify label filters match expected series before querying\n- To check cardinality and avoid slow queries\n\nCARDINALITY GUIDANCE:\n- \u003c100 series: Safe\n- 100-1000: Usually fine\n- \u003e1000: Add more label filters\n\nThe selector should use metric names from list_metrics output.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "enum": [
+            "extra-cluster",
+            "fake-context"
+          ],
+          "type": "string"
+        },
+        "end": {
+          "description": "End time for series discovery as RFC3339 or Unix timestamp (optional, defaults to now)",
+          "type": "string"
+        },
+        "matches": {
+          "description": "PromQL series selector using metric names from list_metrics",
+          "type": "string"
+        },
+        "start": {
+          "description": "Start time for series discovery as RFC3339 or Unix timestamp (optional, defaults to 1 hour ago)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "matches"
+      ]
+    },
+    "name": "get_series"
+  },
+  {
+    "annotations": {
+      "title": "Get Silences",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "description": "Get silences from Alertmanager.\n\nWHEN TO USE:\n- To see which alerts are currently silenced\n- To check active, pending, or expired silences\n- To investigate why certain alerts are not firing notifications\n\nFILTERING:\n- Use 'filter' to apply label matchers to find specific silences\n\nSilences are used to temporarily mute alerts based on label matchers. This tool helps you understand what is currently silenced in your environment.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "enum": [
+            "extra-cluster",
+            "fake-context"
+          ],
+          "type": "string"
+        },
+        "filter": {
+          "description": "Label matchers to filter silences (e.g., 'alertname=HighCPU', optional)",
+          "type": "string"
+        }
+      }
+    },
+    "name": "get_silences"
   },
   {
     "annotations": {
@@ -208,6 +444,37 @@
       ]
     },
     "name": "helm_uninstall"
+  },
+  {
+    "annotations": {
+      "title": "List Available Metrics",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "description": "MANDATORY FIRST STEP: List all available metric names in Prometheus.\n\nYOU MUST CALL THIS TOOL BEFORE ANY OTHER QUERY TOOL\n\nThis tool MUST be called first for EVERY observability question to:\n1. Discover what metrics actually exist in this environment\n2. Find the EXACT metric name to use in queries\n3. Avoid querying non-existent metrics\n4. The 'name_regex' parameter should always be provided, and be a best guess of what the metric would be named like.\n5. Do not use a blanket regex like .* or .+ in the 'name_regex' parameter. Use specific ones like kube.*, node.*, etc.\n\nNEVER skip this step. NEVER guess metric names. Metric names vary between environments.\n\nAfter calling this tool:\n1. Search the returned list for relevant metrics\n2. Use the EXACT metric name found in subsequent queries\n3. If no relevant metric exists, inform the user",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
+          "enum": [
+            "extra-cluster",
+            "fake-context"
+          ],
+          "type": "string"
+        },
+        "name_regex": {
+          "description": "Regex pattern to filter metric names (e.g., 'http_.*', 'node_.*', 'kube.*'). This parameter is required. Don't pass in blanket regex.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name_regex"
+      ]
+    },
+    "name": "list_metrics"
   },
   {
     "annotations": {
@@ -652,87 +919,6 @@
       }
     },
     "name": "pods_top"
-  },
-  {
-    "annotations": {
-      "title": "Prometheus: Instant Query",
-      "readOnlyHint": true,
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true
-    },
-    "description": "Execute an instant PromQL query against the cluster's Thanos Querier.\nReturns current metric values at the specified time (or current time if not specified).\nUse this for point-in-time metric values.\n\nCommon queries:\n- up{job=\"apiserver\"} - Check if API server is up\n- sum by(namespace) (container_memory_usage_bytes) - Memory usage by namespace\n- rate(container_cpu_usage_seconds_total[5m]) - CPU usage rate\n- kube_pod_status_phase{phase=\"Running\"} - Running pods count",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "context": {
-          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
-          "enum": [
-            "extra-cluster",
-            "fake-context"
-          ],
-          "type": "string"
-        },
-        "query": {
-          "description": "PromQL query string (e.g., 'up{job=\"apiserver\"}', 'sum by(namespace) (container_memory_usage_bytes)')",
-          "type": "string"
-        },
-        "time": {
-          "description": "Optional evaluation timestamp. Accepts RFC3339 format (e.g., '2024-01-01T12:00:00Z') or Unix timestamp. If not provided, uses current time.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "query"
-      ]
-    },
-    "name": "prometheus_query"
-  },
-  {
-    "annotations": {
-      "title": "Prometheus: Range Query",
-      "readOnlyHint": true,
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true
-    },
-    "description": "Execute a range PromQL query against the cluster's Thanos Querier.\nReturns metric values over a time range with specified resolution.\nUse this for time-series data, trends, and historical analysis.\n\nSupports relative times:\n- 'now' for current time\n- '-10m', '-1h', '-1d' for relative past times\n\nExample: Get CPU usage over the last hour with 1-minute resolution.",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "context": {
-          "description": "Optional parameter selecting which context to run the tool in. Defaults to fake-context if not set",
-          "enum": [
-            "extra-cluster",
-            "fake-context"
-          ],
-          "type": "string"
-        },
-        "end": {
-          "description": "End time. Accepts RFC3339 timestamp, Unix timestamp, 'now', or relative time",
-          "type": "string"
-        },
-        "query": {
-          "description": "PromQL query string (e.g., 'rate(container_cpu_usage_seconds_total[5m])')",
-          "type": "string"
-        },
-        "start": {
-          "description": "Start time. Accepts RFC3339 timestamp (e.g., '2024-01-01T12:00:00Z'), Unix timestamp, or relative time (e.g., '-1h', '-30m', '-1d')",
-          "type": "string"
-        },
-        "step": {
-          "default": "1m",
-          "description": "Query resolution step width (e.g., '15s', '1m', '5m'). Determines the granularity of returned data points. Default: '1m'",
-          "type": "string"
-        }
-      },
-      "required": [
-        "query",
-        "start",
-        "end"
-      ]
-    },
-    "name": "prometheus_query_range"
   },
   {
     "annotations": {
