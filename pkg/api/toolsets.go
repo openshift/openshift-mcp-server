@@ -55,14 +55,45 @@ type ToolCallRequest interface {
 type ToolCallResult struct {
 	// Raw content returned by the tool.
 	Content string
+	// StructuredContent is an optional JSON-serializable value for MCP Apps UI rendering.
+	// When set, it is passed as structuredContent in the MCP CallToolResult alongside Content.
+	// Must be completely omitted (nil) when not used.
+	StructuredContent any
 	// Error (non-protocol) to send back to the LLM.
 	Error error
 }
 
+// NewToolCallResult creates a ToolCallResult with text content only.
+// Use this for tools that return human-readable text output.
 func NewToolCallResult(content string, err error) *ToolCallResult {
 	return &ToolCallResult{
 		Content: content,
 		Error:   err,
+	}
+}
+
+// NewToolCallResultStructured creates a ToolCallResult with structured content.
+// The structured value is automatically JSON-serialized into the Content field
+// for backward compatibility with MCP clients that don't support structuredContent.
+//
+// Per the MCP specification:
+// "For backwards compatibility, a tool that returns structured content SHOULD
+// also return the serialized JSON in a TextContent block."
+// https://modelcontextprotocol.io/specification/2025-11-25/server/tools#structured-content
+//
+// Use this for tools that return typed/structured data (maps, slices, structs)
+// that MCP clients can parse programmatically.
+func NewToolCallResultStructured(structured any, err error) *ToolCallResult {
+	content := ""
+	if structured != nil {
+		if b, jsonErr := json.Marshal(structured); jsonErr == nil {
+			content = string(b)
+		}
+	}
+	return &ToolCallResult{
+		Content:           content,
+		StructuredContent: structured,
+		Error:             err,
 	}
 }
 
@@ -88,6 +119,9 @@ type Tool struct {
 	Description string `json:"description,omitempty"`
 	// Additional tool information.
 	Annotations ToolAnnotations `json:"annotations"`
+	// Meta contains additional metadata for the tool (e.g., MCP Apps UI resource URI).
+	// Example: map[string]any{"ui": map[string]any{"resourceUri": "ui://server/app.html"}}
+	Meta map[string]any `json:"_meta,omitempty"`
 	// A JSON Schema object defining the expected parameters for the tool.
 	InputSchema *jsonschema.Schema
 }

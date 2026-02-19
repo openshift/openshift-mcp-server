@@ -18,7 +18,7 @@ LD_FLAGS = -s -w \
 COMMON_BUILD_ARGS = -ldflags "$(LD_FLAGS)"
 
 GOLANGCI_LINT = $(shell pwd)/_output/tools/bin/golangci-lint
-GOLANGCI_LINT_VERSION ?= v2.8.0
+GOLANGCI_LINT_VERSION ?= v2.9.0
 
 # NPM version should not append the -dirty flag
 GIT_TAG_VERSION ?= $(shell echo $(shell git describe --tags --always) | sed 's/^v//')
@@ -85,8 +85,9 @@ lint: golangci-lint ## Lint the code
 	$(GOLANGCI_LINT) run --verbose --print-resources-usage
 
 .PHONY: update-readme-tools
-update-readme-tools: ## Update the README.md file with the latest toolsets
+update-readme-tools: ## Update the README.md and docs/configuration.md files with the latest toolsets
 	go run ./internal/tools/update-readme/main.go README.md
+	go run ./internal/tools/update-readme/main.go docs/configuration.md
 
 ##@ Local Development
 

@@ -43,12 +43,12 @@ func initResources(o api.Openshift) []api.ServerTool {
 					"labelSelector": {
 						Type:        "string",
 						Description: "Optional Kubernetes label selector (e.g. 'app=myapp,env=prod' or 'app in (myapp,yourapp)'), use this option when you want to filter the resources by label",
-						Pattern:     "([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]",
+						Pattern:     REGEX_LABELSELECTOR_VALID_CHARS,
 					},
 					"fieldSelector": {
 						Type:        "string",
 						Description: "Optional Kubernetes field selector to filter resources by field values (e.g. 'status.phase=Running', 'metadata.name=myresource'). Supported fields vary by resource type. For Pods: metadata.name, metadata.namespace, spec.nodeName, spec.restartPolicy, spec.schedulerName, spec.serviceAccountName, status.phase (Pending/Running/Succeeded/Failed/Unknown), status.podIP, status.nominatedNodeName. See https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/",
-						Pattern:     "([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]",
+						Pattern:     REGEX_FIELDSELECTOR,
 					},
 				},
 				Required: []string{"apiVersion", "kind"},
@@ -133,6 +133,10 @@ func initResources(o api.Openshift) []api.ServerTool {
 					"name": {
 						Type:        "string",
 						Description: "Name of the resource",
+					},
+					"gracePeriodSeconds": {
+						Type:        "integer",
+						Description: "Optional duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used",
 					},
 				},
 				Required: []string{"apiVersion", "kind", "name"},
@@ -305,7 +309,16 @@ func resourcesDelete(params api.ToolHandlerParams) (*api.ToolCallResult, error) 
 		return api.NewToolCallResult("", fmt.Errorf("name is not a string")), nil
 	}
 
-	err = kubernetes.NewCore(params).ResourcesDelete(params, gvk, ns, n)
+	var gracePeriodSecondsPtr *int64
+	if value, ok := params.GetArguments()["gracePeriodSeconds"]; ok {
+		gracePeriodSeconds, err := api.ParseInt64(value)
+		if err != nil {
+			return api.NewToolCallResult("", fmt.Errorf("failed to delete resource, invalid argument gracePeriodSeconds")), nil
+		}
+		gracePeriodSecondsPtr = &gracePeriodSeconds
+	}
+
+	err = kubernetes.NewCore(params).ResourcesDelete(params, gvk, ns, n, gracePeriodSecondsPtr)
 	if err != nil {
 		mcplog.HandleK8sError(params.Context, err, "resource deletion")
 		return api.NewToolCallResult("", fmt.Errorf("failed to delete resource: %w", err)), nil
