@@ -274,6 +274,7 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 =======
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 | Toolset       | Description                                                                                                                                                     | Default |
 |---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
 | config        | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                         | ✓       |
@@ -346,6 +347,7 @@ If the user mentions a specific alert by name, use get_alerts with a filter to r
 =======
 | helm     | Tools for managing Helm charts and releases                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | ✓       |
 >>>>>>> 0d6b5897 (Update to use commit)
+<<<<<<< HEAD
 >>>>>>> 52847fbb (Update to use commit)
 
 ## MANDATORY WORKFLOW - ALWAYS FOLLOW THIS ORDER
@@ -381,6 +383,19 @@ If the user mentions a specific alert by name, use get_alerts with a filter to r
 | helm     | Tools for managing Helm charts and releases                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | ✓       |
 >>>>>>> 785d3972 (Add AM tools to toolset via rhobs/obs-mcp)
 >>>>>>> 57b5c00f (Add AM tools to toolset via rhobs/obs-mcp)
+=======
+=======
+| Toolset  | Description                                                                                                                                                     | Default |
+|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| config   | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                         | ✓       |
+| core     | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                             | ✓       |
+| kcp      | Manage kcp workspaces and multi-tenancy features                                                                                                                |         |
+| ossm     | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details. |         |
+| kubevirt | KubeVirt virtual machine management tools                                                                                                                       |         |
+| obs-mcp  | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                   | ✓       |
+| helm     | Tools for managing Helm charts and releases                                                                                                                     | ✓       |
+>>>>>>> e64d4178 (Use latest rhobs/obs-mcp)
+>>>>>>> 27b19ad7 (Use latest rhobs/obs-mcp)
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -710,6 +725,8 @@ This tool MUST be called first for EVERY observability question to:
 1. Discover what metrics actually exist in this environment
 2. Find the EXACT metric name to use in queries
 3. Avoid querying non-existent metrics
+4. The 'name_regex' parameter should always be provided, and be a best guess of what the metric would be named like.
+5. Do not use a blanket regex like .* or .+ in the 'name_regex' parameter. Use specific ones like kube.*, node.*, etc.
 
 NEVER skip this step. NEVER guess metric names. Metric names vary between environments.
 
@@ -717,6 +734,7 @@ After calling this tool:
 1. Search the returned list for relevant metrics
 2. Use the EXACT metric name found in subsequent queries
 3. If no relevant metric exists, inform the user
+  - `name_regex` (`string`) **(required)** - Regex pattern to filter metric names (e.g., 'http_.*', 'node_.*', 'kube.*'). This parameter is required. Don't pass in blanket regex.
 
 - **execute_instant_query** - Execute a PromQL instant query to get current/point-in-time values.
 
