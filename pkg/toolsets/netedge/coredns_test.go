@@ -1,31 +1,15 @@
 package netedge
 
 import (
-	"context"
-	"testing"
-
-	"github.com/containers/kubernetes-mcp-server/pkg/api"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"k8s.io/client-go/dynamic/fake"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
-// mockKubernetesClient implements api.KubernetesClient for testing
-type mockKubernetesClient struct {
-	api.KubernetesClient
-	restConfig *rest.Config
-}
+func (s *NetEdgeTestSuite) TestGetCoreDNSConfig() {
 
-func (m *mockKubernetesClient) RESTConfig() *rest.Config {
-	return m.restConfig
-}
-
-func TestGetCoreDNSConfig(t *testing.T) {
 	tests := []struct {
 		name           string
 		configMap      *corev1.ConfigMap
@@ -72,39 +56,34 @@ func TestGetCoreDNSConfig(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			// Setup mock client
 			objs := []runtime.Object{}
 			if tt.configMap != nil {
 				objs = append(objs, tt.configMap)
 			}
 
-			// Override newClientFunc to return fake client
-			originalNewClientFunc := newClientFunc
-			defer func() { newClientFunc = originalNewClientFunc }()
+			// Setup fake dynamic client
+			scheme := runtime.NewScheme()
+			_ = clientgoscheme.AddToScheme(scheme)
 
-			newClientFunc = func(config *rest.Config, options client.Options) (client.Client, error) {
-				return fake.NewClientBuilder().WithRuntimeObjects(objs...).Build(), nil
-			}
+			// Create a fake dynamic client with the objects
+			dynClient := fake.NewSimpleDynamicClient(scheme, objs...)
+			s.SetDynamicClient(dynClient)
 
-			// Call handler
-			params := api.ToolHandlerParams{
-				Context:          context.Background(),
-				KubernetesClient: &mockKubernetesClient{restConfig: &rest.Config{}},
-			}
-
-			result, err := getCoreDNSConfig(params)
+			// Call handler using suite params
+			result, err := getCoreDNSConfig(s.params)
 
 			if tt.expectError {
-				require.NoError(t, err) // Handler returns error in result, not as return value
-				require.NotNil(t, result)
-				require.Error(t, result.Error)
-				assert.Contains(t, result.Error.Error(), tt.errorContains)
+				s.Require().NoError(err) // Handler returns error in result, not as return value
+				s.Require().NotNil(result)
+				s.Require().Error(result.Error)
+				s.Assert().Contains(result.Error.Error(), tt.errorContains)
 			} else {
-				require.NoError(t, err)
-				require.NotNil(t, result)
-				require.NoError(t, result.Error)
-				assert.Equal(t, tt.expectedOutput, result.Content)
+				s.Require().NoError(err)
+				s.Require().NotNil(result)
+				s.Require().NoError(result.Error)
+				s.Assert().Equal(tt.expectedOutput, result.Content)
 			}
 		})
 	}
