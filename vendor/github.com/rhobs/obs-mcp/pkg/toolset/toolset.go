@@ -6,7 +6,6 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
 
-	"github.com/rhobs/obs-mcp/pkg/tools"
 	toolset_tools "github.com/rhobs/obs-mcp/pkg/toolset/tools"
 )
 
@@ -22,7 +21,7 @@ func (t *Toolset) GetName() string {
 
 // GetDescription returns a human-readable description of the toolset.
 func (t *Toolset) GetDescription() string {
-	return tools.ServerPrompt
+	return "Toolset for querying Prometheus and Alertmanager endpoints in efficient ways."
 }
 
 // GetTools returns all tools provided by this toolset.

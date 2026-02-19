@@ -15,7 +15,7 @@ func ListMetricsHandler(params api.ToolHandlerParams) (*api.ToolCallResult, erro
 		return api.NewToolCallResult("", fmt.Errorf("failed to create Prometheus client: %w", err)), nil
 	}
 
-	return tools.ListMetricsHandler(params.Context, promClient).ToToolsetResult()
+	return tools.ListMetricsHandler(params.Context, promClient, tools.BuildListMetricsInput(params.GetArguments())).ToToolsetResult()
 }
 
 // ExecuteInstantQueryHandler handles the execution of Prometheus instant queries.
