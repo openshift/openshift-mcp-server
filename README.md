@@ -249,92 +249,15 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 
 <!-- AVAILABLE-TOOLSETS-START -->
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-| Toolset       | Description                                                                                                                                                     | Default |
-|---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| config        | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                         | ✓       |
-| core          | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                             | ✓       |
-| helm          | Tools for managing Helm charts and releases                                                                                                                     | ✓       |
-| kcp           | Manage kcp workspaces and multi-tenancy features                                                                                                                |         |
-| openshift     | OpenShift-specific tools for cluster management and troubleshooting, check the [OpenShift documentation](docs/OPENSHIFT.md) for more details.                   |         |
-| kubevirt      | KubeVirt virtual machine management tools                                                                                                                       |         |
-| observability | Cluster observability tools for querying Prometheus metrics and Alertmanager alerts                                                                             | ✓       |
-| ossm          | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details. |         |
-=======
-| Toolset  | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Default |
-|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| config   | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | ✓       |
-| core     | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | ✓       |
-| kcp      | Manage kcp workspaces and multi-tenancy features                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |         |
-| ossm     | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |         |
-| kubevirt | KubeVirt virtual machine management tools                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |         |
-| obs-mcp  | Advanced observability tools for comprehensive Prometheus metrics querying with guardrails and discovery features.
-=======
-| Toolset  | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Default |
-|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| config   | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | ✓       |
-| core     | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | ✓       |
-| kcp      | Manage kcp workspaces and multi-tenancy features                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |         |
-| ossm     | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |         |
-| kubevirt | KubeVirt virtual machine management tools                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |         |
-| obs-mcp  | You are an expert Kubernetes and OpenShift observability assistant with direct access to Prometheus metrics and Alertmanager alerts through this MCP server.
->>>>>>> 0d6b5897 (Update to use commit)
-
-## INVESTIGATION STARTING POINT
-
-When the user asks about issues, errors, failures, outages, or things going wrong - consider calling get_alerts first to see what's currently firing. Alert labels provide exact identifiers (namespaces, pods, services) useful for targeted metric queries.
-
-If the user mentions a specific alert by name, use get_alerts with a filter to retrieve its full labels before investigating further.
-
-## MANDATORY WORKFLOW FOR QUERYING - ALWAYS FOLLOW THIS ORDER
-
-**STEP 1: ALWAYS call list_metrics FIRST**
-- This is NON-NEGOTIABLE for EVERY question
-- NEVER skip this step, even if you think you know the metric name
-- NEVER guess metric names - they vary between environments
-- Search the returned list to find the exact metric name that exists
-
-**STEP 2: Call get_label_names for the metric you found**
-- Discover available labels for filtering (namespace, pod, service, etc.)
-
-**STEP 3: Call get_label_values if you need specific filter values**
-- Find exact label values (e.g., actual namespace names, pod names)
-
-**STEP 4: Execute your query using the EXACT metric name from Step 1**
-- Use execute_instant_query for current state questions
-- Use execute_range_query for trends/historical analysis
-
-## CRITICAL RULES
-
-1. **NEVER query a metric without first calling list_metrics** - You must verify the metric exists
-2. **Use EXACT metric names from list_metrics output** - Do not modify or guess metric names
-3. **If list_metrics doesn't return a relevant metric, tell the user** - Don't fabricate queries
-4. **BE PROACTIVE** - Complete all steps automatically without asking for confirmation. When you find a relevant metric, proceed to query.
-5. **UNDERSTAND TIME FRAMES** - Use the start and end parameters to specify the time frame for your queries. You can use NOW for current time liberally across parameters, and NOW±duration for relative time frames.
-
-## Query Type Selection
-
-- **execute_instant_query**: Current values, point-in-time snapshots, "right now" questions
-- **execute_range_query**: Trends over time, rate calculations, historical analysis  |         |
-<<<<<<< HEAD
-| helm     | Tools for managing Helm charts and releases                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | ✓       |
->>>>>>> 785d3972 (Add AM tools to toolset via rhobs/obs-mcp)
-=======
-| helm     | Tools for managing Helm charts and releases                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | ✓       |
->>>>>>> 0d6b5897 (Update to use commit)
-=======
 | Toolset  | Description                                                                                                                                                     | Default |
 |----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
 | config   | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                         | ✓       |
 | core     | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                             | ✓       |
-| kcp      | Manage kcp workspaces and multi-tenancy features                                                                                                                |         |
-| ossm     | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details. |         |
-| kubevirt | KubeVirt virtual machine management tools                                                                                                                       |         |
-| obs-mcp  | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                   | ✓       |
 | helm     | Tools for managing Helm charts and releases                                                                                                                     | ✓       |
->>>>>>> e64d4178 (Use latest rhobs/obs-mcp)
+| kcp      | Manage kcp workspaces and multi-tenancy features                                                                                                                |         |
+| kubevirt | KubeVirt virtual machine management tools                                                                                                                       |         |
+| obs-mcp  | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                   |         |
+| ossm     | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details. |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -519,142 +442,6 @@ In case multi-cluster support is enabled (default) and you have access to multip
 
 <details>
 
-<summary>observability</summary>
-
-- **prometheus_query** - Execute an instant PromQL query against the cluster's Thanos Querier.
-Returns current metric values at the specified time (or current time if not specified).
-Use this for point-in-time metric values.
-
-Common queries:
-- up{job="apiserver"} - Check if API server is up
-- sum by(namespace) (container_memory_usage_bytes) - Memory usage by namespace
-- rate(container_cpu_usage_seconds_total[5m]) - CPU usage rate
-- kube_pod_status_phase{phase="Running"} - Running pods count
-  - `query` (`string`) **(required)** - PromQL query string (e.g., 'up{job="apiserver"}', 'sum by(namespace) (container_memory_usage_bytes)')
-  - `time` (`string`) - Optional evaluation timestamp. Accepts RFC3339 format (e.g., '2024-01-01T12:00:00Z') or Unix timestamp. If not provided, uses current time.
-
-- **prometheus_query_range** - Execute a range PromQL query against the cluster's Thanos Querier.
-Returns metric values over a time range with specified resolution.
-Use this for time-series data, trends, and historical analysis.
-
-Supports relative times:
-- 'now' for current time
-- '-10m', '-1h', '-1d' for relative past times
-
-Example: Get CPU usage over the last hour with 1-minute resolution.
-  - `end` (`string`) **(required)** - End time. Accepts RFC3339 timestamp, Unix timestamp, 'now', or relative time
-  - `query` (`string`) **(required)** - PromQL query string (e.g., 'rate(container_cpu_usage_seconds_total[5m])')
-  - `start` (`string`) **(required)** - Start time. Accepts RFC3339 timestamp (e.g., '2024-01-01T12:00:00Z'), Unix timestamp, or relative time (e.g., '-1h', '-30m', '-1d')
-  - `step` (`string`) - Query resolution step width (e.g., '15s', '1m', '5m'). Determines the granularity of returned data points. Default: '1m'
-
-- **alertmanager_alerts** - Query active and pending alerts from the cluster's Alertmanager.
-Useful for monitoring cluster health, detecting issues, and incident response.
-
-Returns alerts with their labels, annotations, status, and timing information.
-Can filter by active/silenced/inhibited state.
-
-Common use cases:
-- Check for critical alerts affecting the cluster
-- Monitor for specific alert types (e.g., high CPU, disk pressure)
-- Verify alert silences are working correctly
-  - `active` (`boolean`) - Filter for active (firing) alerts. Default: true
-  - `filter` (`string`) - Optional filter using Alertmanager filter syntax. Examples: 'alertname=Watchdog', 'severity=critical', 'namespace=openshift-monitoring'
-  - `inhibited` (`boolean`) - Include inhibited alerts in the results. Default: false
-  - `silenced` (`boolean`) - Include silenced alerts in the results. Default: false
-
-</details>
-
-<details>
-
-<summary>ossm</summary>
-
-- **ossm_mesh_graph** - Returns the topology of a specific namespaces, health, status of the mesh and namespaces. Includes a mesh health summary overview with aggregated counts of healthy, degraded, and failing apps, workloads, and services. Use this for high-level overviews
-  - `graphType` (`string`) - Optional type of graph to return: 'versionedApp', 'app', 'service', 'workload', 'mesh'
-  - `namespace` (`string`) - Optional single namespace to include in the graph (alternative to namespaces)
-  - `namespaces` (`string`) - Optional comma-separated list of namespaces to include in the graph
-  - `rateInterval` (`string`) - Optional rate interval for fetching (e.g., '10m', '5m', '1h').
-
-- **ossm_manage_istio_config_read** - Lists or gets Istio configuration objects (Gateways, VirtualServices, etc.)
-  - `action` (`string`) **(required)** - Action to perform: list or get
-  - `group` (`string`) - API group of the Istio object (e.g., 'networking.istio.io', 'gateway.networking.k8s.io')
-  - `kind` (`string`) - Kind of the Istio object (e.g., 'DestinationRule', 'VirtualService', 'HTTPRoute', 'Gateway')
-  - `name` (`string`) - Name of the Istio object
-  - `namespace` (`string`) - Namespace containing the Istio object
-  - `version` (`string`) - API version of the Istio object (e.g., 'v1', 'v1beta1')
-
-- **ossm_manage_istio_config** - Creates, patches, or deletes Istio configuration objects (Gateways, VirtualServices, etc.)
-  - `action` (`string`) **(required)** - Action to perform: create, patch, or delete
-  - `group` (`string`) - API group of the Istio object (e.g., 'networking.istio.io', 'gateway.networking.k8s.io')
-  - `json_data` (`string`) - JSON data to apply or create the object
-  - `kind` (`string`) - Kind of the Istio object (e.g., 'DestinationRule', 'VirtualService', 'HTTPRoute', 'Gateway')
-  - `name` (`string`) - Name of the Istio object
-  - `namespace` (`string`) - Namespace containing the Istio object
-  - `version` (`string`) - API version of the Istio object (e.g., 'v1', 'v1beta1')
-
-- **ossm_get_resource_details** - Gets lists or detailed info for Kubernetes resources (services, workloads) within the mesh
-  - `namespaces` (`string`) - Comma-separated list of namespaces to get services from (e.g. 'bookinfo' or 'bookinfo,default'). If not provided, will list services from all accessible namespaces
-  - `resource_name` (`string`) - Name of the resource to get details for (optional string - if provided, gets details; if empty, lists all).
-  - `resource_type` (`string`) - Type of resource to get details for (service, workload)
-
-- **ossm_get_metrics** - Gets lists or detailed info for Kubernetes resources (services, workloads) within the mesh
-  - `byLabels` (`string`) - Comma-separated list of labels to group metrics by (e.g., 'source_workload,destination_service'). Optional
-  - `direction` (`string`) - Traffic direction: 'inbound' or 'outbound'. Optional, defaults to 'outbound'
-  - `duration` (`string`) - Time range to get metrics for (optional string - if provided, gets metrics (e.g., '1m', '5m', '1h'); if empty, get default 30m).
-  - `namespace` (`string`) **(required)** - Namespace to get resources from
-  - `quantiles` (`string`) - Comma-separated list of quantiles for histogram metrics (e.g., '0.5,0.95,0.99'). Optional
-  - `rateInterval` (`string`) - Rate interval for metrics (e.g., '1m', '5m'). Optional, defaults to '10m'
-  - `reporter` (`string`) - Metrics reporter: 'source', 'destination', or 'both'. Optional, defaults to 'source'
-  - `requestProtocol` (`string`) - Filter by request protocol (e.g., 'http', 'grpc', 'tcp'). Optional
-  - `resource_name` (`string`) **(required)** - Name of the resource to get details for (optional string - if provided, gets details; if empty, lists all).
-  - `resource_type` (`string`) **(required)** - Type of resource to get details for (service, workload)
-  - `step` (`string`) - Step between data points in seconds (e.g., '15'). Optional, defaults to 15 seconds
-
-- **ossm_workload_logs** - Get logs for a specific workload's pods in a namespace. Only requires namespace and workload name - automatically discovers pods and containers. Optionally filter by container name, time range, and other parameters. Container is auto-detected if not specified.
-  - `container` (`string`) - Optional container name to filter logs. If not provided, automatically detects and uses the main application container (excludes istio-proxy and istio-init)
-  - `namespace` (`string`) **(required)** - Namespace containing the workload
-  - `since` (`string`) - Time duration to fetch logs from (e.g., '5m', '1h', '30s'). If not provided, returns recent logs
-  - `tail` (`integer`) - Number of lines to retrieve from the end of logs (default: 100)
-  - `workload` (`string`) **(required)** - Name of the workload to get logs for
-
-- **ossm_get_traces** - Gets traces for a specific resource (app, service, workload) in a namespace, or gets detailed information for a specific trace by its ID. If traceId is provided, it returns detailed trace information and other parameters are not required.
-  - `clusterName` (`string`) - Cluster name for multi-cluster environments (optional, only used when traceId is not provided)
-  - `endMicros` (`string`) - End time for traces in microseconds since epoch (optional, defaults to 10 minutes after startMicros if not provided, only used when traceId is not provided)
-  - `limit` (`integer`) - Maximum number of traces to return (default: 100, only used when traceId is not provided)
-  - `minDuration` (`integer`) - Minimum trace duration in microseconds (optional, only used when traceId is not provided)
-  - `namespace` (`string`) - Namespace to get resources from. Required if traceId is not provided.
-  - `resource_name` (`string`) - Name of the resource to get traces for. Required if traceId is not provided.
-  - `resource_type` (`string`) - Type of resource to get traces for (app, service, workload). Required if traceId is not provided.
-  - `startMicros` (`string`) - Start time for traces in microseconds since epoch (optional, defaults to 10 minutes before current time if not provided, only used when traceId is not provided)
-  - `tags` (`string`) - JSON string of tags to filter traces (optional, only used when traceId is not provided)
-  - `traceId` (`string`) - Unique identifier of the trace to retrieve detailed information for. If provided, this will return detailed trace information and other parameters (resource_type, namespace, resource_name) are not required.
-
-</details>
-
-<details>
-
-<summary>openshift</summary>
-
-- **vm_create** - Create a VirtualMachine in the cluster with the specified configuration, automatically resolving instance types, preferences, and container disk images. VM will be created in Halted state by default; use autostart parameter to start it immediately.
-  - `autostart` (`boolean`) - Optional flag to automatically start the VM after creation (sets runStrategy to Always instead of Halted). Defaults to false.
-  - `instancetype` (`string`) - Optional instance type name for the VM (e.g., 'u1.small', 'u1.medium', 'u1.large')
-  - `name` (`string`) **(required)** - The name of the virtual machine
-  - `namespace` (`string`) **(required)** - The namespace for the virtual machine
-  - `networks` (`array`) - Optional secondary network interfaces to attach to the VM. Each item specifies a Multus NetworkAttachmentDefinition to attach. Accepts either simple strings (NetworkAttachmentDefinition names) or objects with 'name' (interface name in VM) and 'networkName' (NetworkAttachmentDefinition name) properties. Each network creates a bridge interface on the VM.
-  - `performance` (`string`) - Optional performance family hint for the VM instance type (e.g., 'u1' for general-purpose, 'o1' for overcommitted, 'c1' for compute-optimized, 'm1' for memory-optimized). Defaults to 'u1' (general-purpose) if not specified.
-  - `preference` (`string`) - Optional preference name for the VM
-  - `size` (`string`) - Optional workload size hint for the VM (e.g., 'small', 'medium', 'large', 'xlarge'). Used to auto-select an appropriate instance type if not explicitly specified.
-  - `storage` (`string`) - Optional storage size for the VM's root disk when using DataSources (e.g., '30Gi', '50Gi', '100Gi'). Defaults to 30Gi. Ignored when using container disks.
-  - `workload` (`string`) - The workload for the VM. Accepts OS names (e.g., 'fedora' (default), 'ubuntu', 'centos', 'centos-stream', 'debian', 'rhel', 'opensuse', 'opensuse-tumbleweed', 'opensuse-leap') or full container disk image URLs
-
-- **vm_lifecycle** - Manage VirtualMachine lifecycle: start, stop, or restart a VM
-  - `action` (`string`) **(required)** - The lifecycle action to perform: 'start' (changes runStrategy to Always), 'stop' (changes runStrategy to Halted), or 'restart' (stops then starts the VM)
-  - `name` (`string`) **(required)** - The name of the virtual machine
-  - `namespace` (`string`) **(required)** - The namespace of the virtual machine
-
-</details>
-
-<details>
-
 <summary>obs-mcp</summary>
 
 - **list_metrics** - MANDATORY FIRST STEP: List all available metric names in Prometheus.
@@ -791,21 +578,67 @@ Silences are used to temporarily mute alerts based on label matchers. This tool 
 
 <details>
 
-<summary>helm</summary>
+<summary>ossm</summary>
 
-- **helm_install** - Install a Helm chart in the current or provided namespace
-  - `chart` (`string`) **(required)** - Chart reference to install (for example: stable/grafana, oci://ghcr.io/nginxinc/charts/nginx-ingress)
-  - `name` (`string`) - Name of the Helm release (Optional, random name if not provided)
-  - `namespace` (`string`) - Namespace to install the Helm chart in (Optional, current namespace if not provided)
-  - `values` (`object`) - Values to pass to the Helm chart (Optional)
+- **ossm_mesh_graph** - Returns the topology of a specific namespaces, health, status of the mesh and namespaces. Includes a mesh health summary overview with aggregated counts of healthy, degraded, and failing apps, workloads, and services. Use this for high-level overviews
+  - `graphType` (`string`) - Optional type of graph to return: 'versionedApp', 'app', 'service', 'workload', 'mesh'
+  - `namespace` (`string`) - Optional single namespace to include in the graph (alternative to namespaces)
+  - `namespaces` (`string`) - Optional comma-separated list of namespaces to include in the graph
+  - `rateInterval` (`string`) - Optional rate interval for fetching (e.g., '10m', '5m', '1h').
 
-- **helm_list** - List all the Helm releases in the current or provided namespace (or in all namespaces if specified)
-  - `all_namespaces` (`boolean`) - If true, lists all Helm releases in all namespaces ignoring the namespace argument (Optional)
-  - `namespace` (`string`) - Namespace to list Helm releases from (Optional, all namespaces if not provided)
+- **ossm_manage_istio_config_read** - Lists or gets Istio configuration objects (Gateways, VirtualServices, etc.)
+  - `action` (`string`) **(required)** - Action to perform: list or get
+  - `group` (`string`) - API group of the Istio object (e.g., 'networking.istio.io', 'gateway.networking.k8s.io')
+  - `kind` (`string`) - Kind of the Istio object (e.g., 'DestinationRule', 'VirtualService', 'HTTPRoute', 'Gateway')
+  - `name` (`string`) - Name of the Istio object
+  - `namespace` (`string`) - Namespace containing the Istio object
+  - `version` (`string`) - API version of the Istio object (e.g., 'v1', 'v1beta1')
 
-- **helm_uninstall** - Uninstall a Helm release in the current or provided namespace
-  - `name` (`string`) **(required)** - Name of the Helm release to uninstall
-  - `namespace` (`string`) - Namespace to uninstall the Helm release from (Optional, current namespace if not provided)
+- **ossm_manage_istio_config** - Creates, patches, or deletes Istio configuration objects (Gateways, VirtualServices, etc.)
+  - `action` (`string`) **(required)** - Action to perform: create, patch, or delete
+  - `group` (`string`) - API group of the Istio object (e.g., 'networking.istio.io', 'gateway.networking.k8s.io')
+  - `json_data` (`string`) - JSON data to apply or create the object
+  - `kind` (`string`) - Kind of the Istio object (e.g., 'DestinationRule', 'VirtualService', 'HTTPRoute', 'Gateway')
+  - `name` (`string`) - Name of the Istio object
+  - `namespace` (`string`) - Namespace containing the Istio object
+  - `version` (`string`) - API version of the Istio object (e.g., 'v1', 'v1beta1')
+
+- **ossm_get_resource_details** - Gets lists or detailed info for Kubernetes resources (services, workloads) within the mesh
+  - `namespaces` (`string`) - Comma-separated list of namespaces to get services from (e.g. 'bookinfo' or 'bookinfo,default'). If not provided, will list services from all accessible namespaces
+  - `resource_name` (`string`) - Name of the resource to get details for (optional string - if provided, gets details; if empty, lists all).
+  - `resource_type` (`string`) - Type of resource to get details for (service, workload)
+
+- **ossm_get_metrics** - Gets lists or detailed info for Kubernetes resources (services, workloads) within the mesh
+  - `byLabels` (`string`) - Comma-separated list of labels to group metrics by (e.g., 'source_workload,destination_service'). Optional
+  - `direction` (`string`) - Traffic direction: 'inbound' or 'outbound'. Optional, defaults to 'outbound'
+  - `duration` (`string`) - Time range to get metrics for (optional string - if provided, gets metrics (e.g., '1m', '5m', '1h'); if empty, get default 30m).
+  - `namespace` (`string`) **(required)** - Namespace to get resources from
+  - `quantiles` (`string`) - Comma-separated list of quantiles for histogram metrics (e.g., '0.5,0.95,0.99'). Optional
+  - `rateInterval` (`string`) - Rate interval for metrics (e.g., '1m', '5m'). Optional, defaults to '10m'
+  - `reporter` (`string`) - Metrics reporter: 'source', 'destination', or 'both'. Optional, defaults to 'source'
+  - `requestProtocol` (`string`) - Filter by request protocol (e.g., 'http', 'grpc', 'tcp'). Optional
+  - `resource_name` (`string`) **(required)** - Name of the resource to get details for (optional string - if provided, gets details; if empty, lists all).
+  - `resource_type` (`string`) **(required)** - Type of resource to get details for (service, workload)
+  - `step` (`string`) - Step between data points in seconds (e.g., '15'). Optional, defaults to 15 seconds
+
+- **ossm_workload_logs** - Get logs for a specific workload's pods in a namespace. Only requires namespace and workload name - automatically discovers pods and containers. Optionally filter by container name, time range, and other parameters. Container is auto-detected if not specified.
+  - `container` (`string`) - Optional container name to filter logs. If not provided, automatically detects and uses the main application container (excludes istio-proxy and istio-init)
+  - `namespace` (`string`) **(required)** - Namespace containing the workload
+  - `since` (`string`) - Time duration to fetch logs from (e.g., '5m', '1h', '30s'). If not provided, returns recent logs
+  - `tail` (`integer`) - Number of lines to retrieve from the end of logs (default: 100)
+  - `workload` (`string`) **(required)** - Name of the workload to get logs for
+
+- **ossm_get_traces** - Gets traces for a specific resource (app, service, workload) in a namespace, or gets detailed information for a specific trace by its ID. If traceId is provided, it returns detailed trace information and other parameters are not required.
+  - `clusterName` (`string`) - Cluster name for multi-cluster environments (optional, only used when traceId is not provided)
+  - `endMicros` (`string`) - End time for traces in microseconds since epoch (optional, defaults to 10 minutes after startMicros if not provided, only used when traceId is not provided)
+  - `limit` (`integer`) - Maximum number of traces to return (default: 100, only used when traceId is not provided)
+  - `minDuration` (`integer`) - Minimum trace duration in microseconds (optional, only used when traceId is not provided)
+  - `namespace` (`string`) - Namespace to get resources from. Required if traceId is not provided.
+  - `resource_name` (`string`) - Name of the resource to get traces for. Required if traceId is not provided.
+  - `resource_type` (`string`) - Type of resource to get traces for (app, service, workload). Required if traceId is not provided.
+  - `startMicros` (`string`) - Start time for traces in microseconds since epoch (optional, defaults to 10 minutes before current time if not provided, only used when traceId is not provided)
+  - `tags` (`string`) - JSON string of tags to filter traces (optional, only used when traceId is not provided)
+  - `traceId` (`string`) - Unique identifier of the trace to retrieve detailed information for. If provided, this will return detailed trace information and other parameters (resource_type, namespace, resource_name) are not required.
 
 </details>
 
