@@ -261,6 +261,7 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 <!-- AVAILABLE-TOOLSETS-START -->
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 | Toolset   | Description                                                                                                                                                     | Default |
 |-----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
 | config    | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                         | ✓       |
@@ -385,17 +386,22 @@ If the user mentions a specific alert by name, use get_alerts with a filter to r
 >>>>>>> 57b5c00f (Add AM tools to toolset via rhobs/obs-mcp)
 =======
 =======
+=======
+>>>>>>> 227279d4 (Fix test)
 | Toolset  | Description                                                                                                                                                     | Default |
 |----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
 | config   | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                         | ✓       |
 | core     | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                             | ✓       |
-| kcp      | Manage kcp workspaces and multi-tenancy features                                                                                                                |         |
-| ossm     | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details. |         |
-| kubevirt | KubeVirt virtual machine management tools                                                                                                                       |         |
-| obs-mcp  | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                   | ✓       |
 | helm     | Tools for managing Helm charts and releases                                                                                                                     | ✓       |
+<<<<<<< HEAD
 >>>>>>> e64d4178 (Use latest rhobs/obs-mcp)
 >>>>>>> 27b19ad7 (Use latest rhobs/obs-mcp)
+=======
+| kcp      | Manage kcp workspaces and multi-tenancy features                                                                                                                |         |
+| kubevirt | KubeVirt virtual machine management tools                                                                                                                       |         |
+| obs-mcp  | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                   |         |
+| ossm     | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details. |         |
+>>>>>>> 227279d4 (Fix test)
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -580,6 +586,7 @@ In case multi-cluster support is enabled (default) and you have access to multip
 
 <details>
 
+<<<<<<< HEAD
 <summary>observability</summary>
 
 - **prometheus_query** - Execute an instant PromQL query against the cluster's Thanos Querier.
@@ -715,6 +722,8 @@ Common use cases:
 
 <details>
 
+=======
+>>>>>>> 227279d4 (Fix test)
 <summary>obs-mcp</summary>
 
 - **list_metrics** - MANDATORY FIRST STEP: List all available metric names in Prometheus.
@@ -851,21 +860,67 @@ Silences are used to temporarily mute alerts based on label matchers. This tool 
 
 <details>
 
-<summary>helm</summary>
+<summary>ossm</summary>
 
-- **helm_install** - Install a Helm chart in the current or provided namespace
-  - `chart` (`string`) **(required)** - Chart reference to install (for example: stable/grafana, oci://ghcr.io/nginxinc/charts/nginx-ingress)
-  - `name` (`string`) - Name of the Helm release (Optional, random name if not provided)
-  - `namespace` (`string`) - Namespace to install the Helm chart in (Optional, current namespace if not provided)
-  - `values` (`object`) - Values to pass to the Helm chart (Optional)
+- **ossm_mesh_graph** - Returns the topology of a specific namespaces, health, status of the mesh and namespaces. Includes a mesh health summary overview with aggregated counts of healthy, degraded, and failing apps, workloads, and services. Use this for high-level overviews
+  - `graphType` (`string`) - Optional type of graph to return: 'versionedApp', 'app', 'service', 'workload', 'mesh'
+  - `namespace` (`string`) - Optional single namespace to include in the graph (alternative to namespaces)
+  - `namespaces` (`string`) - Optional comma-separated list of namespaces to include in the graph
+  - `rateInterval` (`string`) - Optional rate interval for fetching (e.g., '10m', '5m', '1h').
 
-- **helm_list** - List all the Helm releases in the current or provided namespace (or in all namespaces if specified)
-  - `all_namespaces` (`boolean`) - If true, lists all Helm releases in all namespaces ignoring the namespace argument (Optional)
-  - `namespace` (`string`) - Namespace to list Helm releases from (Optional, all namespaces if not provided)
+- **ossm_manage_istio_config_read** - Lists or gets Istio configuration objects (Gateways, VirtualServices, etc.)
+  - `action` (`string`) **(required)** - Action to perform: list or get
+  - `group` (`string`) - API group of the Istio object (e.g., 'networking.istio.io', 'gateway.networking.k8s.io')
+  - `kind` (`string`) - Kind of the Istio object (e.g., 'DestinationRule', 'VirtualService', 'HTTPRoute', 'Gateway')
+  - `name` (`string`) - Name of the Istio object
+  - `namespace` (`string`) - Namespace containing the Istio object
+  - `version` (`string`) - API version of the Istio object (e.g., 'v1', 'v1beta1')
 
-- **helm_uninstall** - Uninstall a Helm release in the current or provided namespace
-  - `name` (`string`) **(required)** - Name of the Helm release to uninstall
-  - `namespace` (`string`) - Namespace to uninstall the Helm release from (Optional, current namespace if not provided)
+- **ossm_manage_istio_config** - Creates, patches, or deletes Istio configuration objects (Gateways, VirtualServices, etc.)
+  - `action` (`string`) **(required)** - Action to perform: create, patch, or delete
+  - `group` (`string`) - API group of the Istio object (e.g., 'networking.istio.io', 'gateway.networking.k8s.io')
+  - `json_data` (`string`) - JSON data to apply or create the object
+  - `kind` (`string`) - Kind of the Istio object (e.g., 'DestinationRule', 'VirtualService', 'HTTPRoute', 'Gateway')
+  - `name` (`string`) - Name of the Istio object
+  - `namespace` (`string`) - Namespace containing the Istio object
+  - `version` (`string`) - API version of the Istio object (e.g., 'v1', 'v1beta1')
+
+- **ossm_get_resource_details** - Gets lists or detailed info for Kubernetes resources (services, workloads) within the mesh
+  - `namespaces` (`string`) - Comma-separated list of namespaces to get services from (e.g. 'bookinfo' or 'bookinfo,default'). If not provided, will list services from all accessible namespaces
+  - `resource_name` (`string`) - Name of the resource to get details for (optional string - if provided, gets details; if empty, lists all).
+  - `resource_type` (`string`) - Type of resource to get details for (service, workload)
+
+- **ossm_get_metrics** - Gets lists or detailed info for Kubernetes resources (services, workloads) within the mesh
+  - `byLabels` (`string`) - Comma-separated list of labels to group metrics by (e.g., 'source_workload,destination_service'). Optional
+  - `direction` (`string`) - Traffic direction: 'inbound' or 'outbound'. Optional, defaults to 'outbound'
+  - `duration` (`string`) - Time range to get metrics for (optional string - if provided, gets metrics (e.g., '1m', '5m', '1h'); if empty, get default 30m).
+  - `namespace` (`string`) **(required)** - Namespace to get resources from
+  - `quantiles` (`string`) - Comma-separated list of quantiles for histogram metrics (e.g., '0.5,0.95,0.99'). Optional
+  - `rateInterval` (`string`) - Rate interval for metrics (e.g., '1m', '5m'). Optional, defaults to '10m'
+  - `reporter` (`string`) - Metrics reporter: 'source', 'destination', or 'both'. Optional, defaults to 'source'
+  - `requestProtocol` (`string`) - Filter by request protocol (e.g., 'http', 'grpc', 'tcp'). Optional
+  - `resource_name` (`string`) **(required)** - Name of the resource to get details for (optional string - if provided, gets details; if empty, lists all).
+  - `resource_type` (`string`) **(required)** - Type of resource to get details for (service, workload)
+  - `step` (`string`) - Step between data points in seconds (e.g., '15'). Optional, defaults to 15 seconds
+
+- **ossm_workload_logs** - Get logs for a specific workload's pods in a namespace. Only requires namespace and workload name - automatically discovers pods and containers. Optionally filter by container name, time range, and other parameters. Container is auto-detected if not specified.
+  - `container` (`string`) - Optional container name to filter logs. If not provided, automatically detects and uses the main application container (excludes istio-proxy and istio-init)
+  - `namespace` (`string`) **(required)** - Namespace containing the workload
+  - `since` (`string`) - Time duration to fetch logs from (e.g., '5m', '1h', '30s'). If not provided, returns recent logs
+  - `tail` (`integer`) - Number of lines to retrieve from the end of logs (default: 100)
+  - `workload` (`string`) **(required)** - Name of the workload to get logs for
+
+- **ossm_get_traces** - Gets traces for a specific resource (app, service, workload) in a namespace, or gets detailed information for a specific trace by its ID. If traceId is provided, it returns detailed trace information and other parameters are not required.
+  - `clusterName` (`string`) - Cluster name for multi-cluster environments (optional, only used when traceId is not provided)
+  - `endMicros` (`string`) - End time for traces in microseconds since epoch (optional, defaults to 10 minutes after startMicros if not provided, only used when traceId is not provided)
+  - `limit` (`integer`) - Maximum number of traces to return (default: 100, only used when traceId is not provided)
+  - `minDuration` (`integer`) - Minimum trace duration in microseconds (optional, only used when traceId is not provided)
+  - `namespace` (`string`) - Namespace to get resources from. Required if traceId is not provided.
+  - `resource_name` (`string`) - Name of the resource to get traces for. Required if traceId is not provided.
+  - `resource_type` (`string`) - Type of resource to get traces for (app, service, workload). Required if traceId is not provided.
+  - `startMicros` (`string`) - Start time for traces in microseconds since epoch (optional, defaults to 10 minutes before current time if not provided, only used when traceId is not provided)
+  - `tags` (`string`) - JSON string of tags to filter traces (optional, only used when traceId is not provided)
+  - `traceId` (`string`) - Unique identifier of the trace to retrieve detailed information for. If provided, this will return detailed trace information and other parameters (resource_type, namespace, resource_name) are not required.
 
 </details>
 

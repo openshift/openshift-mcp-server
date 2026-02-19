@@ -10,26 +10,36 @@ This reference focuses on TOML file configuration. For CLI arguments, see the [C
 
 ## Table of Contents
 
-- [Configuration Loading](#configuration-loading)
-- [Drop-in Configuration](#drop-in-configuration)
-- [Dynamic Configuration Reload](#dynamic-configuration-reload)
-- [Configuration Reference](#configuration-reference-1)
-  - [Server Settings](#server-settings)
-  - [Kubernetes Connection](#kubernetes-connection)
-    - [Cross-Cluster Access from a Pod](#cross-cluster-access-from-a-pod)
-  - [Access Control](#access-control)
-  - [Toolsets](#toolsets)
-  - [Tool Filtering](#tool-filtering)
-  - [Denied Resources](#denied-resources)
-  - [Server Instructions](#server-instructions)
-  - [Prompts](#prompts)
-  - [OAuth and Authorization](#oauth-and-authorization)
-  - [Telemetry](#telemetry)
-  - [Validation](#validation)
-  - [Toolset-Specific Configuration](#toolset-specific-configuration)
-  - [Cluster Provider Configuration](#cluster-provider-configuration)
-- [CLI Configuration Options](#cli-configuration-options)
-- [Complete Example](#complete-example)
+- [Configuration Reference](#configuration-reference)
+  - [Table of Contents](#table-of-contents)
+  - [Configuration Loading](#configuration-loading)
+    - [Usage](#usage)
+  - [Drop-in Configuration](#drop-in-configuration)
+    - [How Drop-in Files Work](#how-drop-in-files-work)
+    - [Example Directory Structure](#example-directory-structure)
+    - [Example Drop-in Files](#example-drop-in-files)
+  - [Dynamic Configuration Reload](#dynamic-configuration-reload)
+    - [How to Reload](#how-to-reload)
+    - [What Gets Reloaded](#what-gets-reloaded)
+    - [Limitations](#limitations)
+  - [Configuration Reference](#configuration-reference-1)
+    - [Server Settings](#server-settings)
+    - [Kubernetes Connection](#kubernetes-connection)
+      - [Cross-Cluster Access from a Pod](#cross-cluster-access-from-a-pod)
+    - [Access Control](#access-control)
+    - [Toolsets](#toolsets)
+    - [Tool Filtering](#tool-filtering)
+    - [Denied Resources](#denied-resources)
+    - [Server Instructions](#server-instructions)
+    - [Prompts](#prompts)
+    - [OAuth and Authorization](#oauth-and-authorization)
+    - [Telemetry](#telemetry)
+    - [Validation](#validation)
+    - [Toolset-Specific Configuration](#toolset-specific-configuration)
+    - [Cluster Provider Configuration](#cluster-provider-configuration)
+  - [CLI Configuration Options](#cli-configuration-options)
+  - [Complete Example](#complete-example)
+  - [Related Documentation](#related-documentation)
 
 ## Configuration Loading
 
@@ -259,15 +269,15 @@ Toolsets group related tools together. Enable only the toolsets you need to redu
 
 <!-- AVAILABLE-TOOLSETS-START -->
 
-| Toolset       | Description                                                                                                                                                                     | Default |
-|---------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| config        | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                         | ✓       |
-| core          | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                             | ✓       |
-| helm          | Tools for managing Helm charts and releases                                                                                                                                     |         |
-| kcp           | Manage kcp workspaces and multi-tenancy features                                                                                                                                |         |
-| kubevirt      | KubeVirt virtual machine management tools, check the [KubeVirt documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/kubevirt.md) for more details. |         |
-| observability | Cluster observability tools for querying Prometheus metrics and Alertmanager alerts                                                                                             |         |
-| ossm          | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                 |         |
+| Toolset  | Description                                                                                                                                                     | Default |
+|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| config   | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                         | ✓       |
+| core     | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                             | ✓       |
+| helm     | Tools for managing Helm charts and releases                                                                                                                     | ✓       |
+| kcp      | Manage kcp workspaces and multi-tenancy features                                                                                                                |         |
+| kubevirt | KubeVirt virtual machine management tools                                                                                                                       |         |
+| obs-mcp  | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                   |         |
+| ossm     | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details. |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
