@@ -5,11 +5,10 @@ import (
 	"fmt"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
-	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/google/jsonschema-go/jsonschema"
-	discoveryv1 "k8s.io/api/discovery/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func initEndpoints() []api.ServerTool {
@@ -54,32 +53,31 @@ func getServiceEndpoints(params api.ToolHandlerParams) (*api.ToolCallResult, err
 		return api.NewToolCallResult("", err), nil
 	}
 
-	cfg := params.RESTConfig()
-	if cfg == nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to get REST config")), nil
+	gvr := schema.GroupVersionResource{
+		Group:    "discovery.k8s.io",
+		Version:  "v1",
+		Resource: "endpointslices",
 	}
 
-	cl, err := newClientFunc(cfg, client.Options{Scheme: kubernetes.Scheme})
-	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to create controller-runtime client: %w", err)), nil
-	}
-
-	// Use EndpointSlices as Endpoints is deprecated
-	endpointSlices := &discoveryv1.EndpointSliceList{}
 	// EndpointSlices are linked to a service via the "kubernetes.io/service-name" label
-	labelSelector := client.MatchingLabels{
-		"kubernetes.io/service-name": serviceName,
-	}
-	err = cl.List(params.Context, endpointSlices, client.InNamespace(namespace), labelSelector)
+	labelSelector := "kubernetes.io/service-name=" + serviceName
+
+	list, err := params.DynamicClient().Resource(gvr).Namespace(namespace).List(params.Context, metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to list EndpointSlices for service %s/%s: %w", namespace, serviceName, err)), nil
 	}
 
-	if len(endpointSlices.Items) == 0 {
+	if len(list.Items) == 0 {
 		return api.NewToolCallResult("", fmt.Errorf("no EndpointSlices found for service %s/%s", namespace, serviceName)), nil
 	}
 
-	data, err := json.MarshalIndent(endpointSlices.Items, "", "  ")
+	// Dynamic client returns Unstructured items. We can marshal them directly.
+	// We might want to extract just the item list or marshal the whole list.
+	// The original code marshaled `endpointSlices.Items`.
+
+	data, err := json.MarshalIndent(list.Items, "", "  ")
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to marshal endpoint slices: %w", err)), nil
 	}
