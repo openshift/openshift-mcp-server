@@ -1,64 +1,20 @@
-package tools
+package netedge
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
-	"testing"
 	"time"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/prometheus"
-	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/dynamic"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/rest"
 )
 
-// MockConfigProvider partially implements api.ExtendedConfigProvider
-type MockConfigProvider struct {
-	api.ExtendedConfigProvider // Embed to satisfy interface
-}
-
-func (m *MockConfigProvider) GetToolsetConfig(name string) (api.ExtendedConfig, bool) {
-	return nil, false
-}
-
-// MockKubernetesClient implements api.KubernetesClient with DynamicClient support
-type MockKubernetesClient struct {
-	api.KubernetesClient // Embed to satisfy interface
-	Token                string
-	DynClient            dynamic.Interface
-}
-
-func (m *MockKubernetesClient) RESTConfig() *rest.Config {
-	return &rest.Config{
-		BearerToken: m.Token,
-		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: true,
-		},
-	}
-}
-
-func (m *MockKubernetesClient) DynamicClient() dynamic.Interface {
-	return m.DynClient
-}
-
-// MockToolCallRequest implements api.ToolCallRequest
-type MockToolCallRequest struct {
-	Args map[string]any
-}
-
-func (m *MockToolCallRequest) GetArguments() map[string]any {
-	return m.Args
-}
-
-func TestQueryPrometheusHandler_Diagnostics(t *testing.T) {
+func (s *NetEdgeTestSuite) TestQueryPrometheusHandler_Diagnostics() {
 	// 1. Setup mock Prometheus server (TLS)
 	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify Authentication
@@ -184,47 +140,33 @@ func TestQueryPrometheusHandler_Diagnostics(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Setup dependencies
-			cfgProvider := &MockConfigProvider{}
-			kubeClient := &MockKubernetesClient{
-				Token:     "fake-token",
-				DynClient: dynClient,
-			}
-			toolReq := &MockToolCallRequest{
-				Args: map[string]any{
-					"diagnostic_target": tt.diagTarget,
-				},
-			}
+		s.Run(tt.name, func() {
+			// Ensure Insecure is true for prometheus insecure test handling
+			s.mockClient.restConfig.BearerToken = "fake-token"
+			s.mockClient.restConfig.Insecure = true
 
-			// Construct params
-			params := api.ToolHandlerParams{
-				Context:                context.Background(),
-				ExtendedConfigProvider: cfgProvider,
-				KubernetesClient:       kubeClient,
-				ToolCallRequest:        toolReq,
-			}
+			s.SetDynamicClient(dynClient)
+			s.SetArgs(map[string]any{
+				"diagnostic_target": tt.diagTarget,
+			})
 
-			result, err := queryPrometheusHandler(params)
+			result, err := queryPrometheusHandler(s.params)
 
 			// Validation
 			if tt.expectError {
 				if err == nil {
-					// Check if result has Error field (ToolCallResult)
 					if result == nil || result.Error == nil {
-						t.Errorf("expected error but got nil")
+						s.Fail("expected error but got nil")
 					}
 				} else {
-					// Logic error in test assumption: handler returns (result, nil) usually
-					// but check if err is returned
-					assert.NoError(t, err)
+					s.NoError(err)
 				}
 			} else {
-				assert.NoError(t, err)
-				if assert.NotNil(t, result) {
-					assert.NoError(t, result.Error)
+				s.NoError(err)
+				if s.NotNil(result) {
+					s.NoError(result.Error)
 					for _, expected := range tt.expectedContains {
-						assert.Contains(t, result.Content, expected)
+						s.Contains(result.Content, expected)
 					}
 				}
 			}
