@@ -232,70 +232,10 @@ See the **[Configuration Reference](docs/configuration.md)**.
 ## 📊 MCP Logging <a id="mcp-logging"></a>
 
 The server supports the MCP logging capability, allowing clients to receive debugging information via structured log messages.
+Kubernetes API errors are automatically categorized and logged to clients with appropriate severity levels.
+Sensitive data (tokens, keys, passwords, cloud credentials) is automatically redacted before being sent to clients.
 
-### For Clients
-
-Clients can control log verbosity by sending a `logging/setLevel` request:
-
-```json
-{
-  "method": "logging/setLevel",
-  "params": { "level": "info" }
-}
-```
-
-**Available log levels** (in order of increasing severity):
-- `debug` - Detailed debugging information
-- `info` - General informational messages (default)
-- `notice` - Normal but significant events
-- `warning` - Warning messages
-- `error` - Error conditions
-- `critical` - Critical conditions
-- `alert` - Action must be taken immediately
-- `emergency` - System is unusable
-
-### For Developers
-
-Toolsets can optionally send debug information to clients using helper functions from the `mcplog` package:
-
-**Recommended approach for Kubernetes errors** (automatically categorizes errors and sends appropriate messages):
-
-```go
-import "github.com/containers/kubernetes-mcp-server/pkg/mcplog"
-
-// In your tool handler:
-ret, err := client.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
-if err != nil {
-    mcplog.HandleK8sError(ctx, err, "pod access")
-    return api.NewToolCallResult("", fmt.Errorf("failed to get pod: %v", err)), nil
-}
-```
-
-**Manual logging** (for custom messages):
-
-```go
-import "github.com/containers/kubernetes-mcp-server/pkg/mcplog"
-
-// In your tool handler:
-if err != nil {
-    mcplog.SendMCPLog(ctx, "error", "Operation failed - check permissions")
-    return api.NewToolCallResult("", err)
-}
-```
-
-**Key Points:**
-- Logging is **optional** - toolsets work fine without sending MCP logs
-- Uses a dedicated named logger (`logger="mcp"`) for complete separation from server logs
-- Server logs (klog) remain detailed and unaffected
-- Client logs are high-level, helpful hints for debugging
-- Authentication failures send generic messages to clients (no security info leaked)
-- Sensitive data is automatically redacted with 28 pattern types:
-  - Generic fields (password, token, secret, api_key, etc.)
-  - Authorization headers (Bearer, Basic)
-  - Cloud credentials (AWS, GCP, Azure)
-  - API tokens (GitHub, GitLab, OpenAI, Anthropic)
-  - Cryptographic keys (JWT, SSH, PGP, RSA)
-  - Database connection strings (PostgreSQL, MySQL, MongoDB)
+See the **[MCP Logging Guide](docs/logging.md)**.
 
 ## 🛠️ Tools and Functionalities <a id="tools-and-functionalities"></a>
 
@@ -326,6 +266,72 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 In case multi-cluster support is enabled (default) and you have access to multiple clusters, all applicable tools will include an additional `context` argument to specify the Kubernetes context (cluster) to use for that operation.
 
 <!-- AVAILABLE-TOOLSETS-TOOLS-START -->
+
+<details>
+
+<summary>kiali</summary>
+
+- **kiali_mesh_graph** - Returns the topology of a specific namespaces, health, status of the mesh and namespaces. Includes a mesh health summary overview with aggregated counts of healthy, degraded, and failing apps, workloads, and services. Use this for high-level overviews
+  - `graphType` (`string`) - Optional type of graph to return: 'versionedApp', 'app', 'service', 'workload', 'mesh'
+  - `namespace` (`string`) - Optional single namespace to include in the graph (alternative to namespaces)
+  - `namespaces` (`string`) - Optional comma-separated list of namespaces to include in the graph
+  - `rateInterval` (`string`) - Optional rate interval for fetching (e.g., '10m', '5m', '1h').
+
+- **kiali_manage_istio_config_read** - Lists or gets Istio configuration objects (Gateways, VirtualServices, etc.)
+  - `action` (`string`) **(required)** - Action to perform: list or get
+  - `group` (`string`) - API group of the Istio object (e.g., 'networking.istio.io', 'gateway.networking.k8s.io')
+  - `kind` (`string`) - Kind of the Istio object (e.g., 'DestinationRule', 'VirtualService', 'HTTPRoute', 'Gateway')
+  - `name` (`string`) - Name of the Istio object
+  - `namespace` (`string`) - Namespace containing the Istio object
+  - `version` (`string`) - API version of the Istio object (e.g., 'v1', 'v1beta1')
+
+- **kiali_manage_istio_config** - Creates, patches, or deletes Istio configuration objects (Gateways, VirtualServices, etc.)
+  - `action` (`string`) **(required)** - Action to perform: create, patch, or delete
+  - `group` (`string`) - API group of the Istio object (e.g., 'networking.istio.io', 'gateway.networking.k8s.io')
+  - `json_data` (`string`) - JSON data to apply or create the object
+  - `kind` (`string`) - Kind of the Istio object (e.g., 'DestinationRule', 'VirtualService', 'HTTPRoute', 'Gateway')
+  - `name` (`string`) - Name of the Istio object
+  - `namespace` (`string`) - Namespace containing the Istio object
+  - `version` (`string`) - API version of the Istio object (e.g., 'v1', 'v1beta1')
+
+- **kiali_get_resource_details** - Gets lists or detailed info for Kubernetes resources (services, workloads) within the mesh
+  - `namespaces` (`string`) - Comma-separated list of namespaces to get services from (e.g. 'bookinfo' or 'bookinfo,default'). If not provided, will list services from all accessible namespaces
+  - `resource_name` (`string`) - Name of the resource to get details for (optional string - if provided, gets details; if empty, lists all).
+  - `resource_type` (`string`) - Type of resource to get details for (service, workload)
+
+- **kiali_get_metrics** - Gets lists or detailed info for Kubernetes resources (services, workloads) within the mesh
+  - `byLabels` (`string`) - Comma-separated list of labels to group metrics by (e.g., 'source_workload,destination_service'). Optional
+  - `direction` (`string`) - Traffic direction: 'inbound' or 'outbound'. Optional, defaults to 'outbound'
+  - `duration` (`string`) - Time range to get metrics for (optional string - if provided, gets metrics (e.g., '1m', '5m', '1h'); if empty, get default 30m).
+  - `namespace` (`string`) **(required)** - Namespace to get resources from
+  - `quantiles` (`string`) - Comma-separated list of quantiles for histogram metrics (e.g., '0.5,0.95,0.99'). Optional
+  - `rateInterval` (`string`) - Rate interval for metrics (e.g., '1m', '5m'). Optional, defaults to '10m'
+  - `reporter` (`string`) - Metrics reporter: 'source', 'destination', or 'both'. Optional, defaults to 'source'
+  - `requestProtocol` (`string`) - Filter by request protocol (e.g., 'http', 'grpc', 'tcp'). Optional
+  - `resource_name` (`string`) **(required)** - Name of the resource to get details for (optional string - if provided, gets details; if empty, lists all).
+  - `resource_type` (`string`) **(required)** - Type of resource to get details for (service, workload)
+  - `step` (`string`) - Step between data points in seconds (e.g., '15'). Optional, defaults to 15 seconds
+
+- **kiali_workload_logs** - Get logs for a specific workload's pods in a namespace. Only requires namespace and workload name - automatically discovers pods and containers. Optionally filter by container name, time range, and other parameters. Container is auto-detected if not specified.
+  - `container` (`string`) - Optional container name to filter logs. If not provided, automatically detects and uses the main application container (excludes istio-proxy and istio-init)
+  - `namespace` (`string`) **(required)** - Namespace containing the workload
+  - `since` (`string`) - Time duration to fetch logs from (e.g., '5m', '1h', '30s'). If not provided, returns recent logs
+  - `tail` (`integer`) - Number of lines to retrieve from the end of logs (default: 100)
+  - `workload` (`string`) **(required)** - Name of the workload to get logs for
+
+- **kiali_get_traces** - Gets traces for a specific resource (app, service, workload) in a namespace, or gets detailed information for a specific trace by its ID. If traceId is provided, it returns detailed trace information and other parameters are not required.
+  - `clusterName` (`string`) - Cluster name for multi-cluster environments (optional, only used when traceId is not provided)
+  - `endMicros` (`string`) - End time for traces in microseconds since epoch (optional, defaults to 10 minutes after startMicros if not provided, only used when traceId is not provided)
+  - `limit` (`integer`) - Maximum number of traces to return (default: 100, only used when traceId is not provided)
+  - `minDuration` (`integer`) - Minimum trace duration in microseconds (optional, only used when traceId is not provided)
+  - `namespace` (`string`) - Namespace to get resources from. Required if traceId is not provided.
+  - `resource_name` (`string`) - Name of the resource to get traces for. Required if traceId is not provided.
+  - `resource_type` (`string`) - Type of resource to get traces for (app, service, workload). Required if traceId is not provided.
+  - `startMicros` (`string`) - Start time for traces in microseconds since epoch (optional, defaults to 10 minutes before current time if not provided, only used when traceId is not provided)
+  - `tags` (`string`) - JSON string of tags to filter traces (optional, only used when traceId is not provided)
+  - `traceId` (`string`) - Unique identifier of the trace to retrieve detailed information for. If provided, this will return detailed trace information and other parameters (resource_type, namespace, resource_name) are not required.
+
+</details>
 
 <details>
 
