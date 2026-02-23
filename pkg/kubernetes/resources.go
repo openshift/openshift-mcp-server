@@ -188,6 +188,7 @@ func (c *Core) resourcesCreateOrUpdate(ctx context.Context, resources []*unstruc
 		}
 		resources[i], rErr = c.DynamicClient().Resource(*gvr).Namespace(namespace).Apply(ctx, obj.GetName(), obj, metav1.ApplyOptions{
 			FieldManager: version.BinaryName,
+			Force:        true,
 		})
 		if rErr != nil {
 			return nil, rErr
