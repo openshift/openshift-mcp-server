@@ -27,18 +27,12 @@ github.com/Masterminds/squirrel
 # github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
 ## explicit; go 1.13
 github.com/asaskevich/govalidator
-# github.com/bahlo/generic-list-go v0.2.0
-## explicit; go 1.18
-github.com/bahlo/generic-list-go
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
 # github.com/blang/semver/v4 v4.0.0
 ## explicit; go 1.14
 github.com/blang/semver/v4
-# github.com/buger/jsonparser v1.1.1
-## explicit; go 1.13
-github.com/buger/jsonparser
 # github.com/cenkalti/backoff/v5 v5.0.3
 ## explicit; go 1.23
 github.com/cenkalti/backoff/v5
@@ -195,9 +189,6 @@ github.com/huandu/xstrings
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
-# github.com/invopop/jsonschema v0.13.0
-## explicit; go 1.18
-github.com/invopop/jsonschema
 # github.com/jmoiron/sqlx v1.4.0
 ## explicit; go 1.10
 github.com/jmoiron/sqlx
@@ -237,13 +228,6 @@ github.com/liggitt/tabwriter
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
-# github.com/mark3labs/mcp-go v0.43.2
-## explicit; go 1.23.0
-github.com/mark3labs/mcp-go/client
-github.com/mark3labs/mcp-go/client/transport
-github.com/mark3labs/mcp-go/mcp
-github.com/mark3labs/mcp-go/server
-github.com/mark3labs/mcp-go/util
 # github.com/mattn/go-colorable v0.1.14
 ## explicit; go 1.18
 github.com/mattn/go-colorable
@@ -390,9 +374,6 @@ github.com/stretchr/testify/assert
 github.com/stretchr/testify/assert/yaml
 github.com/stretchr/testify/require
 github.com/stretchr/testify/suite
-# github.com/wk8/go-ordered-map/v2 v2.1.8
-## explicit; go 1.18
-github.com/wk8/go-ordered-map/v2
 # github.com/x448/float16 v0.8.4
 ## explicit; go 1.11
 github.com/x448/float16
