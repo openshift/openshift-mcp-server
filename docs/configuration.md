@@ -16,6 +16,7 @@ This reference focuses on TOML file configuration. For CLI arguments, see the [C
 - [Configuration Reference](#configuration-reference-1)
   - [Server Settings](#server-settings)
   - [Kubernetes Connection](#kubernetes-connection)
+    - [Cross-Cluster Access from a Pod](#cross-cluster-access-from-a-pod)
   - [Access Control](#access-control)
   - [Toolsets](#toolsets)
   - [Tool Filtering](#tool-filtering)
@@ -152,6 +153,75 @@ kubeconfig = "/home/user/.kube/config"
 cluster_provider_strategy = "kubeconfig"
 ```
 
+#### Cross-Cluster Access from a Pod
+
+When the MCP server runs inside a Kubernetes pod, it automatically detects the in-cluster environment and uses the `in-cluster` provider strategy to connect to the **local** cluster's API server.
+
+If you need the server to connect to a **different** cluster instead, you must explicitly provide both `kubeconfig` and `cluster_provider_strategy`. This overrides the automatic in-cluster detection.
+
+**Required configuration:**
+
+```toml
+kubeconfig = "/etc/kubernetes-mcp-server/external-kubeconfig"
+cluster_provider_strategy = "kubeconfig"
+```
+
+Or via CLI flags:
+
+```bash
+kubernetes-mcp-server --kubeconfig /etc/kubernetes-mcp-server/external-kubeconfig --cluster-provider kubeconfig
+```
+
+> **Important:** Both settings are required. Setting `--cluster-provider kubeconfig` alone (without `--kubeconfig`) will fail because the server still detects the in-cluster environment. The explicit `--kubeconfig` path overrides this detection.
+
+**Mounting the kubeconfig in a pod:**
+
+To make an external kubeconfig available inside a pod, mount it from a Secret or ConfigMap:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: external-kubeconfig
+  namespace: mcp
+type: Opaque
+data:
+  kubeconfig: <base64-encoded-kubeconfig>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubernetes-mcp-server
+  namespace: mcp
+spec:
+  template:
+    spec:
+      containers:
+        - name: kubernetes-mcp-server
+          args:
+            - --kubeconfig
+            - /etc/kubernetes-mcp-server/kubeconfig
+            - --cluster-provider
+            - kubeconfig
+          volumeMounts:
+            - name: external-kubeconfig
+              mountPath: /etc/kubernetes-mcp-server
+              readOnly: true
+      volumes:
+        - name: external-kubeconfig
+          secret:
+            secretName: external-kubeconfig
+```
+
+**Troubleshooting cross-cluster access:**
+
+If the server starts but operations fail (e.g., `failed to list namespaces: unknown`), verify:
+
+1. **Network connectivity** — The pod must be able to reach the external cluster's API server. Check network policies, firewalls, and DNS resolution.
+2. **Kubeconfig validity** — Ensure the kubeconfig contains valid credentials (token, client certificate, etc.) and points to the correct API server address.
+3. **Permissions** — The credentials in the kubeconfig must have sufficient RBAC permissions on the target cluster.
+4. **TLS certificates** — If the external cluster uses a private CA, the CA certificate must be included in the kubeconfig or mounted separately.
+
 ### Access Control
 
 Control what operations the MCP server can perform on your Kubernetes cluster. These options help enforce the principle of least privilege, ensuring AI assistants only have the permissions they need for their intended tasks.
@@ -186,11 +256,11 @@ Toolsets group related tools together. Enable only the toolsets you need to redu
 |---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
 | config        | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                         | ✓       |
 | core          | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                             | ✓       |
+| helm          | Tools for managing Helm charts and releases                                                                                                                     | ✓       |
 | kcp           | Manage kcp workspaces and multi-tenancy features                                                                                                                |         |
-| ossm          | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details. |         |
 | kubevirt      | KubeVirt virtual machine management tools                                                                                                                       |         |
 | observability | Cluster observability tools for querying Prometheus metrics and Alertmanager alerts                                                                             | ✓       |
-| helm          | Tools for managing Helm charts and releases                                                                                                                     | ✓       |
+| ossm          | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details. |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -504,4 +574,4 @@ url = "https://kiali.example.com"
 - [OTEL.md](OTEL.md) - OpenTelemetry observability
 - [KIALI.md](KIALI.md) - Kiali toolset configuration
 - [KEYCLOAK_OIDC_SETUP.md](KEYCLOAK_OIDC_SETUP.md) - OAuth/OIDC setup guide
-- [GETTING_STARTED_KUBERNETES.md](GETTING_STARTED_KUBERNETES.md) - Kubernetes setup guide
+- [getting-started-kubernetes.md](getting-started-kubernetes.md) - Kubernetes setup guide
