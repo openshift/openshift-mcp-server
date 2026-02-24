@@ -64,6 +64,10 @@ func (c *Core) ResourcesCreateOrUpdate(ctx context.Context, resource string) ([]
 		if err := yaml.NewYAMLToJSONDecoder(strings.NewReader(r)).Decode(&obj); err != nil {
 			return nil, err
 		}
+
+		// remove the status from the resource, disallowing agent from directly editing (only controllers should be allowed to do this)
+		delete(obj.Object, "status")
+
 		parsedResources = append(parsedResources, &obj)
 	}
 	return c.resourcesCreateOrUpdate(ctx, parsedResources)

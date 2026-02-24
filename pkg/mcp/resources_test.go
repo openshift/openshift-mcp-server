@@ -533,6 +533,37 @@ func (s *ResourcesSuite) TestResourcesCreateOrUpdate() {
 			s.Equalf("true", annotations["updated"], "custom resource not updated")
 		})
 	})
+
+	s.Run("resources_create_or_update strips status from resource", func() {
+		configMapWithStatusYaml := "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: a-cm-with-status\n  namespace: default\ndata:\n  key: value\nstatus:\n  conditions:\n  - type: Ready\n    status: \"True\"\n"
+		result, err := s.CallTool("resources_create_or_update", map[string]interface{}{"resource": configMapWithStatusYaml})
+		s.Run("returns success", func() {
+			s.Nilf(err, "call tool failed %v", err)
+			s.Falsef(result.IsError, "call tool failed")
+		})
+		s.Run("created resource does not contain status", func() {
+			var decodedResources []unstructured.Unstructured
+			err = yaml.Unmarshal([]byte(result.Content[0].(mcp.TextContent).Text), &decodedResources)
+			s.Nilf(err, "invalid tool result content %v", err)
+			s.Require().Lenf(decodedResources, 1, "expected 1 resource, got %d", len(decodedResources))
+			_, hasStatus := decodedResources[0].Object["status"]
+			s.Falsef(hasStatus, "status should have been stripped from the resource")
+		})
+		s.Run("persisted resource does not contain status", func() {
+			cm, cmErr := client.CoreV1().ConfigMaps("default").Get(s.T().Context(), "a-cm-with-status", metav1.GetOptions{})
+			s.Require().Nilf(cmErr, "ConfigMap not found")
+			s.NotNil(cm, "ConfigMap not found")
+			// Retrieve the resource via dynamic client to inspect the raw object for status
+			dynamicClient := dynamic.NewForConfigOrDie(envTestRestConfig)
+			raw, rawErr := dynamicClient.
+				Resource(schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}).
+				Namespace("default").
+				Get(s.T().Context(), "a-cm-with-status", metav1.GetOptions{})
+			s.Require().Nilf(rawErr, "failed to get raw resource")
+			_, hasStatus := raw.Object["status"]
+			s.Falsef(hasStatus, "status should not be present on the persisted resource")
+		})
+	})
 }
 
 func (s *ResourcesSuite) TestResourcesCreateOrUpdateForcesSSA() {
