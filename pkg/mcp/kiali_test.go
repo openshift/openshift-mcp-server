@@ -11,7 +11,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/internal/test"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	kialiToolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kiali"
-	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -64,7 +64,7 @@ func (s *KialiSuite) TestGetTraces() {
 			s.Equal("/api/traces/test-trace-123", capturedURL.Path, "Unexpected path")
 		})
 		s.Run("response contains trace ID", func() {
-			s.Contains(toolResult.Content[0].(mcp.TextContent).Text, traceId, "Response should contain trace ID")
+			s.Contains(toolResult.Content[0].(*mcp.TextContent).Text, traceId, "Response should contain trace ID")
 		})
 	})
 }
