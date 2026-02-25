@@ -1,7 +1,5 @@
 [
   {
-    "name": "plan_mustgather",
-    "description": "Plan for collecting a must-gather archive from an OpenShift cluster. Must-gather is a tool for collecting cluster data related to debugging and troubleshooting like logs, kubernetes resources, etc.",
     "arguments": [
       {
         "name": "node_name",
@@ -47,6 +45,8 @@
         "name": "images",
         "description": "Comma-separated list of custom must-gather container images"
       }
-    ]
+    ],
+    "description": "Plan for collecting a must-gather archive from an OpenShift cluster. Must-gather is a tool for collecting cluster data related to debugging and troubleshooting like logs, kubernetes resources, etc.",
+    "name": "plan_mustgather"
   }
 ]
