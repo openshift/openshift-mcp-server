@@ -19,6 +19,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kcp"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kiali"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt"
+	mgToolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/mustgather"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/openshift"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/suite"
@@ -213,6 +214,23 @@ func (s *ToolsetsSuite) TestOpenShiftToolsetPrompts() {
 		})
 		s.Run("ListPrompts returns correct Prompt metadata", func() {
 			s.assertJsonSnapshot("toolsets-openshift-prompts.json", prompts.Prompts)
+		})
+	})
+}
+
+func (s *ToolsetsSuite) TestOpenShiftMustGatherToolset() {
+	s.Run("OpenShift must-gather toolset", func() {
+		toolsets.Clear()
+		toolsets.Register(&mgToolset.Toolset{})
+		s.Cfg.Toolsets = []string{"openshift/mustgather"}
+		s.InitMcpClient()
+		tools, err := s.ListTools()
+		s.Run("ListTools returns tools", func() {
+			s.NotNil(tools, "Expected tools from ListTools")
+			s.NoError(err, "Expected no error from ListTools")
+		})
+		s.Run("ListTools returns correct Tool metadata", func() {
+			s.assertJsonSnapshot("toolsets-openshift-mustgather-tools.json", tools.Tools)
 		})
 	})
 }
