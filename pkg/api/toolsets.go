@@ -102,6 +102,14 @@ func NewToolCallResultStructured(structured any, err error) *ToolCallResult {
 	return NewToolCallResultFull(content, structured, err)
 }
 
+// ResourceRegistrar allows tools to register MCP resources at runtime.
+// For example, the mustgather_use tool registers a must-gather:// resource
+// after loading an archive.
+type ResourceRegistrar interface {
+	AddResource(uri, name, description, mimeType, content string)
+	RemoveResources(uris ...string)
+}
+
 type ToolHandlerParams struct {
 	context.Context
 	BaseConfig
@@ -109,6 +117,7 @@ type ToolHandlerParams struct {
 	ToolCallRequest
 	ListOutput output.Output
 	Elicitor
+	ResourceRegistrar ResourceRegistrar
 }
 
 type ToolHandlerFunc func(params ToolHandlerParams) (*ToolCallResult, error)
