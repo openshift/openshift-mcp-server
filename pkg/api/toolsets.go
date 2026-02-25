@@ -159,13 +159,6 @@ type ServerResourceTemplate struct {
 	Handler          ResourceTemplateHandler
 }
 
-// ResourceRegistrar allows tools to register MCP resources at runtime.
-// For example, the mustgather_use tool registers a must-gather:// resource
-// after loading an archive.
-type ResourceRegistrar interface {
-	AddResource(uri, name, description, mimeType, content string)
-	RemoveResources(uris ...string)
-}
 type ToolHandlerParams struct {
 	context.Context
 	BaseConfig
