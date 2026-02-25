@@ -9,7 +9,7 @@ import (
 func Default() *StaticConfig {
 	defaultConfig := StaticConfig{
 		ListOutput: "table",
-		Toolsets:   []string{"core", "config", "helm", "observability"},
+		Toolsets:   []string{"core", "config", "helm"},
 	}
 	overrides := defaultOverrides()
 	mergedConfig := mergeConfig(defaultConfig, overrides)
