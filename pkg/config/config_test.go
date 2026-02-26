@@ -1034,11 +1034,7 @@ func (s *ConfigSuite) TestEmptyConfigFile() {
 		s.Equal("9999", config.Port, "port should be from drop-in")
 		// Defaults should still be applied for unset values
 		s.Equal("table", config.ListOutput, "list_output should be default")
-<<<<<<< HEAD
 		s.Equal([]string{"core", "config", "helm"}, config.Toolsets, "toolsets should be default")
-=======
-		s.Equal([]string{"core", "config", "helm", "obs-mcp"}, config.Toolsets, "toolsets should be default")
->>>>>>> 0d6b5897 (Update to use commit)
 	})
 }
 
