@@ -46,8 +46,9 @@ If you're using the native binaries you don't need to have Node or Python instal
 - **✅ High-Performance / Low-Latency**: Directly interacts with the Kubernetes API server without the overhead of calling and waiting for external commands.
 - **✅ Multi-Cluster**: Can interact with multiple Kubernetes clusters simultaneously (as defined in your kubeconfig files).
 - **✅ Cross-Platform**: Available as a native binary for Linux, macOS, and Windows, as well as an npm package, a Python package, and container/Docker image.
-- **✅ Configurable**: Supports [command-line arguments](#configuration)  to configure the server behavior.
+- **✅ Configurable**: Supports [command-line arguments](#configuration), [TOML configuration files](docs/configuration.md), and environment variables.
 - **✅ Well tested**: The server has an extensive test suite to ensure its reliability and correctness across different Kubernetes environments.
+- **📚 Documentation**: Comprehensive [user documentation](docs/) including setup guides, configuration reference, and observability.
 
 ## 🚀 Getting Started <a id="getting-started"></a>
 
@@ -199,7 +200,9 @@ uvx kubernetes-mcp-server@latest --help
 | `--stateless`             | If set, the MCP server will run in stateless mode, disabling tool and prompt change notifications. This is useful for container deployments, load balancing, and serverless environments where maintaining client state is not desired.                                                       |
 | `--toolsets`              | Comma-separated list of toolsets to enable. Check the [🛠️ Tools and Functionalities](#tools-and-functionalities) section for more information.                                                                                                                                                |
 | `--disable-multi-cluster` | If set, the MCP server will disable multi-cluster support and will only use the current context from the kubeconfig file. This is useful if you want to restrict the MCP server to a single cluster.                                                                                          |
-| `--cluster-provider`.     | Cluster provider strategy to use (one of: kubeconfig, in-cluster, kcp, disabled). If not set, the server will auto-detect based on the environment.                                                                                                                                           |
+| `--cluster-provider`      | Cluster provider strategy to use (one of: kubeconfig, in-cluster, kcp, disabled). If not set, the server will auto-detect based on the environment.                                                                                                                                           |
+
+> **Note**: Most CLI options have equivalent TOML configuration fields. The `--disable-multi-cluster` flag is equivalent to setting `cluster_provider_strategy = "disabled"` in TOML. See the [Configuration Reference](docs/configuration.md) for all TOML options.
 
 ### TOML Configuration Files
 
@@ -216,6 +219,12 @@ log_level = 2
 read_only = true
 toolsets = ["core", "config", "helm", "kubevirt"]
 
+# Deny access to sensitive resources
+[[denied_resources]]
+group = ""
+version = "v1"
+kind = "Secret"
+
 [telemetry]
 endpoint = "http://localhost:4317"
 ```
@@ -224,8 +233,10 @@ For comprehensive TOML configuration documentation, including:
 - All configuration options and their defaults
 - Drop-in configuration files for modular settings
 - Dynamic configuration reload via SIGHUP
+- Denied resources for restricting access to sensitive resource types
 - Server instructions for MCP Tool Search
-- Custom MCP prompts
+- [Custom MCP prompts](docs/prompts.md)
+- [OAuth/OIDC authentication](docs/KEYCLOAK_OIDC_SETUP.md) for HTTP mode
 
 See the **[Configuration Reference](docs/configuration.md)**.
 
@@ -255,9 +266,8 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 | core          | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                             | ✓       |
 | helm          | Tools for managing Helm charts and releases                                                                                                                     | ✓       |
 | kcp           | Manage kcp workspaces and multi-tenancy features                                                                                                                |         |
-| openshift     | OpenShift-specific tools for cluster management and troubleshooting, check the [OpenShift documentation](docs/OPENSHIFT.md) for more details.                   |         |
 | kubevirt      | KubeVirt virtual machine management tools                                                                                                                       |         |
-| observability | Cluster observability tools for querying Prometheus metrics and Alertmanager alerts                                                                             | ✓       |
+| observability | Cluster observability tools for querying Prometheus metrics and Alertmanager alerts                                                                             |         |
 | ossm          | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details. |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
@@ -554,25 +564,6 @@ Common use cases:
 
 </details>
 
-<details>
-
-<summary>openshift</summary>
-
-- **plan_mustgather** - Plan for collecting a must-gather archive from an OpenShift cluster, must-gather is a tool for collecting cluster data related to debugging and troubleshooting like logs, kubernetes resources, etc.
-  - `node_name` (`string`) - Optional node to run the mustgather pod. If not provided, a random control-plane node will be selected automatically
-  - `node_selector` (`string`) - Optional node label selector to use, only relevant when specifying a command and image which needs to capture data on a set of cluster nodes simultaneously
-  - `host_network` (`boolean`) - Optionally run the must-gather pods in the host network of the node. This is only relevant if a specific gather image needs to capture host-level data
-  - `gather_command` (`string`) - Optionally specify a custom gather command to run a specialized script, eg. /usr/bin/gather_audit_logs (default: /usr/bin/gather)
-  - `all_component_images` (`boolean`) - Optional when enabled, collects and runs multiple must gathers for all operators and components on the cluster that have an annotated must-gather image available
-  - `images` (`array`) - Optional list of images to use for gathering custom information about specific operators or cluster components. If not specified, OpenShift's default must-gather image will be used by default
-  - `source_dir` (`string`) - Optional to set a specific directory where the pod will copy gathered data from (default: /must-gather)
-  - `timeout` (`string`) - Timeout of the gather process eg. 30s, 6m20s, or 2h10m30s
-  - `namespace` (`string`) - Optional to specify an existing privileged namespace where must-gather pods should run. If not provided, a temporary namespace will be created
-  - `keep_resources` (`boolean`) - Optional to retain all temporary resources when the mustgather completes, otherwise temporary resources created will be advised to be cleaned up
-  - `since` (`string`) - Optional to collect logs newer than a relative duration like 5s, 2m5s, or 3h6m10s. If unspecified, all available logs will be collected
-
-</details>
-
 
 <!-- AVAILABLE-TOOLSETS-TOOLS-END -->
 
@@ -605,7 +596,13 @@ Common use cases:
 
 ## Helm Chart
 
-A [Helm Chart](https://helm.sh) is available to simplify the deployment of the Kubernetes MCP server. Additional details can be found in the [chart README](./charts/kubernetes-mcp-server/README.md).
+A [Helm Chart](https://helm.sh) is available to simplify the deployment of the Kubernetes MCP server.
+
+```shell
+helm install kubernetes-mcp-server oci://ghcr.io/containers/charts/kubernetes-mcp-server
+```
+
+For configuration options including OAuth, telemetry, and resource limits, see the [chart README](./charts/kubernetes-mcp-server/README.md) and [values.yaml](./charts/kubernetes-mcp-server/values.yaml).
 
 ## 🧑‍💻 Development <a id="development"></a>
 

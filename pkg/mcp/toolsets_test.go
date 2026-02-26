@@ -77,9 +77,6 @@ func (s *ToolsetsSuite) TestNoToolsets() {
 }
 
 func (s *ToolsetsSuite) TestDefaultToolsetsTools() {
-	if configuration.HasDefaultOverrides() {
-		s.T().Skip("Skipping test because default configuration overrides are present (this is a downstream fork)")
-	}
 	s.Run("Default configuration toolsets", func() {
 		s.InitMcpClient()
 		tools, err := s.ListTools()
@@ -94,9 +91,6 @@ func (s *ToolsetsSuite) TestDefaultToolsetsTools() {
 }
 
 func (s *ToolsetsSuite) TestDefaultToolsetsToolsInOpenShift() {
-	if configuration.HasDefaultOverrides() {
-		s.T().Skip("Skipping test because default configuration overrides are present (this is a downstream fork)")
-	}
 	s.Run("Default configuration toolsets in OpenShift", func() {
 		s.Handle(test.NewInOpenShiftHandler())
 		s.InitMcpClient()
@@ -112,9 +106,6 @@ func (s *ToolsetsSuite) TestDefaultToolsetsToolsInOpenShift() {
 }
 
 func (s *ToolsetsSuite) TestDefaultToolsetsToolsInMultiCluster() {
-	if configuration.HasDefaultOverrides() {
-		s.T().Skip("Skipping test because default configuration overrides are present (this is a downstream fork)")
-	}
 	s.Run("Default configuration toolsets in multi-cluster (with 11 clusters)", func() {
 		kubeconfig := s.Kubeconfig()
 		for i := 0; i < 10; i++ {
@@ -135,9 +126,6 @@ func (s *ToolsetsSuite) TestDefaultToolsetsToolsInMultiCluster() {
 }
 
 func (s *ToolsetsSuite) TestDefaultToolsetsToolsInMultiClusterEnum() {
-	if configuration.HasDefaultOverrides() {
-		s.T().Skip("Skipping test because default configuration overrides are present (this is a downstream fork)")
-	}
 	s.Run("Default configuration toolsets in multi-cluster (with 2 clusters)", func() {
 		kubeconfig := s.Kubeconfig()
 		// Add additional cluster to force multi-cluster behavior with enum parameter

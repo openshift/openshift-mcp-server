@@ -259,7 +259,7 @@ Toolsets group related tools together. Enable only the toolsets you need to redu
 | helm          | Tools for managing Helm charts and releases                                                                                                                     | ✓       |
 | kcp           | Manage kcp workspaces and multi-tenancy features                                                                                                                |         |
 | kubevirt      | KubeVirt virtual machine management tools                                                                                                                       |         |
-| observability | Cluster observability tools for querying Prometheus metrics and Alertmanager alerts                                                                             | ✓       |
+| observability | Cluster observability tools for querying Prometheus metrics and Alertmanager alerts                                                                             |         |
 | ossm          | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details. |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
