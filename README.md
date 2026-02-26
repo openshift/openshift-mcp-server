@@ -267,6 +267,7 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 | helm          | Tools for managing Helm charts and releases                                                                                                                     | ✓       |
 | kcp           | Manage kcp workspaces and multi-tenancy features                                                                                                                |         |
 | kubevirt      | KubeVirt virtual machine management tools                                                                                                                       |         |
+| oadp          | OADP (OpenShift API for Data Protection) tools for managing Velero backups, restores, and schedules                                                             |         |
 | observability | Cluster observability tools for querying Prometheus metrics and Alertmanager alerts                                                                             |         |
 | ossm          | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details. |         |
 
@@ -448,6 +449,76 @@ In case multi-cluster support is enabled (default) and you have access to multip
   - `action` (`string`) **(required)** - The lifecycle action to perform: 'start' (changes runStrategy to Always), 'stop' (changes runStrategy to Halted), or 'restart' (stops then starts the VM)
   - `name` (`string`) **(required)** - The name of the virtual machine
   - `namespace` (`string`) **(required)** - The namespace of the virtual machine
+
+</details>
+
+<details>
+
+<summary>oadp (8 tools)</summary>
+
+The OADP toolset provides 8 consolidated tools with action-based parameters covering all core OADP/Velero functionality:
+
+- **oadp_backup** - Manage Velero/OADP backups: list, get, create, delete, or retrieve logs
+  - `action` (`string`) **(required)** - Action: 'list', 'get', 'create', 'delete', 'logs'
+  - `namespace` (`string`) - Namespace containing backups (default: openshift-adp)
+  - `name` (`string`) - Name of the backup (required for get, create, delete, logs)
+  - `includedNamespaces` (`array`) - Namespaces to include in backup (for create)
+  - `excludedNamespaces` (`array`) - Namespaces to exclude (for create)
+  - `storageLocation` (`string`) - BackupStorageLocation name (for create)
+  - `ttl` (`string`) - Backup TTL duration e.g., '720h' (for create)
+
+- **oadp_restore** - Manage Velero/OADP restore operations: list, get, create, delete, or retrieve logs
+  - `action` (`string`) **(required)** - Action: 'list', 'get', 'create', 'delete', 'logs'
+  - `namespace` (`string`) - Namespace containing restores (default: openshift-adp)
+  - `name` (`string`) - Name of the restore (required for get, create, delete, logs)
+  - `backupName` (`string`) - Name of the backup to restore from (required for create)
+  - `includedNamespaces` (`array`) - Namespaces to restore (for create)
+  - `namespaceMapping` (`object`) - Map source namespaces to target namespaces (for create)
+
+- **oadp_schedule** - Manage Velero/OADP backup schedules: list, get, create, update, delete, or pause/unpause
+  - `action` (`string`) **(required)** - Action: 'list', 'get', 'create', 'update', 'delete', 'pause'
+  - `namespace` (`string`) - Namespace containing schedules (default: openshift-adp)
+  - `name` (`string`) - Name of the schedule (required for get, create, update, delete, pause)
+  - `schedule` (`string`) - Cron expression e.g., '0 1 * * *' (for create/update)
+  - `includedNamespaces` (`array`) - Namespaces to include in scheduled backups (for create)
+  - `ttl` (`string`) - Backup TTL duration (for create/update)
+  - `paused` (`boolean`) - Set to true to pause, false to unpause (for pause action)
+
+- **oadp_dpa** - Manage OADP DataProtectionApplication resources: list, get, create, update, or delete
+  - `action` (`string`) **(required)** - Action: 'list', 'get', 'create', 'update', 'delete'
+  - `namespace` (`string`) - Namespace containing DPAs (default: openshift-adp)
+  - `name` (`string`) - Name of the DPA (required for get, create, update, delete)
+  - `backupLocationProvider` (`string`) - Provider for backup storage e.g., aws, azure, gcp (for create)
+  - `backupLocationBucket` (`string`) - Bucket name for backup storage (for create)
+  - `enableNodeAgent` (`boolean`) - Enable NodeAgent for file-system backups (for create/update)
+
+- **oadp_storage_location** - Manage Velero storage locations (BackupStorageLocation and VolumeSnapshotLocation)
+  - `action` (`string`) **(required)** - Action: 'list', 'get', 'create', 'update', 'delete'
+  - `type` (`string`) **(required)** - Storage location type: 'bsl' or 'vsl'
+  - `namespace` (`string`) - Namespace containing storage locations (default: openshift-adp)
+  - `name` (`string`) - Name of the storage location (required for get, create, update, delete)
+  - `provider` (`string`) - Storage provider e.g., aws, azure, gcp (for create)
+  - `bucket` (`string`) - Bucket name for object storage (for BSL create)
+  - `region` (`string`) - Region for the storage (for create/update)
+
+- **oadp_data_mover** - Manage Velero data mover resources (DataUpload and DataDownload for CSI snapshots)
+  - `action` (`string`) **(required)** - Action: 'list', 'get', 'cancel'
+  - `type` (`string`) **(required)** - Resource type: 'upload' or 'download'
+  - `namespace` (`string`) - Namespace containing resources (default: openshift-adp)
+  - `name` (`string`) - Name of the resource (required for get, cancel)
+  - `labelSelector` (`string`) - Label selector to filter resources (for list)
+
+- **oadp_repository** - Manage Velero BackupRepository resources (connections to backup storage)
+  - `action` (`string`) **(required)** - Action: 'list', 'get', 'delete'
+  - `namespace` (`string`) - Namespace containing repositories (default: openshift-adp)
+  - `name` (`string`) - Name of the repository (required for get, delete)
+
+- **oadp_data_protection_test** - Manage OADP DataProtectionTest resources for validating storage connectivity
+  - `action` (`string`) **(required)** - Action: 'list', 'get', 'create', 'delete'
+  - `namespace` (`string`) - Namespace containing resources (default: openshift-adp)
+  - `name` (`string`) - Name of the test (required for get, create, delete)
+  - `backupLocationName` (`string`) - Name of the BackupStorageLocation to test (for create)
+  - `uploadTestFileSize` (`string`) - Size of test file for upload speed test e.g., '100MB' (for create)
 
 </details>
 
