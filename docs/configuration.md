@@ -252,15 +252,15 @@ Toolsets group related tools together. Enable only the toolsets you need to redu
 
 <!-- AVAILABLE-TOOLSETS-START -->
 
-| Toolset       | Description                                                                                                                                                     | Default |
-|---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| config        | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                         | ✓       |
-| core          | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                             | ✓       |
-| helm          | Tools for managing Helm charts and releases                                                                                                                     | ✓       |
-| kcp           | Manage kcp workspaces and multi-tenancy features                                                                                                                |         |
-| kubevirt      | KubeVirt virtual machine management tools                                                                                                                       |         |
-| observability | Cluster observability tools for querying Prometheus metrics and Alertmanager alerts                                                                             | ✓       |
-| ossm          | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details. |         |
+| Toolset  | Description                                                                                                                                                     | Default |
+|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| config   | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                         | ✓       |
+| core     | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                             | ✓       |
+| helm     | Tools for managing Helm charts and releases                                                                                                                     | ✓       |
+| kcp      | Manage kcp workspaces and multi-tenancy features                                                                                                                |         |
+| kubevirt | KubeVirt virtual machine management tools                                                                                                                       |         |
+| obs-mcp  | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                   |         |
+| ossm     | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details. |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 

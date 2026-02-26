@@ -27,28 +27,3 @@ type Result struct {
 	// Values is used for range queries - [[timestamp, value], ...]
 	Values [][]any `json:"values,omitempty"`
 }
-
-// Alert represents an Alertmanager alert.
-type Alert struct {
-	Annotations  map[string]string `json:"annotations"`
-	EndsAt       string            `json:"endsAt"`
-	Fingerprint  string            `json:"fingerprint"`
-	Receivers    []Receiver        `json:"receivers"`
-	StartsAt     string            `json:"startsAt"`
-	Status       AlertStatus       `json:"status"`
-	UpdatedAt    string            `json:"updatedAt"`
-	GeneratorURL string            `json:"generatorURL,omitempty"`
-	Labels       map[string]string `json:"labels"`
-}
-
-// Receiver represents an Alertmanager receiver.
-type Receiver struct {
-	Name string `json:"name"`
-}
-
-// AlertStatus represents the status of an alert.
-type AlertStatus struct {
-	InhibitedBy []string `json:"inhibitedBy"`
-	SilencedBy  []string `json:"silencedBy"`
-	State       string   `json:"state"`
-}
