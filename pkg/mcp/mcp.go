@@ -83,10 +83,9 @@ func NewServer(configuration Configuration, targetProvider internalk8s.Provider)
 			},
 			&mcp.ServerOptions{
 				Capabilities: &mcp.ServerCapabilities{
-					Resources: nil,
-					Prompts:   &mcp.PromptCapabilities{ListChanged: !configuration.Stateless},
-					Tools:     &mcp.ToolCapabilities{ListChanged: !configuration.Stateless},
-					Logging:   &mcp.LoggingCapabilities{},
+					Prompts: &mcp.PromptCapabilities{ListChanged: !configuration.Stateless},
+					Tools:   &mcp.ToolCapabilities{ListChanged: !configuration.Stateless},
+					Logging: &mcp.LoggingCapabilities{},
 				},
 				Instructions: configuration.ServerInstructions,
 			}),

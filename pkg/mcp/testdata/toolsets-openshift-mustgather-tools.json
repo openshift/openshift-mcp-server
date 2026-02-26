@@ -1,0 +1,486 @@
+[
+  {
+    "annotations": {
+      "readOnlyHint": true,
+      "title": "ETCD Endpoint Status"
+    },
+    "description": "Get ETCD endpoint status including database size, raft index, and quota from the must-gather archive",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "mustgather_etcd_endpoint_status",
+    "title": "ETCD Endpoint Status"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true,
+      "title": "ETCD Health"
+    },
+    "description": "Get ETCD cluster health status including endpoint health and active alarms from the must-gather archive",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "mustgather_etcd_health",
+    "title": "ETCD Health"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true,
+      "title": "ETCD Members"
+    },
+    "description": "List ETCD cluster members from the must-gather archive",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "mustgather_etcd_members_list",
+    "title": "ETCD Members"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true,
+      "title": "ETCD Object Count"
+    },
+    "description": "Get ETCD object counts by resource type from the must-gather archive",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "description": "Maximum number of resource types to show (default: 50, sorted by count descending)",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "name": "mustgather_etcd_object_count",
+    "title": "ETCD Object Count"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true,
+      "title": "Events by Resource"
+    },
+    "description": "Get all events related to a specific Kubernetes resource from the must-gather archive",
+    "inputSchema": {
+      "properties": {
+        "kind": {
+          "description": "Resource kind (optional, narrows search)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Resource name",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Resource namespace",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "name": "mustgather_events_by_resource",
+    "title": "Events by Resource"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true,
+      "title": "List Events"
+    },
+    "description": "List Kubernetes events from the must-gather archive with optional filtering by type, namespace, resource, and reason",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "description": "Maximum number of events to return (default: 100)",
+          "type": "integer"
+        },
+        "namespace": {
+          "description": "Filter by namespace",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Filter by event reason (partial match)",
+          "type": "string"
+        },
+        "resource": {
+          "description": "Filter by involved resource name (partial match)",
+          "type": "string"
+        },
+        "type": {
+          "description": "Event type filter: all, Warning, Normal",
+          "enum": [
+            "all",
+            "Warning",
+            "Normal"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "mustgather_events_list",
+    "title": "List Events"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true,
+      "title": "AlertManager Status"
+    },
+    "description": "Get AlertManager cluster status from the must-gather archive",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "mustgather_monitoring_alertmanager_status",
+    "title": "AlertManager Status"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true,
+      "title": "Prometheus Alerts"
+    },
+    "description": "Get active Prometheus alerts from the must-gather archive",
+    "inputSchema": {
+      "properties": {
+        "state": {
+          "description": "Filter by alert state: firing, pending (default: all)",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "mustgather_monitoring_prometheus_alerts",
+    "title": "Prometheus Alerts"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true,
+      "title": "Prometheus Config"
+    },
+    "description": "Get a summary of Prometheus configuration from the must-gather archive",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "mustgather_monitoring_prometheus_config_summary",
+    "title": "Prometheus Config"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true,
+      "title": "Prometheus Rules"
+    },
+    "description": "Get Prometheus alerting and recording rules from the must-gather archive",
+    "inputSchema": {
+      "properties": {
+        "type": {
+          "description": "Filter by rule type: alerting, recording (default: all)",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "mustgather_monitoring_prometheus_rules",
+    "title": "Prometheus Rules"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true,
+      "title": "Prometheus Status"
+    },
+    "description": "Get Prometheus TSDB and runtime status from the must-gather archive",
+    "inputSchema": {
+      "properties": {
+        "replica": {
+          "description": "Prometheus replica (0, 1, or all). Default: all",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "mustgather_monitoring_prometheus_status",
+    "title": "Prometheus Status"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true,
+      "title": "Prometheus Targets"
+    },
+    "description": "Get Prometheus scrape targets and their health status from the must-gather archive",
+    "inputSchema": {
+      "properties": {
+        "health": {
+          "description": "Filter by health status: up, down, unknown (default: all)",
+          "type": "string"
+        },
+        "replica": {
+          "description": "Prometheus replica (0, 1, or all). Default: 0",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "mustgather_monitoring_prometheus_targets",
+    "title": "Prometheus Targets"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true,
+      "title": "Prometheus TSDB"
+    },
+    "description": "Get detailed Prometheus TSDB statistics including top metrics by series count and label cardinality",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "description": "Number of top entries to show per category (default: 10)",
+          "type": "integer"
+        },
+        "replica": {
+          "description": "Prometheus replica (0, 1, or all). Default: 0",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "mustgather_monitoring_prometheus_tsdb",
+    "title": "Prometheus TSDB"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true,
+      "title": "List Namespaces"
+    },
+    "description": "List all namespaces found in the must-gather archive",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "mustgather_namespaces_list",
+    "title": "List Namespaces"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true,
+      "title": "Node Diagnostics"
+    },
+    "description": "Get comprehensive diagnostic information for a specific node including kubelet logs, system info, CPU/IRQ affinities, and hardware details",
+    "inputSchema": {
+      "properties": {
+        "include": {
+          "description": "Comma-separated diagnostics to include: kubelet,sysinfo,cpu,irq,pods,lscpu,lspci,dmesg,cmdline (default: all)",
+          "type": "string"
+        },
+        "kubeletTail": {
+          "description": "Number of lines from end of kubelet log (0 for all, default: 100)",
+          "type": "integer"
+        },
+        "node": {
+          "description": "Node name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "node"
+      ],
+      "type": "object"
+    },
+    "name": "mustgather_node_diagnostics_get",
+    "title": "Node Diagnostics"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true,
+      "title": "Kubelet Logs"
+    },
+    "description": "Get kubelet logs for a specific node (decompressed from .gz file)",
+    "inputSchema": {
+      "properties": {
+        "node": {
+          "description": "Node name",
+          "type": "string"
+        },
+        "tail": {
+          "description": "Number of lines from end (0 for all)",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "node"
+      ],
+      "type": "object"
+    },
+    "name": "mustgather_node_kubelet_logs",
+    "title": "Kubelet Logs"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true,
+      "title": "Kubelet Logs Grep"
+    },
+    "description": "Filter kubelet logs for a specific node by a search string. Returns only matching lines.",
+    "inputSchema": {
+      "properties": {
+        "caseInsensitive": {
+          "description": "Perform case-insensitive search (default: false)",
+          "type": "boolean"
+        },
+        "filter": {
+          "description": "String to search for in log lines",
+          "type": "string"
+        },
+        "node": {
+          "description": "Node name",
+          "type": "string"
+        },
+        "tail": {
+          "description": "Maximum number of matching lines to return (0 for all)",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "node",
+        "filter"
+      ],
+      "type": "object"
+    },
+    "name": "mustgather_node_kubelet_logs_grep",
+    "title": "Kubelet Logs Grep"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true,
+      "title": "Get Pod Logs"
+    },
+    "description": "Get container logs for a specific pod from the must-gather archive. Returns current or previous logs.",
+    "inputSchema": {
+      "properties": {
+        "container": {
+          "description": "Container name (uses first container if not specified)",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Pod namespace",
+          "type": "string"
+        },
+        "pod": {
+          "description": "Pod name",
+          "type": "string"
+        },
+        "previous": {
+          "description": "Get previous container logs (from crash/restart)",
+          "type": "boolean"
+        },
+        "tail": {
+          "description": "Number of lines from end of logs (0 for all)",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "namespace",
+        "pod"
+      ],
+      "type": "object"
+    },
+    "name": "mustgather_pod_logs_get",
+    "title": "Get Pod Logs"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true,
+      "title": "Get Resource"
+    },
+    "description": "Get a specific Kubernetes resource from the must-gather archive by kind, name, and optional namespace",
+    "inputSchema": {
+      "properties": {
+        "apiVersion": {
+          "description": "API version (default: v1)",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Resource kind (e.g., Pod, Deployment, Service)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Resource name",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Resource namespace (omit for cluster-scoped resources)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "name"
+      ],
+      "type": "object"
+    },
+    "name": "mustgather_resources_get",
+    "title": "Get Resource"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true,
+      "title": "List Resources"
+    },
+    "description": "List Kubernetes resources from the must-gather archive with optional filtering by namespace, labels, and fields",
+    "inputSchema": {
+      "properties": {
+        "apiVersion": {
+          "description": "API version (default: v1)",
+          "type": "string"
+        },
+        "fieldSelector": {
+          "description": "Field selector (e.g., metadata.name=foo)",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Resource kind (e.g., Pod, Deployment, Service)",
+          "type": "string"
+        },
+        "labelSelector": {
+          "description": "Label selector (e.g., app=nginx,tier=frontend)",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Maximum number of resources to return (0 for all)",
+          "type": "integer"
+        },
+        "namespace": {
+          "description": "Filter by namespace",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "type": "object"
+    },
+    "name": "mustgather_resources_list",
+    "title": "List Resources"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true,
+      "title": "Load Must-Gather Archive"
+    },
+    "description": "Load a must-gather archive from a given filesystem path for analysis. Must be called before any other mustgather_* tools.",
+    "inputSchema": {
+      "properties": {
+        "path": {
+          "description": "Absolute path to the must-gather archive directory",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "name": "mustgather_use",
+    "title": "Load Must-Gather Archive"
+  }
+]
