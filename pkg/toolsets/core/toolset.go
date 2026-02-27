@@ -26,6 +26,7 @@ func (t *Toolset) GetTools(o api.Openshift) []api.ServerTool {
 		initNodes(),
 		initPods(),
 		initResources(o),
+		initTraceOLM(),
 	)
 }
 
