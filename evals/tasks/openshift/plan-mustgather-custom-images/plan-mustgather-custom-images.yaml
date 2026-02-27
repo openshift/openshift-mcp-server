@@ -1,0 +1,21 @@
+kind: Task
+metadata:
+  labels:
+    suite: openshift
+  name: plan-mustgather-custom-images
+  difficulty: medium
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # No setup needed - plan_mustgather is a prompt that generates a plan
+  verify:
+    contains: "ose-must-gather"
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # No cleanup needed - plan_mustgather only generates a plan without applying
+  prompt:
+    inline: Use the plan_mustgather prompt with images set to "registry.redhat.io/openshift4/ose-must-gather:v4.15,registry.redhat.io/openshift-logging/cluster-logging-rhel9-operator:latest" to plan a must-gather using custom images for both the platform and logging operator.

@@ -1,0 +1,21 @@
+kind: Task
+metadata:
+  labels:
+    suite: openshift
+  name: plan-mustgather-host-network
+  difficulty: easy
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # No setup needed - plan_mustgather is a prompt that generates a plan
+  verify:
+    contains: "hostNetwork"
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # No cleanup needed - plan_mustgather only generates a plan without applying
+  prompt:
+    inline: Use the plan_mustgather prompt with host_network set to "true" and keep_resources set to "true" to plan a must-gather that uses host networking and keeps pod resources after collection.
