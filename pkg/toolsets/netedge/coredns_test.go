@@ -1,12 +1,6 @@
 package netedge
 
 import (
-	"context"
-	"testing"
-
-	"github.com/containers/kubernetes-mcp-server/pkg/api"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -15,17 +9,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-// mockKubernetesClient implements api.KubernetesClient for testing
-type mockKubernetesClient struct {
-	api.KubernetesClient
-	restConfig *rest.Config
-}
+func (s *NetEdgeTestSuite) TestGetCoreDNSConfig() {
 
-func (m *mockKubernetesClient) RESTConfig() *rest.Config {
-	return m.restConfig
-}
-
-func TestGetCoreDNSConfig(t *testing.T) {
 	tests := []struct {
 		name           string
 		configMap      *corev1.ConfigMap
@@ -72,7 +57,7 @@ func TestGetCoreDNSConfig(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			// Setup mock client
 			objs := []runtime.Object{}
 			if tt.configMap != nil {
@@ -87,24 +72,19 @@ func TestGetCoreDNSConfig(t *testing.T) {
 				return fake.NewClientBuilder().WithRuntimeObjects(objs...).Build(), nil
 			}
 
-			// Call handler
-			params := api.ToolHandlerParams{
-				Context:          context.Background(),
-				KubernetesClient: &mockKubernetesClient{restConfig: &rest.Config{}},
-			}
-
-			result, err := getCoreDNSConfig(params)
+			// Call handler using suite params (which has valid RESTConfig from SetupTest)
+			result, err := getCoreDNSConfig(s.params)
 
 			if tt.expectError {
-				require.NoError(t, err) // Handler returns error in result, not as return value
-				require.NotNil(t, result)
-				require.Error(t, result.Error)
-				assert.Contains(t, result.Error.Error(), tt.errorContains)
+				s.Require().NoError(err) // Handler returns error in result, not as return value
+				s.Require().NotNil(result)
+				s.Require().Error(result.Error)
+				s.Assert().Contains(result.Error.Error(), tt.errorContains)
 			} else {
-				require.NoError(t, err)
-				require.NotNil(t, result)
-				require.NoError(t, result.Error)
-				assert.Equal(t, tt.expectedOutput, result.Content)
+				s.Require().NoError(err)
+				s.Require().NotNil(result)
+				s.Require().NoError(result.Error)
+				s.Assert().Equal(tt.expectedOutput, result.Content)
 			}
 		})
 	}
