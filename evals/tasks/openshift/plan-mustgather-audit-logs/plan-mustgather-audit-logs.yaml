@@ -1,0 +1,21 @@
+kind: Task
+metadata:
+  labels:
+    suite: openshift
+  name: plan-mustgather-audit-logs
+  difficulty: easy
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # No setup needed - plan_mustgather is a prompt that generates a plan
+  verify:
+    contains: "gather_audit_logs"
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # No cleanup needed - plan_mustgather only generates a plan without applying
+  prompt:
+    inline: Use the plan_mustgather prompt with the gather_command set to "/usr/bin/gather_audit_logs" to plan collecting audit logs from my OpenShift cluster.

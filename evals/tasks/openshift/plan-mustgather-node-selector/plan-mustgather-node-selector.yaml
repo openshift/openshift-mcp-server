@@ -1,0 +1,21 @@
+kind: Task
+metadata:
+  labels:
+    suite: openshift
+  name: plan-mustgather-node-selector
+  difficulty: medium
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # No setup needed - plan_mustgather is a prompt that generates a plan
+  verify:
+    contains: "node-role.kubernetes.io/worker"
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # No cleanup needed - plan_mustgather only generates a plan without applying
+  prompt:
+    inline: Use the plan_mustgather prompt with a node_selector of "node-role.kubernetes.io/worker=true" to plan a must-gather that runs only on worker nodes.
