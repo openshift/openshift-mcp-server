@@ -1,0 +1,49 @@
+kind: Task
+metadata:
+  labels:
+    suite: openshift
+  name: plan-mustgather-timeout-since
+  difficulty: medium
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # Cleanup any existing must-gather resources from previous runs
+      kubectl get ns -o name 2>/dev/null | grep openshift-must-gather | xargs -r kubectl delete --wait=false 2>/dev/null || true
+      kubectl get clusterrolebinding -o name 2>/dev/null | grep must-gather-collector | xargs -r kubectl delete 2>/dev/null || true
+  verify:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # Find must-gather pod and verify it has timeout and since configured
+      POD_JSON=$(kubectl get pods -A -o json | jq -r '.items[] | select(.metadata.namespace | startswith("openshift-must-gather"))')
+      if [ -z "$POD_JSON" ]; then
+        echo "No must-gather pod found"
+        exit 1
+      fi
+      NS=$(echo "$POD_JSON" | jq -r '.metadata.namespace' | head -1)
+      POD=$(echo "$POD_JSON" | jq -r '.metadata.name' | head -1)
+      POD_YAML=$(kubectl get pod "$POD" -n "$NS" -o yaml)
+      # Verify pod has MUST_GATHER_SINCE env var
+      echo "$POD_YAML" | grep -q "MUST_GATHER_SINCE"
+      # Verify pod has timeout in command
+      echo "$POD_YAML" | grep -q "/usr/bin/timeout"
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # Delete all must-gather namespaces and clusterrolebindings
+      kubectl get ns -o name 2>/dev/null | grep openshift-must-gather | xargs -r kubectl delete --wait=false 2>/dev/null || true
+      kubectl get clusterrolebinding -o name 2>/dev/null | grep must-gather-collector | xargs -r kubectl delete 2>/dev/null || true
+  prompt:
+    inline: My cluster had an incident about an hour ago. I need a must-gather that only collects logs and data from the last 2 hours to keep the archive small. Also set a 30 minute timeout so it doesn't run forever. Set this up and apply it.
+  assertions:
+    promptsUsed:
+      - server: kubernetes
+        prompt: plan_mustgather
+    toolsUsed:
+      - server: kubernetes
+        tool: resource_create_or_update
+    minToolCalls: 1
+    maxToolCalls: 15

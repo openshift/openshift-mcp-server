@@ -1,0 +1,40 @@
+kind: Task
+metadata:
+  labels:
+    suite: openshift
+  name: plan-mustgather-custom-namespace
+  difficulty: easy
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # Cleanup any existing resources
+      kubectl delete ns my-debug-namespace --wait=false 2>/dev/null || true
+      kubectl get clusterrolebinding -o name 2>/dev/null | grep my-debug-namespace-must-gather-collector | xargs -r kubectl delete 2>/dev/null || true
+  verify:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # Verify resources exist in the custom namespace
+      kubectl get ns my-debug-namespace
+      kubectl get sa must-gather-collector -n my-debug-namespace
+      kubectl get pod -n my-debug-namespace -o name | grep -q must-gather
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # Delete the custom namespace and clusterrolebinding
+      kubectl delete ns my-debug-namespace --wait=false 2>/dev/null || true
+      kubectl get clusterrolebinding -o name 2>/dev/null | grep my-debug-namespace-must-gather-collector | xargs -r kubectl delete 2>/dev/null || true
+  prompt:
+    inline: I want to run a must-gather but need it in a specific namespace called "my-debug-namespace" due to our cluster policies. Can you set this up and apply it?
+  assertions:
+    promptsUsed:
+      - server: kubernetes
+        prompt: plan_mustgather
+    toolsUsed:
+      - server: kubernetes
+        tool: resource_create_or_update
+    minToolCalls: 1
+    maxToolCalls: 15
