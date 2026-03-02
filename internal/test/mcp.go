@@ -25,6 +25,7 @@ type mcpClientConfig struct {
 	clientInfo           *mcp.Implementation
 	endpoint             string
 	allowConnectionError bool
+	elicitationHandler   func(context.Context, *mcp.ElicitRequest) (*mcp.ElicitResult, error)
 }
 
 // httpHeaderOption sets custom HTTP headers
@@ -93,6 +94,22 @@ func (o allowConnectionErrorOption) apply(c *mcpClientConfig) {
 // Useful for testing authentication/authorization scenarios where connection rejection is expected.
 func WithAllowConnectionError() McpClientOption {
 	return allowConnectionErrorOption{}
+}
+
+// elicitationHandlerOption sets a custom elicitation handler on the MCP client
+type elicitationHandlerOption struct {
+	handler func(context.Context, *mcp.ElicitRequest) (*mcp.ElicitResult, error)
+}
+
+func (o elicitationHandlerOption) apply(c *mcpClientConfig) {
+	c.elicitationHandler = o.handler
+}
+
+// WithElicitationHandler sets an elicitation handler on the MCP client.
+// When set, the client advertises elicitation support and the handler is invoked
+// when the server sends an elicitation request during tool execution.
+func WithElicitationHandler(handler func(context.Context, *mcp.ElicitRequest) (*mcp.ElicitResult, error)) McpClientOption {
+	return elicitationHandlerOption{handler: handler}
 }
 
 // headerRoundTripper injects HTTP headers into requests
@@ -184,6 +201,7 @@ func NewMcpClient(t *testing.T, mcpHttpServer http.Handler, options ...McpClient
 
 	// Create go-sdk client with notification handlers
 	clientOptions := &mcp.ClientOptions{
+		ElicitationHandler: cfg.elicitationHandler,
 		ToolListChangedHandler: func(_ context.Context, req *mcp.ToolListChangedRequest) {
 			ret.notifications.capture(&CapturedNotification{
 				Method: "notifications/tools/list_changed",

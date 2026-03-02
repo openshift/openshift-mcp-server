@@ -103,9 +103,37 @@ type ToolHandlerParams struct {
 	KubernetesClient
 	ToolCallRequest
 	ListOutput output.Output
+	Elicitor
 }
 
 type ToolHandlerFunc func(params ToolHandlerParams) (*ToolCallResult, error)
+
+// Elicitor provides a mechanism for tools and prompts to request additional information
+// from the user during execution via the MCP elicitation protocol.
+// The elicitation request is forwarded to the MCP client, which presents a form to the user.
+// See MCP specification: https://modelcontextprotocol.io/specification/2025-11-25/client/elicitation
+type Elicitor interface {
+	Elicit(ctx context.Context, message string, requestedSchema *jsonschema.Schema) (*ElicitResult, error)
+}
+
+// ElicitAction constants define the possible user responses to an elicitation request.
+// See MCP specification: https://modelcontextprotocol.io/specification/2025-11-25/client/elicitation
+const (
+	// ElicitActionAccept indicates the user submitted the form with content.
+	ElicitActionAccept = "accept"
+	// ElicitActionDecline indicates the user explicitly declined the request.
+	ElicitActionDecline = "decline"
+	// ElicitActionCancel indicates the user dismissed the form without making a choice.
+	ElicitActionCancel = "cancel"
+)
+
+// ElicitResult represents the user's response to an elicitation request.
+type ElicitResult struct {
+	// Action is one of ElicitActionAccept, ElicitActionDecline, or ElicitActionCancel.
+	Action string
+	// Content contains the submitted form data. Only populated when Action is ElicitActionAccept.
+	Content map[string]any
+}
 
 type Tool struct {
 	// The name of the tool.
