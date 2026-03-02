@@ -1,12 +1,11 @@
 package netedge
 
 import (
-	"encoding/json"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic/fake"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/yaml"
 )
 
 func (s *NetEdgeTestSuite) TestInspectRoute() {
@@ -39,10 +38,15 @@ func (s *NetEdgeTestSuite) TestInspectRoute() {
 			},
 			validate: func(result string) {
 				var r map[string]interface{}
-				err := json.Unmarshal([]byte(result), &r)
+				err := yaml.Unmarshal([]byte(result), &r)
 				s.Require().NoError(err)
-				s.Assert().Equal("my-route", r["metadata"].(map[string]interface{})["name"])
-				s.Assert().Equal("example.com", r["spec"].(map[string]interface{})["host"])
+				rawRoute := r["RawRoute"].(map[string]interface{})
+				keyFields := r["KeyFields"].(map[string]interface{})
+				s.Assert().Equal("my-route", rawRoute["metadata"].(map[string]interface{})["name"])
+				s.Assert().Equal("example.com", rawRoute["spec"].(map[string]interface{})["host"])
+				s.Assert().Equal("my-route", keyFields["Name"])
+				s.Assert().Equal("default", keyFields["Namespace"])
+				s.Assert().Equal("example.com", keyFields["Host"])
 			},
 		},
 		{
