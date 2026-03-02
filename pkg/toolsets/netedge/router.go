@@ -20,6 +20,14 @@ const (
 	routerContainerName          = "router"
 )
 
+var (
+	podGVR = schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "pods",
+	}
+)
+
 func initRouter() []api.ServerTool {
 	return []api.ServerTool{
 		{
@@ -182,31 +190,14 @@ func getRouterSessions(params api.ToolHandlerParams) (*api.ToolCallResult, error
 }
 
 func getAnyRouterPod(params api.ToolHandlerParams, icName string) (string, error) {
-	podGVK := &schema.GroupVersionKind{
-		Group:   "",
-		Version: "v1",
-		Kind:    "Pod",
-	}
-	pods, err := kubernetes.NewCore(params).ResourcesList(params, podGVK, ingressNamespace, api.ListOptions{
-		ListOptions: metav1.ListOptions{
-			LabelSelector: "ingresscontroller.operator.openshift.io/deployment-ingresscontroller=" + icName,
-		},
-		AsTable: false,
+	pods, err := params.DynamicClient().Resource(podGVR).Namespace(ingressNamespace).List(params.Context, metav1.ListOptions{
+		LabelSelector: "ingresscontroller.operator.openshift.io/deployment-ingresscontroller=" + icName,
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to list router pods: %v", err)
 	}
-	podsMap := pods.UnstructuredContent()
-	if items, ok := podsMap["items"].([]interface{}); ok {
-		for _, item := range items {
-			if itemMap, ok := item.(map[string]interface{}); ok {
-				if metadata, ok := itemMap["metadata"].(map[string]interface{}); ok {
-					if podName, ok := metadata["name"].(string); ok {
-						return podName, nil
-					}
-				}
-			}
-		}
+	for _, pod := range pods.Items {
+		return pod.GetName(), nil
 	}
 	return "", errors.New("no router pod found")
 }
