@@ -9,13 +9,6 @@ on:
   issue_comment:
     types: [created]
 
-  # Automatically run kubevirt evals when kubevirt-related files change
-  pull_request:
-    paths:
-      - 'pkg/toolsets/kubevirt/**'
-      - 'evals/tasks/kubevirt/**'
-      - 'build/kubevirt.mk'
-
   # Allow manual workflow dispatch for testing
   workflow_dispatch:
     inputs:
@@ -67,7 +60,6 @@ jobs:
     if: |
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'pull_request' ||
       (github.event_name == 'issue_comment' &&
        github.event.issue.pull_request &&
        contains(github.event.comment.body, '/run-mcpchecker'))
@@ -104,11 +96,6 @@ jobs:
               echo "should-run=false" >> $GITHUB_OUTPUT
               echo "User ${{ github.event.comment.user.login }} does not have permission to trigger evaluations"
             fi
-          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "should-run=true" >> $GITHUB_OUTPUT
-            echo "is-pr=true" >> $GITHUB_OUTPUT
-            echo "pr-number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
-            echo "pr-sha=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
           else
             echo "should-run=true" >> $GITHUB_OUTPUT
             echo "is-pr=false" >> $GITHUB_OUTPUT
@@ -116,15 +103,12 @@ jobs:
           fi
 
           # Suite selection:
-          # - For pull_request, always run kubevirt (triggered by kubevirt path changes).
           # - For workflow_dispatch, use the provided input.
           # - For other triggers (schedule/issue_comment), default to kubernetes.
           SUITE="${{ github.event.inputs.suite || 'kubernetes' }}"
           TASK_FILTER="${{ github.event.inputs.task-filter || '' }}"
 
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            SUITE_INPUT="kubevirt"
-          elif [[ "${{ github.event_name }}" == "issue_comment" ]]; then
+          if [[ "${{ github.event_name }}" == "issue_comment" ]]; then
             # Parse comment: /run-mcpchecker [suite]. Suite = kubernetes | kubevirt | kiali | all
             COMMENT_BODY="${{ github.event.comment.body }}"
             COMMENT_BODY="${COMMENT_BODY//[[:space:]]/ }"
@@ -208,10 +192,11 @@ jobs:
               (needs.check-trigger.outputs.kubevirt-run == 'true' && 'kubevirt') ||
               ''
             }}
+          MCP_CONFIG_DIR: 'dev/config/mcp-configs'
 
       - name: Run mcpchecker evaluation
         id: mcpchecker
-        uses: mcpchecker/mcpchecker/.github/actions/mcpchecker-action@v0.0.9
+        uses: mcpchecker/mcpchecker/.github/actions/mcpchecker-action@v0.0.10
         with:
           eval-config: 'evals/openai-agent/eval.yaml'
           mcpchecker-version: 'latest'
@@ -260,7 +245,7 @@ jobs:
 
       - name: Upload PR context
         if: always() && needs.check-trigger.outputs.is-pr == 'true'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: eval-context
           path: eval-context/
@@ -283,7 +268,7 @@ jobs:
           ref: main
 
       - name: Download mcpchecker results
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: mcpchecker-results
           path: mcpchecker-results/
@@ -296,8 +281,13 @@ jobs:
           AGENT_NAME=$(echo "$EVAL_CONFIG" | sed 's|evals/||; s|/eval\.yaml||')
 
           mkdir -p evals/results
-          # Copy the mcpchecker results file with agent-specific name
-          cp mcpchecker-results/results.json "evals/results/${AGENT_NAME}-latest.json"
+          # Copy the most recent mcpchecker results file with agent-specific name
+          RESULTS_FILE=$(ls -t mcpchecker-results/mcpchecker-*-out.json 2>/dev/null | head -1)
+          if [ -z "$RESULTS_FILE" ]; then
+            echo "Error: No mcpchecker results file found"
+            exit 1
+          fi
+          cp "$RESULTS_FILE" "evals/results/${AGENT_NAME}-latest.json"
 
       - name: Create Pull Request
         env:
@@ -314,6 +304,13 @@ jobs:
           # Create or reset the branch
           git checkout -B "$BRANCH"
           git add evals/results/*-latest.json
+
+          # Skip if no changes
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
           git commit -m "chore(evals): update mcpchecker evaluation results"
           git push -f origin "$BRANCH"
 
