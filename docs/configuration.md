@@ -131,6 +131,8 @@ The server will:
 | `sse_base_url` | string | `""` | Base URL for Server-Sent Events (SSE) connections. Used when the server is behind a reverse proxy. |
 | `list_output` | string | `"table"` | Output format for resource list operations. Valid values: `yaml`, `table`. |
 | `stateless` | boolean | `false` | When `true`, disables tool and prompt change notifications. Useful for container deployments, load balancing, and serverless environments. |
+| `tls_cert` | string | `""` | Path to TLS certificate file for HTTPS. When set along with `tls_key`, the server serves HTTPS instead of HTTP. |
+| `tls_key` | string | `""` | Path to TLS private key file for HTTPS. Must be set together with `tls_cert`. |
 
 **Example:**
 ```toml
@@ -138,6 +140,10 @@ log_level = 2
 port = "8080"
 list_output = "yaml"
 stateless = true
+
+# Enable TLS for HTTPS
+tls_cert = "/etc/tls/tls.crt"
+tls_key = "/etc/tls/tls.key"
 ```
 
 ### Kubernetes Connection
@@ -252,15 +258,15 @@ Toolsets group related tools together. Enable only the toolsets you need to redu
 
 <!-- AVAILABLE-TOOLSETS-START -->
 
-| Toolset       | Description                                                                                                                                                     | Default |
-|---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| config        | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                         | ✓       |
-| core          | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                             | ✓       |
-| helm          | Tools for managing Helm charts and releases                                                                                                                     | ✓       |
-| kcp           | Manage kcp workspaces and multi-tenancy features                                                                                                                |         |
-| kubevirt      | KubeVirt virtual machine management tools                                                                                                                       |         |
-| observability | Cluster observability tools for querying Prometheus metrics and Alertmanager alerts                                                                             |         |
-| ossm          | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details. |         |
+| Toolset       | Description                                                                                                                                                                     | Default |
+|---------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| config        | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                         | ✓       |
+| core          | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                             | ✓       |
+| helm          | Tools for managing Helm charts and releases                                                                                                                                     |         |
+| kcp           | Manage kcp workspaces and multi-tenancy features                                                                                                                                |         |
+| kubevirt      | KubeVirt virtual machine management tools, check the [KubeVirt documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/kubevirt.md) for more details. |         |
+| observability | Cluster observability tools for querying Prometheus metrics and Alertmanager alerts                                                                                             |         |
+| ossm          | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                 |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -505,6 +511,8 @@ The following options can be set via command-line arguments. CLI arguments overr
 | `--toolsets` | Comma-separated list of toolsets to enable |
 | `--disable-multi-cluster` | Disable multi-cluster support |
 | `--cluster-provider` | Cluster provider strategy (`kubeconfig`, `in-cluster`, `kcp`, `disabled`) |
+| `--tls-cert` | Path to TLS certificate file for HTTPS (must be used with `--tls-key`) |
+| `--tls-key` | Path to TLS private key file for HTTPS (must be used with `--tls-cert`) |
 
 ## Complete Example
 
