@@ -53,6 +53,18 @@ func (s *NetEdgeTestSuite) TestGetCoreDNSConfig() {
 			expectError:    true,
 			errorContains:  "corefile not found",
 		},
+		{
+			name: "failure - data not found",
+			configMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "dns-default",
+					Namespace: "openshift-dns",
+				},
+			},
+			expectedOutput: "",
+			expectError:    true,
+			errorContains:  "ConfigMap has no data",
+		},
 	}
 
 	for _, tt := range tests {
@@ -65,7 +77,8 @@ func (s *NetEdgeTestSuite) TestGetCoreDNSConfig() {
 
 			// Setup fake dynamic client
 			scheme := runtime.NewScheme()
-			_ = clientgoscheme.AddToScheme(scheme)
+			err := clientgoscheme.AddToScheme(scheme)
+			s.Require().NoError(err)
 
 			// Create a fake dynamic client with the objects
 			dynClient := fake.NewSimpleDynamicClient(scheme, objs...)
