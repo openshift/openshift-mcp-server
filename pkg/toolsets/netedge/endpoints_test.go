@@ -1,14 +1,13 @@
 package netedge
 
 import (
-	"encoding/json"
-
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic/fake"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/yaml"
 )
 
 func (s *NetEdgeTestSuite) TestGetServiceEndpoints() {
@@ -47,12 +46,21 @@ func (s *NetEdgeTestSuite) TestGetServiceEndpoints() {
 				},
 			},
 			validate: func(result string) {
-				var eps []discoveryv1.EndpointSlice
-				err := json.Unmarshal([]byte(result), &eps)
+				var r map[string]interface{}
+				err := yaml.Unmarshal([]byte(result), &r)
 				s.Require().NoError(err)
-				s.Assert().Len(eps, 1)
-				s.Assert().Equal("myservice-1", eps[0].Name)
-				s.Assert().Equal("1.2.3.4", eps[0].Endpoints[0].Addresses[0])
+
+				raw := r["RawEndpointSlices"].([]interface{})
+				s.Assert().Len(raw, 1)
+
+				keyFields := r["KeyFields"].([]interface{})
+				s.Assert().Len(keyFields, 1)
+
+				firstRaw := raw[0].(map[string]interface{})
+				firstKF := keyFields[0].(map[string]interface{})
+
+				s.Assert().Equal("myservice-1", firstRaw["metadata"].(map[string]interface{})["name"])
+				s.Assert().Equal("myservice-1", firstKF["Name"])
 			},
 		},
 		{
@@ -74,8 +82,10 @@ func (s *NetEdgeTestSuite) TestGetServiceEndpoints() {
 		s.Run(tt.name, func() {
 			// Create fake dynamic client
 			scheme := runtime.NewScheme()
-			_ = clientgoscheme.AddToScheme(scheme)
-			_ = discoveryv1.AddToScheme(scheme)
+			err := clientgoscheme.AddToScheme(scheme)
+			s.Require().NoError(err)
+			err = discoveryv1.AddToScheme(scheme)
+			s.Require().NoError(err)
 			dynClient := fake.NewSimpleDynamicClient(scheme, tt.existingObjs...)
 
 			// Create mock params

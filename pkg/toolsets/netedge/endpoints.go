@@ -1,14 +1,15 @@
 package netedge
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/google/jsonschema-go/jsonschema"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/yaml"
 )
 
 func initEndpoints() []api.ServerTool {
@@ -73,13 +74,50 @@ func getServiceEndpoints(params api.ToolHandlerParams) (*api.ToolCallResult, err
 		return api.NewToolCallResult("", fmt.Errorf("no EndpointSlices found for service %s/%s", namespace, serviceName)), nil
 	}
 
-	// Dynamic client returns Unstructured items. We can marshal them directly.
-	// We might want to extract just the item list or marshal the whole list.
-	// The original code marshaled `endpointSlices.Items`.
+	// Extract KeyFields from EndpointSlices
+	var keyFields []map[string]interface{}
+	for _, eps := range list.Items {
+		kf := map[string]interface{}{
+			"Name":      eps.GetName(),
+			"Namespace": eps.GetNamespace(),
+		}
 
-	data, err := json.MarshalIndent(list.Items, "", "  ")
+		if endpoints, found, err := unstructured.NestedSlice(eps.Object, "endpoints"); found && err == nil {
+			var addresses []string
+			var nodeNames []string
+			for _, epRaw := range endpoints {
+				if ep, ok := epRaw.(map[string]interface{}); ok {
+					if addrs, ok := ep["addresses"].([]interface{}); ok {
+						for _, a := range addrs {
+							if addrStr, ok := a.(string); ok {
+								addresses = append(addresses, addrStr)
+							}
+						}
+					}
+					if nodeName, ok := ep["nodeName"].(string); ok {
+						nodeNames = append(nodeNames, nodeName)
+					}
+				}
+			}
+			kf["Addresses"] = addresses
+			kf["NodeNames"] = nodeNames
+		}
+
+		if ports, found, err := unstructured.NestedSlice(eps.Object, "ports"); found && err == nil {
+			kf["Ports"] = ports
+		}
+
+		keyFields = append(keyFields, kf)
+	}
+
+	resultObj := map[string]interface{}{
+		"KeyFields":         keyFields,
+		"RawEndpointSlices": list.Items,
+	}
+
+	data, err := yaml.Marshal(resultObj)
 	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to marshal endpoint slices: %w", err)), nil
+		return api.NewToolCallResult("", fmt.Errorf("failed to marshal endpoint slices as yaml: %w", err)), nil
 	}
 
 	return api.NewToolCallResult(string(data), nil), nil
