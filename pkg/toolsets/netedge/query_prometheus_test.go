@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 func (s *NetEdgeTestSuite) TestQueryPrometheusHandler_Diagnostics() {
@@ -91,6 +92,8 @@ func (s *NetEdgeTestSuite) TestQueryPrometheusHandler_Diagnostics() {
 	}
 
 	scheme := runtime.NewScheme()
+	err := clientgoscheme.AddToScheme(scheme)
+	s.Require().NoError(err)
 	dynClient := fakedynamic.NewSimpleDynamicClient(scheme, route)
 
 	tests := []struct {
