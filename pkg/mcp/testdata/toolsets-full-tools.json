@@ -139,71 +139,6 @@
   },
   {
     "annotations": {
-      "destructiveHint": true,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "title": "Pods: Delete"
-    },
-    "description": "Delete a Kubernetes Pod in the current or provided namespace with the provided name",
-    "inputSchema": {
-      "properties": {
-        "name": {
-          "description": "Name of the Pod to delete",
-          "type": "string"
-        },
-        "namespace": {
-          "description": "Namespace to delete the Pod from",
-          "type": "string"
-        }
-      },
-      "required": [
-        "name"
-      ],
-      "type": "object"
-    },
-    "name": "pods_delete",
-    "title": "Pods: Delete"
-  },
-  {
-    "annotations": {
-      "destructiveHint": true,
-      "openWorldHint": true,
-      "title": "Pods: Exec"
-    },
-    "description": "Execute a command in a Kubernetes Pod (shell access, run commands in container) in the current or provided namespace with the provided name and command",
-    "inputSchema": {
-      "properties": {
-        "command": {
-          "description": "Command to execute in the Pod container. The first item is the command to be run, and the rest are the arguments to that command. Example: [\"ls\", \"-l\", \"/tmp\"]",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "container": {
-          "description": "Name of the Pod container where the command will be executed (Optional)",
-          "type": "string"
-        },
-        "name": {
-          "description": "Name of the Pod where the command will be executed",
-          "type": "string"
-        },
-        "namespace": {
-          "description": "Namespace of the Pod where the command will be executed",
-          "type": "string"
-        }
-      },
-      "required": [
-        "name",
-        "command"
-      ],
-      "type": "object"
-    },
-    "name": "pods_exec",
-    "title": "Pods: Exec"
-  },
-  {
-    "annotations": {
       "destructiveHint": false,
       "openWorldHint": true,
       "readOnlyHint": true,
@@ -332,40 +267,6 @@
   {
     "annotations": {
       "destructiveHint": false,
-      "openWorldHint": true,
-      "title": "Pods: Run"
-    },
-    "description": "Run a Kubernetes Pod in the current or provided namespace with the provided container image and optional name",
-    "inputSchema": {
-      "properties": {
-        "image": {
-          "description": "Container Image to run in the Pod",
-          "type": "string"
-        },
-        "name": {
-          "description": "Name of the Pod (Optional, random name if not provided)",
-          "type": "string"
-        },
-        "namespace": {
-          "description": "Namespace to run the Pod in",
-          "type": "string"
-        },
-        "port": {
-          "description": "TCP/IP port to expose from the Pod container (Optional, no port exposed if not provided)",
-          "type": "number"
-        }
-      },
-      "required": [
-        "image"
-      ],
-      "type": "object"
-    },
-    "name": "pods_run",
-    "title": "Pods: Run"
-  },
-  {
-    "annotations": {
-      "destructiveHint": false,
       "idempotentHint": true,
       "openWorldHint": true,
       "readOnlyHint": true,
@@ -397,70 +298,6 @@
     },
     "name": "pods_top",
     "title": "Pods: Top"
-  },
-  {
-    "annotations": {
-      "destructiveHint": true,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "title": "Resources: Create or Update"
-    },
-    "description": "Create or update a Kubernetes resource in the current cluster by providing a YAML or JSON representation of the resource\n(common apiVersion and kind include: v1 Pod, v1 Service, v1 Node, apps/v1 Deployment, networking.k8s.io/v1 Ingress)",
-    "inputSchema": {
-      "properties": {
-        "resource": {
-          "description": "A JSON or YAML containing a representation of the Kubernetes resource. Should include top-level fields such as apiVersion,kind,metadata, and spec",
-          "type": "string"
-        }
-      },
-      "required": [
-        "resource"
-      ],
-      "type": "object"
-    },
-    "name": "resources_create_or_update",
-    "title": "Resources: Create or Update"
-  },
-  {
-    "annotations": {
-      "destructiveHint": true,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "title": "Resources: Delete"
-    },
-    "description": "Delete a Kubernetes resource in the current cluster by providing its apiVersion, kind, optionally the namespace, and its name\n(common apiVersion and kind include: v1 Pod, v1 Service, v1 Node, apps/v1 Deployment, networking.k8s.io/v1 Ingress)",
-    "inputSchema": {
-      "properties": {
-        "apiVersion": {
-          "description": "apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)",
-          "type": "string"
-        },
-        "gracePeriodSeconds": {
-          "description": "Optional duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used",
-          "type": "integer"
-        },
-        "kind": {
-          "description": "kind of the resource (examples of valid kind are: Pod, Service, Deployment, Ingress)",
-          "type": "string"
-        },
-        "name": {
-          "description": "Name of the resource",
-          "type": "string"
-        },
-        "namespace": {
-          "description": "Optional Namespace to delete the namespaced resource from (ignored in case of cluster scoped resources). If not provided, will delete resource from configured namespace",
-          "type": "string"
-        }
-      },
-      "required": [
-        "apiVersion",
-        "kind",
-        "name"
-      ],
-      "type": "object"
-    },
-    "name": "resources_delete",
-    "title": "Resources: Delete"
   },
   {
     "annotations": {
@@ -540,46 +377,5 @@
     },
     "name": "resources_list",
     "title": "Resources: List"
-  },
-  {
-    "annotations": {
-      "destructiveHint": true,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "title": "Resources: Scale"
-    },
-    "description": "Get or update the scale of a Kubernetes resource in the current cluster by providing its apiVersion, kind, name, and optionally the namespace. If the scale is set in the tool call, the scale will be updated to that value. Always returns the current scale of the resource",
-    "inputSchema": {
-      "properties": {
-        "apiVersion": {
-          "description": "apiVersion of the resource (examples of valid apiVersion are apps/v1)",
-          "type": "string"
-        },
-        "kind": {
-          "description": "kind of the resource (examples of valid kind are: StatefulSet, Deployment)",
-          "type": "string"
-        },
-        "name": {
-          "description": "Name of the resource",
-          "type": "string"
-        },
-        "namespace": {
-          "description": "Optional Namespace to get/update the namespaced resource scale from (ignored in case of cluster scoped resources). If not provided, will get/update resource scale from configured namespace",
-          "type": "string"
-        },
-        "scale": {
-          "description": "Optional scale to update the resources scale to. If not provided, will return the current scale of the resource, and not update it",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "apiVersion",
-        "kind",
-        "name"
-      ],
-      "type": "object"
-    },
-    "name": "resources_scale",
-    "title": "Resources: Scale"
   }
 ]
