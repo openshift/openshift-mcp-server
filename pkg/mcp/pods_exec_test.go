@@ -73,9 +73,9 @@ func (s *PodsExecSuite) TestPodsExec() {
 			"name":    "pod-to-exec",
 			"command": []interface{}{"ls", "-l"},
 		})
-		s.Require().NotNil(result)
+		s.Require().NoError(err, "CallTool should not return an error")
+		s.Require().NotNil(result, "CallTool returned nil result")
 		s.Run("returns command output", func() {
-			s.NoError(err, "call tool failed %v", err)
 			s.Falsef(result.IsError, "call tool failed: %v", result.Content)
 			s.Contains(result.Content[0].(*mcp.TextContent).Text, "command:ls -l\n", "unexpected result %v", result.Content[0].(*mcp.TextContent).Text)
 		})
@@ -86,9 +86,9 @@ func (s *PodsExecSuite) TestPodsExec() {
 			"name":      "pod-to-exec",
 			"command":   []interface{}{"ls", "-l"},
 		})
-		s.Require().NotNil(result)
+		s.Require().NoError(err, "CallTool should not return an error")
+		s.Require().NotNil(result, "CallTool returned nil result")
 		s.Run("returns command output", func() {
-			s.NoError(err, "call tool failed %v", err)
 			s.Falsef(result.IsError, "call tool failed: %v", result.Content)
 			s.Contains(result.Content[0].(*mcp.TextContent).Text, "command:ls -l\n", "unexpected result %v", result.Content[0].(*mcp.TextContent).Text)
 		})
@@ -100,9 +100,9 @@ func (s *PodsExecSuite) TestPodsExec() {
 			"command":   []interface{}{"ls", "-l"},
 			"container": "a-specific-container",
 		})
-		s.Require().NotNil(result)
+		s.Require().NoError(err, "CallTool should not return an error")
+		s.Require().NotNil(result, "CallTool returned nil result")
 		s.Run("returns command output", func() {
-			s.NoError(err, "call tool failed %v", err)
 			s.Falsef(result.IsError, "call tool failed: %v", result.Content)
 			s.Contains(result.Content[0].(*mcp.TextContent).Text, "command:ls -l\n", "unexpected result %v", result.Content[0].(*mcp.TextContent).Text)
 		})
