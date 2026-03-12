@@ -14,12 +14,14 @@ import (
 )
 
 type mockDNSClient struct {
-	msg *dns.Msg
-	rtt time.Duration
-	err error
+	msg        *dns.Msg
+	rtt        time.Duration
+	err        error
+	lastServer string
 }
 
 func (m *mockDNSClient) Exchange(msg *dns.Msg, server string) (*dns.Msg, time.Duration, error) {
+	m.lastServer = server
 	return m.msg, m.rtt, m.err
 }
 
@@ -36,7 +38,7 @@ func TestProbeDNSLocalHandler(t *testing.T) {
 		args          map[string]interface{}
 		mockClient    *mockDNSClient
 		expectedError string
-		validate      func(t *testing.T, result string)
+		validate      func(t *testing.T, result *api.ToolCallResult)
 	}{
 		{
 			name: "success query A record",
@@ -50,14 +52,19 @@ func TestProbeDNSLocalHandler(t *testing.T) {
 				rtt: 10 * time.Millisecond,
 				err: nil,
 			},
-			validate: func(t *testing.T, content string) {
+			validate: func(t *testing.T, result *api.ToolCallResult) {
 				var res DNSResult
-				err := json.Unmarshal([]byte(content), &res)
+				err := json.Unmarshal([]byte(result.Content), &res)
 				require.NoError(t, err)
 				assert.Equal(t, "NOERROR", res.Rcode)
 				assert.Equal(t, int64(10), res.LatencyMS)
 				assert.Len(t, res.Answers, 1)
 				assert.Contains(t, res.Answers[0], "93.184.216.34")
+
+				// Also check structured content
+				structured, ok := result.StructuredContent.(DNSResult)
+				require.True(t, ok)
+				assert.Equal(t, "NOERROR", structured.Rcode)
 			},
 		},
 		{
@@ -108,11 +115,44 @@ func TestProbeDNSLocalHandler(t *testing.T) {
 				rtt: 5 * time.Millisecond,
 				err: nil,
 			},
-			validate: func(t *testing.T, content string) {
+			validate: func(t *testing.T, result *api.ToolCallResult) {
 				var res DNSResult
-				err := json.Unmarshal([]byte(content), &res)
+				err := json.Unmarshal([]byte(result.Content), &res)
 				require.NoError(t, err)
 				assert.Equal(t, "NOERROR", res.Rcode)
+
+				// Also check structured content
+				structured, ok := result.StructuredContent.(DNSResult)
+				require.True(t, ok)
+				assert.Equal(t, "NOERROR", structured.Rcode)
+			},
+		},
+		{
+			name: "ipv4 address appends default port",
+			args: map[string]interface{}{
+				"server": "1.1.1.1",
+				"name":   "example.com",
+			},
+			mockClient: &mockDNSClient{
+				msg: successMsg,
+				rtt: 5 * time.Millisecond,
+			},
+			validate: func(t *testing.T, result *api.ToolCallResult) {
+				assert.Equal(t, "1.1.1.1:53", activeDNSClient.(*mockDNSClient).lastServer)
+			},
+		},
+		{
+			name: "ipv6 address appends default port",
+			args: map[string]interface{}{
+				"server": "2001:4860:4860::8888",
+				"name":   "example.com",
+			},
+			mockClient: &mockDNSClient{
+				msg: successMsg,
+				rtt: 5 * time.Millisecond,
+			},
+			validate: func(t *testing.T, result *api.ToolCallResult) {
+				assert.Equal(t, "[2001:4860:4860::8888]:53", activeDNSClient.(*mockDNSClient).lastServer)
 			},
 		},
 	}
@@ -149,7 +189,7 @@ func TestProbeDNSLocalHandler(t *testing.T) {
 				require.NotNil(t, result)
 				require.NoError(t, result.Error)
 				if tt.validate != nil {
-					tt.validate(t, result.Content)
+					tt.validate(t, result)
 				}
 			}
 		})

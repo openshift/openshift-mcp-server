@@ -45,7 +45,8 @@ func initProbeDNSLocal() []api.ServerTool {
 					OpenWorldHint:   ptr.To(true),
 				},
 			},
-			Handler: probeDNSLocalHandler,
+			ClusterAware: ptr.To(false),
+			Handler:      probeDNSLocalHandler,
 		},
 	}
 }
@@ -77,12 +78,12 @@ type DNSResult struct {
 func probeDNSLocalHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	serverParam, ok := params.GetArguments()["server"].(string)
 	if !ok || serverParam == "" {
-		return api.NewToolCallResult("", fmt.Errorf("server parameter is required")), nil
+		return api.NewToolCallResultStructured(nil, fmt.Errorf("server parameter is required")), nil
 	}
 
 	nameParam, ok := params.GetArguments()["name"].(string)
 	if !ok || nameParam == "" {
-		return api.NewToolCallResult("", fmt.Errorf("name parameter is required")), nil
+		return api.NewToolCallResultStructured(nil, fmt.Errorf("name parameter is required")), nil
 	}
 
 	typeParam, ok := params.GetArguments()["type"].(string)
@@ -95,16 +96,18 @@ func probeDNSLocalHandler(params api.ToolHandlerParams) (*api.ToolCallResult, er
 
 	// Ensure server parameter has a port
 	if _, _, err := net.SplitHostPort(serverParam); err != nil {
-		if strings.Contains(err.Error(), "missing port in address") {
-			serverParam = net.JoinHostPort(serverParam, "53")
+		// If port is missing, try adding default DNS port 53
+		appended := net.JoinHostPort(serverParam, "53")
+		if _, _, err2 := net.SplitHostPort(appended); err2 == nil {
+			serverParam = appended
 		} else {
-			return api.NewToolCallResult("", fmt.Errorf("invalid server address format: %w", err)), nil
+			return api.NewToolCallResultStructured(nil, fmt.Errorf("invalid server address format: %w", err)), nil
 		}
 	}
 
 	recordType, ok := dns.StringToType[strings.ToUpper(typeParam)]
 	if !ok {
-		return api.NewToolCallResult("", fmt.Errorf("invalid or unsupported DNS record type: %s", typeParam)), nil
+		return api.NewToolCallResultStructured(nil, fmt.Errorf("invalid or unsupported DNS record type: %s", typeParam)), nil
 	}
 
 	msg := new(dns.Msg)
@@ -115,7 +118,7 @@ func probeDNSLocalHandler(params api.ToolHandlerParams) (*api.ToolCallResult, er
 
 	if err != nil {
 		// Log network level errors directly to the tool output so agent can interpret it
-		return api.NewToolCallResult("", fmt.Errorf("DNS query failed: %w", err)), nil
+		return api.NewToolCallResultStructured(nil, fmt.Errorf("DNS query failed: %w", err)), nil
 	}
 
 	result := DNSResult{
@@ -130,10 +133,5 @@ func probeDNSLocalHandler(params api.ToolHandlerParams) (*api.ToolCallResult, er
 		result.Answers = append(result.Answers, ans)
 	}
 
-	jsonData, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to marshal DNS result: %w", err)), nil
-	}
-
-	return api.NewToolCallResult(string(jsonData), nil), nil
+	return api.NewToolCallResultStructured(result, nil), nil
 }
