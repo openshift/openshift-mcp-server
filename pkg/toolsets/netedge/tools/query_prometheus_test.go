@@ -20,9 +20,9 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-// MockConfigProvider partially implements api.ExtendedConfigProvider
+// MockConfigProvider partially implements api.BaseConfig
 type MockConfigProvider struct {
-	api.ExtendedConfigProvider // Embed to satisfy interface
+	api.BaseConfig // Embed to satisfy interface
 }
 
 func (m *MockConfigProvider) GetToolsetConfig(name string) (api.ExtendedConfig, bool) {
@@ -199,10 +199,10 @@ func TestQueryPrometheusHandler_Diagnostics(t *testing.T) {
 
 			// Construct params
 			params := api.ToolHandlerParams{
-				Context:                context.Background(),
-				ExtendedConfigProvider: cfgProvider,
-				KubernetesClient:       kubeClient,
-				ToolCallRequest:        toolReq,
+				Context:          context.Background(),
+				BaseConfig:       cfgProvider,
+				KubernetesClient: kubeClient,
+				ToolCallRequest:  toolReq,
 			}
 
 			result, err := queryPrometheusHandler(params)
