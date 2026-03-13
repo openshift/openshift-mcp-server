@@ -440,7 +440,7 @@ github.com/prometheus/prometheus/tsdb/errors
 github.com/prometheus/prometheus/tsdb/fileutil
 github.com/prometheus/prometheus/util/annotations
 github.com/prometheus/prometheus/util/strutil
-# github.com/rhobs/obs-mcp v0.0.0-20260216112111-918411d4d054
+# github.com/rhobs/obs-mcp v0.0.0-20260310160107-d22b1ab4b2f8
 ## explicit; go 1.25.0
 github.com/rhobs/obs-mcp/pkg/alertmanager
 github.com/rhobs/obs-mcp/pkg/prometheus

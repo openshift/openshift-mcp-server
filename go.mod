@@ -12,7 +12,7 @@ require (
 	github.com/google/jsonschema-go v0.4.2
 	github.com/modelcontextprotocol/go-sdk v1.4.0
 	github.com/prometheus/client_golang v1.23.2
-	github.com/rhobs/obs-mcp v0.0.0-20260216112111-918411d4d054
+	github.com/rhobs/obs-mcp v0.0.0-20260310160107-d22b1ab4b2f8
 	github.com/spf13/afero v1.15.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
