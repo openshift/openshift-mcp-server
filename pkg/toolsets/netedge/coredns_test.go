@@ -4,9 +4,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"k8s.io/client-go/dynamic/fake"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 func (s *NetEdgeTestSuite) TestGetCoreDNSConfig() {
@@ -64,13 +63,13 @@ func (s *NetEdgeTestSuite) TestGetCoreDNSConfig() {
 				objs = append(objs, tt.configMap)
 			}
 
-			// Override newClientFunc to return fake client
-			originalNewClientFunc := newClientFunc
-			defer func() { newClientFunc = originalNewClientFunc }()
+			// Setup fake dynamic client
+			scheme := runtime.NewScheme()
+			_ = clientgoscheme.AddToScheme(scheme)
 
-			newClientFunc = func(config *rest.Config, options client.Options) (client.Client, error) {
-				return fake.NewClientBuilder().WithRuntimeObjects(objs...).Build(), nil
-			}
+			// Create a fake dynamic client with the objects
+			dynClient := fake.NewSimpleDynamicClient(scheme, objs...)
+			s.SetDynamicClient(dynClient)
 
 			// Call handler using suite params
 			result, err := getCoreDNSConfig(s.params)
