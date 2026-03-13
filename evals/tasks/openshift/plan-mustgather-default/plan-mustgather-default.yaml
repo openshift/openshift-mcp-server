@@ -1,0 +1,21 @@
+kind: Task
+metadata:
+  labels:
+    suite: openshift
+  name: plan-mustgather-default
+  difficulty: easy
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # No setup needed - plan_mustgather is a prompt that generates a plan
+  verify:
+    contains: "must-gather"
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # No cleanup needed - plan_mustgather only generates a plan without applying
+  prompt:
+    inline: Use the plan_mustgather prompt with default parameters to generate a must-gather collection plan for my OpenShift cluster.
