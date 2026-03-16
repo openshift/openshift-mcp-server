@@ -120,9 +120,9 @@ The following models have been evaluated on OCP 4.XX
 | Provider | Model | Evaluation Results |
 | :---- | :---- | :---- |
 | OpenAI | gpt-5 | 17/24 |
-| Anthropic | Claude 4.5 Sonnet |  |
+| Anthropic | Claude 4.5 Sonnet | Not evaluated |
 | Google | Gemini 3.1 Pro | 15/24 |
-| IBM Watson.x | Granite ?? |  |
+| IBM Watson.x | Granite | Not evaluated |
 
 ## Safety And Best Practices
 
@@ -219,7 +219,7 @@ disabled_tools = ["resources_delete", "pods_delete"]
 ```
 
 2. Uninstall the MCP Server completely
-   `helm uninstall openshift-mcp-server`\[[link](https://github.com/openshift/openshift-mcp-server/pull/178)\]
+   `helm uninstall openshift-mcp-server`
 3. Per User Revocation with RBAC revocation
    Get rid of the user's rolebinding/clusterrolebinding \[[OpenShift RBAC API docs](https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html/rbac_apis/rbac-apis)\]
 4. Remove access through the MCP Gateway
