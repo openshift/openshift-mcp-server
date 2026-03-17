@@ -26,6 +26,7 @@ func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
 		InitQueryPrometheus(),
 		initCoreDNS(),
 		initEndpoints(),
+		initProbeDNSLocal(),
 	)
 }
 
