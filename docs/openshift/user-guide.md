@@ -1,21 +1,21 @@
-# MCP Server for Red Hat OpenShift User Guide
+# MCP server for Red Hat OpenShift User Guide
 
 ## Features
 
-The MCP server for Red Hat Openshift supports several enterprise grade features
+The MCP server for Red Hat OpenShift supports several enterprise grade features
 
 1. OAuth & OIDC integration for Token Exchange support with Keycloak
 2. Modular Toolset Architecture with Read Only defaults
 3. Full Observability stack with OpenTelemetry
-4. Advanced Cluster Management integration & MCP Gateway Integration
+4. Advanced Cluster Management integration & MCP gateway Integration
 
 ## Deployment and Architectural Guardrails
 
 ### Data Flow
 
-#### Openshift Lightspeed
+#### OpenShift Lightspeed
 
-![Openshift Lightspeed Data Flow](images/lightspeed-data-flow.png)
+![OpenShift Lightspeed Data Flow](images/lightspeed-data-flow.png)
 
 ## Toolsets and Functionality
 
@@ -109,11 +109,11 @@ All five tools are read-only and accept an optional \`namespace\` parameter (def
 
 ### Accuracy
 
-Large Language Models (LLM's) are probabilistic in nature, which are inherently different in testing than traditional, procedural programming.  While we've made every effort to thoroughly and reliably evaluate our MCP Server against a variety of prompts that mimic real world scenarios.  Despite best efforts, this list may not be exhaustive, so please ensure you follow our recommendations around safety and best practices, data ownership, and security guardrails below (and note where there are any gaps/risks associated with your data flow).
+Large Language Models (LLM's) are probabilistic in nature, which are inherently different in testing than traditional, procedural programming.  While we've made every effort to thoroughly and reliably evaluate our MCP server against a variety of prompts that mimic real world scenarios.  Despite best efforts, this list may not be exhaustive, so please ensure you follow our recommendations around safety and best practices, data ownership, and security guardrails below (and note where there are any gaps/risks associated with your data flow).
 
 ### Verification & Evaluation Process
 
-MCP server for Red Hat Openshift uses [mcpchecker](https://github.com/mcpchecker/mcpchecker) for evaluations and verifies the tool we described is successfully called based on possible prompts via the Agent.
+MCP server for Red Hat OpenShift uses [mcpchecker](https://github.com/mcpchecker/mcpchecker) for evaluations and verifies the tool we described is successfully called based on possible prompts via the Agent.
 
 The following models have been evaluated on OCP 4.XX
 
@@ -136,19 +136,19 @@ The following models have been evaluated on OCP 4.XX
 
 #### Data Privacy & Redaction
 
-The MCP server for Red Hat Openshift has no internal mechanisms for PII and data redaction.  If you need to ensure any cluster information within allowed CR's (see Access Revocation Protocols for how to scope and limit MCP access to specific Cluster Resources), then leverage Trusty AI as an MCP Gateway extension to do so.
+The MCP server for Red Hat OpenShift has no internal mechanisms for PII and data redaction.  If you need to ensure any cluster information within allowed CR's (see Access Revocation Protocols for how to scope and limit MCP access to specific Cluster Resources), then leverage Trusty AI as an MCP gateway extension to do so.
 
 #### Audit Trail Recommendation
 
-The MCP server for Red Hat Openshift is configured to append a user-agent string in audit logs to identify that requests were made via an Agent (through the MCP server).  Ensure that authorization is enabled via OAuth (Keycloak) or MCP Gateway\[[config](https://docs.kuadrant.io/dev/mcp-gateway/docs/guides/authorization/)\].
+The MCP server for Red Hat OpenShift is configured to append a user-agent string in audit logs to identify that requests were made via an Agent (through the MCP server).  Ensure that authorization is enabled via OAuth (Keycloak) or MCP gateway\[[config](https://docs.kuadrant.io/dev/mcp-gateway/docs/guides/authorization/)\].
 
-#### Recommendations Regarding 3rd Party MCP Servers
+#### Recommendations Regarding 3rd Party MCP servers
 
-The MCP server for Red Hat Openshift cannot speak to the efficacy, accuracy or utility to 3rd party MCP servers.  It is best practice to leverage Red Hat Openshift AI to do so.
+The MCP server for Red Hat OpenShift cannot speak to the efficacy, accuracy or utility to 3rd party MCP servers.  It is best practice to leverage Red Hat OpenShift AI to do so.
 
 ## Data Ownership
 
-The MCP server for Red Hat Openshift does not store any information or state of the cluster.  Should you opt-in, there are several telemetry metrics that are collected to understand the overall usage levels of the MCP server;
+The MCP server for Red Hat OpenShift does not store any information or state of the cluster.  Should you opt-in, there are several telemetry metrics that are collected to understand the overall usage levels of the MCP server;
 
 Cluster:k8s\_mcp\_tool\_calls:sum: Total count of all MCP tool invocations across the cluster
 Cluster:k8s\_mcp\_tool\_errors:sum: Total count of all failed MCP tool invocations across the cluster
@@ -158,19 +158,19 @@ These metrics do not collect specific details of the calls, requests are errors 
 
 ## Security Guardrails / TrustAI
 
-### MCP Gateway Setup
+### MCP gateway Setup
 
 [https://docs.kuadrant.io/1.4.x/mcp-gateway/docs/guides/register-mcp-servers/\#step-2-create-mcpserverregistration-resource](https://docs.kuadrant.io/1.4.x/mcp-gateway/docs/guides/register-mcp-servers/#step-2-create-mcpserverregistration-resource)
 
-We recommend you route all traffic through the MCP Gateway to take advantage of the security guardrails and authorization features that MCP Gateway provides.  To do so, follow the guide\[[MCP Gateway registration guide](https://docs.kuadrant.io/1.4.x/mcp-gateway/docs/guides/register-mcp-servers/#step-2-create-mcpserverregistration-resource)\] to registering the MCP server as a MCP Server Registration Resource.
+We recommend you route all traffic through the MCP gateway to take advantage of the security guardrails and authorization features that MCP gateway provides.  To do so, follow the guide\[[MCP gateway registration guide](https://docs.kuadrant.io/1.4.x/mcp-gateway/docs/guides/register-mcp-servers/#step-2-create-mcpserverregistration-resource)\] to registering the MCP server as a MCP server Registration Resource.
 
 ### RBAC Enforcement
 
-The MCP server for Red Hat Openshift can be configured to use a Service Account and RBAC.  By default, RBAC is enabled, and you can extend the ClusterRoles, ClusterRoleBindings, Roles and Rolebindings via their relevant 'extra' parameters here: [https://github.com/openshift/openshift-mcp-server/blob/main/charts/kubernetes-mcp-server/values.yaml\#L37](https://github.com/openshift/openshift-mcp-server/blob/main/charts/kubernetes-mcp-server/values.yaml#L37)
+The MCP server for Red Hat OpenShift can be configured to use a Service Account and RBAC.  By default, RBAC is enabled, and you can extend the ClusterRoles, ClusterRoleBindings, Roles and Rolebindings via their relevant 'extra' parameters here: [https://github.com/openshift/openshift-mcp-server/blob/main/charts/kubernetes-mcp-server/values.yaml\#L37](https://github.com/openshift/openshift-mcp-server/blob/main/charts/kubernetes-mcp-server/values.yaml#L37)
 
 ### Access Revocation Protocols
 
-The MCP server for Red Hat Openshift supports revoking access to CR level resources.  We highly recommend that you limit access to Secrets, ConfigMaps and RBAC (RoleBindings, ClusterRoles)
+The MCP server for Red Hat OpenShift supports revoking access to CR level resources.  We highly recommend that you limit access to Secrets, ConfigMaps and RBAC (RoleBindings, ClusterRoles)
 
 ```toml
 # Deny access to Secrets and ConfigMaps
@@ -218,20 +218,20 @@ enabled_tools = ["pods_list", "pods_get", "pods_log"]
 disabled_tools = ["resources_delete", "pods_delete"]
 ```
 
-2. Uninstall the MCP Server completely
+2. Uninstall the MCP server completely
    `helm uninstall openshift-mcp-server`
 3. Per User Revocation with RBAC revocation
    Get rid of the user's rolebinding/clusterrolebinding \[[OpenShift RBAC API docs](https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html/rbac_apis/rbac-apis)\]
-4. Remove access through the MCP Gateway
+4. Remove access through the MCP gateway
 
-To remove access through the gateway, you can delete the MCPServerRegistration CR \[[Kuadrant MCP Gateway guide](https://docs.kuadrant.io/1.4.x/mcp-gateway/docs/guides/register-mcp-servers/#step-2-create-mcpserverregistration-resource)\]. `oc delete mcpsr <name of registration>`
+To remove access through the gateway, you can delete the MCPServerRegistration CR \[[Kuadrant MCP gateway guide](https://docs.kuadrant.io/1.4.x/mcp-gateway/docs/guides/register-mcp-servers/#step-2-create-mcpserverregistration-resource)\]. `oc delete mcpsr <name of registration>`
 
 ## Troubleshooting & Support
 
 ### Technical Issues
 
 File bugs in accordance with your support contact – [access.redhat.com](http://access.redhat.com)
-Product: Openshift Container Platform \- Component: MCP server for Red Hat Openshift
+Product: OpenShift Container Platform \- Component: MCP server for Red Hat OpenShift
 
 ### Feedback
 
