@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -18,6 +19,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
 	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 )
 
@@ -63,11 +65,19 @@ func NewKubernetes(baseConfig api.BaseConfig, clientCmdConfig clientcmd.ClientCo
 		k.restConfig.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
 
+	apiPathPrefix := ""
+	if hostURL, err := url.Parse(k.restConfig.Host); err != nil {
+		klog.Warningf("failed to parse Kubernetes API server host %q to determine API path prefix: %v", k.restConfig.Host, err)
+	} else {
+		apiPathPrefix = hostURL.Path
+	}
+
 	k.restConfig.Wrap(func(original http.RoundTripper) http.RoundTripper {
 		return NewAccessControlRoundTripper(AccessControlRoundTripperConfig{
 			Delegate:                original,
 			DeniedResourcesProvider: baseConfig,
 			RestMapperProvider:      func() meta.RESTMapper { return k.restMapper },
+			APIPathPrefix:           apiPathPrefix,
 			DiscoveryProvider:       func() discovery.DiscoveryInterface { return k.discoveryClient },
 			AuthClientProvider:      func() authv1client.AuthorizationV1Interface { return k.AuthorizationV1() },
 			ValidationEnabled:       baseConfig.IsValidationEnabled(),
