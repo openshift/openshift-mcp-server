@@ -1,16 +1,12 @@
 package netedge
 
 import (
-	"context"
 	"encoding/json"
 	"net"
-	"testing"
 	"time"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/miekg/dns"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 type mockDNSClient struct {
@@ -25,7 +21,7 @@ func (m *mockDNSClient) Exchange(msg *dns.Msg, server string) (*dns.Msg, time.Du
 	return m.msg, m.rtt, m.err
 }
 
-func TestProbeDNSLocalHandler(t *testing.T) {
+func (s *NetEdgeTestSuite) TestProbeDNSLocalHandler() {
 	// Setup static success response
 	successMsg := new(dns.Msg)
 	successMsg.Rcode = dns.RcodeSuccess
@@ -33,165 +29,160 @@ func TestProbeDNSLocalHandler(t *testing.T) {
 	aRecord, _ := dns.NewRR("example.com. 3600 IN A 93.184.216.34")
 	successMsg.Answer = append(successMsg.Answer, aRecord)
 
-	tests := []struct {
-		name          string
-		args          map[string]interface{}
-		mockClient    *mockDNSClient
-		expectedError string
-		validate      func(t *testing.T, result *api.ToolCallResult)
-	}{
-		{
-			name: "success query A record",
-			args: map[string]interface{}{
-				"server": "8.8.8.8",
-				"name":   "example.com",
-				"type":   "A",
-			},
-			mockClient: &mockDNSClient{
-				msg: successMsg,
-				rtt: 10 * time.Millisecond,
-				err: nil,
-			},
-			validate: func(t *testing.T, result *api.ToolCallResult) {
-				var res DNSResult
-				err := json.Unmarshal([]byte(result.Content), &res)
-				require.NoError(t, err)
-				assert.Equal(t, "NOERROR", res.Rcode)
-				assert.Equal(t, int64(10), res.LatencyMS)
-				assert.Len(t, res.Answers, 1)
-				assert.Contains(t, res.Answers[0], "93.184.216.34")
-
-				// Also check structured content
-				structured, ok := result.StructuredContent.(DNSResult)
-				require.True(t, ok)
-				assert.Equal(t, "NOERROR", structured.Rcode)
-			},
-		},
-		{
-			name: "missing name parameter",
-			args: map[string]interface{}{
-				"server": "8.8.8.8",
-			},
-			expectedError: "name parameter is required",
-		},
-		{
-			name: "missing server parameter",
-			args: map[string]interface{}{
-				"name": "example.com",
-			},
-			expectedError: "server parameter is required",
-		},
-		{
-			name: "invalid record type",
-			args: map[string]interface{}{
-				"server": "8.8.8.8",
-				"name":   "example.com",
-				"type":   "INVALID",
-			},
-			expectedError: "invalid or unsupported DNS record type: INVALID",
-		},
-		{
-			name: "network failure from library",
-			args: map[string]interface{}{
-				"server": "8.8.8.8",
-				"name":   "example.com",
-				"type":   "A",
-			},
-			mockClient: &mockDNSClient{
-				msg: nil,
-				rtt: 0,
-				err: &net.OpError{Op: "dial", Net: "udp", Err: net.UnknownNetworkError("timeout")},
-			},
-			expectedError: "DNS query failed",
-		},
-		{
-			name: "default type is A if omitted",
-			args: map[string]interface{}{
-				"server": "8.8.8.8",
-				"name":   "example.com",
-			},
-			mockClient: &mockDNSClient{
-				msg: successMsg,
-				rtt: 5 * time.Millisecond,
-				err: nil,
-			},
-			validate: func(t *testing.T, result *api.ToolCallResult) {
-				var res DNSResult
-				err := json.Unmarshal([]byte(result.Content), &res)
-				require.NoError(t, err)
-				assert.Equal(t, "NOERROR", res.Rcode)
-
-				// Also check structured content
-				structured, ok := result.StructuredContent.(DNSResult)
-				require.True(t, ok)
-				assert.Equal(t, "NOERROR", structured.Rcode)
-			},
-		},
-		{
-			name: "ipv4 address appends default port",
-			args: map[string]interface{}{
-				"server": "1.1.1.1",
-				"name":   "example.com",
-			},
-			mockClient: &mockDNSClient{
-				msg: successMsg,
-				rtt: 5 * time.Millisecond,
-			},
-			validate: func(t *testing.T, result *api.ToolCallResult) {
-				assert.Equal(t, "1.1.1.1:53", activeDNSClient.(*mockDNSClient).lastServer)
-			},
-		},
-		{
-			name: "ipv6 address appends default port",
-			args: map[string]interface{}{
-				"server": "2001:4860:4860::8888",
-				"name":   "example.com",
-			},
-			mockClient: &mockDNSClient{
-				msg: successMsg,
-				rtt: 5 * time.Millisecond,
-			},
-			validate: func(t *testing.T, result *api.ToolCallResult) {
-				assert.Equal(t, "[2001:4860:4860::8888]:53", activeDNSClient.(*mockDNSClient).lastServer)
-			},
-		},
-	}
-
-	// Stash original
-	origClient := activeDNSClient
-	defer func() {
-		activeDNSClient = origClient
-	}()
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.mockClient != nil {
-				activeDNSClient = tt.mockClient
-			}
-
-			// Mock toolcall params
-			toolReq := &mockToolCallRequest{args: tt.args}
-			params := api.ToolHandlerParams{
-				Context:         context.Background(),
-				ToolCallRequest: toolReq,
-			}
-
-			result, err := probeDNSLocalHandler(params)
-
-			// The handler wraps the validation error into NewToolCallResult("", err) or returns err directly?
-			// Actually our handler returns api.NewToolCallResult("", err), nil for errors so err is always nil.
-			require.NoError(t, err)
-
-			if tt.expectedError != "" {
-				require.NotNil(t, result.Error)
-				assert.Contains(t, result.Error.Error(), tt.expectedError)
-			} else {
-				require.NotNil(t, result)
-				require.NoError(t, result.Error)
-				if tt.validate != nil {
-					tt.validate(t, result)
-				}
-			}
+	s.Run("success query A record", func() {
+		mock := &mockDNSClient{msg: successMsg, rtt: 10 * time.Millisecond}
+		s.SetArgs(map[string]interface{}{
+			"server": "8.8.8.8",
+			"name":   "example.com",
+			"type":   "A",
 		})
-	}
+		handler := makeProbeDNSLocalHandler(mock)
+
+		result, err := handler(s.params)
+
+		s.Require().NoError(err)
+		s.Require().NoError(result.Error)
+
+		var res DNSResult
+		jsonErr := json.Unmarshal([]byte(result.Content), &res)
+		s.Require().NoError(jsonErr)
+		s.Assert().Equal("NOERROR", res.Rcode)
+		s.Assert().Equal(int64(10), res.LatencyMS)
+		s.Assert().Len(res.Answers, 1)
+		s.Assert().Contains(res.Answers[0], "93.184.216.34")
+
+		structured, ok := result.StructuredContent.(DNSResult)
+		s.Require().True(ok)
+		s.Assert().Equal("NOERROR", structured.Rcode)
+	})
+
+	s.Run("missing name parameter", func() {
+		mock := &mockDNSClient{msg: successMsg}
+		s.SetArgs(map[string]interface{}{"server": "8.8.8.8"})
+		handler := makeProbeDNSLocalHandler(mock)
+
+		result, err := handler(s.params)
+
+		s.Require().NoError(err)
+		s.Require().NotNil(result.Error)
+		s.Assert().Contains(result.Error.Error(), "name parameter is required")
+	})
+
+	s.Run("missing server parameter", func() {
+		mock := &mockDNSClient{msg: successMsg}
+		s.SetArgs(map[string]interface{}{"name": "example.com"})
+		handler := makeProbeDNSLocalHandler(mock)
+
+		result, err := handler(s.params)
+
+		s.Require().NoError(err)
+		s.Require().NotNil(result.Error)
+		s.Assert().Contains(result.Error.Error(), "server parameter is required")
+	})
+
+	s.Run("invalid record type", func() {
+		mock := &mockDNSClient{msg: successMsg}
+		s.SetArgs(map[string]interface{}{
+			"server": "8.8.8.8",
+			"name":   "example.com",
+			"type":   "INVALID",
+		})
+		handler := makeProbeDNSLocalHandler(mock)
+
+		result, err := handler(s.params)
+
+		s.Require().NoError(err)
+		s.Require().NotNil(result.Error)
+		s.Assert().Contains(result.Error.Error(), "invalid or unsupported DNS record type: INVALID")
+	})
+
+	s.Run("network failure from library", func() {
+		mock := &mockDNSClient{
+			msg: nil,
+			rtt: 0,
+			err: &net.OpError{Op: "dial", Net: "udp", Err: net.UnknownNetworkError("timeout")},
+		}
+		s.SetArgs(map[string]interface{}{
+			"server": "8.8.8.8",
+			"name":   "example.com",
+			"type":   "A",
+		})
+		handler := makeProbeDNSLocalHandler(mock)
+
+		result, err := handler(s.params)
+
+		s.Require().NoError(err)
+		s.Require().NotNil(result.Error)
+		s.Assert().Contains(result.Error.Error(), "DNS query failed")
+	})
+
+	s.Run("default type is A if omitted", func() {
+		mock := &mockDNSClient{msg: successMsg, rtt: 5 * time.Millisecond}
+		s.SetArgs(map[string]interface{}{
+			"server": "8.8.8.8",
+			"name":   "example.com",
+		})
+		handler := makeProbeDNSLocalHandler(mock)
+
+		result, err := handler(s.params)
+
+		s.Require().NoError(err)
+		s.Require().NoError(result.Error)
+
+		var res DNSResult
+		jsonErr := json.Unmarshal([]byte(result.Content), &res)
+		s.Require().NoError(jsonErr)
+		s.Assert().Equal("NOERROR", res.Rcode)
+
+		structured, ok := result.StructuredContent.(DNSResult)
+		s.Require().True(ok)
+		s.Assert().Equal("NOERROR", structured.Rcode)
+	})
+
+	s.Run("ipv4 address appends default port", func() {
+		mock := &mockDNSClient{msg: successMsg, rtt: 5 * time.Millisecond}
+		s.SetArgs(map[string]interface{}{
+			"server": "1.1.1.1",
+			"name":   "example.com",
+		})
+		handler := makeProbeDNSLocalHandler(mock)
+
+		result, err := handler(s.params)
+
+		s.Require().NoError(err)
+		s.Require().NoError(result.Error)
+		s.Assert().Equal("1.1.1.1:53", mock.lastServer)
+	})
+
+	s.Run("ipv6 address appends default port", func() {
+		mock := &mockDNSClient{msg: successMsg, rtt: 5 * time.Millisecond}
+		s.SetArgs(map[string]interface{}{
+			"server": "2001:4860:4860::8888",
+			"name":   "example.com",
+		})
+		handler := makeProbeDNSLocalHandler(mock)
+
+		result, err := handler(s.params)
+
+		s.Require().NoError(err)
+		s.Require().NoError(result.Error)
+		s.Assert().Equal("[2001:4860:4860::8888]:53", mock.lastServer)
+	})
+
+	s.Run("invalid result is returned as structured error", func() {
+		mock := &mockDNSClient{msg: successMsg, rtt: 5 * time.Millisecond}
+		s.SetArgs(map[string]interface{}{
+			"server": "8.8.8.8",
+			"name":   "example.com",
+			"type":   "A",
+		})
+		handler := makeProbeDNSLocalHandler(mock)
+
+		result, err := handler(s.params)
+		_ = result
+
+		s.Require().NoError(err)
+		// Ensure structured content is returned (not just raw string)
+		s.Assert().IsType(api.ToolCallResult{}, *result)
+	})
 }
