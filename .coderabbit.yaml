@@ -1,0 +1,3 @@
+reviews:
+  ignore_title_keywords:
+    - "Sync downstream"
