@@ -19,7 +19,7 @@ The MCP server for Red Hat OpenShift supports several enterprise grade features
 
 ## Toolsets and Functionality
 
-By default the MCP server for Red Hat OpenShift enables only "core" and "config" tools in a read-only mode. In order to enable other available toolsets, like Kiali/OSSM or Kubevirt, those must be enabled in the config.toml file. In case of using Helm there is a "config" section which needs to be updated, like:
+By default the MCP server for Red Hat OpenShift enables only `core` and `config` tools in a read-only mode. In order to enable other available toolsets, like Kiali/OSSM or Kubevirt, those must be enabled in the `config.toml` file. In case of using `olm` or `kubevirt` toolsets there is a "config" section which needs to be updated, like:
 
 ```toml
 toolsets = ["core", "olm", "kubevirt"]
@@ -42,9 +42,11 @@ toolsets = ["core", "olm", "kubevirt"]
 
 \- **resources\_list**\*\* – List Kubernetes resources by apiVersion and kind with optional namespace and selectors
 \- **resources\_get**\*\* – Get a specific resource by apiVersion, kind, name, and optional namespace
-\- **resources\_create\_or\_update** – Create or update a resource from a YAML or JSON representation
-\- **resources\_delete** – Delete a resource by apiVersion, kind, name, and optional namespace
-\- **resources\_scale** – Get or update the scale of a resource (e.g., Deployment, StatefulSet)
+\- **resources\_create\_or\_update** – Create or update a resource from a YAML or JSON representation (not enabled by default)
+\- **resources\_delete** – Delete a resource by apiVersion, kind, name, and optional namespace (not enabled by default)
+
+\- **resources\_scale** – Get or update the scale of a resource (e.g., Deployment, StatefulSet) (not enabled by default)
+
 
 #### Events
 
@@ -86,18 +88,6 @@ The Kiali toolset provides
   \- **operators** – queries for active firing alerts and operator up status in ingress/DNS namespaces
 
 \- **get\_coredns\_config** – Retrieves the current CoreDNS configuration (Corefile) from the cluster by reading the \`dns-default\` ConfigMap in the \`openshift-dns\` namespace
-
-### OLM
-
-The OLM toolset provides the following tools:
-
-\- **olm\_operators\_list** – List all installed operators (ClusterServiceVersions) in the current or specified namespace
-\- **olm\_subscriptions\_list** – List all operator subscriptions in the current or specified namespace
-\- **olm\_installplans\_list** – List all install plans in the current or specified namespace
-\- **olm\_operatorgroups\_list** – List all operator groups in the current or specified namespace
-\- **olm\_catalogsources\_list** – List all catalog sources in the current or specified namespace
-
-All five tools are read-only and accept an optional \`namespace\` parameter (defaults to all namespaces if not provided).
 
 ### Observability
 
