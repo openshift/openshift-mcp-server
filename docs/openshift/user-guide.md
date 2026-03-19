@@ -145,7 +145,7 @@ The MCP server for Red Hat OpenShift is configured to append a user-agent string
 
 #### Recommendations Regarding 3rd Party MCP servers
 
-The MCP server for Red Hat OpenShift cannot speak to the efficacy, accuracy or utility to 3rd party MCP servers.  It is best practice to leverage Red Hat OpenShift AI to do so.
+For better security and control, it is recommended that third-party MCP hosts implement a Human-In-The-Loop (HITL) requirement to approve any "write" operations performed via the MCP server for Red Hat OpenShift.
 
 ## Data Ownership
 
