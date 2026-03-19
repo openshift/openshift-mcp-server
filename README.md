@@ -268,6 +268,7 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 | kcp           | Manage kcp workspaces and multi-tenancy features                                                                                                                                |         |
 | kubevirt      | KubeVirt virtual machine management tools, check the [KubeVirt documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/kubevirt.md) for more details. |         |
 | observability | Cluster observability tools for querying Prometheus metrics and Alertmanager alerts                                                                                             |         |
+| openshift     | OpenShift-specific tools for cluster management and troubleshooting                                                                                                             | ✓       |
 | ossm          | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                 |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
@@ -500,6 +501,19 @@ Common use cases:
 
 <details>
 
+<summary>openshift</summary>
+
+- **nodes_debug_exec** - Run commands on an OpenShift node using a privileged debug pod with comprehensive troubleshooting utilities. The debug pod uses the UBI9 toolbox image which includes: systemd tools (systemctl, journalctl), networking tools (ss, ip, ping, traceroute, nmap), process tools (ps, top, lsof, strace), file system tools (find, tar, rsync), and debugging tools (gdb). The host filesystem is mounted at /host, allowing commands to chroot /host if needed to access node-level resources. Output is truncated to the most recent 100 lines, so prefer filters like grep when expecting large logs.
+  - `command` (`array`) **(required)** - Command to execute on the node. All standard debugging utilities from the UBI9 toolbox are available. The host filesystem is mounted at /host - use 'chroot /host <command>' to access node-level resources, or run commands directly in the toolbox environment. Provide each argument as a separate array item (e.g. ['chroot', '/host', 'systemctl', 'status', 'kubelet'] or ['journalctl', '-u', 'kubelet', '--since', '1 hour ago']).
+  - `image` (`string`) - Container image to use for the debug pod (optional). Defaults to registry.access.redhat.com/ubi9/toolbox:latest which provides comprehensive debugging and troubleshooting utilities.
+  - `namespace` (`string`) - Namespace to create the temporary debug pod in (optional, defaults to the current namespace or 'default').
+  - `node` (`string`) **(required)** - Name of the node to debug (e.g. worker-0).
+  - `timeout_seconds` (`integer`) - Maximum time to wait for the command to complete before timing out (optional, defaults to 60 seconds).
+
+</details>
+
+<details>
+
 <summary>ossm</summary>
 
 - **ossm_mesh_graph** - Returns the topology of a specific namespaces, health, status of the mesh and namespaces. Includes a mesh health summary overview with aggregated counts of healthy, degraded, and failing apps, workloads, and services. Use this for high-level overviews
@@ -587,6 +601,25 @@ Common use cases:
 - **vm-troubleshoot** - Generate a step-by-step troubleshooting guide for diagnosing VirtualMachine issues
   - `namespace` (`string`) **(required)** - The namespace of the VirtualMachine to troubleshoot
   - `name` (`string`) **(required)** - The name of the VirtualMachine to troubleshoot
+
+</details>
+
+<details>
+
+<summary>openshift</summary>
+
+- **plan_mustgather** - Plan for collecting a must-gather archive from an OpenShift cluster. Must-gather is a tool for collecting cluster data related to debugging and troubleshooting like logs, kubernetes resources, etc.
+  - `node_name` (`string`) - Specific node name to run must-gather pod on
+  - `node_selector` (`string`) - Node selector in key=value,key2=value2 format to filter nodes for the pod
+  - `source_dir` (`string`) - Custom gather directory inside pod (default: /must-gather)
+  - `namespace` (`string`) - Privileged namespace to use for must-gather (auto-generated if not specified)
+  - `gather_command` (`string`) - Custom gather command eg. /usr/bin/gather_audit_logs (default: /usr/bin/gather)
+  - `timeout` (`string`) - Timeout duration for gather command (eg. 30m, 1h)
+  - `since` (`string`) - Only gather data newer than this duration (eg. 5s, 2m5s, or 3h6m10s) defaults to all data.
+  - `host_network` (`string`) - Use host network for must-gather pod (true/false)
+  - `keep_resources` (`string`) - Keep pod resources after collection (true/false, default: false)
+  - `all_component_images` (`string`) - Include must-gather images from all installed operators (true/false)
+  - `images` (`string`) - Comma-separated list of custom must-gather container images
 
 </details>
 
