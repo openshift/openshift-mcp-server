@@ -116,7 +116,7 @@ Large Language Models (LLM's) are probabilistic in nature, which are inherently 
 
 MCP server for Red Hat OpenShift uses [mcpchecker](https://github.com/mcpchecker/mcpchecker) for evaluations and verifies the tool we described is successfully called based on possible prompts via the Agent.
 
-The following models have been evaluated on OCP 4.XX
+The following models have been evaluated on OCP 4.21
 
 | Provider | Model | Evaluation Results |
 | :---- | :---- | :---- |
