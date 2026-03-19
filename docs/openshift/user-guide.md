@@ -180,11 +180,6 @@ group = ""
 version = "v1"
 kind = "Secret"
 
-[[denied_resources]]
-group = ""
-version = "v1"
-kind = "ConfigMap"
-
 # Deny access to RBAC resources for additional security
 [[denied_resources]]
 group = "rbac.authorization.k8s.io"
