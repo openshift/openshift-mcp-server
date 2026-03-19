@@ -29,71 +29,82 @@ toolsets = ["core", "olm", "kubevirt"]
 
 #### Pods
 
-\- **pods\_list** – List all pods in the cluster from all namespaces with optional label and field selectors
-\- **pods\_list\_in\_namespace** – List all pods in a specified namespace with optional label and field selectors
-\- **pods\_get** – Get a specific pod by name in the current or provided namespace
-\- **pods\_delete** – Delete a pod by name in the current or provided namespace
-\- **pods\_top** – List resource consumption (CPU and memory) for pods via the Metrics Server
-\- **pods\_exec** – Execute a command in a pod
-\- **pods\_log** – Get the logs of a pod with options for container selection, tail lines, and previous container logs
-\- **pods\_run** – Run a pod in a specified namespace with a container image and optional name and port exposure
+| Tool                     | Description                                                                                         |
+| :----------------------- | :-------------------------------------------------------------------------------------------------- |
+| `pods_list`              | List all pods in the cluster from all namespaces with optional label and field selectors            |
+| `pods_list_in_namespace` | List all pods in a specified namespace with optional label and field selectors                      |
+| `pods_get`               | Get a specific pod by name in the current or provided namespace                                     |
+| `pods_delete`            | Delete a pod by name in the current or provided namespace                                           |
+| `pods_top`               | List resource consumption (CPU and memory) for pods via the Metrics Server                          |
+| `pods_exec`              | Execute a command in a pod                                                                          |
+| `pods_log`               | Get the logs of a pod with options for container selection, tail lines, and previous container logs |
+| `pods_run`               | Run a pod in a specified namespace with a container image and optional name and port exposure       |
 
 #### Generic Resources
 
-\- **resources\_list**\*\* – List Kubernetes resources by apiVersion and kind with optional namespace and selectors
-\- **resources\_get**\*\* – Get a specific resource by apiVersion, kind, name, and optional namespace
-\- **resources\_create\_or\_update** – Create or update a resource from a YAML or JSON representation (not enabled by default)
-\- **resources\_delete** – Delete a resource by apiVersion, kind, name, and optional namespace (not enabled by default)
-
-\- **resources\_scale** – Get or update the scale of a resource (e.g., Deployment, StatefulSet) (not enabled by default)
-
+| Tool                         | Description                                                                                    |
+| :--------------------------- | :--------------------------------------------------------------------------------------------- |
+| `resources_list`             | List Kubernetes resources by apiVersion and kind with optional namespace and selectors         |
+| `resources_get`              | Get a specific resource by apiVersion, kind, name, and optional namespace                      |
+| `resources_create_or_update` | Create or update a resource from a YAML or JSON representation (not enabled by default)        |
+| `resources_delete`           | Delete a resource by apiVersion, kind, name, and optional namespace (not enabled by default)   |
+| `resources_scale`            | Get or update the scale of a resource (e.g., Deployment, StatefulSet) (not enabled by default) |
 
 #### Events
 
-\- **events\_list** – List Kubernetes events (warnings, errors, state changes) for debugging and troubleshooting
+| Tool          | Description                                                                                |
+| :------------ | :----------------------------------------------------------------------------------------- |
+| `events_list` | List Kubernetes events (warnings, errors, state changes) for debugging and troubleshooting |
 
 #### Namespaces
 
-\- **namespaces\_list** – List all Kubernetes namespaces in the current cluster
-\- **projects\_list** – List all OpenShift projects in the current cluster (OpenShift-only)
+| Tool              | Description                                                         |
+| :---------------- | :------------------------------------------------------------------ |
+| `namespaces_list` | List all Kubernetes namespaces in the current cluster               |
+| `projects_list`   | List all OpenShift projects in the current cluster (OpenShift-only) |
 
 #### Nodes
 
-\- **nodes\_log** – Get logs from a Kubernetes node through the API proxy to the kubelet
-\- **nodes\_stats\_summary** – Get detailed resource usage statistics from a node via the kubelet's Summary API
-\- **nodes\_top** – List resource consumption (CPU and memory) for nodes via the Metrics Server
+| Tool                  | Description                                                                      |
+| :-------------------- | :------------------------------------------------------------------------------- |
+| `nodes_log`           | Get logs from a Kubernetes node through the API proxy to the kubelet             |
+| `nodes_stats_summary` | Get detailed resource usage statistics from a node via the kubelet's Summary API |
+| `nodes_top`           | List resource consumption (CPU and memory) for nodes via the Metrics Server      |
 
 ### Kiali
 
-The Kiali toolset provides
-\- **kiali\_mesh\_graph** – Returns the topology of specific namespaces, including health, status of the mesh, and a mesh health summary overview with aggregated counts of healthy, degraded, and failing apps, workloads, and services
-\- **kiali\_get\_resource\_details** – Gets lists or detailed info for Kubernetes resources (services, workloads) within the service mesh
-\- **kiali\_get\_metrics** – Gets metrics for a specific resource (service or workload) in a namespace, with configurable duration, step, rate interval, direction, reporter, and quantiles
-\- **kiali\_get\_traces** – Gets distributed traces for a specific resource (app, service, or workload) in a namespace, or retrieves detailed information for a specific trace by its ID
-\- **kiali\_workload\_logs** – Gets logs for a specific workload's pods in a namespace, with automatic pod and container discovery and optional filtering by container name, time range, and line count
-\- **kiali\_manage\_istio\_config** – Creates, patches, or deletes Istio configuration objects (Gateways, VirtualServices, DestinationRules, etc.)
-\- **kiali\_manage\_istio\_config\_read** – Lists or gets Istio configuration objects (Gateways, VirtualServices, etc.) in a read-only manner
+| Tool                           | Description                                                                                                                                                                                                  |
+| :----------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kiali_mesh_graph`             | Returns the topology of specific namespaces, including health, status of the mesh, and a mesh health summary overview with aggregated counts of healthy, degraded, and failing apps, workloads, and services |
+| `kiali_get_resource_details`   | Gets lists or detailed info for Kubernetes resources (services, workloads) within the service mesh                                                                                                           |
+| `kiali_get_metrics`            | Gets metrics for a specific resource (service or workload) in a namespace, with configurable duration, step, rate interval, direction, reporter, and quantiles                                               |
+| `kiali_get_traces`             | Gets distributed traces for a specific resource (app, service, or workload) in a namespace, or retrieves detailed information for a specific trace by its ID                                                 |
+| `kiali_workload_logs`          | Gets logs for a specific workload's pods in a namespace, with automatic pod and container discovery and optional filtering by container name, time range, and line count                                     |
+| `kiali_manage_istio_config`    | Creates, patches, or deletes Istio configuration objects (Gateways, VirtualServices, DestinationRules, etc.)                                                                                                 |
+| `kiali_manage_istio_config_read` | Lists or gets Istio configuration objects (Gateways, VirtualServices, etc.) in a read-only manner                                                                                                          |
 
 ### Kubevirt
 
-\- **vm\_create** – Create a VirtualMachine in the cluster with the specified configuration, automatically resolving instance types, preferences, and container disk images. VM will be created in Halted state by default; use the autostart parameter to start it immediately.
-\- **vm\_lifecycle** – Manage VirtualMachine lifecycle: start, stop, or restart a VM.
-\- **vm\_clone** – Clone a KubeVirt VirtualMachine by creating a VirtualMachineClone resource. This creates a copy of the source VM with a new name using the KubeVirt Clone API.
+| Tool           | Description                                                                                                                                                                                                                                                    |
+| :------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vm_create`    | Create a VirtualMachine in the cluster with the specified configuration, automatically resolving instance types, preferences, and container disk images. VM will be created in Halted state by default; use the `autostart` parameter to start it immediately. |
+| `vm_lifecycle` | Manage VirtualMachine lifecycle: start, stop, or restart a VM.                                                                                                                                                                                                 |
+| `vm_clone`     | Clone a KubeVirt VirtualMachine by creating a VirtualMachineClone resource. This creates a copy of the source VM with a new name using the KubeVirt Clone API.                                                                                                 |
 
 ### Netedge
 
-\- **netedge\_query\_prometheus** – Executes specialized diagnostic queries for specific NetEdge components. Accepts a \`diagnostic\_target\` parameter with one of three values:
-  \- **ingress** – queries for ingress error rate, active connections, reloads, and top error routes
-  \- **dns** – queries for DNS request rate, NXDOMAIN rate, SERVFAIL rate, panic recovery, error breakdown, and rewrite count
-  \- **operators** – queries for active firing alerts and operator up status in ingress/DNS namespaces
-
-\- **get\_coredns\_config** – Retrieves the current CoreDNS configuration (Corefile) from the cluster by reading the \`dns-default\` ConfigMap in the \`openshift-dns\` namespace
+| Tool                       | Description                                                                                                                                                                                                                                                                                                                                                                          |
+| :------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `netedge_query_prometheus` | Executes specialized diagnostic queries for specific NetEdge components. Accepts a `diagnostic_target` parameter: `ingress` (error rate, active connections, reloads, top error routes), `dns` (request rate, NXDOMAIN rate, SERVFAIL rate, panic recovery, error breakdown, rewrite count), or `operators` (active firing alerts and operator up status in ingress/DNS namespaces). |
+| `get_coredns_config`       | Retrieves the current CoreDNS configuration (Corefile) from the cluster by reading the `dns-default` ConfigMap in the `openshift-dns` namespace.                                                                                                                                                                                                                                     |
 
 ### Observability
 
-\- **prometheus\_query** – Executes an instant PromQL query against the cluster's Thanos Querier, returning current metric values at a specified point in time (or the current time if not specified)
-\- **prometheus\_query\_range** – Executes a range PromQL query against the cluster's Thanos Querier, returning metric values over a time range with a specified resolution step, useful for time-series data, trends, and historical analysis
-\- **alertmanager\_alerts** – Queries active and pending alerts from the cluster's Alertmanager, with filtering support for active/silenced/inhibited states and Alertmanager filter syntax
+| Tool                     | Description                                                                                                                                                                                                   |
+| :----------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `prometheus_query`       | Executes an instant PromQL query against the cluster's Thanos Querier, returning current metric values at a specified point in time (or the current time if not specified).                                   |
+| `prometheus_query_range` | Executes a range PromQL query against the cluster's Thanos Querier, returning metric values over a time range with a specified resolution step, useful for time-series data, trends, and historical analysis. |
+| `alertmanager_alerts`    | Queries active and pending alerts from the cluster's Alertmanager, with filtering support for active/silenced/inhibited states and Alertmanager filter syntax.                                                |
 
 ## Bring Your Own Model
 
