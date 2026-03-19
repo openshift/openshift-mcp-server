@@ -202,7 +202,7 @@ version = "v1"
 kind = "ClusterRoleBinding"
 ```
 
-In an emergency, one of two possible actions can be taken to revoke access for the LLM Agent (via the MCP server).
+In an emergency, one of several possible actions can be taken to revoke access for the LLM Agent (via the MCP server).
 
 1. Remove access to the offending tool \[[Github Link](https://github.com/openshift/openshift-mcp-server/blob/main/docs/configuration.md#tool-filtering)\] in `config.toml`
 
@@ -212,6 +212,14 @@ enabled_tools = ["pods_list", "pods_get", "pods_log"]
 
 # Or disable specific tools from enabled toolsets
 disabled_tools = ["resources_delete", "pods_delete"]
+```
+2. Disable destructive tool calls \[[Github Link](https://github.com/openshift/openshift-mcp-server/blob/main/docs/configuration.md#access-control)\] in `config.toml`
+```toml
+# Production-safe configuration
+read_only = true
+
+# Or allow writes but prevent deletions
+disable_destructive = true
 ```
 
 2. Uninstall the MCP server completely
