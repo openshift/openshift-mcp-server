@@ -21,6 +21,7 @@ import (
 
 const (
 	defaultPrometheusURL = "http://localhost:9090"
+	serviceCAFile        = "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
 )
 
 // getConfig retrieves the obs-mcp toolset configuration from params.
@@ -150,16 +151,16 @@ func createCertPoolFromRESTConfig(restConfig *rest.Config) (*x509.CertPool, erro
 		}
 	}
 
-	// If CAData wasn't available, try CAFile
-	if !caLoaded && restConfig.CAFile != "" {
-		caPEM, err := os.ReadFile(restConfig.CAFile)
+	// If CAData wasn't available, try serviceCAFile
+	if !caLoaded {
+		caPEM, err := os.ReadFile(serviceCAFile)
 		if err != nil {
-			slog.Warn("Failed to read CA file", "file", restConfig.CAFile, "error", err)
+			slog.Warn("Failed to read CA file", "file", serviceCAFile, "error", err)
 		} else {
 			if ok := certPool.AppendCertsFromPEM(caPEM); ok {
-				slog.Debug("Loaded cluster CA from file", "file", restConfig.CAFile)
+				slog.Debug("Loaded cluster CA from file", "file", serviceCAFile)
 			} else {
-				slog.Warn("Failed to parse CA certificates from file", "file", restConfig.CAFile)
+				slog.Warn("Failed to parse CA certificates from file", "file", serviceCAFile)
 			}
 		}
 	}

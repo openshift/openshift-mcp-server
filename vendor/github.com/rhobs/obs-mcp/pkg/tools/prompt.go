@@ -49,16 +49,8 @@ This tool MUST be called first for EVERY observability question to:
 1. Discover what metrics actually exist in this environment
 2. Find the EXACT metric name to use in queries
 3. Avoid querying non-existent metrics
-<<<<<<< HEAD
-<<<<<<< HEAD
 4. The 'name_regex' parameter should always be provided, and be a best guess of what the metric would be named like.
 5. Do not use a blanket regex like .* or .+ in the 'name_regex' parameter. Use specific ones like kube.*, node.*, etc.
-=======
->>>>>>> 0d6b5897 (Update to use commit)
-=======
-4. The 'name_regex' parameter should always be provided, and be a best guess of what the metric would be named like.
-5. Do not use a blanket regex like .* or .+ in the 'name_regex' parameter. Use specific ones like kube.*, node.*, etc.
->>>>>>> e64d4178 (Use latest rhobs/obs-mcp)
 
 NEVER skip this step. NEVER guess metric names. Metric names vary between environments.
 
@@ -153,35 +145,4 @@ FILTERING:
 - Use 'filter' to apply label matchers to find specific silences
 
 Silences are used to temporarily mute alerts based on label matchers. This tool helps you understand what is currently silenced in your environment.`
-
-	GenerateSLOPrompt = `Generate SLO (Service Level Objective) PromQL expressions for error rate and latency monitoring.
-
-WHEN TO USE:
-- When the user wants to set up SLO monitoring for a service or endpoint
-- To generate standardized error budget and latency tracking queries
-- To establish reliability targets for services
-
-HOW IT WORKS:
-This tool will:
-1. Use list_metrics to discover relevant error and latency metrics for the target
-2. Analyze the metric structure and labels
-3. Generate PromQL expressions for:
-   - Error rate SLO (availability tracking)
-   - Latency SLO (performance tracking)
-   - Error budget calculations
-4. Provide ready-to-use queries with explanations
-
-PARAMETERS:
-- 'target': The service/endpoint to monitor (used to find matching metrics)
-- 'window': SLO evaluation window (default: 28d)
-- 'availability_target': Success rate target percentage (default: 99.9%)
-- 'latency_target_duration': Maximum acceptable latency (default: 5s)
-- 'latency_target_percentile': Latency percentile to track (default: 99.9)
-
-COMMON SLO PATTERNS:
-- 99.9% availability = 43.8 minutes downtime per month
-- 99.95% availability = 21.9 minutes downtime per month
-- 99.5% availability = 3.6 hours downtime per month
-
-The tool will help construct proper burn rate alerts and error budget tracking.`
 )

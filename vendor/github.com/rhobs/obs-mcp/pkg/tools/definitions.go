@@ -249,49 +249,6 @@ var (
 			},
 		},
 	}
-
-	GenerateSLO = ToolDef{
-		Name:        "generate_slo",
-		Description: GenerateSLOPrompt,
-		Title:       "Generate SLO Expressions",
-		ReadOnly:    true,
-		Destructive: false,
-		Idempotent:  true,
-		OpenWorld:   true,
-		Params: []ParamDef{
-			{
-				Name:        "target",
-				Type:        ParamTypeString,
-				Description: "The target to monitor (e.g., endpoint path, service name, job name). This will be used to find relevant metrics.",
-				Required:    true,
-			},
-			{
-				Name:        "window",
-				Type:        ParamTypeString,
-				Description: "SLO window duration (e.g., '28d', '30d', '7d'). Defaults to '28d'.",
-				Required:    false,
-				Pattern:     `^\d+[smhdwy]$`,
-			},
-			{
-				Name:        "availability_target",
-				Type:        ParamTypeString,
-				Description: "Availability target as percentage (e.g., '99.9', '99.95', '99.5'). Defaults to '99.9'.",
-				Required:    false,
-			},
-			{
-				Name:        "latency_target_duration",
-				Type:        ParamTypeString,
-				Description: "Latency target duration (e.g., '5s', '1s', '100ms'). Defaults to '5s'.",
-				Required:    false,
-			},
-			{
-				Name:        "latency_target_percentile",
-				Type:        ParamTypeString,
-				Description: "Latency target percentile (e.g., '99.9', '99', '95'). Defaults to '99.9'.",
-				Required:    false,
-			},
-		},
-	}
 )
 
 // AllTools returns all tool definitions
@@ -305,6 +262,5 @@ func AllTools() []ToolDef {
 		GetSeries,
 		GetAlerts,
 		GetSilences,
-		GenerateSLO,
 	}
 }

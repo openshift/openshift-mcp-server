@@ -35,7 +35,6 @@ func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
 		toolset_tools.InitGetSeries(),
 		toolset_tools.InitGetAlerts(),
 		toolset_tools.InitGetSilences(),
-		toolset_tools.InitGenerateSLO(),
 	)
 }
 

@@ -88,13 +88,3 @@ func GetSilencesHandler(params api.ToolHandlerParams) (*api.ToolCallResult, erro
 
 	return tools.GetSilencesHandler(params.Context, amClient, tools.BuildSilencesInput(params.GetArguments())).ToToolsetResult()
 }
-
-// GenerateSLOHandler handles the generation of SLO expressions.
-func GenerateSLOHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	promClient, err := getPromClient(params)
-	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to create Prometheus client: %w", err)), nil
-	}
-
-	return tools.GenerateSLOHandler(params.Context, promClient, tools.BuildGenerateSLOInput(params.GetArguments())).ToToolsetResult()
-}

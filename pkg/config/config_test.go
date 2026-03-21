@@ -1049,7 +1049,6 @@ func (s *ConfigSuite) TestEmptyConfigFile() {
 		// Defaults should still be applied for unset values
 		s.Equal(s.defaults.ListOutput, config.ListOutput, "list_output should be default")
 		s.Equal(s.defaults.Toolsets, config.Toolsets, "toolsets should be default")
-		s.Equal([]string{"core", "config", "helm", "obs-mcp"}, config.Toolsets, "toolsets should be default")
 	})
 }
 

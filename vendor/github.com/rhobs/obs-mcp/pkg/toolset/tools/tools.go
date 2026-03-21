@@ -61,10 +61,3 @@ func InitGetSilences() []api.ServerTool {
 		tools.GetSilences.ToServerTool(GetSilencesHandler),
 	}
 }
-
-// InitGenerateSLO creates the generate_slo tool.
-func InitGenerateSLO() []api.ServerTool {
-	return []api.ServerTool{
-		tools.GenerateSLO.ToServerTool(GenerateSLOHandler),
-	}
-}
