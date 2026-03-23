@@ -65,34 +65,46 @@ func inspectRoute(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get route %s/%s: %w", namespace, routeName, err)), nil
 	}
 
-	keyFields := map[string]interface{}{
-		"Name":      route.GetName(),
-		"Namespace": route.GetNamespace(),
+	// Deep-copy the route so we can redact sensitive TLS fields without
+	// mutating the original object returned by the API server.
+	sanitizedRoute := route.DeepCopy()
+	tlsSensitiveFields := []string{"key", "certificate", "caCertificate"}
+	for _, field := range tlsSensitiveFields {
+		if _, found, _ := unstructured.NestedString(sanitizedRoute.Object, "spec", "tls", field); found {
+			if err := unstructured.SetNestedField(sanitizedRoute.Object, "<redacted>", "spec", "tls", field); err != nil {
+				return api.NewToolCallResult("", fmt.Errorf("failed to redact tls.%s: %w", field, err)), nil
+			}
+		}
 	}
 
-	if host, found, err := unstructured.NestedString(route.Object, "spec", "host"); found && err == nil {
+	keyFields := map[string]interface{}{
+		"Name":      sanitizedRoute.GetName(),
+		"Namespace": sanitizedRoute.GetNamespace(),
+	}
+
+	if host, found, err := unstructured.NestedString(sanitizedRoute.Object, "spec", "host"); found && err == nil {
 		keyFields["Host"] = host
 	}
 
-	if tls, found, err := unstructured.NestedMap(route.Object, "spec", "tls"); found && err == nil {
+	if tls, found, err := unstructured.NestedMap(sanitizedRoute.Object, "spec", "tls"); found && err == nil {
 		keyFields["TLS"] = tls
 	}
 
-	if to, found, err := unstructured.NestedMap(route.Object, "spec", "to"); found && err == nil {
+	if to, found, err := unstructured.NestedMap(sanitizedRoute.Object, "spec", "to"); found && err == nil {
 		keyFields["To"] = to
 	}
 
-	if port, found, err := unstructured.NestedMap(route.Object, "spec", "port"); found && err == nil {
+	if port, found, err := unstructured.NestedMap(sanitizedRoute.Object, "spec", "port"); found && err == nil {
 		keyFields["Port"] = port
 	}
 
-	if ingress, found, err := unstructured.NestedSlice(route.Object, "status", "ingress"); found && err == nil {
+	if ingress, found, err := unstructured.NestedSlice(sanitizedRoute.Object, "status", "ingress"); found && err == nil {
 		keyFields["IngressStatus"] = ingress
 	}
 
 	resultObj := map[string]interface{}{
 		"KeyFields": keyFields,
-		"RawRoute":  route.Object,
+		"RawRoute":  sanitizedRoute.Object,
 	}
 
 	data, err := yaml.Marshal(resultObj)
