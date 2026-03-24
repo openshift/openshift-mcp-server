@@ -296,6 +296,12 @@ func (p *acmHubClusterProvider) IsOpenShift(ctx context.Context) bool {
 	return p.hubManager.IsOpenShift(ctx)
 }
 
+func (p *acmHubClusterProvider) IsMultiTarget() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return len(p.clusterManagers) > 1
+}
+
 func (p *acmHubClusterProvider) GetDerivedKubernetes(ctx context.Context, target string) (*Kubernetes, error) {
 	if target == "" || target == p.GetDefaultTarget() {
 		return p.hubManager.Derived(ctx)
