@@ -1,7 +1,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "kubernetes-mcp-server.name" -}}
+{{- define "openshift-mcp-server.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -10,7 +10,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "kubernetes-mcp-server.fullname" -}}
+{{- define "openshift-mcp-server.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -26,16 +26,16 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "kubernetes-mcp-server.chart" -}}
+{{- define "openshift-mcp-server.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "kubernetes-mcp-server.labels" -}}
-helm.sh/chart: {{ include "kubernetes-mcp-server.chart" . }}
-{{ include "kubernetes-mcp-server.selectorLabels" . }}
+{{- define "openshift-mcp-server.labels" -}}
+helm.sh/chart: {{ include "openshift-mcp-server.chart" . }}
+{{ include "openshift-mcp-server.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -45,17 +45,17 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "kubernetes-mcp-server.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "kubernetes-mcp-server.name" . }}
+{{- define "openshift-mcp-server.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "openshift-mcp-server.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "kubernetes-mcp-server.serviceAccountName" -}}
+{{- define "openshift-mcp-server.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "kubernetes-mcp-server.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "openshift-mcp-server.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
@@ -64,7 +64,7 @@ Create the name of the service account to use
 {{/*
 Create the image path for the passed in image field
 */}}
-{{- define "kubernetes-mcp-server.image" -}}
+{{- define "openshift-mcp-server.image" -}}
 {{- if eq (substr 0 7 .version) "sha256:" -}}
 {{- printf "%s/%s@%s" .registry .repository .version -}}
 {{- else -}}
@@ -74,10 +74,10 @@ Create the image path for the passed in image field
 
 {{/*
 Create a suffixed resource name, ensuring the total length doesn't exceed 63 characters.
-Usage: {{ include "kubernetes-mcp-server.fullname.suffixed" (dict "root" $ "suffix" "my-suffix") }}
+Usage: {{ include "openshift-mcp-server.fullname.suffixed" (dict "root" $ "suffix" "my-suffix") }}
 */}}
-{{- define "kubernetes-mcp-server.fullname.suffixed" -}}
-{{- $fullname := include "kubernetes-mcp-server.fullname" .root -}}
+{{- define "openshift-mcp-server.fullname.suffixed" -}}
+{{- $fullname := include "openshift-mcp-server.fullname" .root -}}
 {{- $suffix := .suffix -}}
 {{- printf "%s-%s" $fullname $suffix | trunc 63 | trimSuffix "-" -}}
 {{- end -}}

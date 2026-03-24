@@ -15,9 +15,9 @@ modifying upstream templates. Define your RBAC needs in values.yaml under:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "kubernetes-mcp-server.fullname.suffixed" (dict "root" $ "suffix" .name) }}
+  name: {{ include "openshift-mcp-server.fullname.suffixed" (dict "root" $ "suffix" .name) }}
   labels:
-    {{- include "kubernetes-mcp-server.labels" $ | nindent 4 }}
+    {{- include "openshift-mcp-server.labels" $ | nindent 4 }}
     {{- with .labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
@@ -34,9 +34,9 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "kubernetes-mcp-server.fullname.suffixed" (dict "root" $ "suffix" .name) }}
+  name: {{ include "openshift-mcp-server.fullname.suffixed" (dict "root" $ "suffix" .name) }}
   labels:
-    {{- include "kubernetes-mcp-server.labels" $ | nindent 4 }}
+    {{- include "openshift-mcp-server.labels" $ | nindent 4 }}
     {{- with .labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
@@ -50,14 +50,14 @@ roleRef:
   {{- if .roleRef.external }}
   name: {{ .roleRef.name }}
   {{- else }}
-  name: {{ include "kubernetes-mcp-server.fullname.suffixed" (dict "root" $ "suffix" .roleRef.name) }}
+  name: {{ include "openshift-mcp-server.fullname.suffixed" (dict "root" $ "suffix" .roleRef.name) }}
   {{- end }}
 subjects:
   {{- if .subjects }}
   {{- toYaml .subjects | nindent 2 }}
   {{- else }}
   - kind: ServiceAccount
-    name: {{ include "kubernetes-mcp-server.serviceAccountName" $ }}
+    name: {{ include "openshift-mcp-server.serviceAccountName" $ }}
     namespace: {{ $.Release.Namespace }}
   {{- end }}
 {{- end }}
@@ -67,10 +67,10 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ include "kubernetes-mcp-server.fullname.suffixed" (dict "root" $ "suffix" .name) }}
+  name: {{ include "openshift-mcp-server.fullname.suffixed" (dict "root" $ "suffix" .name) }}
   namespace: {{ .namespace | default $.Release.Namespace }}
   labels:
-    {{- include "kubernetes-mcp-server.labels" $ | nindent 4 }}
+    {{- include "openshift-mcp-server.labels" $ | nindent 4 }}
     {{- with .labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
@@ -87,10 +87,10 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "kubernetes-mcp-server.fullname.suffixed" (dict "root" $ "suffix" .name) }}
+  name: {{ include "openshift-mcp-server.fullname.suffixed" (dict "root" $ "suffix" .name) }}
   namespace: {{ .namespace | default $.Release.Namespace }}
   labels:
-    {{- include "kubernetes-mcp-server.labels" $ | nindent 4 }}
+    {{- include "openshift-mcp-server.labels" $ | nindent 4 }}
     {{- with .labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
@@ -104,14 +104,14 @@ roleRef:
   {{- if .roleRef.external }}
   name: {{ .roleRef.name }}
   {{- else }}
-  name: {{ include "kubernetes-mcp-server.fullname.suffixed" (dict "root" $ "suffix" .roleRef.name) }}
+  name: {{ include "openshift-mcp-server.fullname.suffixed" (dict "root" $ "suffix" .roleRef.name) }}
   {{- end }}
 subjects:
   {{- if .subjects }}
   {{- toYaml .subjects | nindent 2 }}
   {{- else }}
   - kind: ServiceAccount
-    name: {{ include "kubernetes-mcp-server.serviceAccountName" $ }}
+    name: {{ include "openshift-mcp-server.serviceAccountName" $ }}
     namespace: {{ $.Release.Namespace }}
   {{- end }}
 {{- end }}

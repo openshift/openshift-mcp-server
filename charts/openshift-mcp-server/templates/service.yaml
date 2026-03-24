@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "kubernetes-mcp-server.fullname" . }}
+  name: {{ include "openshift-mcp-server.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "kubernetes-mcp-server.labels" . | nindent 4 }}
+    {{- include "openshift-mcp-server.labels" . | nindent 4 }}
   {{- with .Values.service.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -17,4 +17,4 @@ spec:
       protocol: TCP
       name: http
   selector:
-    {{- include "kubernetes-mcp-server.selectorLabels" . | nindent 4 }}
+    {{- include "openshift-mcp-server.selectorLabels" . | nindent 4 }}
