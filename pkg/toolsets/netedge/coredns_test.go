@@ -9,7 +9,6 @@ import (
 )
 
 func (s *NetEdgeTestSuite) TestGetCoreDNSConfig() {
-
 	tests := []struct {
 		name           string
 		configMap      *corev1.ConfigMap
