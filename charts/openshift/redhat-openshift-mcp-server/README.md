@@ -4,7 +4,7 @@
 
 Helm Chart for the MCP server for Red Hat Openshift
 
-**Homepage:** <https://github.com/containers/kubernetes-mcp-server>
+**Homepage:** <https://github.com/openshift/openshift-mcp-server>
 
 ## Maintainers
 
