@@ -1,8 +1,8 @@
-# kubernetes-mcp-server
+# redhat-openshift-mcp-server
 
 ![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![AppVersion: latest](https://img.shields.io/badge/AppVersion-latest-informational?style=flat-square)
 
-Helm Chart for the Kubernetes MCP Server
+Helm Chart for the MCP server for Red Hat Openshift
 
 **Homepage:** <https://github.com/containers/kubernetes-mcp-server>
 
@@ -12,6 +12,8 @@ Helm Chart for the Kubernetes MCP Server
 | ---- | ------ | --- |
 | Andrew Block | <ablock@redhat.com> |  |
 | Marc Nuri | <marc.nuri@redhat.com> |  |
+| Matthias Wessendorf | <mwessend@redhat.com> |  |
+| Kaustubh Pande | <kpande@redhat.com> |  |
 
 ## Installing the Chart
 
@@ -20,12 +22,20 @@ The Chart can be installed quickly and easily to a Kubernetes cluster. Since an 
 Install the Chart using the following command from the root of this directory:
 
 ```shell
-helm upgrade -i -n kubernetes-mcp-server --create-namespace kubernetes-mcp-server oci://ghcr.io/containers/charts/kubernetes-mcp-server --set ingress.host=<hostname>
+helm upgrade -i -n redhat-openshift-mcp-server --create-namespace redhat-openshift-mcp-server redhat-openshift-mcp-server ./charts/openshift/redhat-openshift-mcp-server --set ingress.host=<hostname>
 ```
 
 ### Optimized OpenShift Deployment
 
-Functionality has been added to the Chart to simplify the deployment to OpenShift Cluster.
+This downstream chart ships with OpenShift defaults enabled in `values.yaml`.
+
+### ACM Provider
+
+To include the ACM-specific RBAC permissions, add the ACM overlay file:
+
+```shell
+helm upgrade -i -n redhat-openshift-mcp-server --create-namespace redhat-openshift-mcp-server redhat-openshift-mcp-server ./charts/openshift/redhat-openshift-mcp-server --set ingress.host=<hostname> -f ./charts/openshift/redhat-openshift-mcp-server/values-acm.yaml
+```
 
 ### RBAC Configuration
 
@@ -108,7 +118,7 @@ Each container accepts any valid Kubernetes container field including `image`, `
 | metrics.serviceMonitor.tlsConfig | object | `{}` | TLS configuration for scraping |
 | nameOverride | string | `""` |  |
 | nodeSelector | object | `{}` |  |
-| openshift | bool | `false` | Enable OpenShift specific features |
+| openshift | bool | `true` | Enable OpenShift specific features |
 | podAnnotations | object | `{}` | For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/ |
 | podLabels | object | `{}` | For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/ |
 | podSecurityContext | object | `{}` | Define the Security Context for the Pod |

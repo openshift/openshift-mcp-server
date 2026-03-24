@@ -49,8 +49,8 @@ jobs:
 
       - name: Check for uncommitted changes
         run: |
-          if ! git diff --quiet charts/kubernetes-mcp-server/README.md; then
+          if ! git diff --quiet charts/kubernetes-mcp-server/README.md charts/openshift/redhat-openshift-mcp-server/README.md; then
             echo "::error::Helm chart README.md is out of date. Please run 'make helm-docs' and commit the changes."
-            git diff charts/kubernetes-mcp-server/README.md
+            git diff charts/kubernetes-mcp-server/README.md charts/openshift/redhat-openshift-mcp-server/README.md
             exit 1
           fi

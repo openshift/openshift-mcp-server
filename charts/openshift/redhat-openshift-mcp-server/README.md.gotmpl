@@ -1,0 +1,88 @@
+{{ template "chart.header" . }}
+{{ template "chart.deprecationWarning" . }}
+
+{{ template "chart.badgesSection" . }}
+
+{{ template "chart.description" . }}
+
+{{ template "chart.homepageLine" . }}
+
+{{ template "chart.maintainersSection" . }}
+
+{{ template "chart.sourcesSection" . }}
+
+{{ template "chart.requirementsSection" . }}
+
+## Installing the Chart
+
+The Chart can be installed quickly and easily to a Kubernetes cluster. Since an _Ingress_ is added as part of the default install of the Chart, the `ingress.host` Value must be specified.
+
+Install the Chart using the following command from the root of this directory:
+
+```shell
+helm upgrade -i -n redhat-openshift-mcp-server --create-namespace redhat-openshift-mcp-server redhat-openshift-mcp-server ./charts/openshift/redhat-openshift-mcp-server --set ingress.host=<hostname>
+```
+
+### Optimized OpenShift Deployment
+
+This downstream chart ships with OpenShift defaults enabled in `values.yaml`.
+
+### ACM Provider
+
+To include the ACM-specific RBAC permissions, add the ACM overlay file:
+
+```shell
+helm upgrade -i -n redhat-openshift-mcp-server --create-namespace redhat-openshift-mcp-server redhat-openshift-mcp-server ./charts/openshift/redhat-openshift-mcp-server --set ingress.host=<hostname> -f ./charts/openshift/redhat-openshift-mcp-server/values-acm.yaml
+```
+
+### RBAC Configuration
+
+The chart supports creating custom RBAC resources. Set `rbac.create: false` to disable all RBAC resource creation.
+
+To bind to an existing cluster role (e.g., `view`, `edit`, `admin`), use `roleRef.external: true`:
+
+```yaml
+rbac:
+  extraClusterRoleBindings:
+    - name: use-view-role
+      roleRef:
+        name: view
+        external: true
+```
+
+### Additional Containers (Sidecars)
+
+The chart supports adding additional containers to the deployment pod. These can be used for various purposes such as MCP proxying.
+
+To add extra containers, define them in the `extraContainers` value using standard Kubernetes container specifications:
+
+```yaml
+extraContainers:
+  - name: sidecar
+    image: quay.io/prometheus/busybox:latest
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 50m
+        memory: 64Mi
+  - name: metrics-exporter
+    image: quay.io/prometheus/prometheus:latest
+    ports:
+      - containerPort: 9090
+```
+
+Each container accepts any valid Kubernetes container field including `image`, `command`, `args`, `env`, `volumeMounts`, `resources`, `ports`, and more.
+
+{{ template "chart.valuesSection" . }}
+
+## Updating the README
+
+The contents of the README.md file is generated using [helm-docs](https://github.com/norwoodj/helm-docs). Whenever changes are introduced to the Chart and its _Values_, the documentation should be regenerated. 
+
+Execute the following command to regenerate the documentation from within the Helm Chart directory.
+
+```shell
+helm-docs -t README.md.gotmpl
+```

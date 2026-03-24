@@ -138,15 +138,14 @@ config:
 Deploy the MCP Server using Helm with the base values, OpenShift values, and your custom ACM values:
 
 ```bash
-helm install kubernetes-mcp-server ./charts/kubernetes-mcp-server \
-  -f ./charts/kubernetes-mcp-server/values.yaml \
-  -f ./charts/kubernetes-mcp-server/values-openshift.yaml \
+helm install redhat-openshift-mcp-server ./charts/openshift/redhat-openshift-mcp-server \
+  -f ./charts/openshift/redhat-openshift-mcp-server/values-acm.yaml \
   -f acm-custom-values.yaml \
   -n <namespace> \
-  --set ingress.host=kubernetes-mcp-server.apps.<cluster-domain>
+  --set ingress.host=redhat-openshift-mcp-server.apps.<cluster-domain>
 ```
 
-**Important:** The `values-openshift.yaml` file includes the necessary RBAC permissions for ACM to function properly.
+**Important:** The `values-acm.yaml` file includes the necessary RBAC permissions for ACM to function properly.
 
 ### Step 4: Verify Deployment
 
@@ -154,12 +153,12 @@ Check that the MCP Server is running:
 
 ```bash
 kubectl get pods -n <namespace>
-kubectl logs -n <namespace> deployment/kubernetes-mcp-server
+kubectl logs -n <namespace> deployment/redhat-openshift-mcp-server
 ```
 
 Access the MCP Server through the ingress URL:
 ```
-https://kubernetes-mcp-server.apps.<cluster-domain>
+https://redhat-openshift-mcp-server.apps.<cluster-domain>
 ```
 
 ## Configuration Reference (TOML Format)

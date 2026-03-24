@@ -1,12 +1,13 @@
 ##@ Helm Chart build targets
 
-HELM_CHART_DIR = ./charts/kubernetes-mcp-server
+HELM_CHART_DIR ?= ./charts/kubernetes-mcp-server
+HELM_CHART_DIRS = $(shell find charts -name Chart.yaml -type f -exec dirname {} \; | sort)
 HELM_CHART_VERSION_BASE = $(shell grep '^version:' $(HELM_CHART_DIR)/Chart.yaml | awk '{print $$2}')
 HELM_CHART_VERSION ?= $(HELM_CHART_VERSION_BASE)
 HELM_PACKAGE_DIR = ./_output/helm-packages
 HELM_REGISTRY ?= ghcr.io
 HELM_REGISTRY_ORG ?= containers
-HELM_CHART_NAME = kubernetes-mcp-server
+HELM_CHART_NAME = $(shell grep '^name:' $(HELM_CHART_DIR)/Chart.yaml | awk '{print $$2}')
 
 KUBECONFORM = $(shell pwd)/_output/tools/bin/kubeconform
 KUBECONFORM_VERSION ?= latest
@@ -33,15 +34,24 @@ helm-docs-install:
 
 .PHONY: helm-docs
 helm-docs: helm-docs-install ## Generate Helm chart documentation using helm-docs
-	$(HELM_DOCS) -c $(HELM_CHART_DIR) -t README.md.gotmpl
+	@for chart in $(HELM_CHART_DIRS); do \
+		echo "Generating Helm docs for $$chart..."; \
+		$(HELM_DOCS) -c $$chart -t README.md.gotmpl; \
+	done
 
 .PHONY: helm-lint
 helm-lint: ## Lint the Helm chart
-	helm lint $(HELM_CHART_DIR)
+	@for chart in $(HELM_CHART_DIRS); do \
+		echo "Linting $$chart..."; \
+		helm lint $$chart --set ingress.host=localhost; \
+	done
 
 .PHONY: helm-template
 helm-template: ## Render Helm chart templates (dry run)
-	helm template test-release $(HELM_CHART_DIR) --set ingress.host=localhost --debug
+	@for chart in $(HELM_CHART_DIRS); do \
+		echo "Rendering $$chart..."; \
+		helm template test-release $$chart --set ingress.host=localhost --debug; \
+	done
 
 # Download and install kubeconform if not already installed
 .PHONY: kubeconform
@@ -58,11 +68,16 @@ kubeconform:
 
 .PHONY: helm-validate
 helm-validate: kubeconform ## Validate Helm chart manifests with kubeconform
-	@echo "Validating with default values..."
-	@bash -o pipefail -c 'helm template test-release $(HELM_CHART_DIR) --set ingress.host=localhost | $(KUBECONFORM) -strict -summary -ignore-missing-schemas'
-	@echo ""
-	@echo "Validating with tpl-exercising values..."
-	@bash -o pipefail -c 'helm template test-release $(HELM_CHART_DIR) -f $(HELM_CHART_DIR)/ci/tpl-test-values.yaml | $(KUBECONFORM) -strict -summary -ignore-missing-schemas'
+	@for chart in $(HELM_CHART_DIRS); do \
+		echo "Validating $$chart with default values..."; \
+		bash -o pipefail -c "helm template test-release $$chart --set ingress.host=localhost | $(KUBECONFORM) -strict -summary -ignore-missing-schemas"; \
+		if [ -f "$$chart/ci/tpl-test-values.yaml" ]; then \
+			echo ""; \
+			echo "Validating $$chart with tpl-exercising values..."; \
+			bash -o pipefail -c "helm template test-release $$chart -f $$chart/ci/tpl-test-values.yaml | $(KUBECONFORM) -strict -summary -ignore-missing-schemas"; \
+		fi; \
+		echo ""; \
+	done
 
 .PHONY: helm-package
 helm-package: helm-lint helm-template ## Package the Helm chart (supports HELM_CHART_VERSION override)
