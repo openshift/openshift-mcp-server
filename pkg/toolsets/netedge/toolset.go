@@ -27,6 +27,7 @@ func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
 		initCoreDNS(),
 		initEndpoints(),
 		initProbeDNSLocal(),
+		initProbeHTTP(),
 		initRoutes(),
 	)
 }
