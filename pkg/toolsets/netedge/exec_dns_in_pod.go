@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
+	"strings"
 	"time"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
@@ -130,7 +132,7 @@ func initExecDNSInPodWith(executor podExecutor) []api.ServerTool {
 					Title:           "Exec DNS in Pod",
 					ReadOnlyHint:    ptr.To(false),
 					DestructiveHint: ptr.To(false),
-					IdempotentHint:  ptr.To(true),
+					IdempotentHint:  ptr.To(false),
 					OpenWorldHint:   ptr.To(true),
 				},
 			},
@@ -150,15 +152,24 @@ func makeExecDNSInPodHandler(executor podExecutor) api.ToolHandlerFunc {
 		if !ok || targetServer == "" {
 			return api.NewToolCallResultStructured(nil, fmt.Errorf("target_server parameter is required")), nil
 		}
+		if net.ParseIP(targetServer) == nil {
+			return api.NewToolCallResultStructured(nil, fmt.Errorf("target_server must be a valid IP address")), nil
+		}
 
 		targetName, ok := params.GetArguments()["target_name"].(string)
 		if !ok || targetName == "" {
 			return api.NewToolCallResultStructured(nil, fmt.Errorf("target_name parameter is required")), nil
 		}
+		if strings.ContainsAny(targetName, " \t\r\n") || strings.HasPrefix(targetName, "-") || strings.HasPrefix(targetName, "+") || strings.HasPrefix(targetName, "@") {
+			return api.NewToolCallResultStructured(nil, fmt.Errorf("target_name must be a DNS name, not a dig option")), nil
+		}
 
 		recordType, ok := params.GetArguments()["record_type"].(string)
 		if !ok || recordType == "" {
 			recordType = "A"
+		}
+		if strings.ContainsAny(recordType, " \t\r\n") || strings.HasPrefix(recordType, "-") || strings.HasPrefix(recordType, "+") || strings.HasPrefix(recordType, "@") {
+			return api.NewToolCallResultStructured(nil, fmt.Errorf("record_type must be a DNS record type, not a dig option")), nil
 		}
 
 		// Use provided executor or create one from the KubernetesClient
@@ -175,7 +186,8 @@ func makeExecDNSInPodHandler(executor podExecutor) api.ToolHandlerFunc {
 				Namespace: namespace,
 			},
 			Spec: corev1.PodSpec{
-				RestartPolicy: corev1.RestartPolicyNever,
+				AutomountServiceAccountToken: ptr.To(false),
+				RestartPolicy:                corev1.RestartPolicyNever,
 				Containers: []corev1.Container{
 					{
 						Name:    "dns-probe",

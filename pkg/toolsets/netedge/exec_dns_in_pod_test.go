@@ -335,4 +335,97 @@ func (s *NetEdgeTestSuite) TestExecDNSInPodHandler() {
 		s.Assert().Equal(dnsProbeImage, container.Image)
 		s.Assert().Equal([]string{"/usr/bin/dig", "@10.0.0.10", "myservice.default.svc.cluster.local", "AAAA"}, container.Command)
 	})
+
+	s.Run("pod spec disables service account token mount", func() {
+		mock := &mockPodExecutor{
+			waitPod: succeededPod("mcp-dns-probe-abc123", "test-ns"),
+			logs:    sampleDigOutput,
+		}
+		s.SetArgs(map[string]interface{}{
+			"namespace":     "test-ns",
+			"target_server": "172.30.0.10",
+			"target_name":   "example.com",
+		})
+		handler := makeExecDNSInPodHandler(mock)
+
+		_, err := handler(s.params)
+		s.Require().NoError(err)
+
+		s.Require().NotNil(mock.lastPod)
+		s.Require().NotNil(mock.lastPod.Spec.AutomountServiceAccountToken)
+		s.Assert().False(*mock.lastPod.Spec.AutomountServiceAccountToken, "SA token should not be mounted")
+	})
+
+	s.Run("rejects non-IP target_server", func() {
+		mock := &mockPodExecutor{}
+		s.SetArgs(map[string]interface{}{
+			"namespace":     "test-ns",
+			"target_server": "not-an-ip",
+			"target_name":   "example.com",
+		})
+		handler := makeExecDNSInPodHandler(mock)
+
+		result, err := handler(s.params)
+
+		s.Require().NoError(err)
+		s.Require().NotNil(result.Error)
+		s.Assert().Contains(result.Error.Error(), "target_server must be a valid IP address")
+	})
+
+	s.Run("rejects option-shaped target_name", func() {
+		testCases := []struct {
+			name       string
+			targetName string
+		}{
+			{"dash prefix", "-f /etc/hostname"},
+			{"plus prefix", "+trace"},
+			{"at prefix", "@8.8.8.8"},
+		}
+		for _, tc := range testCases {
+			s.Run(tc.name, func() {
+				mock := &mockPodExecutor{}
+				s.SetArgs(map[string]interface{}{
+					"namespace":     "test-ns",
+					"target_server": "172.30.0.10",
+					"target_name":   tc.targetName,
+				})
+				handler := makeExecDNSInPodHandler(mock)
+
+				result, err := handler(s.params)
+
+				s.Require().NoError(err)
+				s.Require().NotNil(result.Error)
+				s.Assert().Contains(result.Error.Error(), "target_name must be a DNS name")
+			})
+		}
+	})
+
+	s.Run("rejects option-shaped record_type", func() {
+		testCases := []struct {
+			name       string
+			recordType string
+		}{
+			{"dash prefix", "-f"},
+			{"plus prefix", "+short"},
+			{"at prefix", "@server"},
+		}
+		for _, tc := range testCases {
+			s.Run(tc.name, func() {
+				mock := &mockPodExecutor{}
+				s.SetArgs(map[string]interface{}{
+					"namespace":     "test-ns",
+					"target_server": "172.30.0.10",
+					"target_name":   "example.com",
+					"record_type":   tc.recordType,
+				})
+				handler := makeExecDNSInPodHandler(mock)
+
+				result, err := handler(s.params)
+
+				s.Require().NoError(err)
+				s.Require().NotNil(result.Error)
+				s.Assert().Contains(result.Error.Error(), "record_type must be a DNS record type")
+			})
+		}
+	})
 }
