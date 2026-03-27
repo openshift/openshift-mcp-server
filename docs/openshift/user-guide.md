@@ -223,7 +223,7 @@ disable_destructive = true
 ```
 
 2. Uninstall the MCP server completely
-   `helm uninstall openshift-mcp-server`
+   `helm uninstall redhat-openshift-mcp-server`
 3. Per User Revocation with RBAC revocation
    Get rid of the user's rolebinding/clusterrolebinding \[[OpenShift RBAC API docs](https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html/rbac_apis/rbac-apis)\]
 4. Remove access through the MCP gateway
