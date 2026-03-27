@@ -1,0 +1,14 @@
+apiVersion: v2
+name: redhat-openshift-mcp-server
+description: Helm Chart for MCP server for Red Hat OpenShift
+home: https://github.com/openshift/openshift-mcp-server
+keywords:
+  - openshift
+  - mcp
+maintainers:
+  - name: Andrew Block
+    email: ablock@redhat.com
+  - name: Marc Nuri
+    email: marc.nuri@redhat.com
+version: 0.2.0
+appVersion: "latest"

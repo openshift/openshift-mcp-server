@@ -17,6 +17,31 @@ The MCP server for Red Hat OpenShift supports several enterprise grade features
 
 ![OpenShift Lightspeed Data Flow](images/lightspeed-data-flow.png)
 
+### Installation
+
+Install the Helm chart:
+
+```bash
+helm upgrade -i -n openshift-mcp-server --create-namespace \
+  openshift-mcp-server \
+  oci://ghcr.io/openshift/charts/openshift-mcp-server \
+  --set ingress.host=<hostname>
+```
+
+Verify the deployment:
+
+```bash
+kubectl get pods -n openshift-mcp-server
+```
+
+To uninstall:
+
+```bash
+helm uninstall openshift-mcp-server -n openshift-mcp-server
+```
+
+For configuration options including OAuth, RBAC, TLS, and telemetry, see the [chart values](https://github.com/openshift/openshift-mcp-server/blob/main/charts/openshift-mcp-server/values.yaml).
+
 ## Toolsets and Functionality
 
 By default the MCP server for Red Hat OpenShift enables only `core` and `config` tools in a read-only mode. In order to enable other available toolsets, like Kiali/OSSM or Kubevirt, those must be enabled in the `config.toml` file. In case of using `olm` or `kubevirt` toolsets there is a "config" section which needs to be updated, like:
@@ -167,7 +192,7 @@ We recommend you route all traffic through the MCP gateway to take advantage of 
 
 ### RBAC Enforcement
 
-The MCP server for Red Hat OpenShift can be configured to use a Service Account and RBAC.  By default, RBAC is enabled, and you can extend the ClusterRoles, ClusterRoleBindings, Roles and Rolebindings via their relevant 'extra' parameters here: [https://github.com/openshift/openshift-mcp-server/blob/main/charts/kubernetes-mcp-server/values.yaml\#L37](https://github.com/openshift/openshift-mcp-server/blob/main/charts/kubernetes-mcp-server/values.yaml#L37)
+The MCP server for Red Hat OpenShift can be configured to use a Service Account and RBAC.  By default, RBAC is enabled, and you can extend the ClusterRoles, ClusterRoleBindings, Roles and Rolebindings via their relevant 'extra' parameters here: [https://github.com/openshift/openshift-mcp-server/blob/main/charts/openshift-mcp-server/values.yaml\#L37](https://github.com/openshift/openshift-mcp-server/blob/main/charts/openshift-mcp-server/values.yaml#L37)
 
 ### Access Revocation Protocols
 
@@ -223,7 +248,7 @@ disable_destructive = true
 ```
 
 2. Uninstall the MCP server completely
-   `helm uninstall openshift-mcp-server`
+   `helm uninstall redhat-openshift-mcp-server`
 3. Per User Revocation with RBAC revocation
    Get rid of the user's rolebinding/clusterrolebinding \[[OpenShift RBAC API docs](https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html/rbac_apis/rbac-apis)\]
 4. Remove access through the MCP gateway
