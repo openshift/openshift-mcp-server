@@ -6,6 +6,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/openshift/mustgather"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/openshift/ztp"
 )
 
 type Toolset struct{}
@@ -27,6 +28,7 @@ func (t *Toolset) GetTools(o api.Openshift) []api.ServerTool {
 func (t *Toolset) GetPrompts() []api.ServerPrompt {
 	return slices.Concat(
 		mustgather.Prompts(),
+		ztp.Prompts(),
 	)
 }
 
