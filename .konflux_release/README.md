@@ -1,52 +1,61 @@
 # Konflux Release Artifacts
 
-This directory contains developer-side Konflux release templates for the existing
-`mcp-server-02` application in the `ocp-mcp-server-tenant` workspace.
+This directory contains the Konflux release artifacts used to promote builds of
+this repository.
+
+## What these resources mean
+
+- `Snapshot`: a point-in-time capture of the component image, source revision,
+  and related build inputs that should be released together.
+- `ReleasePlan`: the developer-side configuration that declares where the
+  application can be promoted and which managed-side admission should process
+  it.
+- `Release`: the concrete release request that promotes one snapshot through one
+  release plan.
+- `ReleasePlanAdmission`: the managed-side policy and pipeline configuration.
+  It is managed outside this repository in the Konflux configuration repo, so
+  it is not stored under `.konflux_release/`.
 
 ## Layout
 
-- `releasePlan/` contains developer-side `ReleasePlan` objects.
-- `releasePlanAdmission/` contains managed-side `ReleasePlanAdmission` examples.
-- `releases/` contains `Release` objects.
-- `snapshot/` contains manual `Snapshot` templates.
+- `releasePlan/`: developer-side `ReleasePlan` manifests
+- `snapshot/`: `Snapshot` manifests that pin the exact image digest and source
+  revision to release
+- `releases/`: `Release` manifests that request promotion of a snapshot through
+  a release plan
 
-## How to use these manifests
+The exact filenames may change over time as new release requests are created.
 
-1. Update placeholders in the YAML files:
-   - `TODO-managed-tenant-namespace`
-   - `TODO-your-userid`
-   - the image digest and git revision in the manual snapshot
-2. Apply the release plan:
+## High-Level Flow
 
-   ```bash
-   kubectl apply -f .konflux_release/releasePlan/openshift-mcp-server-release-020.yaml
-   ```
+1. Build pipelines produce an image that should be promoted.
+2. A `Snapshot` captures the exact image digest, component name, and source
+   revision for that build.
+3. A `ReleasePlan` defines the developer-side promotion intent.
+4. A `Release` references both the `Snapshot` and the `ReleasePlan` to request
+   promotion.
+5. Konflux matches that `ReleasePlan` with the corresponding
+   `ReleasePlanAdmission` from the Konflux config repo and executes the managed
+   release process.
 
-3. Ask the managed environment owners to create or update the matching
-   `ReleasePlanAdmission`:
+## Typical usage
 
-   ```bash
-   kubectl apply -f .konflux_release/releasePlanAdmission/openshift-mcp-server-release-020-managed.yaml
-   ```
+1. Update or create a `Snapshot` with the image digest and source revision you
+   want to promote.
+2. Apply or update the developer-side `ReleasePlan` if needed.
+3. Create a new `Release` that references the chosen `Snapshot` and
+   `ReleasePlan`.
 
-4. Either:
-   - use a push-generated Snapshot created by Konflux, then update
-     `.konflux_release/releases/openshift-mcp-server-release-020-manual.yaml`
-     to point at it, or
-   - create the manual Snapshot from `snapshot/openshift-mcp-server-release-020-manual.yaml`
-
-5. Create the release:
-
-   ```bash
-   kubectl create -f .konflux_release/releases/openshift-mcp-server-release-020-manual.yaml
-   ```
+```bash
+kubectl apply -f .konflux_release/releasePlan/<release-plan>.yaml
+kubectl apply -f .konflux_release/snapshot/<snapshot>.yaml
+kubectl create -f .konflux_release/releases/<release>.yaml
+```
 
 ## Notes
 
-- The manual snapshot must reference an image by digest, not by tag.
-- A matching `ReleasePlanAdmission` must exist in the managed namespace before
-  the `Release` can proceed.
-- `releasePlan/openshift-mcp-server-release-020.yaml` defaults to manual releases by setting
-  `release.appstudio.openshift.io/auto-release: "false"`. If you want automatic
-  releases after tests pass, change that value to a Konflux-supported CEL
-  expression such as `"true"`.
+- Snapshots should reference container images by digest, not by tag.
+- `ReleasePlanAdmission` is owned in the Konflux config repo, not in this
+  application repo.
+- Create a new manifest under `releases/` for each manual release request
+  instead of reusing an old `Release` object.
