@@ -5,7 +5,7 @@ steps:
   verify:
     contains: "Addresses"
   prompt:
-    inline: List the endpoint slices for the router-default service in the openshift-ingress namespace and report the backend pod addresses and node names.
+    inline: Use the get_service_endpoints tool to list the endpoint slices for the router-default service in the openshift-ingress namespace. Report the backend pod addresses and node names from the result.
   assertions:
     toolsUsed:
       - server: kubernetes
