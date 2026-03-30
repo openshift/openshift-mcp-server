@@ -5,7 +5,7 @@ steps:
   verify:
     contains: "NOERROR"
   prompt:
-    inline: Run a DNS query from the MCP server for kubernetes.default.svc.cluster.local against the cluster DNS server at 172.30.0.10, record type A, and report the resolved addresses and response code.
+    inline: You have a specialized tool called probe_dns_local. Use it to run a DNS query from the MCP server for kubernetes.default.svc.cluster.local against the cluster DNS server at 172.30.0.10, record type A. Report the resolved addresses and response code (Rcode).
   assertions:
     toolsUsed:
       - server: kubernetes
@@ -13,3 +13,4 @@ steps:
         args:
           server: "172.30.0.10"
           name: "kubernetes.default.svc.cluster.local"
+          type: "A"
