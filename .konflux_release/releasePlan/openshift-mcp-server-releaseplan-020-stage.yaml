@@ -1,0 +1,20 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: ReleasePlan
+metadata:
+  name: openshift-mcp-server-releaseplan-020-stage
+  namespace: ocp-mcp-server-tenant
+  labels:
+    release.appstudio.openshift.io/auto-release: "false"
+    release.appstudio.openshift.io/releasePlanAdmission: openshift-mcp-server-020-stage
+    release.appstudio.openshift.io/standing-attribution: "true"
+spec:
+  application: mcp-server-02
+  target: rhtap-releng-tenant
+  data:
+    releaseNotes:
+      solution: |
+        The MCP Server for Red Hat OpenShift helps manage MCP workloads on OpenShift.
+      description: "The Developer Preview 0.2.0 (DP2) release of MCP Server for Red Hat OpenShift."
+      topic: |
+        The 0.2.0 Developer Preview (DP2) release of MCP Server for Red Hat OpenShift, This release introduces early access to MCP server capabilities on OpenShift
+      synopsis: "MCP Server for Red Hat OpenShift Developer Preview 0.2.0"
