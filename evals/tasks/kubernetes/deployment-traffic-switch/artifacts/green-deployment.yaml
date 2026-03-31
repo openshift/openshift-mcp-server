@@ -16,6 +16,25 @@ spec:
     spec:
       containers:
       - name: app
-        image: nginx:1.26 # Use a different image tag to represent a new version
+        image: nginxinc/nginx-unprivileged:1.29
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: nginx-cache
+          mountPath: /var/cache/nginx
         ports:
-        - containerPort: 80
+        - containerPort: 8080
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: nginx-cache
+        emptyDir: {}
