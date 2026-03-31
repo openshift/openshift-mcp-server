@@ -66,6 +66,7 @@ type RequireTLSProvider interface {
 type BaseConfig interface {
 	AuthProvider
 	ClusterProvider
+	ConfirmationRulesProvider
 	DeniedResourcesProvider
 	ExtendedConfigProvider
 	StsConfigProvider

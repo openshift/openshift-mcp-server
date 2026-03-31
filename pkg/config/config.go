@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -105,6 +106,12 @@ type StaticConfig struct {
 	// When enabled, validates resources, schemas, and RBAC before execution.
 	// Defaults to false.
 	ValidationEnabled bool `toml:"validation_enabled,omitempty"`
+
+	// ConfirmationFallback is the global default fallback behavior when a client
+	// does not support elicitation. Valid values are "deny" and "allow".
+	ConfirmationFallback string `toml:"confirmation_fallback,omitempty"`
+	// ConfirmationRules define rules for prompting the user before dangerous actions.
+	ConfirmationRules []api.ConfirmationRule `toml:"confirmation_rules,omitempty"`
 
 	// Internal: parsed provider configs (not exposed to TOML package)
 	parsedClusterProviderConfigs map[string]api.ExtendedConfig
@@ -313,6 +320,16 @@ func ReadToml(configData []byte, opts ...ReadConfigOpt) (*StaticConfig, error) {
 		return nil, err
 	}
 
+	var ruleErrors []error
+	for i := range config.ConfirmationRules {
+		if ruleErr := config.ConfirmationRules[i].Validate(); ruleErr != nil {
+			ruleErrors = append(ruleErrors, fmt.Errorf("confirmation_rules[%d]: %w", i, ruleErr))
+		}
+	}
+	if len(ruleErrors) > 0 {
+		return nil, fmt.Errorf("invalid confirmation rules:\n%w", errors.Join(ruleErrors...))
+	}
+
 	return config, nil
 }
 
@@ -361,6 +378,14 @@ func (c *StaticConfig) GetStsScopes() []string {
 
 func (c *StaticConfig) IsValidationEnabled() bool {
 	return c.ValidationEnabled
+}
+
+func (c *StaticConfig) GetConfirmationRules() []api.ConfirmationRule {
+	return c.ConfirmationRules
+}
+
+func (c *StaticConfig) GetConfirmationFallback() string {
+	return c.ConfirmationFallback
 }
 
 func (c *StaticConfig) IsRequireTLS() bool {
