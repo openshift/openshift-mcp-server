@@ -19,6 +19,14 @@ spec:
     spec:
       containers:
       - name: rec-engine
-        image: nginx:1.28
+        image: nginxinc/nginx-unprivileged:1.28
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
         ports:
-        - containerPort: 80
+        - containerPort: 8080
