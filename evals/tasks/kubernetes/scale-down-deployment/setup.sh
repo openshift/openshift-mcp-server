@@ -1,12 +1,33 @@
 #!/usr/bin/env bash
-# Create namespace and a deployment with initial replicas
+set -euo pipefail
+
 kubectl delete namespace scale-down-test --ignore-not-found
 kubectl create namespace scale-down-test
-kubectl create deployment web-service --image=nginx --replicas=2 -n scale-down-test
-# Wait for initial deployment to be ready
-for i in {1..30}; do
-    if kubectl --request-timeout=10s get deployment web-service -n scale-down-test -o jsonpath='{.status.availableReplicas}' | grep -q "2"; then
-        exit 0
-    fi
-    sleep 1
-done 
+
+cat <<'EOF' | kubectl apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-service
+  namespace: scale-down-test
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-service
+  template:
+    metadata:
+      labels:
+        app: web-service
+    spec:
+      containers:
+      - name: app
+        image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+        command: ["/bin/sh", "-c", "sleep infinity"]
+EOF
+
+if ! kubectl rollout status deployment/web-service -n scale-down-test --timeout=180s; then
+  echo "Setup failed: deployment web-service did not become ready in time"
+  kubectl get deploy,pods -n scale-down-test -o wide 2>/dev/null || true
+  exit 1
+fi
