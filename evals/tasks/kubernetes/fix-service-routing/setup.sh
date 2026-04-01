@@ -1,31 +1,47 @@
 #!/usr/bin/env bash
-# Create namespace and deployment with one set of labels
+set -euo pipefail
+
 kubectl delete namespace web --ignore-not-found
 kubectl create namespace web
 
-# Create deployment with label app=nginx
-kubectl create deployment nginx --image=nginx -n web
-# kubectl label deployment nginx -n web app=nginx --overwrite
+# UBI minimal + sleep (OpenShift restricted SCC). Declares containerPort 80 so Service targetPort 80 matches the Pod spec.
+# Intentional break: only the Service selector below (points at app=api, not app=http).
+cat <<'EOF' | kubectl apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: http
+  namespace: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: http
+  template:
+    metadata:
+      labels:
+        app: http
+    spec:
+      containers:
+      - name: main
+        image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+        command: ["/bin/sh", "-c", "sleep infinity"]
+        ports:
+        - containerPort: 80
+EOF
 
-# Create service with different selector (app=web)
-cat <<EOF | kubectl apply -f -
+cat <<'EOF' | kubectl apply -f -
 apiVersion: v1
 kind: Service
 metadata:
-  name: nginx
+  name: http
   namespace: web
 spec:
   ports:
   - port: 80
     targetPort: 80
   selector:
-    app: web  # Mismatched label - deployment has app=nginx
+    app: api
 EOF
 
-# Wait for deployment to be ready
-for i in {1..30}; do
-    if kubectl get deployment nginx -n web -o jsonpath='{.status.availableReplicas}' | grep -q "1"; then
-        exit 0
-    fi
-    sleep 2
-done 
+kubectl rollout status deployment/http -n web --timeout=180s
