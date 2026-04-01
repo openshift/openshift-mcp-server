@@ -7,11 +7,13 @@ if ! kubectl get deployment web-app-deployment -n webshop-frontend &>/dev/null; 
   exit 1
 fi
 
-# Check if pods are being created successfully
-echo "Waiting for pods to become ready..."
+# Wait for the current Deployment revision to become available. Do not use
+# `kubectl wait pods -l app=web-app`: that waits for every Pod with the label,
+# including stale ReplicaSet Pods that stay Pending forever after a bad rollout.
+echo "Waiting for deployment rollout to finish..."
 TIMEOUT="120s"
-if ! kubectl wait --for=condition=Ready pods -l app=web-app -n webshop-frontend --timeout=$TIMEOUT; then
-  echo "Pods are not reaching Ready state after fixing the node selector"
+if ! kubectl rollout status deployment/web-app-deployment -n webshop-frontend --timeout="$TIMEOUT"; then
+  echo "Deployment did not become ready after fixing scheduling/workload"
   exit 1
 fi
 

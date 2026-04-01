@@ -12,4 +12,7 @@ steps:
   cleanup:
     file: cleanup.sh
   prompt:
-    inline: "Our frontend application in the webshop-frontend namespace is reporting connection errors. The logs show: 'Error: connection to web-app-service.webshop-frontend.svc.cluster.local failed: connection refused'. Can you help diagnose why pods aren't running and fix the deployment?"
+    inline: >-
+      Fix Service web-app-service in webshop-frontend (no backends / connection refused). Do all writes now; no questions; <=20 tools; no polling loops.
+      Diagnose once: pods_list_in_namespace, events_list. Fix with minimal patches: preferred fix is ONLY clear template.spec.nodeSelector (empty {}) on Deployment web-app-deployment; keep the existing ubi-minimal image and sleep command; do not add probes; do not switch to httpd/nginx. Change Service only if targetPort does not match containerPort 80.
+      Verify once: pods_list_in_namespace, Endpoints for web-app-service. Summarize root cause and edits. No debug Pods/Jobs.

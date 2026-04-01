@@ -6,7 +6,7 @@ metadata:
   labels:
     app: web-app
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: web-app
@@ -19,6 +19,7 @@ spec:
         environment: production-gpu
       containers:
       - name: web-app-container
-        image: nginx:latest
+        image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+        command: ["/bin/sh", "-c", "sleep infinity"]
         ports:
         - containerPort: 80
