@@ -32,12 +32,23 @@ commands:
       exit 1
     fi
 
-    # Extract the MCP server URL for 'netedge' from the config file
-    NETEDGE_URL="$(jq -r '.mcpServers.kubernetes.url' "${MCP_SERVER_FILE}")"
-    if [[ -z "${NETEDGE_URL}" || "${NETEDGE_URL}" == "null" ]]; then
-      echo "Unable to parse netedge MCP URL from ${MCP_SERVER_FILE}" >&2
+    # Extract Kubernetes MCP server URL from the config file
+    KUBERNETES_URL="$(jq -r '.mcpServers.kubernetes.url' "${MCP_SERVER_FILE}")"
+    if [[ -z "${KUBERNETES_URL}" || "${KUBERNETES_URL}" == "null" ]]; then
+      echo "Unable to parse kubernetes MCP URL from ${MCP_SERVER_FILE}" >&2
       exit 1
     fi
+
+    # Extract hostname from MCP URL and add to NO_PROXY to bypass proxy
+    # This ensures Gemini CLI can connect directly to the MCP server
+    MCP_HOST="$(echo "${KUBERNETES_URL}" | sed -E 's|^https?://([^/:]+).*|\1|')"
+    if [[ -n "${NO_PROXY:-}" ]]; then
+      export NO_PROXY="${NO_PROXY},${MCP_HOST}"
+    else
+      export NO_PROXY="${MCP_HOST}"
+    fi
+    export no_proxy="${NO_PROXY}"  # Some tools use lowercase
+    echo "[DEBUG] NO_PROXY set to: ${NO_PROXY}" >&2
 
     PROMPT_FILE="$(mktemp)"
     printf '%b' {{ printf "%q" .Prompt }} > "${PROMPT_FILE}"
@@ -53,16 +64,27 @@ commands:
     export HOME="${TMP_HOME}"
     cd "${TMP_HOME}"
 
-    # Configure the Gemini CLI to use the MCP server
-    # We use 'netedge' as the server name in the gemini config
-    gemini mcp add netedge "${NETEDGE_URL}" --transport http >/dev/null
+    mkdir -p "${TMP_HOME}/.gemini"
+
+    # Create MCP settings directly (gemini mcp add doesn't work reliably in temp dirs)
+    printf '{\n  "mcpServers": {\n    "kubernetes": {\n      "url": "%s",\n      "type": "http"\n    }\n  }\n}' "${KUBERNETES_URL}" > "${TMP_HOME}/.gemini/settings.json"
 
     PROMPT_CONTENT="$(cat "${PROMPT_FILE}")"
-    
+    ALLOWED_TOOLS="{{ .AllowedToolArgs }}"
+    MCP_ENFORCEMENT_PREFIX=$'SYSTEM REQUIREMENTS:\n- Execute changes using Kubernetes MCP tools in this session.\n- Use tools from the allow-list below exactly as named.\n- Do NOT use run_shell_command or write_file unless no MCP tool can perform the action.\n- Do not return plans or YAML-only answers when execution is required.\n'
+    PROMPT_CONTENT="${MCP_ENFORCEMENT_PREFIX}"$'\n\n'"${PROMPT_CONTENT}"
+    if [[ -n "${ALLOWED_TOOLS}" ]]; then
+      PROMPT_CONTENT="${PROMPT_CONTENT}"$'\n\n'"ALLOWED MCP TOOL NAMES: ${ALLOWED_TOOLS}"
+    fi
+
     # Construct arguments for gemini
     # usage: gemini [prompt] [flags]
     # We use YOLO mode to avoid interactive prompts during CI/demo
-    GEMINI_ARGS=("--approval-mode" "yolo" "--output-format" "stream-json")
+    GEMINI_ARGS=(
+      "--approval-mode" "yolo"
+      "--output-format" "stream-json"
+      "--allowed-mcp-server-names" "kubernetes"
+    )
     
     # Use the API key provided in the environment
     if [[ -z "${RH_GEMINI_API_KEY:-}" ]]; then
@@ -76,8 +98,14 @@ commands:
         GEMINI_ARGS+=(--model "${GEMINI_MODEL}")
     fi
 
+    # Verify MCP configuration before running
+    echo "[DEBUG] MCP servers configured:" >&2
+    gemini mcp list 2>&1 | grep -v "Both GOOGLE_API_KEY" >&2 || true
+    echo "[DEBUG] Settings file content:" >&2
+    cat "${TMP_HOME}/.gemini/settings.json" >&2
+
     # Execute Gemini
-    gemini "${PROMPT_CONTENT}" "${GEMINI_ARGS[@]}"
+    gemini --prompt "${PROMPT_CONTENT}" "${GEMINI_ARGS[@]}"
 
     # Cleanup
     rm -rf "${TMP_HOME}"
