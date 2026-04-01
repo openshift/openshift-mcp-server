@@ -12,4 +12,4 @@ steps:
   cleanup:
     file: cleanup.sh
   prompt:
-    inline: Please fix the error in the deployment named 'app' in namespace 'crashloop-test'
+    inline: "Fix deployment 'app' in namespace 'crashloop-test' so it becomes Available and the pod stops crash-looping. Workload uses label app=crashloop and container name main. Apply changes now: use a long-running command (e.g. sleep infinity) with image registry.access.redhat.com/ubi9/ubi-minimal:latest, or otherwise repair the container command so the process stays up under OpenShift restricted SCC."

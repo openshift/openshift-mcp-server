@@ -2,7 +2,7 @@
 kubectl delete namespace crashloop-test --ignore-not-found
 # Create namespace and a deployment with an invalid command that will cause crashloop
 kubectl create namespace crashloop-test
-cat <<EOF | kubectl apply -f -
+cat <<'EOF' | kubectl apply -f -
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -12,23 +12,24 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: nginx
+      app: crashloop
   template:
     metadata:
       labels:
-        app: nginx
+        app: crashloop
     spec:
       containers:
-      - name: nginx
-        image: nginx
-        command: ["/bin/sh", "-c"]
-        args: ["nonexistent_command"]  # This will cause the pod to crash
+      - name: main
+        image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+        command: ["/bin/sh", "-c", "exit 1"]
 EOF
 
-# Wait for pod to enter crashloop state
-for i in {1..30}; do
-    if kubectl get pods -n crashloop-test -l app=nginx -o jsonpath='{.items[0].status.containerStatuses[0].restartCount}' | grep -q "[1-9]"; then
+for i in {1..60}; do
+    rc=$(kubectl get pods -n crashloop-test -l app=crashloop -o jsonpath='{.items[0].status.containerStatuses[0].restartCount}' 2>/dev/null || echo "0")
+    if [[ "${rc}" =~ ^[1-9] ]]; then
         exit 0
     fi
     sleep 1
-done 
+done
+echo "Setup failed: pod did not enter crash loop in time"
+exit 1
