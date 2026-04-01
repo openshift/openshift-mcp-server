@@ -12,4 +12,5 @@ steps:
   cleanup:
     file: cleanup.sh
   prompt:
-    inline: "Deploy a 3-replica StatefulSet db in namespace statefulset-test with each pod mounting a 1Gi PVC at /data containing a file `test` populated with the string `initial_data`. Then, scale back down to 1 replicas."
+    inline: >-
+      Deploy a 3-replica StatefulSet named `db` in namespace `statefulset-test` with per-pod **1Gi** PVCs mounted at `/data` via `volumeClaimTemplates` (use a working default StorageClass from `kubectl get storageclass`). Initialize `/data/test` to exact content `initial_data` in every pod using an initContainer command like `sh -c 'printf initial_data > /data/test'` (no chmod/chown tricks). Keep pod security OpenShift-compatible (non-root, no privileged/hostPath). After all 3 pods are Ready, scale StatefulSet to **1** and wait until only `db-0` remains Ready with `/data/test` still present.
