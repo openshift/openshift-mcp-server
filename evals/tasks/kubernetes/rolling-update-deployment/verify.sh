@@ -2,7 +2,7 @@
 # Configuration constants
 NAMESPACE="rollout-test"
 DEPLOYMENT="web-app"
-EXPECTED_IMAGE="nginx:1.22"
+EXPECTED_IMAGE="registry.access.redhat.com/ubi9/ubi-minimal:latest"
 TIMEOUT="120s"
 TASK_NAME="rolling-update-deployment"
 
