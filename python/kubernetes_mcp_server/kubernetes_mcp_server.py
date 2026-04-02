@@ -1,16 +1,13 @@
 import os
 import platform
+import signal
 import subprocess
 import sys
+from importlib.metadata import version
 from pathlib import Path
 import shutil
 import tempfile
 import urllib.request
-
-if sys.version_info >= (3, 8):
-    from importlib.metadata import version
-else:
-    from importlib_metadata import version
 
 __version__ = version("kubernetes-mcp-server")
 
@@ -82,8 +79,26 @@ def execute(args=None):
         cmd = [str(binary_path)] + args
 
         # Execute the binary with the provided arguments
-        process = subprocess.run(cmd)
-        return process.returncode
+        process = subprocess.Popen(cmd)
+
+        def handle_signal(signum, frame):
+            try:
+                process.send_signal(signum)
+            except OSError:
+                pass
+
+        signal.signal(signal.SIGTERM, handle_signal)
+        if hasattr(signal, "SIGHUP"):
+            signal.signal(signal.SIGHUP, handle_signal)
+
+        try:
+            return process.wait()
+        except KeyboardInterrupt:
+            try:
+                process.send_signal(signal.SIGINT)
+            except OSError:
+                pass
+            return process.wait()
     except Exception as e:
         print(f"Error executing kubernetes-mcp-server: {e}", file=sys.stderr)
         return 1
