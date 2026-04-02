@@ -108,15 +108,21 @@ func Serve(ctx context.Context, mcpServer *mcp.Server, staticConfig *config.Stat
 	mux := http.NewServeMux()
 
 	wrappedMux := RequestMiddleware(
-		AuthorizationMiddleware(staticConfig, oidcProvider)(mux),
+		AuthorizationMiddleware(staticConfig, oidcProvider)(
+			MaxBodyMiddleware(staticConfig.HTTP.MaxBodyBytes)(mux),
+		),
 	)
 
 	// Wrap with metrics middleware
 	instrumentedHandler := metricsMiddleware(wrappedMux, mcpServer)
 
+	// Note: WriteTimeout is intentionally omitted - it would kill SSE streams.
+	// ReadHeaderTimeout provides Slowloris protection; other timeouts are left
+	// at Go defaults since MCP clients maintain persistent connections.
 	httpServer := &http.Server{
-		Addr:    ":" + staticConfig.Port,
-		Handler: instrumentedHandler,
+		Addr:              ":" + staticConfig.Port,
+		Handler:           instrumentedHandler,
+		ReadHeaderTimeout: staticConfig.HTTP.ReadHeaderTimeout.Duration(),
 		TLSConfig: &tls.Config{
 			MinVersion: tls.VersionTLS12,
 		},
