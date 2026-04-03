@@ -1,0 +1,12 @@
+kind: Task
+metadata:
+  name: get-router-sessions
+steps:
+  verify:
+    contains: "frontend=GLOBAL"
+  prompt:
+    inline: Retrieve and display all active sessions from the OpenShift router.
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "netedge__get_router_sessions"
