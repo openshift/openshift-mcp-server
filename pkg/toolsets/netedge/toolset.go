@@ -29,8 +29,9 @@ func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
 		initProbeDNSLocal(),
 		initProbeHTTP(),
 		initRoutes(),
-		initExecDNSInPod(),
-	)
+                initExecDNSInPod(),
+                initRouter(),
+                )
 }
 
 func (t *Toolset) GetPrompts() []api.ServerPrompt {
