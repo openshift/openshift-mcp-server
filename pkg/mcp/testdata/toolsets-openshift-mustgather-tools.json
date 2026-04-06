@@ -432,6 +432,53 @@
   {
     "annotations": {
       "readOnlyHint": true,
+      "title": "Pod Logs Grep"
+    },
+    "description": "Filter pod container logs by a search string. Returns only matching lines from the must-gather archive.",
+    "inputSchema": {
+      "properties": {
+        "caseInsensitive": {
+          "description": "Perform case-insensitive search (default: false)",
+          "type": "boolean"
+        },
+        "container": {
+          "description": "Container name (uses first container if not specified)",
+          "type": "string"
+        },
+        "filter": {
+          "description": "String to search for in log lines",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Pod namespace",
+          "type": "string"
+        },
+        "pod": {
+          "description": "Pod name",
+          "type": "string"
+        },
+        "previous": {
+          "description": "Search previous container logs (from crash/restart)",
+          "type": "boolean"
+        },
+        "tail": {
+          "description": "Maximum number of matching lines to return (0 for all)",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "namespace",
+        "pod",
+        "filter"
+      ],
+      "type": "object"
+    },
+    "name": "mustgather_pod_logs_grep",
+    "title": "Pod Logs Grep"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true,
       "title": "Get Resource"
     },
     "description": "Get a specific Kubernetes resource from the must-gather archive by kind, name, and optional namespace",
