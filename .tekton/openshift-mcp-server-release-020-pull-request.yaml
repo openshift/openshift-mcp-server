@@ -380,6 +380,8 @@ spec:
         value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
       - name: CACHI2_ARTIFACT
         value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+      - name: ARGS
+        value: "--project-name=openshift-mcp-server-{{target_branch}} --report --org=8ac235b7-f212-4d5c-964b-77225e1a5fda"
       runAfter:
       - build-image-index
       taskRef:
