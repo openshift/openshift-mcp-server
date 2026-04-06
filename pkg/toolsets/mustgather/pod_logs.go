@@ -3,6 +3,7 @@ package mustgather
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
@@ -58,6 +59,31 @@ func initPodLogs() []api.ServerTool {
 				},
 			},
 			Handler:      mustgatherPodLogsGrep,
+			ClusterAware: ptr.To(false),
+		},
+		{
+			Tool: api.Tool{
+				Name:        "mustgather_pod_logs_by_time",
+				Description: "Get pod container logs within a specific time range. Each log line is expected to have an RFC3339Nano timestamp prefix (from kubectl logs --timestamps).",
+				Annotations: api.ToolAnnotations{
+					Title:        "Pod Logs by Time",
+					ReadOnlyHint: ptr.To(true),
+				},
+				InputSchema: &jsonschema.Schema{
+					Type: "object",
+					Properties: map[string]*jsonschema.Schema{
+						"namespace": {Type: "string", Description: "Pod namespace"},
+						"pod":       {Type: "string", Description: "Pod name"},
+						"container": {Type: "string", Description: "Container name (uses first container if not specified)"},
+						"since":     {Type: "string", Description: "Start time in RFC3339 format (e.g. 2026-01-15T10:00:00Z)"},
+						"until":     {Type: "string", Description: "End time in RFC3339 format (e.g. 2026-01-15T12:00:00Z)"},
+						"previous":  {Type: "boolean", Description: "Search previous container logs (from crash/restart)"},
+						"limit":     {Type: "integer", Description: "Maximum number of lines to return (default: 500)"},
+					},
+					Required: []string{"namespace", "pod", "since"},
+				},
+			},
+			Handler:      mustgatherPodLogsByTime,
 			ClusterAware: ptr.To(false),
 		},
 	}
@@ -181,6 +207,106 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 	}
 	if tail > 0 {
 		header += fmt.Sprintf(" (last %d matches)", tail)
+	}
+	header += fmt.Sprintf(":\n\nFound %d matching line(s)\n\n", len(matchingLines))
+
+	if len(matchingLines) == 0 {
+		return api.NewToolCallResult(header+"No matching lines found.", nil), nil
+	}
+
+	return api.NewToolCallResult(header+strings.Join(matchingLines, "\n"), nil), nil
+}
+
+func mustgatherPodLogsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
+	p, err := getProvider()
+	if err != nil {
+		return api.NewToolCallResult("", err), nil
+	}
+
+	args := params.GetArguments()
+	namespace := getString(args, "namespace", "")
+	pod := getString(args, "pod", "")
+	container := getString(args, "container", "")
+	sinceStr := getString(args, "since", "")
+	untilStr := getString(args, "until", "")
+	previous := getBool(args, "previous", false)
+	limit := getInt(args, "limit", 500)
+
+	if namespace == "" || pod == "" {
+		return api.NewToolCallResult("", fmt.Errorf("namespace and pod are required")), nil
+	}
+	if sinceStr == "" {
+		return api.NewToolCallResult("", fmt.Errorf("since is required (RFC3339 format)")), nil
+	}
+
+	sinceTime, err := time.Parse(time.RFC3339, sinceStr)
+	if err != nil {
+		return api.NewToolCallResult("", fmt.Errorf("invalid since time format, expected RFC3339 (e.g. 2026-01-15T10:00:00Z): %w", err)), nil
+	}
+
+	var untilTime time.Time
+	hasUntil := untilStr != ""
+	if hasUntil {
+		untilTime, err = time.Parse(time.RFC3339, untilStr)
+		if err != nil {
+			return api.NewToolCallResult("", fmt.Errorf("invalid until time format, expected RFC3339 (e.g. 2026-01-15T12:00:00Z): %w", err)), nil
+		}
+	}
+
+	logType := mg.LogTypeCurrent
+	if previous {
+		logType = mg.LogTypePrevious
+	}
+
+	logs, err := p.GetPodLog(mg.PodLogOptions{
+		Namespace: namespace,
+		Pod:       pod,
+		Container: container,
+		LogType:   logType,
+	})
+	if err != nil {
+		return api.NewToolCallResult("", fmt.Errorf("failed to get pod logs: %w", err)), nil
+	}
+
+	lines := strings.Split(logs, "\n")
+	var matchingLines []string
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		// Each line starts with an RFC3339Nano timestamp followed by a space
+		spaceIdx := strings.IndexByte(line, ' ')
+		if spaceIdx == -1 {
+			continue
+		}
+		lineTime, err := time.Parse(time.RFC3339Nano, line[:spaceIdx])
+		if err != nil {
+			continue
+		}
+		if lineTime.Before(sinceTime) {
+			continue
+		}
+		if hasUntil && lineTime.After(untilTime) {
+			continue
+		}
+		matchingLines = append(matchingLines, line)
+	}
+
+	if limit > 0 && len(matchingLines) > limit {
+		matchingLines = matchingLines[:limit]
+	}
+
+	header := fmt.Sprintf("Logs for pod %s/%s between %s and ", namespace, pod, sinceStr)
+	if hasUntil {
+		header += untilStr
+	} else {
+		header += "latest"
+	}
+	if container != "" {
+		header += fmt.Sprintf(", container %s", container)
+	}
+	if previous {
+		header += " (previous)"
 	}
 	header += fmt.Sprintf(":\n\nFound %d matching line(s)\n\n", len(matchingLines))
 
