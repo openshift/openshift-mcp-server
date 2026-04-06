@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
@@ -58,6 +59,29 @@ func initEvents() []api.ServerTool {
 				},
 			},
 			Handler:      mustgatherEventsByResource,
+			ClusterAware: ptr.To(false),
+		},
+		{
+			Tool: api.Tool{
+				Name:        "mustgather_events_by_time",
+				Description: "List Kubernetes events from the must-gather archive within a specific time range, sorted chronologically",
+				Annotations: api.ToolAnnotations{
+					Title:        "Events by Time",
+					ReadOnlyHint: ptr.To(true),
+				},
+				InputSchema: &jsonschema.Schema{
+					Type: "object",
+					Properties: map[string]*jsonschema.Schema{
+						"since":     {Type: "string", Description: "Start time in RFC3339 format (e.g. 2026-01-15T10:00:00Z)"},
+						"until":     {Type: "string", Description: "End time in RFC3339 format (e.g. 2026-01-15T12:00:00Z)"},
+						"namespace": {Type: "string", Description: "Filter by namespace"},
+						"type":      {Type: "string", Description: "Event type filter: all, Warning, Normal", Enum: []any{"all", "Warning", "Normal"}},
+						"limit":     {Type: "integer", Description: "Maximum number of events to return (default: 200)"},
+					},
+					Required: []string{"since"},
+				},
+			},
+			Handler:      mustgatherEventsByTime,
 			ClusterAware: ptr.To(false),
 		},
 	}
@@ -179,6 +203,106 @@ func mustgatherEventsByResource(params api.ToolHandlerParams) (*api.ToolCallResu
 	output := fmt.Sprintf("Found %d events for %s:\n\n", len(matched), name)
 	for i := range matched {
 		output += formatEvent(&matched[i])
+	}
+
+	return api.NewToolCallResult(output, nil), nil
+}
+
+func mustgatherEventsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
+	p, err := getProvider()
+	if err != nil {
+		return api.NewToolCallResult("", err), nil
+	}
+
+	args := params.GetArguments()
+	sinceStr := getString(args, "since", "")
+	untilStr := getString(args, "until", "")
+	namespace := getString(args, "namespace", "")
+	typeFilter := getString(args, "type", "all")
+	limit := getInt(args, "limit", 200)
+
+	if sinceStr == "" {
+		return api.NewToolCallResult("", fmt.Errorf("since is required (RFC3339 format)")), nil
+	}
+
+	sinceTime, err := time.Parse(time.RFC3339, sinceStr)
+	if err != nil {
+		return api.NewToolCallResult("", fmt.Errorf("invalid since time format, expected RFC3339 (e.g. 2026-01-15T10:00:00Z): %w", err)), nil
+	}
+
+	var untilTime time.Time
+	hasUntil := untilStr != ""
+	if hasUntil {
+		untilTime, err = time.Parse(time.RFC3339, untilStr)
+		if err != nil {
+			return api.NewToolCallResult("", fmt.Errorf("invalid until time format, expected RFC3339 (e.g. 2026-01-15T12:00:00Z): %w", err)), nil
+		}
+	}
+
+	list := p.ListResources(params.Context, eventGVK, namespace, mg.ListOptions{})
+
+	var filtered []unstructured.Unstructured
+	for i := range list.Items {
+		event := &list.Items[i]
+
+		lastTimestamp, _, _ := unstructured.NestedString(event.Object, "lastTimestamp")
+		if lastTimestamp == "" {
+			continue
+		}
+
+		eventTime, err := time.Parse(time.RFC3339, lastTimestamp)
+		if err != nil {
+			continue
+		}
+
+		if eventTime.Before(sinceTime) {
+			continue
+		}
+		if hasUntil && eventTime.After(untilTime) {
+			continue
+		}
+
+		if typeFilter != "all" {
+			eventType, _, _ := unstructured.NestedString(event.Object, "type")
+			if eventType != typeFilter {
+				continue
+			}
+		}
+
+		filtered = append(filtered, *event)
+	}
+
+	// Sort chronologically (oldest first)
+	sort.Slice(filtered, func(i, j int) bool {
+		ti, _, _ := unstructured.NestedString(filtered[i].Object, "lastTimestamp")
+		tj, _, _ := unstructured.NestedString(filtered[j].Object, "lastTimestamp")
+		return ti < tj
+	})
+
+	if limit > 0 && len(filtered) > limit {
+		filtered = filtered[:limit]
+	}
+
+	if len(filtered) == 0 {
+		msg := fmt.Sprintf("No events found between %s and ", sinceStr)
+		if hasUntil {
+			msg += untilStr
+		} else {
+			msg += "now"
+		}
+		return api.NewToolCallResult(msg, nil), nil
+	}
+
+	output := fmt.Sprintf("Found %d events between %s and ", len(filtered), sinceStr)
+	if hasUntil {
+		output += untilStr
+	} else {
+		output += "latest"
+	}
+	output += ":\n\n"
+
+	for i := range filtered {
+		output += formatEvent(&filtered[i])
 	}
 
 	return api.NewToolCallResult(output, nil), nil
