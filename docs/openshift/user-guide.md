@@ -1,8 +1,10 @@
 # MCP server for Red Hat OpenShift User Guide
 
+**Note**: the MCP server for Red Hat OpenShift is in Developer Preview. A Developer Preview in the context of Red Hat products indicates that the product is in a pre-release stage, intended for developers and early adopters to test and provide feedback. It's not recommended for production use due to potential limitations and instability.
+
 ## Features
 
-The MCP server for Red Hat OpenShift supports several enterprise grade features
+The MCP server for Red Hat OpenShift includes several enterprise grade features
 
 1. OAuth & OIDC integration for Token Exchange support with Keycloak
 2. Modular Toolset Architecture with Read Only defaults
