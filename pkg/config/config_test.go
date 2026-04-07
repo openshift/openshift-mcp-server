@@ -1052,6 +1052,211 @@ func (s *ConfigSuite) TestEmptyConfigFile() {
 	})
 }
 
+func (s *ConfigSuite) TestToolOverridesParsed() {
+	configPath := s.writeConfig(`
+		[tool_overrides.pods_list]
+		description = "Custom pods list description"
+
+		[tool_overrides.resources_get]
+		description = "Custom resources get description"
+	`)
+
+	config, err := Read(configPath, "")
+	s.Require().NoError(err)
+	s.Require().NotNil(config)
+
+	s.Run("parses tool_overrides with multiple entries", func() {
+		s.Require().Len(config.ToolOverrides, 2)
+		s.Equal("Custom pods list description", config.ToolOverrides["pods_list"].Description)
+		s.Equal("Custom resources get description", config.ToolOverrides["resources_get"].Description)
+	})
+}
+
+func (s *ConfigSuite) TestToolOverridesNilWhenNotSpecified() {
+	configPath := s.writeConfig(`
+		log_level = 1
+	`)
+
+	config, err := Read(configPath, "")
+	s.Require().NoError(err)
+	s.Require().NotNil(config)
+
+	s.Run("ToolOverrides is nil when not specified", func() {
+		s.Nil(config.ToolOverrides)
+	})
+}
+
+func (s *ConfigSuite) TestToolOverridesDropInMerge() {
+	tempDir := s.T().TempDir()
+
+	mainConfigPath := filepath.Join(tempDir, "config.toml")
+	s.Require().NoError(os.WriteFile(mainConfigPath, []byte(`
+		[tool_overrides.pods_list]
+		description = "Main pods description"
+
+		[tool_overrides.resources_get]
+		description = "Main resources description"
+	`), 0644))
+
+	confDDir := filepath.Join(tempDir, "conf.d")
+	s.Require().NoError(os.Mkdir(confDDir, 0755))
+
+	s.Require().NoError(os.WriteFile(filepath.Join(confDDir, "10-override.toml"), []byte(`
+		[tool_overrides.pods_list]
+		description = "Overridden pods description"
+
+		[tool_overrides.events_list]
+		description = "New events description"
+	`), 0644))
+
+	config, err := Read(mainConfigPath, "")
+	s.Require().NoError(err)
+	s.Require().NotNil(config)
+
+	s.Run("drop-in overrides existing tool override", func() {
+		s.Equal("Overridden pods description", config.ToolOverrides["pods_list"].Description)
+	})
+
+	s.Run("drop-in adds new tool override", func() {
+		s.Equal("New events description", config.ToolOverrides["events_list"].Description)
+	})
+
+	s.Run("preserves tool overrides not in drop-in", func() {
+		s.Equal("Main resources description", config.ToolOverrides["resources_get"].Description)
+	})
+}
+
+func (s *ConfigSuite) TestConfirmationRulesDefaults() {
+	configPath := s.writeConfig(``)
+	config, err := Read(configPath, "")
+	s.Require().NoError(err)
+	s.Run("default fallback is allow", func() {
+		s.Equal("allow", config.GetConfirmationFallback())
+	})
+	s.Run("default rules is empty", func() {
+		s.Empty(config.GetConfirmationRules())
+	})
+}
+
+func (s *ConfigSuite) TestConfirmationRulesParsing() {
+	configPath := s.writeConfig(`
+		confirmation_fallback = "deny"
+
+		[[confirmation_rules]]
+		tool = "helm_uninstall"
+		message = "This will uninstall a Helm release."
+
+		[[confirmation_rules]]
+		destructive = true
+		message = "Destructive operation."
+
+		[[confirmation_rules]]
+		verb = "delete"
+		namespace = "kube-system"
+		message = "Deleting in kube-system."
+
+		[[confirmation_rules]]
+		verb = "get"
+		kind = "Secret"
+		message = "Accessing a Secret."
+	`)
+	config, err := Read(configPath, "")
+	s.Require().NoError(err)
+	s.Run("confirmation_fallback parsed correctly", func() {
+		s.Equal("deny", config.GetConfirmationFallback())
+	})
+	s.Run("all rules parsed", func() {
+		s.Len(config.GetConfirmationRules(), 4)
+	})
+	s.Run("tool-level rule parsed", func() {
+		r := config.GetConfirmationRules()[0]
+		s.Equal("helm_uninstall", r.Tool)
+		s.Equal("This will uninstall a Helm release.", r.Message)
+	})
+	s.Run("destructive rule parsed", func() {
+		r := config.GetConfirmationRules()[1]
+		s.Require().NotNil(r.Destructive)
+		s.True(*r.Destructive)
+	})
+	s.Run("kube-level rule parsed", func() {
+		r := config.GetConfirmationRules()[2]
+		s.Equal("delete", r.Verb)
+		s.Equal("kube-system", r.Namespace)
+	})
+	s.Run("kube-level rule with kind parsed", func() {
+		r := config.GetConfirmationRules()[3]
+		s.Equal("get", r.Verb)
+		s.Equal("Secret", r.Kind)
+	})
+}
+
+func (s *ConfigSuite) TestConfirmationRulesValidationRejectsMixed() {
+	configPath := s.writeConfig(`
+		[[confirmation_rules]]
+		tool = "helm_uninstall"
+		verb = "delete"
+		message = "Mixed rule."
+	`)
+	_, err := Read(configPath, "")
+	s.Run("returns error for mixed tool and kube fields", func() {
+		s.Require().Error(err)
+		s.Contains(err.Error(), "invalid confirmation rules")
+	})
+}
+
+func (s *ConfigSuite) TestConfirmationRulesValidationReportsAllErrors() {
+	configPath := s.writeConfig(`
+		[[confirmation_rules]]
+		tool = "a"
+		verb = "delete"
+		message = "Mixed 1."
+
+		[[confirmation_rules]]
+		destructive = true
+		kind = "Pod"
+		message = "Mixed 2."
+	`)
+	_, err := Read(configPath, "")
+	s.Run("reports all validation errors", func() {
+		s.Require().Error(err)
+		s.Contains(err.Error(), "confirmation_rules[0]")
+		s.Contains(err.Error(), "confirmation_rules[1]")
+	})
+}
+
+func (s *ConfigSuite) TestConfirmationFallbackValidation() {
+	s.Run("rejects invalid fallback value", func() {
+		configPath := s.writeConfig(`confirmation_fallback = "block"`)
+		_, err := Read(configPath, "")
+		s.Require().Error(err)
+		s.Contains(err.Error(), "invalid confirmation_fallback")
+	})
+	s.Run("accepts allow", func() {
+		configPath := s.writeConfig(`confirmation_fallback = "allow"`)
+		config, err := Read(configPath, "")
+		s.Require().NoError(err)
+		s.Equal("allow", config.GetConfirmationFallback())
+	})
+	s.Run("accepts deny", func() {
+		configPath := s.writeConfig(`confirmation_fallback = "deny"`)
+		config, err := Read(configPath, "")
+		s.Require().NoError(err)
+		s.Equal("deny", config.GetConfirmationFallback())
+	})
+}
+
+func (s *ConfigSuite) TestConfirmationRulesValidationRejectsEmptyRule() {
+	configPath := s.writeConfig(`
+		[[confirmation_rules]]
+		message = "No level fields."
+	`)
+	_, err := Read(configPath, "")
+	s.Run("returns error for rule with no level fields", func() {
+		s.Require().Error(err)
+		s.Contains(err.Error(), "must set at least one")
+	})
+}
+
 func TestConfig(t *testing.T) {
 	suite.Run(t, new(ConfigSuite))
 }

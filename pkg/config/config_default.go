@@ -2,6 +2,7 @@ package config
 
 import (
 	"bytes"
+	"time"
 
 	"github.com/BurntSushi/toml"
 )
@@ -11,8 +12,13 @@ import (
 // the raw upstream configuration independent of downstream customization.
 func BaseDefault() *StaticConfig {
 	return &StaticConfig{
-		ListOutput: "table",
-		Toolsets:   []string{"core", "config"},
+		ListOutput:           "table",
+		Toolsets:             []string{"core", "config"},
+		ConfirmationFallback: "allow",
+		HTTP: HTTPConfig{
+			ReadHeaderTimeout: Duration(10 * time.Second), // Slowloris protection
+			MaxBodyBytes:      16 << 20,                   // 16 MB for large K8s manifests
+		},
 	}
 }
 
