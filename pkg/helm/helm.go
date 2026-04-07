@@ -25,15 +25,16 @@ type Kubernetes interface {
 
 type Helm struct {
 	kubernetes Kubernetes
+	config     *Config
 }
 
 // NewHelm creates a new Helm instance
-func NewHelm(kubernetes Kubernetes) *Helm {
-	return &Helm{kubernetes: kubernetes}
+func NewHelm(kubernetes Kubernetes, config *Config) *Helm {
+	return &Helm{kubernetes: kubernetes, config: config}
 }
 
-func (h *Helm) Install(ctx context.Context, chart string, values map[string]interface{}, name string, namespace string, helmCfg *Config) (string, error) {
-	if err := validateChartReference(chart, helmCfg); err != nil {
+func (h *Helm) Install(ctx context.Context, chart string, values map[string]interface{}, name string, namespace string) (string, error) {
+	if err := validateChartReference(chart, h.config); err != nil {
 		return "", err
 	}
 	cfg, err := h.newAction(h.kubernetes.NamespaceOrDefault(namespace), false)
@@ -112,6 +113,10 @@ func (h *Helm) Uninstall(name string, namespace string) (string, error) {
 }
 
 func (h *Helm) newAction(namespace string, allNamespaces bool) (*action.Configuration, error) {
+	storageDriver := ""
+	if h.config != nil {
+		storageDriver = h.config.StorageDriver
+	}
 	cfg := new(action.Configuration)
 	applicableNamespace := ""
 	if !allNamespaces {
@@ -122,7 +127,7 @@ func (h *Helm) newAction(namespace string, allNamespaces bool) (*action.Configur
 		return nil, err
 	}
 	cfg.RegistryClient = registryClient
-	return cfg, cfg.Init(h.kubernetes, applicableNamespace, "", klog.V(5).Infof)
+	return cfg, cfg.Init(h.kubernetes, applicableNamespace, storageDriver, klog.V(5).Infof)
 }
 
 // validateChartReference blocks chart references using dangerous URL schemes.

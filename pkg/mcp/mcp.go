@@ -216,6 +216,7 @@ func (s *Server) collectApplicableTools() []api.ServerTool {
 	mutator := ComposeMutators(
 		WithTargetParameter(s.p.GetDefaultTarget(), s.p.GetTargetParameterName(), s.p.IsMultiTarget()),
 		WithTargetListTool(s.p.GetDefaultTarget(), s.p.GetTargetParameterName(), s.p),
+		WithToolOverrides(s.configuration.ToolOverrides),
 	)
 
 	tools := make([]api.ServerTool, 0)
@@ -230,11 +231,15 @@ func (s *Server) collectApplicableTools() []api.ServerTool {
 	return tools
 }
 
-// collectApplicablePrompts returns prompts after merging toolset and config prompts
+// collectApplicablePrompts returns prompts after applying mutation and merging toolset and config prompts
 func (s *Server) collectApplicablePrompts() []api.ServerPrompt {
+	mutator := WithPromptTargetParameter(s.p.GetDefaultTarget(), s.p.GetTargetParameterName(), s.p.IsMultiTarget())
+
 	toolsetPrompts := make([]api.ServerPrompt, 0)
 	for _, toolset := range s.configuration.Toolsets() {
-		toolsetPrompts = append(toolsetPrompts, toolset.GetPrompts()...)
+		for _, prompt := range toolset.GetPrompts() {
+			toolsetPrompts = append(toolsetPrompts, mutator(prompt))
+		}
 	}
 	configPrompts := prompts.ToServerPrompts(s.configuration.Prompts)
 	return prompts.MergePrompts(toolsetPrompts, configPrompts)
@@ -341,6 +346,11 @@ func (s *Server) GetEnabledPrompts() []string {
 // configuration changes are detected.
 func (s *Server) ReloadConfiguration(newConfig *config.StaticConfig) error {
 	klog.V(1).Info("Reloading MCP server configuration...")
+
+	// Validate require_tls constraints (fail-fast on reload, same check as startup)
+	if err := newConfig.ValidateRequireTLS(); err != nil {
+		return fmt.Errorf("configuration reload rejected: %w", err)
+	}
 
 	// Update the configuration
 	s.configuration.StaticConfig = newConfig
