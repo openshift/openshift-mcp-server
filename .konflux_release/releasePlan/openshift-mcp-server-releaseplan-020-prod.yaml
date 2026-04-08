@@ -1,11 +1,11 @@
 apiVersion: appstudio.redhat.com/v1alpha1
 kind: ReleasePlan
 metadata:
-  name: openshift-mcp-server-releaseplan-020-stage
+  name: openshift-mcp-server-releaseplan-020-prod
   namespace: ocp-mcp-server-tenant
   labels:
     release.appstudio.openshift.io/auto-release: "false"
-    release.appstudio.openshift.io/releasePlanAdmission: openshift-mcp-server-020-stage
+    release.appstudio.openshift.io/releasePlanAdmission: openshift-mcp-server-020-prod
     release.appstudio.openshift.io/standing-attribution: "true"
 spec:
   application: mcp-server-02
