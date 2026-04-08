@@ -13,7 +13,7 @@ openshift: true
 image:
   registry: registry.redhat.io
   repository: openshift-mcp-beta/openshift-mcp-server-rhel9
-  version: 0.2
+  version: "0.2"
 
 # -- RBAC configuration for ACM (Advanced Cluster Management) provider.
 # -- These permissions are the minimum required for the ACM hub provider to function.

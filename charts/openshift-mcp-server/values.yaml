@@ -9,7 +9,7 @@ image:
   registry: registry.redhat.io
   repository: openshift-mcp-beta/openshift-mcp-server-rhel9
   # -- This sets the tag or sha digest for the image.
-  version: 0.2
+  version: "0.2"
   # -- This sets the pull policy for images.
   pullPolicy: IfNotPresent
 
