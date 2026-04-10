@@ -14,6 +14,27 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+// resourceRegistrar adapts the MCP go-sdk Server for the api.ResourceRegistrar interface
+type resourceRegistrar struct {
+	server *mcp.Server
+}
+
+func (r *resourceRegistrar) AddResource(uri, name, description, mimeType, content string) {
+	resourceContent := content // capture for closure
+	r.server.AddResource(
+		&mcp.Resource{URI: uri, Name: name, Description: description, MIMEType: mimeType},
+		func(_ context.Context, _ *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+			return &mcp.ReadResourceResult{
+				Contents: []*mcp.ResourceContents{{URI: uri, Text: resourceContent}},
+			}, nil
+		},
+	)
+}
+
+func (r *resourceRegistrar) RemoveResources(uris ...string) {
+	r.server.RemoveResources(uris...)
+}
+
 func ServerToolToGoSdkTool(s *Server, tool api.ServerTool) (*mcp.Tool, mcp.ToolHandler, error) {
 	// Ensure InputSchema.Properties is initialized for OpenAI API compatibility
 	// https://github.com/containers/kubernetes-mcp-server/issues/717
@@ -56,12 +77,13 @@ func ServerToolToGoSdkTool(s *Server, tool api.ServerTool) (*mcp.Tool, mcp.ToolH
 		}
 
 		result, err := tool.Handler(api.ToolHandlerParams{
-			Context:          ctx,
-			BaseConfig:       s.configuration,
-			KubernetesClient: k,
-			ToolCallRequest:  toolCallRequest,
-			ListOutput:       s.configuration.ListOutput(),
-			Elicitor:         &sessionElicitor{},
+			Context:           ctx,
+			BaseConfig:        s.configuration,
+			KubernetesClient:  k,
+			ToolCallRequest:   toolCallRequest,
+			ListOutput:        s.configuration.ListOutput(),
+			Elicitor:          &sessionElicitor{},
+			ResourceRegistrar: &resourceRegistrar{server: s.server},
 		})
 		if err != nil {
 			return nil, err
