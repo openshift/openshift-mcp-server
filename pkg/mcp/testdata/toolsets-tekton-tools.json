@@ -1,0 +1,36 @@
+[
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": "Tekton: Get TaskRun Logs"
+    },
+    "description": "Get the logs from a Tekton TaskRun by resolving its underlying pod",
+    "inputSchema": {
+      "properties": {
+        "name": {
+          "description": "Name of the TaskRun to get logs from",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Namespace of the TaskRun",
+          "type": "string"
+        },
+        "tail": {
+          "default": 100,
+          "description": "Number of lines to retrieve from the end of the logs (Optional, default: 100)",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "name": "tekton_taskrun_logs",
+    "title": "Tekton: Get TaskRun Logs"
+  }
+]
