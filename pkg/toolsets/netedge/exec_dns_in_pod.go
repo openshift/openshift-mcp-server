@@ -13,6 +13,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/google/jsonschema-go/jsonschema"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
@@ -25,6 +26,19 @@ const (
 	dnsProbePollPeriod = 2 * time.Second
 	dnsProbeTimeout    = 120 * time.Second
 )
+
+var supportedRecordTypes = map[string]bool{
+	"A":     true,
+	"AAAA":  true,
+	"ANY":   true,
+	"CNAME": true,
+	"MX":    true,
+	"NS":    true,
+	"PTR":   true,
+	"SOA":   true,
+	"SRV":   true,
+	"TXT":   true,
+}
 
 // podExecutor interface abstracts pod lifecycle operations for testability.
 type podExecutor interface {
@@ -168,8 +182,9 @@ func makeExecDNSInPodHandler(executor podExecutor) api.ToolHandlerFunc {
 		if !ok || recordType == "" {
 			recordType = "A"
 		}
-		if strings.ContainsAny(recordType, " \t\r\n") || strings.HasPrefix(recordType, "-") || strings.HasPrefix(recordType, "+") || strings.HasPrefix(recordType, "@") {
-			return api.NewToolCallResultStructured(nil, fmt.Errorf("record_type must be a DNS record type, not a dig option")), nil
+		recordType = strings.ToUpper(recordType)
+		if !supportedRecordTypes[recordType] {
+			return api.NewToolCallResultStructured(nil, fmt.Errorf("unsupported record_type: %s", recordType)), nil
 		}
 
 		// Use provided executor or create one from the KubernetesClient
@@ -193,6 +208,26 @@ func makeExecDNSInPodHandler(executor podExecutor) api.ToolHandlerFunc {
 						Name:    "dns-probe",
 						Image:   dnsProbeImage,
 						Command: []string{"/usr/bin/dig", fmt.Sprintf("@%s", targetServer), targetName, recordType},
+						SecurityContext: &corev1.SecurityContext{
+							RunAsNonRoot:             ptr.To(true),
+							AllowPrivilegeEscalation: ptr.To(false),
+							Capabilities: &corev1.Capabilities{
+								Drop: []corev1.Capability{"ALL"},
+							},
+							SeccompProfile: &corev1.SeccompProfile{
+								Type: corev1.SeccompProfileTypeRuntimeDefault,
+							},
+						},
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("50m"),
+								corev1.ResourceMemory: resource.MustParse("64Mi"),
+							},
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("100m"),
+								corev1.ResourceMemory: resource.MustParse("128Mi"),
+							},
+						},
 					},
 				},
 			},

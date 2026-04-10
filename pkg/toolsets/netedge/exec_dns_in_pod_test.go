@@ -400,7 +400,7 @@ func (s *NetEdgeTestSuite) TestExecDNSInPodHandler() {
 		}
 	})
 
-	s.Run("rejects option-shaped record_type", func() {
+	s.Run("rejects unsupported record_type", func() {
 		testCases := []struct {
 			name       string
 			recordType string
@@ -408,6 +408,7 @@ func (s *NetEdgeTestSuite) TestExecDNSInPodHandler() {
 			{"dash prefix", "-f"},
 			{"plus prefix", "+short"},
 			{"at prefix", "@server"},
+			{"unknown type", "UNKNOWN"},
 		}
 		for _, tc := range testCases {
 			s.Run(tc.name, func() {
@@ -424,8 +425,39 @@ func (s *NetEdgeTestSuite) TestExecDNSInPodHandler() {
 
 				s.Require().NoError(err)
 				s.Require().NotNil(result.Error)
-				s.Assert().Contains(result.Error.Error(), "record_type must be a DNS record type")
+				s.Assert().Contains(result.Error.Error(), "unsupported record_type")
 			})
 		}
+	})
+
+	s.Run("pod spec includes security context and resources", func() {
+		mock := &mockPodExecutor{
+			waitPod: succeededPod("mcp-dns-probe-abc123", "test-ns"),
+			logs:    sampleDigOutput,
+		}
+		s.SetArgs(map[string]interface{}{
+			"namespace":     "test-ns",
+			"target_server": "172.30.0.10",
+			"target_name":   "example.com",
+		})
+		handler := makeExecDNSInPodHandler(mock)
+
+		_, err := handler(s.params)
+		s.Require().NoError(err)
+
+		s.Require().NotNil(mock.lastPod)
+		s.Require().Len(mock.lastPod.Spec.Containers, 1)
+		container := mock.lastPod.Spec.Containers[0]
+
+		s.Require().NotNil(container.SecurityContext)
+		s.Assert().True(*container.SecurityContext.RunAsNonRoot)
+		s.Assert().False(*container.SecurityContext.AllowPrivilegeEscalation)
+		s.Require().NotNil(container.SecurityContext.Capabilities)
+		s.Assert().Contains(container.SecurityContext.Capabilities.Drop, corev1.Capability("ALL"))
+
+		s.Assert().False(container.Resources.Requests.Cpu().IsZero())
+		s.Assert().False(container.Resources.Requests.Memory().IsZero())
+		s.Assert().False(container.Resources.Limits.Cpu().IsZero())
+		s.Assert().False(container.Resources.Limits.Memory().IsZero())
 	})
 }
