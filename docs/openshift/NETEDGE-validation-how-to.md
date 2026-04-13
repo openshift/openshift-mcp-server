@@ -57,6 +57,26 @@ This document outlines the procedure for validating the NetEdge (NIDS) toolset o
     export RH_GEMINI_API_KEY=$RH_GEMINI_API_KEY && export JUDGE_API_KEY=$OPENAI_API_KEY && export JUDGE_BASE_URL="https://api.openai.com/v1" && export JUDGE_MODEL_NAME="gpt-4o" && ./gevals check evals/gemini-agent/eval.yaml --run "query-prometheus-ingress" -v
     ```
 
+    **Test 3: Inspect Route**
+    ```bash
+    export RH_GEMINI_API_KEY=$RH_GEMINI_API_KEY && export JUDGE_API_KEY=$OPENAI_API_KEY && export JUDGE_BASE_URL="https://api.openai.com/v1" && export JUDGE_MODEL_NAME="gpt-4o" && ./gevals check evals/gemini-agent/eval.yaml --run "inspect-route" -v
+    ```
+
+    **Test 4: Get Service Endpoints**
+    ```bash
+    export RH_GEMINI_API_KEY=$RH_GEMINI_API_KEY && export JUDGE_API_KEY=$OPENAI_API_KEY && export JUDGE_BASE_URL="https://api.openai.com/v1" && export JUDGE_MODEL_NAME="gpt-4o" && ./gevals check evals/gemini-agent/eval.yaml --run "get-service-endpoints" -v
+    ```
+
+    **Test 5: Probe DNS Local**
+    ```bash
+    export RH_GEMINI_API_KEY=$RH_GEMINI_API_KEY && export JUDGE_API_KEY=$OPENAI_API_KEY && export JUDGE_BASE_URL="https://api.openai.com/v1" && export JUDGE_MODEL_NAME="gpt-4o" && ./gevals check evals/gemini-agent/eval.yaml --run "probe-dns-local" -v
+    ```
+
+    **Test 6: Probe HTTP**
+    ```bash
+    export RH_GEMINI_API_KEY=$RH_GEMINI_API_KEY && export JUDGE_API_KEY=$OPENAI_API_KEY && export JUDGE_BASE_URL="https://api.openai.com/v1" && export JUDGE_MODEL_NAME="gpt-4o" && ./gevals check evals/gemini-agent/eval.yaml --run "probe-http" -v
+    ```
+
     **Tip**: To see the full agent conversation and debug details:
     ```bash
     ./gevals view mcpchecker-gemini-agent-netedge-eval-out.json
