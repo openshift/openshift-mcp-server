@@ -1,247 +1,276 @@
-# Observability Toolset
+# Observability Toolset (`obs-mcp`)
 
-This toolset provides tools for querying OpenShift cluster observability data including Prometheus metrics and Alertmanager alerts.
+This toolset provides tools for querying Prometheus/Thanos metrics and Alertmanager alerts.
+It is implemented by the [`rhobs/obs-mcp`](https://github.com/rhobs/obs-mcp) package and registered
+into the openshift-mcp-server as the `obs-mcp` toolset.
 
 ## Tools
 
-### prometheus_query
+### list_metrics
 
-Execute instant PromQL queries against the cluster's Thanos Querier.
+**First step for metric discovery.** Lists available metric names using a regex filter.
+Always start here before writing PromQL queries to discover what metrics exist.
 
 **Parameters:**
-- `query` (required) - PromQL query string
-- `time` (optional) - Evaluation timestamp (RFC3339, Unix timestamp, or relative like `-5m`, `now`)
+- `name_regex` (string, required) — Regex pattern to filter metric names (e.g., `"apiserver"`, `"container_cpu"`)
+
+**Example:** `name_regex: "kube_pod"`
+
+---
+
+### execute_instant_query
+
+Execute a PromQL instant query to get point-in-time values.
+
+**Parameters:**
+- `query` (string, required) — PromQL query string
+- `time` (string, optional) — Evaluation time. Accepts RFC3339 (`2024-01-15T10:00:00Z`), Unix timestamp, or relative (`-5m`, `now`)
+
+**Example:** `query: up{job="apiserver"}`
+
+---
+
+### execute_range_query
+
+Execute a PromQL range query for time-series data.
+
+**Parameters:**
+- `query` (string, required) — PromQL query string
+- `step` (string, required) — Query resolution step (e.g., `15s`, `1m`, `1h`)
+- `start` (string, optional) — Start time (RFC3339, Unix, or relative like `-1h`)
+- `end` (string, optional) — End time (RFC3339, Unix, or relative like `now`)
+- `duration` (string, optional) — Duration to look back instead of explicit start/end (e.g., `1h`, `30m`)
 
 **Example:**
 ```
-Query: up{job="apiserver"}
+query:    rate(container_cpu_usage_seconds_total[5m])
+duration: 1h
+step:     1m
 ```
 
-### prometheus_query_range
+---
 
-Execute range PromQL queries for time-series data.
+### show_timeseries
+
+Display range query results as an interactive timeseries chart (requires a compatible UI).
+Accepts the same parameters as `execute_range_query`, plus:
+
+- `title` (string, optional) — Chart title
+- `description` (string, optional) — Chart description
+
+---
+
+### get_label_names
+
+Get all label names (dimensions) available for a metric or across all metrics.
 
 **Parameters:**
-- `query` (required) - PromQL query string
-- `start` (required) - Start time (RFC3339, Unix timestamp, or relative like `-1h`)
-- `end` (required) - End time (RFC3339, Unix timestamp, or relative like `now`)
-- `step` (optional) - Query resolution step (default: `1m`)
+- `metric` (string, optional) — Metric name to scope results to
+- `start` (string, optional) — Start time (defaults to 1 hour ago)
+- `end` (string, optional) — End time (defaults to now)
 
-**Example:**
-```
-Query: rate(container_cpu_usage_seconds_total[5m])
-Start: -1h
-End: now
-Step: 1m
-```
+---
 
-### alertmanager_alerts
+### get_label_values
 
-Query alerts from the cluster's Alertmanager.
+Get all unique values for a specific label.
 
 **Parameters:**
-- `active` (optional) - Include active alerts (default: true)
-- `silenced` (optional) - Include silenced alerts (default: false)
-- `inhibited` (optional) - Include inhibited alerts (default: false)
-- `filter` (optional) - Label filter in PromQL format (e.g., `alertname="Watchdog"`)
+- `label` (string, required) — Label name to get values for
+- `metric` (string, optional) — Metric name to scope results to
+- `start` (string, optional) — Start time
+- `end` (string, optional) — End time
 
-**Example:**
-```
-Active: true
-Filter: severity="critical"
-```
+---
 
-## Enable the Observability Toolset
+### get_series
 
-### Option 1: Command Line
+Get time series matching a selector and preview cardinality before running expensive queries.
+
+**Parameters:**
+- `matches` (string, required) — PromQL series selector (e.g., `container_cpu_usage_seconds_total{namespace="default"}`)
+- `start` (string, optional) — Start time
+- `end` (string, optional) — End time
+
+---
+
+### get_alerts
+
+Query alerts from Alertmanager. Requires `alertmanager_url` to be configured.
+
+**Parameters:**
+- `active` (boolean, optional) — Filter for active alerts only
+- `silenced` (boolean, optional) — Filter for silenced alerts
+- `inhibited` (boolean, optional) — Filter for inhibited alerts
+- `unprocessed` (boolean, optional) — Filter for unprocessed alerts
+- `filter` (string, optional) — Label matchers (e.g., `alertname=HighCPU,severity=critical`)
+- `receiver` (string, optional) — Receiver name to filter by
+
+---
+
+### get_silences
+
+Query silences from Alertmanager. Requires `alertmanager_url` to be configured.
+
+**Parameters:**
+- `filter` (string, optional) — Label matchers to filter silences
+
+---
+
+## Enable the Toolset
+
+### Command line
 
 ```bash
-kubernetes-mcp-server --toolsets core,config,helm,observability
+kubernetes-mcp-server --toolsets core,obs-mcp
 ```
 
-### Option 2: Configuration File
+### Configuration file (TOML)
 
 ```toml
-toolsets = ["core", "config", "helm", "observability"]
+toolsets = ["core", "obs-mcp"]
 ```
 
-### Option 3: MCP Client Configuration
+### MCP client configuration
 
 ```json
 {
   "mcpServers": {
     "kubernetes": {
       "command": "npx",
-      "args": ["-y", "kubernetes-mcp-server@latest", "--toolsets", "core,config,helm,observability"]
+      "args": ["-y", "kubernetes-mcp-server@latest", "--toolsets", "core,obs-mcp"]
     }
   }
 }
 ```
 
+---
+
 ## Configuration
 
-The observability toolset supports optional configuration via the config file:
+The toolset is configured via a `[obs-mcp]` section in the TOML config file.
 
 ```toml
-[observability]
-# Custom monitoring namespace (default: "openshift-monitoring")
-monitoring_namespace = "custom-monitoring"
+[toolset_configs.obs-mcp]
+# URL of the Prometheus or Thanos Querier endpoint.
+# Required for metric/query tools. Defaults to http://localhost:9090 if unset.
+# Example for OpenShift in-cluster Thanos:
+prometheus_url = "https://thanos-querier.openshift-monitoring.svc.cluster.local:9091"
+# Example for an external route:
+# prometheus_url = "https://thanos-querier-openshift-monitoring.apps.example.com"
+
+# URL of the Alertmanager endpoint.
+# Required for get_alerts and get_silences. No default — those tools fail without it.
+# Example for OpenShift in-cluster Alertmanager:
+alertmanager_url = "https://alertmanager-main.openshift-monitoring.svc.cluster.local:9095"
+# Example for an external route:
+# alertmanager_url = "https://alertmanager-main-openshift-monitoring.apps.example.com"
+
+# Skip TLS certificate verification.
+# Set to true only for development or when using a self-signed cert you can't import.
+# Default: false
+insecure = false
+
+# Query safety guardrails.
+# Valid values:
+#   "all"   — enable all guardrails (default)
+#   "none"  — disable all guardrails
+#   or a comma-separated subset:
+#     "disallow-explicit-name-label" — reject queries that filter by __name__ label directly
+#     "require-label-matcher"        — reject queries with no label matchers (full table scans)
+#     "disallow-blanket-regex"       — reject .* regexes that would match too many series
+# Default: "all"
+guardrails = "none"
+
+# Maximum number of series allowed per metric before a query is rejected.
+# Guards against accidentally pulling millions of series.
+# Set to 0 to disable this check.
+# Default: 20000
+max_metric_cardinality = 0
+
+# Maximum number of label values allowed before a blanket regex (.*) is rejected.
+# Only applies when the "disallow-blanket-regex" guardrail is active.
+# Set to 0 to always disallow blanket regex regardless of cardinality.
+# Default: 500
+max_label_cardinality = 0
 ```
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `monitoring_namespace` | `openshift-monitoring` | Namespace where Prometheus and Alertmanager routes are located |
+### Configuration reference
 
-## Prerequisites
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `prometheus_url` | string | `http://localhost:9090` | Prometheus or Thanos Querier endpoint URL |
+| `alertmanager_url` | string | — | Alertmanager endpoint URL (required for alert/silence tools) |
+| `insecure` | bool | `false` | Skip TLS certificate verification |
+| `guardrails` | string | `"all"` | Query safety checks (`"all"`, `"none"`, or comma-separated list) |
+| `max_metric_cardinality` | uint64 | `20000` | Max series per metric (0 = disabled) |
+| `max_label_cardinality` | uint64 | `500` | Max label values before blanket regex is rejected (0 = always reject) |
 
-The observability tools require:
+---
 
-1. **OpenShift cluster** - These tools are designed for OpenShift and rely on OpenShift-specific routes
-2. **Monitoring stack enabled** - The cluster must have the monitoring stack deployed (default in OpenShift)
-3. **Proper RBAC** - The user/service account must have permissions to:
-   - Read routes in `openshift-monitoring` namespace
-   - Access the Thanos Querier and Alertmanager APIs
+## Authentication and TLS
 
-## How It Works
+The toolset reuses the bearer token from the active Kubernetes/OpenShift kubeconfig (or the
+in-cluster service account token when running inside a pod). No separate credentials are needed.
 
-### Route Discovery
+**TLS certificate resolution order:**
 
-The tools automatically discover the Prometheus (Thanos Querier) and Alertmanager endpoints by reading OpenShift routes:
+1. CA certificate embedded in the kubeconfig (`certificate-authority-data`)
+2. Service account CA file at `/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt`
+   (automatically present when running in a pod on OpenShift)
+3. System certificate pool (for publicly trusted certificates)
 
-- **Thanos Querier**: `thanos-querier` route in `openshift-monitoring` namespace
-- **Alertmanager**: `alertmanager-main` route in `openshift-monitoring` namespace
+For endpoints with self-signed or private certificates that are not covered by the above, set
+`insecure = true` in the config (not recommended in production).
 
-### Authentication
+---
 
-The tools use the bearer token from your Kubernetes configuration to authenticate with the monitoring endpoints. This is the same credential used to access the cluster.
+## Endpoint Discovery
 
-### Relative Time Support
+`obs-mcp` does not perform automatic OpenShift route discovery. Endpoint URLs must be provided explicitly via `prometheus_url` and `alertmanager_url`.
 
-Time parameters support multiple formats:
+Typical values for OpenShift:
 
-| Format | Example | Description |
-|--------|---------|-------------|
-| RFC3339 | `2024-01-15T10:00:00Z` | Absolute timestamp |
-| Unix | `1705312800` | Unix timestamp in seconds |
-| Relative | `-10m`, `-1h`, `-1d` | Relative to current time |
-| Keyword | `now` | Current time |
+| Endpoint | In-cluster service URL | External route URL (example) |
+|---|---|---|
+| Thanos Querier | `https://thanos-querier.openshift-monitoring.svc.cluster.local:9091` | `https://thanos-querier-openshift-monitoring.apps.<cluster>` |
+| Alertmanager | `https://alertmanager-main.openshift-monitoring.svc.cluster.local:9095` | `https://alertmanager-main-openshift-monitoring.apps.<cluster>` |
 
-## Security Considerations
+To look up the actual routes in an OpenShift cluster:
 
-### Allowed Prometheus Endpoints
-
-Only read-only Prometheus API endpoints are allowed:
-- `/api/v1/query` - Instant queries
-- `/api/v1/query_range` - Range queries
-- `/api/v1/series` - Series metadata
-- `/api/v1/labels` - Label names
-- `/api/v1/label/<name>/values` - Label values
-
-Administrative endpoints (like `/api/v1/admin/*`) are blocked.
-
-### Allowed Alertmanager Endpoints
-
-Only alert query endpoints are allowed:
-- `/api/v2/alerts` - List alerts
-- `/api/v2/silences` - List silences
-- `/api/v1/alerts` - Legacy alert endpoint
-
-### Query Limits
-
-- Maximum query length: 10,000 characters
-- Maximum response size: 10MB
-
-## Common Use Cases
-
-### Cluster Health
-
-**Check if all API servers are up:**
-```
-Query: up{job="apiserver"}
-```
-
-**API server request latency (99th percentile):**
-```
-Query: histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket[5m])) by (le, verb))
-```
-
-### Node and Pod Metrics
-
-**Node CPU usage percentage:**
-```
-Query: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
-```
-
-**Pods in CrashLoopBackOff:**
-```
-Query: kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"} > 0
-```
-
-**Container memory usage by namespace:**
-```
-Query: sum by(namespace) (container_memory_working_set_bytes{container!=""})
-```
-
-### Alerting
-
-**Get all firing critical alerts:**
-```
-Tool: alertmanager_alerts
-Active: true
-Filter: severity="critical"
-```
-
-**Count alerts by severity:**
-```
-Query: count by(severity) (ALERTS{alertstate="firing"})
-```
-
-### Network
-
-**Network receive rate by pod:**
-```
-Query: rate(container_network_receive_bytes_total[5m])
-Start: -1h
-End: now
-Step: 1m
-```
-
-### etcd Health
-
-**etcd leader changes:**
-```
-Query: changes(etcd_server_leader_changes_seen_total[1h])
-```
-
-**etcd disk sync duration:**
-```
-Query: histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket[5m]))
-```
-
-## Troubleshooting
-
-### "failed to get route" Error
-
-The monitoring routes may not exist or the user lacks permissions:
 ```bash
 oc get routes -n openshift-monitoring
 ```
 
-### "no bearer token available" Error
+---
 
-Ensure your kubeconfig has a valid token:
-```bash
-oc whoami
-oc get pods -n openshift-monitoring
+## Prerequisites
+
+- **Prometheus or Thanos Querier** accessible at `prometheus_url`
+- **Alertmanager** accessible at `alertmanager_url` (only required for `get_alerts` / `get_silences`)
+- **Bearer token** with read access to the metrics endpoints (automatically sourced from kubeconfig
+  or in-cluster service account)
+- For OpenShift in-cluster use, the service account needs:
+  ```
+  cluster-monitoring-view  (ClusterRole)
+  ```
+
+---
+
+## Query Guardrails
+
+Guardrails protect against runaway queries that could overload the metrics backend.
+They are enabled by default (`guardrails = "all"`).
+
+| Guardrail | Key | Effect |
+|---|---|---|
+| Disallow explicit name label | `disallow-explicit-name-label` | Rejects queries that filter on `__name__` directly instead of using metric name syntax |
+| Require label matcher | `require-label-matcher` | Rejects bare metric name queries with no label filters (prevents full-cardinality scans) |
+| Disallow blanket regex | `disallow-blanket-regex` | Rejects `.*` or equivalently broad regex matchers when the matched series count exceeds `max_label_cardinality` |
+
+To disable a specific guardrail while keeping others:
+
+```toml
+[toolset_config.obs-mcp]
+guardrails = "disallow-explicit-name-label,require-label-matcher"  # omit disallow-blanket-regex
 ```
-
-### Empty Results from Prometheus
-
-Verify the query works in the OpenShift console:
-1. Go to **Observe** > **Metrics**
-2. Enter your PromQL query
-3. Check for results
-
-### TLS Certificate Errors
-
-The tools use `InsecureSkipVerify` for route access. If you need strict TLS verification, this would require additional configuration.
