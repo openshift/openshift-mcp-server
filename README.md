@@ -265,16 +265,16 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 
 <!-- AVAILABLE-TOOLSETS-START -->
 
-| Toolset       | Description                                                                                                                                                                     | Default |
-|---------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| config        | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                         | ✓       |
-| core          | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                             | ✓       |
-| helm          | Tools for managing Helm charts and releases                                                                                                                                     |         |
-| kcp           | Manage kcp workspaces and multi-tenancy features                                                                                                                                |         |
-| kubevirt      | KubeVirt virtual machine management tools, check the [KubeVirt documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/kubevirt.md) for more details. |         |
-| observability | Cluster observability tools for querying Prometheus metrics and Alertmanager alerts                                                                                             |         |
-| ossm          | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                 |         |
-| tekton        | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns.                                                                                              |         |
+| Toolset  | Description                                                                                                                                                                     | Default |
+|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| config   | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                         | ✓       |
+| core     | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                             | ✓       |
+| helm     | Tools for managing Helm charts and releases                                                                                                                                     |         |
+| kcp      | Manage kcp workspaces and multi-tenancy features                                                                                                                                |         |
+| kubevirt | KubeVirt virtual machine management tools, check the [KubeVirt documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/kubevirt.md) for more details. |         |
+| metrics  | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                   |         |
+| ossm     | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                 |         |
+| tekton   | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns.                                                                                              |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -459,48 +459,165 @@ In case multi-cluster support is enabled (default) and you have access to multip
 
 <details>
 
-<summary>observability</summary>
+<summary>metrics</summary>
 
-- **prometheus_query** - Execute an instant PromQL query against the cluster's Thanos Querier.
-Returns current metric values at the specified time (or current time if not specified).
-Use this for point-in-time metric values.
+- **list_metrics** - MANDATORY FIRST STEP: List all available metric names in Prometheus.
 
-Common queries:
-- up{job="apiserver"} - Check if API server is up
-- sum by(namespace) (container_memory_usage_bytes) - Memory usage by namespace
-- rate(container_cpu_usage_seconds_total[5m]) - CPU usage rate
-- kube_pod_status_phase{phase="Running"} - Running pods count
-  - `query` (`string`) **(required)** - PromQL query string (e.g., 'up{job="apiserver"}', 'sum by(namespace) (container_memory_usage_bytes)')
-  - `time` (`string`) - Optional evaluation timestamp. Accepts RFC3339 format (e.g., '2024-01-01T12:00:00Z') or Unix timestamp. If not provided, uses current time.
+YOU MUST CALL THIS TOOL BEFORE ANY OTHER QUERY TOOL
 
-- **prometheus_query_range** - Execute a range PromQL query against the cluster's Thanos Querier.
-Returns metric values over a time range with specified resolution.
-Use this for time-series data, trends, and historical analysis.
+This tool MUST be called first for EVERY observability question to:
+1. Discover what metrics actually exist in this environment
+2. Find the EXACT metric name to use in queries
+3. Avoid querying non-existent metrics
+4. The 'name_regex' parameter should always be provided, and be a best guess of what the metric would be named like.
+5. Do not use a blanket regex like .* or .+ in the 'name_regex' parameter. Use specific ones like kube.*, node.*, etc.
 
-Supports relative times:
-- 'now' for current time
-- '-10m', '-1h', '-1d' for relative past times
+REGEX PATTERN GUIDANCE:
+- Prometheus metrics are typically prefixed (e.g., 'prometheus_tsdb_head_series', 'kube_pod_status_phase')
+- To match metrics CONTAINING a substring, use wildcards: '.*tsdb.*' matches 'prometheus_tsdb_head_series'
+- Without wildcards, the pattern matches EXACTLY: 'tsdb' only matches a metric literally named 'tsdb' (which rarely exists)
+- Common patterns: 'kube_pod.*' (pods), '.*memory.*' (memory-related), 'node_.*' (node metrics)
+- If you get empty results, try adding '.*' before/after your search term
 
-Example: Get CPU usage over the last hour with 1-minute resolution.
-  - `end` (`string`) **(required)** - End time. Accepts RFC3339 timestamp, Unix timestamp, 'now', or relative time
-  - `query` (`string`) **(required)** - PromQL query string (e.g., 'rate(container_cpu_usage_seconds_total[5m])')
-  - `start` (`string`) **(required)** - Start time. Accepts RFC3339 timestamp (e.g., '2024-01-01T12:00:00Z'), Unix timestamp, or relative time (e.g., '-1h', '-30m', '-1d')
-  - `step` (`string`) - Query resolution step width (e.g., '15s', '1m', '5m'). Determines the granularity of returned data points. Default: '1m'
+NEVER skip this step. NEVER guess metric names. Metric names vary between environments.
 
-- **alertmanager_alerts** - Query active and pending alerts from the cluster's Alertmanager.
-Useful for monitoring cluster health, detecting issues, and incident response.
+After calling this tool:
+1. Search the returned list for relevant metrics
+2. Use the EXACT metric name found in subsequent queries
+3. If no relevant metric exists, inform the user
+  - `name_regex` (`string`) **(required)** - Regex pattern to filter metric names. IMPORTANT: Metric names are typically prefixed (e.g., 'prometheus_tsdb_head_series'). Use wildcards to match substrings: '.*tsdb.*' matches any metric containing 'tsdb', while 'tsdb' only matches the exact string 'tsdb'. Examples: 'http_.*' (starts with http_), '.*memory.*' (contains memory), 'node_.*' (starts with node_). This parameter is required. Don't pass in blanket regex like '.*' or '.+'.
 
-Returns alerts with their labels, annotations, status, and timing information.
-Can filter by active/silenced/inhibited state.
+- **execute_instant_query** - Execute a PromQL instant query to get current/point-in-time values.
 
-Common use cases:
-- Check for critical alerts affecting the cluster
-- Monitor for specific alert types (e.g., high CPU, disk pressure)
-- Verify alert silences are working correctly
-  - `active` (`boolean`) - Filter for active (firing) alerts. Default: true
-  - `filter` (`string`) - Optional filter using Alertmanager filter syntax. Examples: 'alertname=Watchdog', 'severity=critical', 'namespace=openshift-monitoring'
-  - `inhibited` (`boolean`) - Include inhibited alerts in the results. Default: false
-  - `silenced` (`boolean`) - Include silenced alerts in the results. Default: false
+PREREQUISITE: You MUST call list_metrics first to verify the metric exists
+
+WHEN TO USE:
+- Current state questions: "What is the current error rate?"
+- Point-in-time snapshots: "How many pods are running?"
+- Latest values: "Which pods are in Pending state?"
+
+The 'query' parameter MUST use metric names that were returned by list_metrics.
+  - `query` (`string`) **(required)** - PromQL query string using metric names verified via list_metrics
+  - `time` (`string`) - Evaluation time as RFC3339 or Unix timestamp. Omit or use 'NOW' for current time.
+
+- **execute_range_query** - Execute a PromQL range query to get time-series data over a period.
+
+PREREQUISITE: You MUST call list_metrics first to verify the metric exists
+
+WHEN TO USE:
+- Trends over time: "What was CPU usage over the last hour?"
+- Rate calculations: "How many requests per second?"
+- Historical analysis: "Were there any restarts in the last 5 minutes?"
+
+TIME PARAMETERS:
+- 'duration': Look back from now (e.g., "5m", "1h", "24h")
+- 'step': Data point resolution (e.g., "1m" for 1-hour duration, "5m" for 24-hour duration)
+
+The 'query' parameter MUST use metric names that were returned by list_metrics.
+  - `duration` (`string`) - Duration to look back from now (e.g., '1h', '30m', '1d', '2w') (optional)
+  - `end` (`string`) - End time as RFC3339 or Unix timestamp (optional). Use `NOW` for current time.
+  - `query` (`string`) **(required)** - PromQL query string using metric names verified via list_metrics
+  - `start` (`string`) - Start time as RFC3339 or Unix timestamp (optional)
+  - `step` (`string`) **(required)** - Query resolution step width (e.g., '15s', '1m', '1h'). Choose based on time range: shorter ranges use smaller steps.
+
+- **show_timeseries** - Display the results as an interactive timeseries chart.
+
+This tool works like execute_range_query but renders the results as a visual chart in the UI clients.
+Use it when the user wants to see a graph or visualization of time-series data and to use visuals to provide the answer.
+Use the show_timeseries as the last tool call after all the other Prometheus tool calls where finalized.
+
+TIME PARAMETERS:
+- 'duration': Look back from now (e.g., "5m", "1h", "24h")
+- 'step': Data point resolution (e.g., "1m" for 1-hour duration, "5m" for 24-hour duration)
+- 'title': A descriptive chart title (e.g., "API Error Rate Over Last Hour")
+- 'description': An explanation of the chart's meaning or context (e.g., "Shows the rate of HTTP 5xx errors per second, broken down by pod")
+
+The 'query' parameter MUST be a range query and must use metric names that were returned by list_metrics.
+  - `description` (`string`) - Explanation of the chart's meaning or context (e.g., 'Shows the rate of HTTP 5xx errors per second, broken down by pod'). Displayed below the title when provided.
+  - `duration` (`string`) - Duration to look back from now (e.g., '1h', '30m', '1d', '2w') (optional)
+  - `end` (`string`) - End time as RFC3339 or Unix timestamp (optional). Use `NOW` for current time.
+  - `query` (`string`) **(required)** - PromQL query string using metric names verified via list_metrics
+  - `start` (`string`) - Start time as RFC3339 or Unix timestamp (optional)
+  - `step` (`string`) **(required)** - Query resolution step width (e.g., '15s', '1m', '1h'). Choose based on time range: shorter ranges use smaller steps.
+  - `title` (`string`) - Human-readable chart title describing what the query shows (e.g., 'API Error Rate Over Last Hour'). Displayed above the chart when provided.
+
+- **get_label_names** - Get all label names (dimensions) available for filtering a metric.
+
+WHEN TO USE (after calling list_metrics):
+- To discover how to filter metrics (by namespace, pod, service, etc.)
+- Before constructing label matchers in PromQL queries
+
+The 'metric' parameter should use a metric name from list_metrics output.
+  - `end` (`string`) - End time for label discovery as RFC3339 or Unix timestamp (optional, defaults to now)
+  - `metric` (`string`) - Metric name (from list_metrics) to get label names for. Leave empty for all metrics.
+  - `start` (`string`) - Start time for label discovery as RFC3339 or Unix timestamp (optional, defaults to 1 hour ago)
+
+- **get_label_values** - Get all unique values for a specific label.
+
+WHEN TO USE (after calling list_metrics and get_label_names):
+- To find exact label values for filtering (namespace names, pod names, etc.)
+- To see what values exist before constructing queries
+
+The 'metric' parameter should use a metric name from list_metrics output.
+  - `end` (`string`) - End time for label value discovery as RFC3339 or Unix timestamp (optional, defaults to now)
+  - `label` (`string`) **(required)** - Label name (from get_label_names) to get values for
+  - `metric` (`string`) - Metric name (from list_metrics) to scope the label values to. Leave empty for all metrics.
+  - `start` (`string`) - Start time for label value discovery as RFC3339 or Unix timestamp (optional, defaults to 1 hour ago)
+
+- **get_series** - Get time series matching selectors and preview cardinality.
+
+WHEN TO USE (optional, after calling list_metrics):
+- To verify label filters match expected series before querying
+- To check cardinality and avoid slow queries
+
+CARDINALITY GUIDANCE:
+- <100 series: Safe
+- 100-1000: Usually fine
+- >1000: Add more label filters
+
+The selector should use metric names from list_metrics output.
+  - `end` (`string`) - End time for series discovery as RFC3339 or Unix timestamp (optional, defaults to now)
+  - `matches` (`string`) **(required)** - PromQL series selector using metric names from list_metrics
+  - `start` (`string`) - Start time for series discovery as RFC3339 or Unix timestamp (optional, defaults to 1 hour ago)
+
+- **get_alerts** - Get alerts from Alertmanager.
+
+WHEN TO USE:
+- START HERE when investigating issues: if the user asks about things breaking, errors, failures, outages, services being down, or anything going wrong in the cluster
+- When the user mentions a specific alert name - use this tool to get the alert's full labels (namespace, pod, service, etc.) which are essential for further investigation with other tools
+- To see currently firing alerts in the cluster
+- To check which alerts are active, silenced, or inhibited
+- To understand what's happening before diving into metrics or logs
+
+INVESTIGATION TIP: Alert labels often contain the exact identifiers (pod names, namespaces, job names) needed for targeted queries with prometheus tools.
+
+FILTERING:
+- Use 'active' to filter for only active alerts (not resolved)
+- Use 'silenced' to filter for silenced alerts
+- Use 'inhibited' to filter for inhibited alerts
+- Use 'filter' to apply label matchers (e.g., "alertname=HighCPU")
+- Use 'receiver' to filter alerts by receiver name
+
+All filter parameters are optional. Without filters, all alerts are returned.
+  - `active` (`boolean`) - Filter for active alerts only (true/false, optional)
+  - `filter` (`string`) - Label matchers to filter alerts (e.g., 'alertname=HighCPU', optional)
+  - `inhibited` (`boolean`) - Filter for inhibited alerts only (true/false, optional)
+  - `receiver` (`string`) - Receiver name to filter alerts (optional)
+  - `silenced` (`boolean`) - Filter for silenced alerts only (true/false, optional)
+  - `unprocessed` (`boolean`) - Filter for unprocessed alerts only (true/false, optional)
+
+- **get_silences** - Get silences from Alertmanager.
+
+WHEN TO USE:
+- To see which alerts are currently silenced
+- To check active, pending, or expired silences
+- To investigate why certain alerts are not firing notifications
+
+FILTERING:
+- Use 'filter' to apply label matchers to find specific silences
+
+Silences are used to temporarily mute alerts based on label matchers. This tool helps you understand what is currently silenced in your environment.
+  - `filter` (`string`) - Label matchers to filter silences (e.g., 'alertname=HighCPU', optional)
 
 </details>
 
