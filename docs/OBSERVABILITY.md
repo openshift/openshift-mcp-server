@@ -193,6 +193,11 @@ max_metric_cardinality = 0
 # Set to 0 to always disallow blanket regex regardless of cardinality.
 # Default: 500
 max_label_cardinality = 0
+
+# Controls whether range queries return full data points
+#	instead of summary statistics to the model.
+#	Default: false (return summary statistics)
+range_query_full_response = false
 ```
 
 ### Configuration reference
@@ -205,6 +210,7 @@ max_label_cardinality = 0
 | `guardrails` | string | `"all"` | Query safety checks (`"all"`, `"none"`, or comma-separated list) |
 | `max_metric_cardinality` | uint64 | `20000` | Max series per metric (0 = disabled) |
 | `max_label_cardinality` | uint64 | `500` | Max label values before blanket regex is rejected (0 = always reject) |
+| `range_query_full_response` | bool | `false` | Controls whether range queries return full data points |
 
 ---
 
@@ -212,6 +218,9 @@ max_label_cardinality = 0
 
 The toolset reuses the bearer token from the active Kubernetes/OpenShift kubeconfig (or the
 in-cluster service account token when running inside a pod). No separate credentials are needed.
+
+Currently there's a limitation here, as kubeconfig using client certificates, will get a 401 from Thanos Querier. 
+So users need to `oc login` first to get a token-based session.
 
 **TLS certificate resolution order:**
 
@@ -271,6 +280,6 @@ They are enabled by default (`guardrails = "all"`).
 To disable a specific guardrail while keeping others:
 
 ```toml
-[toolset_config.obs-mcp]
+[toolset_configs.obs-mcp]
 guardrails = "disallow-explicit-name-label,require-label-matcher"  # omit disallow-blanket-regex
 ```

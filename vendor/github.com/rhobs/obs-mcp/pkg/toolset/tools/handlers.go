@@ -36,7 +36,7 @@ func ExecuteRangeQueryHandler(params api.ToolHandlerParams) (*api.ToolCallResult
 	}
 
 	cfg := getConfig(params)
-	return tools.ExecuteRangeQueryHandler(params.Context, promClient, tools.BuildRangeQueryInput(params.GetArguments()), cfg.SummarizeRangeQuery).ToToolsetResult()
+	return tools.ExecuteRangeQueryHandler(params.Context, promClient, tools.BuildRangeQueryInput(params.GetArguments()), cfg.RangeQueryFullResponse).ToToolsetResult()
 }
 
 // ShowTimeseriesHandler handles the show_timeseries tool.

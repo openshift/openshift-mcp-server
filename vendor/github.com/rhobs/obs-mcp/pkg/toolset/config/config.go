@@ -43,10 +43,10 @@ type Config struct {
 	// Default: 500
 	MaxLabelCardinality uint64 `toml:"max_label_cardinality,omitempty"`
 
-	// SummarizeRangeQuery controls whether range queries return summary statistics
-	// (max, min, avg, count) instead of full data points.
-	// Default: false (return full data)
-	SummarizeRangeQuery bool `toml:"summarize_range_query,omitempty"`
+	// RangeQueryFullResponse controls whether range queries return full data points
+	// instead of summary statistics.
+	// Default: false (return summary statistics)
+	RangeQueryFullResponse bool `toml:"range_query_full_response,omitempty"`
 }
 
 var _ api.ExtendedConfig = (*Config)(nil)
