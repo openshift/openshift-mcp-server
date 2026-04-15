@@ -107,8 +107,8 @@ func Serve(ctx context.Context, mcpServer *mcp.Server, staticConfig *config.Stat
 	mux := http.NewServeMux()
 
 	wrappedMux := RequestMiddleware(staticConfig.TrustProxyHeaders)(
-		AuthorizationMiddleware(staticConfig, oauthState)(
-			MaxBodyMiddleware(staticConfig.HTTP.MaxBodyBytes)(mux),
+		MaxBodyMiddleware(staticConfig.HTTP.MaxBodyBytes)(
+			AuthorizationMiddleware(staticConfig, oauthState)(mux),
 		),
 	)
 

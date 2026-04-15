@@ -1,8 +1,11 @@
 package http
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"slices"
 	"strings"
@@ -16,6 +19,47 @@ import (
 	internalk8s "github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/oauth"
 )
+
+// mcpJSONRPCRequest contains only the fields needed to identify a tools/list
+// request. ID uses json.RawMessage so we can distinguish "present" (request)
+// from "absent" (notification).
+type mcpJSONRPCRequest struct {
+	JSONRPC string          `json:"jsonrpc"`
+	Method  string          `json:"method"`
+	ID      json.RawMessage `json:"id"`
+}
+
+// isToolsListRequest checks whether the request body is a single JSON-RPC
+// tools/list request. It always restores r.Body so downstream handlers can
+// read the full payload regardless of the outcome.
+// Body size is expected to already be bounded by MaxBodyMiddleware.
+func isToolsListRequest(r *http.Request) bool {
+	if r.Body == nil || r.Body == http.NoBody {
+		return false
+	}
+
+	buf, err := io.ReadAll(r.Body)
+	// Restore the body from the buffer so downstream handlers can read it.
+	r.Body = io.NopCloser(bytes.NewReader(buf))
+	if err != nil {
+		return false
+	}
+
+	// Reject batched requests (JSON arrays) and empty/malformed bodies.
+	trimmed := bytes.TrimLeft(buf, " \t\r\n")
+	if len(trimmed) == 0 || trimmed[0] != '{' {
+		return false
+	}
+
+	var msg mcpJSONRPCRequest
+	if err := json.Unmarshal(buf, &msg); err != nil {
+		return false
+	}
+
+	return msg.JSONRPC == "2.0" &&
+		msg.Method == "tools/list" &&
+		len(msg.ID) > 0 && string(msg.ID) != "null"
+}
 
 // write401 sends a 401/Unauthorized response with WWW-Authenticate header.
 func write401(w http.ResponseWriter, wwwAuthenticateHeader, errorType, message string) {
@@ -64,6 +108,17 @@ func AuthorizationMiddleware(staticConfig *config.StaticConfig, oauthState *oaut
 				return
 			}
 			if !staticConfig.RequireOAuth {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Skip auth for tools/list requests on the StreamableHTTP endpoint
+			// when configured. No auth context is injected — tool calls still
+			// require authentication.
+			if staticConfig.ExperimentalSkipToolListAuth &&
+				r.Method == http.MethodPost && r.URL.Path == mcpEndpoint &&
+				isToolsListRequest(r) {
+				klog.V(3).Infof("Skipping auth for tools/list request: %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
 				next.ServeHTTP(w, r)
 				return
 			}
