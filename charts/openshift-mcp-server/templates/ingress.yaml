@@ -3,10 +3,10 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "kubernetes-mcp-server.fullname" . }}
+  name: {{ include "openshift-mcp-server.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "kubernetes-mcp-server.labels" . | nindent 4 }}
+    {{- include "openshift-mcp-server.labels" . | nindent 4 }}
   annotations:
     {{- if eq .Values.openshift true }}
     route.openshift.io/termination: {{ .Values.ingress.termination }}
@@ -32,7 +32,7 @@ spec:
             pathType: {{ .Values.ingress.pathType }}
             backend:
               service:
-                name: {{ include "kubernetes-mcp-server.fullname" $ }}
+                name: {{ include "openshift-mcp-server.fullname" $ }}
                 port:
                   number: {{ $.Values.service.port }}
 {{- end }}

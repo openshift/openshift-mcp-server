@@ -7,7 +7,7 @@ replicaCount: 1
 # -- This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
 image:
   registry: quay.io
-  repository: redhat-user-workloads/crt-nshift-lightspeed-tenant/openshift-mcp-server
+  repository: redhat-user-workloads/ocp-mcp-server-tenant/openshift-mcp-server-release-030
   # -- This sets the tag or sha digest for the image.
   version: latest
   # -- This sets the pull policy for images.
@@ -193,7 +193,7 @@ tls:
   # -- Name of the key file within the secret (default: tls.key)
   keyFile: tls.key
 
-# -- Extra arguments to pass to the kubernetes-mcp-server command line.
+# -- Extra arguments to pass to the openshift-mcp-server command line.
 # -- Useful for passing additional configuration options. It can also be configured using ConfigMap.
 # -- Note: For TLS configuration, use the tls section above instead of extraArgs.
 extraArgs: []
@@ -219,7 +219,7 @@ tolerations: []
 affinity: {}  
 
 # Path to the configuration file inside the container
-configFilePath: /etc/kubernetes-mcp-server/config.toml
+configFilePath: /etc/openshift-mcp-server/config.toml
 
 # -- Metrics and monitoring configuration
 metrics:
@@ -278,6 +278,6 @@ metrics:
     #         expr: sum(some_metric)
     additionalRules: []
 
-# MCP Server configuration options. See https://github.com/containers/kubernetes-mcp-server/blob/main/pkg/config/config.go for details.
+# MCP Server configuration options. See https://github.com/openshift/openshift-mcp-server/blob/main/pkg/config/config.go for details.
 config:
   port: "{{ .Values.service.port }}"
