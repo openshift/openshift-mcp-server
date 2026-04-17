@@ -1,10 +1,10 @@
-# kubernetes-mcp-server
+# openshift-mcp-server
 
-![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![AppVersion: latest](https://img.shields.io/badge/AppVersion-latest-informational?style=flat-square)
+![Version: 0.3.0](https://img.shields.io/badge/Version-0.3.0-informational?style=flat-square) ![AppVersion: latest](https://img.shields.io/badge/AppVersion-latest-informational?style=flat-square)
 
-Helm Chart for the Kubernetes MCP Server
+Helm Chart for MCP server for Red Hat OpenShift
 
-**Homepage:** <https://github.com/containers/kubernetes-mcp-server>
+**Homepage:** <https://github.com/openshift/openshift-mcp-server>
 
 ## Maintainers
 
@@ -20,7 +20,7 @@ The Chart can be installed quickly and easily to a Kubernetes cluster. Since an 
 Install the Chart using the following command from the root of this directory:
 
 ```shell
-helm upgrade -i -n kubernetes-mcp-server --create-namespace kubernetes-mcp-server oci://ghcr.io/containers/charts/kubernetes-mcp-server --set ingress.host=<hostname>
+helm upgrade -i -n openshift-mcp-server --create-namespace openshift-mcp-server oci://ghcr.io/openshift/charts/openshift-mcp-server --set ingress.host=<hostname>
 ```
 
 ### Optimized OpenShift Deployment
@@ -73,7 +73,7 @@ Each container accepts any valid Kubernetes container field including `image`, `
 |-----|------|---------|-------------|
 | affinity | object | `{}` |  |
 | config.port | string | `"{{ .Values.service.port }}"` |  |
-| configFilePath | string | `"/etc/kubernetes-mcp-server/config.toml"` |  |
+| configFilePath | string | `"/etc/openshift-mcp-server/config.toml"` |  |
 | defaultPodSecurityContext | object | `{"seccompProfile":{"type":"RuntimeDefault"}}` | Default Security Context for the Pod when one is not provided |
 | defaultSecurityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"runAsNonRoot":true}` | Default Security Context for the Container when one is not provided |
 | extraArgs | list | `[]` | Note: For TLS configuration, use the tls section above instead of extraArgs. |

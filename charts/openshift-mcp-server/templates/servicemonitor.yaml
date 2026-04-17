@@ -2,10 +2,10 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ include "kubernetes-mcp-server.fullname" . }}
+  name: {{ include "openshift-mcp-server.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "kubernetes-mcp-server.labels" . | nindent 4 }}
+    {{- include "openshift-mcp-server.labels" . | nindent 4 }}
     {{- with .Values.metrics.serviceMonitor.labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
@@ -46,5 +46,5 @@ spec:
       - {{ .Release.Namespace }}
   selector:
     matchLabels:
-      {{- include "kubernetes-mcp-server.selectorLabels" . | nindent 6 }}
+      {{- include "openshift-mcp-server.selectorLabels" . | nindent 6 }}
 {{- end }}

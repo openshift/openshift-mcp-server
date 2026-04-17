@@ -1,15 +1,15 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "kubernetes-mcp-server.fullname" . }}
+  name: {{ include "openshift-mcp-server.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "kubernetes-mcp-server.labels" . | nindent 4 }}
+    {{- include "openshift-mcp-server.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "kubernetes-mcp-server.selectorLabels" . | nindent 6 }}
+      {{- include "openshift-mcp-server.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       annotations:
@@ -18,7 +18,7 @@ spec:
         {{- tpl (toYaml .) $ | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "kubernetes-mcp-server.labels" . | nindent 8 }}
+        {{- include "openshift-mcp-server.labels" . | nindent 8 }}
         {{- with .Values.podLabels }}
         {{- tpl (toYaml .) $ | nindent 8 }}
         {{- end }}
@@ -27,7 +27,7 @@ spec:
       imagePullSecrets:
         {{- tpl (toYaml .) $ | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "kubernetes-mcp-server.serviceAccountName" . }}
+      serviceAccountName: {{ include "openshift-mcp-server.serviceAccountName" . }}
       securityContext:
         {{- tpl (toYaml (default .Values.defaultPodSecurityContext .Values.podSecurityContext)) . | nindent 8 }}
       {{- with .Values.initContainers }}
@@ -35,10 +35,10 @@ spec:
         {{- tpl (toYaml .) $ | nindent 8 }}
       {{- end }}
       containers:
-        - name: {{ include "kubernetes-mcp-server.name" . }}
+        - name: {{ include "openshift-mcp-server.name" . }}
           securityContext:
             {{- tpl (toYaml (default .Values.defaultSecurityContext .Values.securityContext)) . | nindent 12 }}
-          image: "{{ template "kubernetes-mcp-server.image" .Values.image }}"
+          image: "{{ template "openshift-mcp-server.image" .Values.image }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
@@ -96,7 +96,7 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: {{ include "kubernetes-mcp-server.fullname" . }}
+            name: {{ include "openshift-mcp-server.fullname" . }}
       {{- if .Values.tls.enabled }}
         - name: tls
           secret:
