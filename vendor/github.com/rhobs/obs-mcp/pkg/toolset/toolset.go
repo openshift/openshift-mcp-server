@@ -16,7 +16,7 @@ var _ api.Toolset = (*Toolset)(nil)
 
 // GetName returns the name of the toolset.
 func (t *Toolset) GetName() string {
-	return "obs-mcp"
+	return "metrics"
 }
 
 // GetDescription returns a human-readable description of the toolset.

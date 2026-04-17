@@ -1,8 +1,8 @@
-# Observability Toolset (`obs-mcp`)
+# Metrics Toolset (`metrics`)
 
 This toolset provides tools for querying Prometheus/Thanos metrics and Alertmanager alerts.
 It is implemented by the [`rhobs/obs-mcp`](https://github.com/rhobs/obs-mcp) package and registered
-into the openshift-mcp-server as the `obs-mcp` toolset.
+into the openshift-mcp-server as the `metrics` toolset.
 
 ## Tools
 
@@ -122,13 +122,13 @@ Query silences from Alertmanager. Requires `alertmanager_url` to be configured.
 ### Command line
 
 ```bash
-kubernetes-mcp-server --toolsets core,obs-mcp
+kubernetes-mcp-server --toolsets core,metrics
 ```
 
 ### Configuration file (TOML)
 
 ```toml
-toolsets = ["core", "obs-mcp"]
+toolsets = ["core", "metrics"]
 ```
 
 ### MCP client configuration
@@ -138,7 +138,7 @@ toolsets = ["core", "obs-mcp"]
   "mcpServers": {
     "kubernetes": {
       "command": "npx",
-      "args": ["-y", "kubernetes-mcp-server@latest", "--toolsets", "core,obs-mcp"]
+      "args": ["-y", "kubernetes-mcp-server@latest", "--toolsets", "core,metrics"]
     }
   }
 }
@@ -148,10 +148,10 @@ toolsets = ["core", "obs-mcp"]
 
 ## Configuration
 
-The toolset is configured via a `[obs-mcp]` section in the TOML config file.
+The toolset is configured via a `[metrics]` section in the TOML config file.
 
 ```toml
-[toolset_configs.obs-mcp]
+[toolset_configs.metrics]
 # URL of the Prometheus or Thanos Querier endpoint.
 # Required for metric/query tools. Defaults to http://localhost:9090 if unset.
 # Example for OpenShift in-cluster Thanos:
@@ -280,6 +280,6 @@ They are enabled by default (`guardrails = "all"`).
 To disable a specific guardrail while keeping others:
 
 ```toml
-[toolset_configs.obs-mcp]
+[toolset_configs.metrics]
 guardrails = "disallow-explicit-name-label,require-label-matcher"  # omit disallow-blanket-regex
 ```

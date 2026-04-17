@@ -272,7 +272,7 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 | helm     | Tools for managing Helm charts and releases                                                                                                                                     |         |
 | kcp      | Manage kcp workspaces and multi-tenancy features                                                                                                                                |         |
 | kubevirt | KubeVirt virtual machine management tools, check the [KubeVirt documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/kubevirt.md) for more details. |         |
-| obs-mcp  | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                   |         |
+| metrics  | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                   |         |
 | ossm     | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                 |         |
 | tekton   | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns.                                                                                              |         |
 
@@ -459,7 +459,7 @@ In case multi-cluster support is enabled (default) and you have access to multip
 
 <details>
 
-<summary>obs-mcp</summary>
+<summary>metrics</summary>
 
 - **list_metrics** - MANDATORY FIRST STEP: List all available metric names in Prometheus.
 
