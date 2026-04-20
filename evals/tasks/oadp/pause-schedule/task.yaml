@@ -1,0 +1,55 @@
+kind: Task
+metadata:
+  name: "pause-oadp-schedule"
+  difficulty: medium
+  description: "Pause an active OADP backup schedule and verify it is paused"
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="openshift-adp"
+
+      # Verify OADP is installed
+      kubectl get crd schedules.velero.io > /dev/null 2>&1 || { echo "Velero Schedule CRD not found"; exit 1; }
+
+      # Clean up any existing schedule
+      kubectl delete schedule.velero.io pause-test-schedule -n "$NS" --ignore-not-found
+
+      # Create an active (unpaused) schedule
+      cat <<EOF | kubectl apply -f -
+      apiVersion: velero.io/v1
+      kind: Schedule
+      metadata:
+        name: pause-test-schedule
+        namespace: $NS
+      spec:
+        schedule: "0 3 * * *"
+        template:
+          includedNamespaces:
+            - default
+          ttl: 720h
+      EOF
+
+      echo "Schedule 'pause-test-schedule' created (active/unpaused)"
+  verify:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="openshift-adp"
+
+      echo "=== Verification: Checking schedule is paused ==="
+
+      PAUSED=$(kubectl get schedule.velero.io pause-test-schedule -n "$NS" -o jsonpath='{.spec.paused}' 2>/dev/null)
+      if [ "$PAUSED" = "true" ]; then
+          echo "PASS: Schedule is paused"
+          exit 0
+      else
+          echo "FAIL: Schedule is not paused (spec.paused=$PAUSED)"
+          exit 1
+      fi
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="openshift-adp"
+      kubectl delete schedule.velero.io pause-test-schedule -n "$NS" --ignore-not-found
+  prompt:
+    inline: Pause the OADP backup schedule named 'pause-test-schedule' in the openshift-adp namespace

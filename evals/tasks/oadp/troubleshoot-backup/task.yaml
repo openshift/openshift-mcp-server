@@ -1,0 +1,74 @@
+kind: Task
+metadata:
+  name: "troubleshoot-oadp-backup"
+  difficulty: hard
+  description: "Use the oadp-troubleshoot prompt to diagnose and fix OADP backup issues"
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="openshift-adp"
+
+      # Verify OADP is installed
+      if ! kubectl get crd dataprotectionapplications.oadp.openshift.io > /dev/null 2>&1; then
+          echo "OADP CRD not found - OADP must be installed"
+          exit 1
+      fi
+
+      # Create a backup that will fail (referencing a non-existent BSL)
+      cat <<EOF | kubectl apply -f -
+      apiVersion: velero.io/v1
+      kind: Backup
+      metadata:
+        name: failing-backup
+        namespace: $NS
+      spec:
+        includedNamespaces:
+          - oadp-eval-app
+        storageLocation: non-existent-bsl
+        ttl: 1h
+      EOF
+
+      echo "Created backup referencing non-existent BSL - waiting for failure"
+      sleep 10
+  verify:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="openshift-adp"
+
+      echo "=== Verification: Checking if agent diagnosed the issue ==="
+
+      # The agent should have identified that the backup failed because
+      # it references a non-existent BSL. The main success criteria is
+      # that the agent used the oadp-troubleshoot prompt and identified
+      # the root cause.
+
+      # Check if the failing backup still exists (agent should not have deleted it)
+      if kubectl get backup.velero.io failing-backup -n "$NS" > /dev/null 2>&1; then
+          PHASE=$(kubectl get backup.velero.io failing-backup -n "$NS" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+          echo "Backup exists with phase: $PHASE"
+      fi
+
+      echo ""
+      echo "=== Troubleshooting Eval Complete ==="
+      echo "The agent should have:"
+      echo "  1. Used the oadp-troubleshoot prompt to gather diagnostic data"
+      echo "  2. Identified the root cause (backup references non-existent BSL 'non-existent-bsl')"
+      echo "  3. Reported findings with status, root cause, and recommended action"
+      echo ""
+
+      exit 0
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="openshift-adp"
+      kubectl delete backup.velero.io failing-backup -n "$NS" --ignore-not-found
+  prompt:
+    inline: |-
+      There is an OADP backup named "failing-backup" in the openshift-adp namespace that is not completing successfully.
+
+      Please use the oadp-troubleshoot prompt to diagnose the issue.
+      Follow the troubleshooting guide to identify the problem and report your findings including:
+      - The root cause of the issue
+      - What action should be taken to fix it
+      - The current status of the OADP environment

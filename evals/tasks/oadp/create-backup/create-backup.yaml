@@ -1,0 +1,13 @@
+kind: Task
+metadata:
+  name: "create-oadp-backup"
+  difficulty: medium
+steps:
+  setup:
+    file: setup.sh
+  verify:
+    file: verify.sh
+  cleanup:
+    file: cleanup.sh
+  prompt:
+    inline: Create a new OADP backup named 'app-backup' that backs up the 'oadp-eval-app' namespace with a 24-hour TTL
