@@ -1,0 +1,23 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "backend-reachability"
+  difficulty: easy
+  parallel: true
+  runs: 1
+  labels:
+    suite: observability
+    category: queries
+    toolType: smoke-test
+  description: |
+    Smoke test to verify the agent can reach the metrics backend and get a
+    valid response. The agent should query the up metric and confirm the
+    backend is reachable before any complex eval tasks run.
+spec:
+  verify:
+    - llmJudge:
+        contains: "up"
+        reason: "Verify the agent confirmed the metrics backend is reachable and targets are up"
+  prompt:
+    inline: |
+      Is the metrics backend reachable? Query up{job="prometheus-k8s"} and report the status.
