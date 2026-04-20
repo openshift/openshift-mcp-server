@@ -1,0 +1,29 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "alert-investigation"
+  difficulty: medium
+  parallel: true
+  runs: 1
+  labels:
+    suite: observability
+    category: alerts
+    toolType: multi-step
+  description: |
+    Tests if the agent can perform multi-step alert triage: first retrieving
+    alerts from Alertmanager, then investigating related metrics for the most
+    critical alert using Prometheus queries.
+spec:
+  verify:
+    - llmJudge:
+        contains: "alert"
+        reason: "Verify the agent retrieved alerts from Alertmanager"
+    - llmJudge:
+        contains: "metric"
+        reason: "Verify the agent investigated a related Prometheus metric"
+  prompt:
+    inline: |
+      Check if there are any firing alerts. If there are, investigate
+      the related metrics for the most critical alert and summarize
+      what's happening. If there are no firing alerts, check cluster
+      health metrics instead.

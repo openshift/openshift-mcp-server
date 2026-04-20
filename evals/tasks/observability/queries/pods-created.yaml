@@ -1,0 +1,22 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "pods-created"
+  difficulty: medium
+  parallel: true
+  runs: 1
+  labels:
+    suite: observability
+    category: queries
+    toolType: range-query
+  description: |
+    Tests if the agent can use a range query to find recently created pods by
+    discovering the kube_pod_created metric and querying it over a 5-minute window.
+spec:
+  verify:
+    - llmJudge:
+        contains: "kube_pod_created"
+        reason: "Verify the agent used the correct metric for pod creation timestamps"
+  prompt:
+    inline: |
+      How many pods were created in the last 5 minutes?

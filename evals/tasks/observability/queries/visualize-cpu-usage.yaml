@@ -1,0 +1,23 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "visualize-cpu-usage"
+  difficulty: medium
+  parallel: true
+  runs: 1
+  labels:
+    suite: observability
+    category: queries
+    toolType: visualization
+  description: |
+    Tests if the agent uses the show_timeseries tool to visualize CPU usage
+    as a chart. The agent should discover the metric, then use show_timeseries
+    to render a time-series visualization.
+spec:
+  verify:
+    - llmJudge:
+        contains: "cpu"
+        reason: "Verify the agent queried and visualized CPU usage data"
+  prompt:
+    inline: |
+      Visualize the CPU usage for pods in the default namespace over the last 30 minutes.

@@ -1,0 +1,24 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "high-cardinality-rejection"
+  difficulty: medium
+  parallel: true
+  runs: 1
+  labels:
+    suite: observability
+    category: queries
+    toolType: error-handling
+  description: |
+    Tests agent behavior when a query is rejected by obs-mcp guardrails
+    due to high cardinality. The agent should explain the guardrail
+    rejection and suggest a scoped alternative rather than giving up.
+spec:
+  verify:
+    - llmJudge:
+        contains: "namespace"
+        reason: "Verify the agent suggests scoping the query by namespace or another dimension"
+  prompt:
+    inline: |
+      Show me the CPU, memory, network, and disk usage for every single container
+      across all namespaces over the last 24 hours with 1-second resolution.

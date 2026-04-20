@@ -1,0 +1,27 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "filtered-alerts"
+  difficulty: medium
+  parallel: true
+  runs: 1
+  labels:
+    suite: observability
+    category: alerts
+    toolType: alertmanager
+  description: |
+    Tests if the agent uses the get_alerts tool with filter parameters
+    to retrieve only active alerts matching a specific severity. The agent
+    should pass appropriate filter arguments rather than fetching all alerts
+    and filtering client-side.
+spec:
+  verify:
+    - llmJudge:
+        contains: "alert"
+        reason: "Verify the agent retrieved and reported on alerts"
+    - llmJudge:
+        contains: "critical"
+        reason: "Verify the agent filtered or addressed the critical severity"
+  prompt:
+    inline: |
+      Are there any firing alerts with severity=critical? Show only active alerts.
