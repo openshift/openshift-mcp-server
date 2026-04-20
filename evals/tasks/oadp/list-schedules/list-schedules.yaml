@@ -1,0 +1,13 @@
+kind: Task
+metadata:
+  name: "list-oadp-schedules"
+  difficulty: easy
+steps:
+  setup:
+    file: setup.sh
+  verify:
+    file: verify.sh
+  cleanup:
+    file: cleanup.sh
+  prompt:
+    inline: List all OADP backup schedules in the openshift-adp namespace
