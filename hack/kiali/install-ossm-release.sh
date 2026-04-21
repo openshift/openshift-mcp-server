@@ -290,8 +290,8 @@ elif [ "${_CMD}" == "install-istio" ]; then
 
 elif [ "${_CMD}" == "delete-operators" ]; then
 
-  delete_servicemesh_operators
   delete_kiali_operator
+  delete_servicemesh_operators
 
 elif [ "${_CMD}" == "delete-istio" ]; then
 

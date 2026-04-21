@@ -218,7 +218,11 @@ expose_service() {
   # If OpenShift we just rely on default behavior when exposing the service to create a route.
   # If vanilla Kubernetes, we want to expose the service using LoadBalancer.
   if [ "${IS_OPENSHIFT}" == "true" ]; then
-    ${OC} expose service ${service_name} --namespace ${CONTROL_PLANE_NAMESPACE}
+    if ${OC} get route "${service_name}" --namespace "${CONTROL_PLANE_NAMESPACE}" >/dev/null 2>&1; then
+      infomsg "Route for service [${service_name}] already exists"
+    else
+      ${OC} expose service "${service_name}" --namespace "${CONTROL_PLANE_NAMESPACE}"
+    fi
   else
     # if the addon yaml already created the service, just change the type to LoadBalancer
     if ${OC} get service ${service_name} --namespace ${CONTROL_PLANE_NAMESPACE} &> /dev/null; then

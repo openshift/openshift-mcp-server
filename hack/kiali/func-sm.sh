@@ -93,15 +93,10 @@ install_istio() {
   for op in ${servicemesh_deployment}
   do
     infomsg "Expecting [${op}] to be ready"
-    echo -n "Waiting."
-    local readyReplicas="0"
-    while [ "$?" != "0" -o "$readyReplicas" == "0" ]
-    do
-      sleep 1
-      echo -n '.'
-      readyReplicas="$(${OC} get ${op} -n ${OLM_OPERATORS_NAMESPACE} -o jsonpath='{.status.readyReplicas}' 2> /dev/null)"
-    done
-    echo "done."
+    if ! ${OC} rollout status "${op}" -n "${OLM_OPERATORS_NAMESPACE}" --timeout=300s; then
+      errormsg "Timed out waiting for operator deployment [${op}] to become ready."
+      exit 1
+    fi
   done
 
   infomsg "Wait for the servicemesh operator to be Ready."

@@ -94,7 +94,7 @@ install_ossmconsole_cr() {
   while ! ${OC} get crd ossmconsoles.kiali.io >& /dev/null ; do echo -n '.'; sleep 1; done
   ${OC} wait --for condition=established crd/ossmconsoles.kiali.io
 
-  if ! ${OC} get kiali --all-namespaces &> /dev/null; then
+  if ! ${OC} get kiali --all-namespaces -o name 2>/dev/null | grep -q .; then
     errormsg "OSSMC cannot be installed because Kiali is not yet installed."
     return 1
   fi
@@ -247,6 +247,9 @@ wait_for_cluster_crd() {
     waited=$((waited + 5))
   done
   echo ""
-  ${OC} wait --for condition=established "crd/${crd_name}" --timeout=3m 2>/dev/null || true
+  if ! ${OC} wait --for condition=established "crd/${crd_name}" --timeout=3m; then
+    errormsg "CRD [${crd_name}] did not become Established within 3m."
+    exit 1
+  fi
   infomsg "CRD [${crd_name}] is ready"
 }

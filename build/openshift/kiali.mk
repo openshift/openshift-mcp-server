@@ -87,9 +87,9 @@ download-bookinfo-istio: ## Download Istio release from GitHub (tar.gz + .sha256
 setup-kiali-openshift: ## OpenShift: OSSM/Sail + Istio/Kiali + Bookinfo (Kiali hack script + OpenShift Routes)
 	@test -f '$(OSSM_INSTALL_SCRIPT)' || { echo "Missing $(OSSM_INSTALL_SCRIPT). Expected vendored scripts under hack/kiali/ in this repo."; exit 1; }
 	@echo "==> OSSM: installing operators (Sail, Kiali) ..."
-	bash '$(OSSM_INSTALL_SCRIPT)' install-operators
+	bash '$(OSSM_INSTALL_SCRIPT)' -c '$(BOOKINFO_CLIENT)' install-operators
 	@echo "==> OSSM: installing Istio, addons, and Kiali CR ..."
-	bash '$(OSSM_INSTALL_SCRIPT)' install-istio
+	bash '$(OSSM_INSTALL_SCRIPT)' -c '$(BOOKINFO_CLIENT)' -cpn '$(BOOKINFO_CP_NAMESPACE)' install-istio
 	@$(MAKE) -s install-bookinfo-openshift
 	@echo "==> Bookinfo: OpenShift routes (productpage / gateways):"
 	@'$(BOOKINFO_CLIENT)' get route -n '$(BOOKINFO_NAMESPACE)' 2>/dev/null || true
