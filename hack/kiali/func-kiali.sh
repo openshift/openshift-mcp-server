@@ -168,7 +168,7 @@ delete_ossmconsole_cr() {
 status_kiali_operator() {
   infomsg ""
   infomsg "===== KIALI OPERATOR SUBSCRIPTION"
-  local sub_name="$(${OC} get subscriptions -n ${OLM_OPERATORS_NAMESPACE} -o name my-kiali)"
+  local sub_name="$(${OC} get subscriptions -n ${OLM_OPERATORS_NAMESPACE} -o name my-kiali 2>/dev/null)"
   if [ ! -z "${sub_name}" ]; then
     infomsg "A Subscription exists for the Kiali Operator"
     ${OC} get --namespace ${OLM_OPERATORS_NAMESPACE} ${sub_name}

@@ -112,8 +112,8 @@ install_addon_prometheus() {
   infomsg "Installing Addon: prometheus"
   local addon_name="prometheus"
   local yaml_file="/tmp/prometheus.yaml"
-  download_istio_addon_yaml "${addon_name}" "${yaml_file}"
-  apply_istio_addon_yaml "${yaml_file}"
+  download_istio_addon_yaml "${addon_name}" "${yaml_file}" || return 1
+  apply_istio_addon_yaml "${yaml_file}" || return 1
   expose_service "${addon_name}"
 }
 
@@ -121,7 +121,7 @@ delete_addon_prometheus() {
   infomsg "Removing Addon: prometheus"
   local addon_name="prometheus"
   local yaml_file="/tmp/prometheus.yaml"
-  download_istio_addon_yaml "${addon_name}" "${yaml_file}"
+  download_istio_addon_yaml "${addon_name}" "${yaml_file}" || return 1
   delete_istio_addon_yaml "${yaml_file}"
 }
 
@@ -129,15 +129,15 @@ install_addon_jaeger() {
   infomsg "Installing Addon: jaeger"
   local addon_name="jaeger"
   local yaml_file="/tmp/jaeger.yaml"
-  download_istio_addon_yaml "${addon_name}" "${yaml_file}"
-  apply_istio_addon_yaml "${yaml_file}"
+  download_istio_addon_yaml "${addon_name}" "${yaml_file}" || return 1
+  apply_istio_addon_yaml "${yaml_file}" || return 1
 }
 
 delete_addon_jaeger() {
   infomsg "Removing Addon: jaeger"
   local addon_name="jaeger"
   local yaml_file="/tmp/jaeger.yaml"
-  download_istio_addon_yaml "${addon_name}" "${yaml_file}"
+  download_istio_addon_yaml "${addon_name}" "${yaml_file}" || return 1
   delete_istio_addon_yaml "${yaml_file}"
 }
 
@@ -145,8 +145,8 @@ install_addon_grafana() {
   infomsg "Installing Addon: grafana"
   local addon_name="grafana"
   local yaml_file="/tmp/grafana.yaml"
-  download_istio_addon_yaml "${addon_name}" "${yaml_file}"
-  apply_istio_addon_yaml "${yaml_file}"
+  download_istio_addon_yaml "${addon_name}" "${yaml_file}" || return 1
+  apply_istio_addon_yaml "${yaml_file}" || return 1
   expose_service "${addon_name}"
 }
 
@@ -154,7 +154,7 @@ delete_addon_grafana() {
   infomsg "Removing Addon: grafana"
   local addon_name="grafana"
   local yaml_file="/tmp/grafana.yaml"
-  download_istio_addon_yaml "${addon_name}" "${yaml_file}"
+  download_istio_addon_yaml "${addon_name}" "${yaml_file}" || return 1
   delete_istio_addon_yaml "${yaml_file}"
 }
 
@@ -162,28 +162,38 @@ install_addon_loki() {
   infomsg "Installing Addon: loki"
   local addon_name="loki"
   local yaml_file="/tmp/loki.yaml"
-  download_istio_addon_yaml "${addon_name}" "${yaml_file}"
-  apply_istio_addon_yaml "${yaml_file}"
+  download_istio_addon_yaml "${addon_name}" "${yaml_file}" || return 1
+  apply_istio_addon_yaml "${yaml_file}" || return 1
 }
 
 delete_addon_loki() {
   infomsg "Removing Addon: loki"
   local addon_name="loki"
   local yaml_file="/tmp/loki.yaml"
-  download_istio_addon_yaml "${addon_name}" "${yaml_file}"
+  download_istio_addon_yaml "${addon_name}" "${yaml_file}" || return 1
   delete_istio_addon_yaml "${yaml_file}"
 }
 
 # $1 = name of addon, $2 is the file path where the yaml is to be stored
 download_istio_addon_yaml() {
   local addon_url="https://raw.githubusercontent.com/istio/istio/master/samples/addons/$1.yaml"
+  local max_attempts="${ISTIO_ADDON_DOWNLOAD_MAX_ATTEMPTS:-30}"
+  local attempt=1
   infomsg "Istio addon URL to download: $addon_url"
-  while ! curl --silent --output "$2" --location ${addon_url}
-  do
-    errormsg "Failed to download Istio addon yaml from [${addon_url}] - will retry in 10 seconds..."
+  while [ "${attempt}" -le "${max_attempts}" ]; do
+    if curl -fsSL --connect-timeout 10 --max-time 60 --output "$2" --location "${addon_url}"; then
+      infomsg "Istio addon yaml for [$1] is stored at [$2]"
+      return 0
+    fi
+    errormsg "Failed to download Istio addon yaml from [${addon_url}] (attempt ${attempt}/${max_attempts})"
+    if [ "${attempt}" -eq "${max_attempts}" ]; then
+      errormsg "Giving up after ${max_attempts} attempts downloading [${addon_url}]"
+      return 1
+    fi
+    errormsg "Will retry in 10 seconds..."
     sleep 10
+    attempt=$((attempt + 1))
   done
-  infomsg "Istio addon yaml for [$1] is stored at [$2]"
 }
 
 # $1 = file path where the yaml is found

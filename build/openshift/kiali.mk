@@ -55,16 +55,32 @@ fetch-bookinfo-hack: ## Download Kiali hack/istio bookinfo scripts (curl; ref KI
 	echo "Done."
 
 .PHONY: download-bookinfo-istio
-download-bookinfo-istio: ## Download full Istio release (curl istio.io; same idea as build/kiali.mk istioctl) for Bookinfo
-	@if [ -n "$(BOOKINFO_ISTIO_DIR)" ]; then echo "BOOKINFO_ISTIO_DIR set to $(BOOKINFO_ISTIO_DIR); skip download"; exit 0; fi
-	@set -e; dest='$(BOOKINFO_ISTIO_HOME)'; ver='$(BOOKINFO_ISTIO_VERSION)'; out='$(BOOKINFO_OUTPUT_DIR)'; \
+# Trust: tarball + .sha256 come only from https://github.com/istio/istio/releases/download/<ver>/
+# (no istio.io piped installer). Verify digest before tar -xzf.
+download-bookinfo-istio: ## Download Istio release from GitHub (tar.gz + .sha256 verify) for Bookinfo
+	@set -e; \
+	if [ -n "$(BOOKINFO_ISTIO_DIR)" ]; then echo "BOOKINFO_ISTIO_DIR set to $(BOOKINFO_ISTIO_DIR); skip download"; exit 0; fi; \
+	dest='$(BOOKINFO_ISTIO_HOME)'; out='$(BOOKINFO_OUTPUT_DIR)'; ver_raw='$(BOOKINFO_ISTIO_VERSION)'; ver=$${ver_raw#v}; \
 	if [ -x "$$dest/bin/istioctl" ]; then echo "Istio already present at $$dest"; exit 0; fi; \
-	echo "Downloading Istio $$ver into $$dest ..."; \
-	mkdir -p "$$out"; tmp=$$(mktemp -d); \
-	( cd "$$tmp" && curl -fsSL --connect-timeout 15 --max-time 300 https://istio.io/downloadIstio | ISTIO_VERSION="$$ver" sh - ); \
-	rel=$$(ls -d "$$tmp"/istio-* | head -n1); \
-	rm -rf "$$dest"; mv "$$rel" "$$dest"; \
-	rm -rf "$$tmp"; \
+	os=$$(uname -s); uarch=$$(uname -m); \
+	case "$$os:$$uarch" in \
+	  Linux:x86_64) tuple=linux-amd64 ;; \
+	  Linux:aarch64|Linux:arm64) tuple=linux-arm64 ;; \
+	  Darwin:arm64) tuple=osx-arm64 ;; \
+	  Darwin:x86_64) tuple=osx ;; \
+	  *) echo "Unsupported OS/arch $$os/$$uarch for Istio release tarball; set BOOKINFO_ISTIO_DIR." >&2; exit 1 ;; \
+	esac; \
+	base="istio-$$ver-$$tuple"; tgz="$$base.tar.gz"; url="https://github.com/istio/istio/releases/download/$$ver/$$tgz"; \
+	echo "Downloading $$url -> $$dest ..."; \
+	mkdir -p "$$out"; tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
+	( cd "$$tmp" && curl -fSL --connect-timeout 15 --max-time 300 -o "$$tgz" "$$url" && \
+	  curl -fSL --connect-timeout 15 --max-time 120 -o "$$tgz.sha256" "$$url.sha256" ); \
+	if command -v sha256sum >/dev/null 2>&1; then ( cd "$$tmp" && sha256sum -c "$$tgz.sha256" ); \
+	elif command -v shasum >/dev/null 2>&1; then ( cd "$$tmp" && shasum -a 256 -c "$$tgz.sha256" ); \
+	else echo "Need sha256sum or shasum to verify $$tgz" >&2; exit 1; fi; \
+	( cd "$$tmp" && tar -xzf "$$tgz" ); \
+	rm -rf "$$dest"; mv "$$tmp/istio-$$ver" "$$dest"; \
+	trap - EXIT; rm -rf "$$tmp"; \
 	echo "Istio $$ver ready at $$dest"
 
 .PHONY: setup-kiali-openshift
@@ -122,7 +138,7 @@ ossm-install-istio: ## Install only Istio + addons + Kiali CR (same as second st
 	bash '$(OSSM_INSTALL_SCRIPT)' install-istio
 
 .PHONY: ossm-status
-ossm-status: ## Show OSSM/Sail/Kiali/Tempo status via vendored script
+ossm-status: ## Show OSSM/Sail/Kiali status via vendored script
 	@test -f '$(OSSM_INSTALL_SCRIPT)' || { echo "Missing $(OSSM_INSTALL_SCRIPT). Expected vendored scripts under hack/kiali/ in this repo."; exit 1; }
 	bash '$(OSSM_INSTALL_SCRIPT)' status
 

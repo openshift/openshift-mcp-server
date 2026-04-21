@@ -105,8 +105,14 @@ install_istio() {
   done
 
   infomsg "Wait for the servicemesh operator to be Ready."
-  ${OC} wait --for condition=Ready $(${OC} get pod -n ${OLM_OPERATORS_NAMESPACE} -o name | grep -E 'sail|servicemesh|istio') --timeout 300s -n ${OLM_OPERATORS_NAMESPACE}
-  infomsg "done."
+  local operator_pods
+  operator_pods="$(${OC} get pod -n ${OLM_OPERATORS_NAMESPACE} -o name 2>/dev/null | grep -E 'sail|servicemesh|istio' || true)"
+  if [ -z "${operator_pods}" ]; then
+    errormsg "No Sail/ServiceMesh operator pods found in namespace [${OLM_OPERATORS_NAMESPACE}] (cannot oc wait on an empty list)."
+    exit 1
+  fi
+  ${OC} wait --for condition=Ready ${operator_pods} --timeout 300s -n ${OLM_OPERATORS_NAMESPACE}
+  infomsg "Servicemesh operator pod(s) Ready (done)."
 
   # TODO: Sail has no webhooks (yet)
   #infomsg "Wait for the servicemesh validating webhook to be created."
@@ -244,6 +250,46 @@ EOM
   infomsg "IstioRevisionTag [${istio_cr_name}] applied."
 }
 
+# Read exactly "yes" from /dev/tty when available (works when stdin is a pipe).
+# Otherwise require OSSM_DELETE_CONFIRM=yes (e.g. CI or fully non-interactive).
+ossm_prompt_yes_or_env_confirm() {
+  local prompt="$1"
+  if [ -r /dev/tty ] && [ -w /dev/tty ]; then
+    local ans
+    read -r -p "${prompt}" ans < /dev/tty || true
+    if [ "${ans}" != "yes" ]; then
+      errormsg "Deletion aborted (expected exactly 'yes')."
+      exit 1
+    fi
+  elif [ "${OSSM_DELETE_CONFIRM:-}" != "yes" ]; then
+    errormsg "No usable /dev/tty for confirmation: set OSSM_DELETE_CONFIRM=yes to proceed, or run from a terminal."
+    exit 1
+  fi
+}
+
+# Print matched resources, require confirmation, then delete each line with oc delete.
+# Interactive: type exactly "yes". Non-interactive: set OSSM_DELETE_CONFIRM=yes.
+# stdin: one full resource name per line (e.g. customresourcedefinition.apiextensions.k8s.io/foo.bar.istio.io).
+ossm_confirm_and_delete_resource_lines() {
+  local desc="$1"
+  local lines
+  lines=$(cat)
+  if ! echo "${lines}" | grep -q '[^[:space:]]'; then
+    infomsg "No resources matched for [${desc}]; nothing to delete."
+    return 0
+  fi
+  infomsg "---------- Matched for [${desc}] (review before delete) ----------"
+  echo "${lines}"
+  infomsg "-------------------------------------------------------------------"
+  ossm_prompt_yes_or_env_confirm "Type 'yes' to delete these resources: "
+  while IFS= read -r res; do
+    [ -z "$(echo "${res}" | tr -d '[:space:]')" ] && continue
+    ${OC} delete --ignore-not-found=true "${res}"
+  done <<EOF
+${lines}
+EOF
+}
+
 delete_servicemesh_operators() {
   local abort_operation="false"
   for cr in \
@@ -265,32 +311,59 @@ delete_servicemesh_operators() {
   ${OC} delete subscription --ignore-not-found=true --namespace ${OLM_OPERATORS_NAMESPACE} my-sailoperator
 
   infomsg "Deleting OLM CSVs which uninstalls the operators and their related resources"
-  for csv in $(${OC} get csv --all-namespaces --no-headers -o custom-columns=NS:.metadata.namespace,N:.metadata.name | sed 's/  */:/g' | grep -E 'sail|servicemesh|istio')
-  do
-    ${OC} delete csv -n $(echo -n $csv | cut -d: -f1) $(echo -n $csv | cut -d: -f2)
-  done
+  local csv_list
+  csv_list="$(${OC} get csv --all-namespaces --no-headers -o custom-columns=NS:.metadata.namespace,N:.metadata.name 2>/dev/null | sed 's/  */:/g' | grep -E ':(sailoperator|servicemeshoperator3|servicemeshoperator\.|istio-operator|istiooperator)\.' || true)"
+  if echo "${csv_list}" | grep -q '[^[:space:]]'; then
+    infomsg "---------- Matched ClusterServiceVersions (tight name prefix) ----------"
+    echo "${csv_list}"
+    infomsg "-------------------------------------------------------------------------"
+    ossm_prompt_yes_or_env_confirm "Type 'yes' to delete these CSVs: "
+    while IFS= read -r csv; do
+      [ -z "$(echo "${csv}" | tr -d '[:space:]')" ] && continue
+      ${OC} delete csv -n "$(echo -n "${csv}" | cut -d: -f1)" "$(echo -n "${csv}" | cut -d: -f2)" --ignore-not-found=true
+    done <<EOF
+${csv_list}
+EOF
+  else
+    infomsg "No matching CSVs to delete."
+  fi
 
   infomsg "Deleting any cluster-scoped resources that are getting left behind"
-  for r in \
-    $(${OC} get clusterroles -o name | grep -E 'sail|servicemesh|istio')
-  do
-    ${OC} delete ${r}
-  done
+  local cr_list
+  cr_list="$(${OC} get clusterroles -o name 2>/dev/null | grep -E 'clusterrole\.rbac\.authorization\.k8s\.io/(istio-|mesh-|.*sail.*|.*servicemesh.*)' || true)"
+  echo "${cr_list}" | ossm_confirm_and_delete_resource_lines "ClusterRoles (istio-/mesh-/sail/servicemesh name prefix)"
 
   infomsg "Delete any resources that are getting left behind"
-  for r in \
-    $(${OC} get secrets -n ${OLM_OPERATORS_NAMESPACE} cacerts --no-headers -o custom-columns=K:kind,NS:.metadata.namespace,N:.metadata.name | sed 's/  */:/g') \
-    $(${OC} get configmaps --all-namespaces --no-headers -o custom-columns=K:kind,NS:.metadata.namespace,N:.metadata.name | sed 's/  */:/g' | grep -E 'sail|servicemesh|istio')
-  do
-    local res_kind=$(echo ${r} | cut -d: -f1)
-    local res_namespace=$(echo ${r} | cut -d: -f2)
-    local res_name=$(echo ${r} | cut -d: -f3)
-    infomsg "Deleting resource [${res_name}] of kind [${res_kind}] in namespace [${res_namespace}]"
-    ${OC} delete ${res_kind} -n ${res_namespace} ${res_name}
-  done
+  local leftover_list
+  leftover_list="$(${OC} get secrets -n ${OLM_OPERATORS_NAMESPACE} cacerts --no-headers -o custom-columns=K:kind,NS:.metadata.namespace,N:.metadata.name 2>/dev/null | sed 's/  */:/g' || true)"
+  leftover_list="${leftover_list}
+$(${OC} get configmaps --all-namespaces --no-headers -o custom-columns=K:kind,NS:.metadata.namespace,N:.metadata.name 2>/dev/null | sed 's/  */:/g' | grep -Ei ':configmap:[^:]+:.*(istio|sail|servicemesh)' || true)"
+  if echo "${leftover_list}" | grep -q '[^[:space:]]'; then
+    infomsg "---------- Matched secrets/configmaps (cacerts + configmap names matching istio|sail|servicemesh) ----------"
+    echo "${leftover_list}"
+    infomsg "----------------------------------------------------------------------------------------"
+    ossm_prompt_yes_or_env_confirm "Type 'yes' to delete these secrets/configmaps: "
+    while IFS= read -r r; do
+      [ -z "$(echo "${r}" | tr -d '[:space:]')" ] && continue
+      local res_kind
+      local res_namespace
+      local res_name
+      res_kind=$(echo "${r}" | cut -d: -f1)
+      res_namespace=$(echo "${r}" | cut -d: -f2)
+      res_name=$(echo "${r}" | cut -d: -f3)
+      infomsg "Deleting resource [${res_name}] of kind [${res_kind}] in namespace [${res_namespace}]"
+      ${OC} delete "${res_kind}" -n "${res_namespace}" "${res_name}" --ignore-not-found=true
+    done <<EOF
+${leftover_list}
+EOF
+  else
+    infomsg "No matching secrets/configmaps to delete."
+  fi
 
-  infomsg "Delete the CRDs"
-  ${OC} get crds -o name | grep -E 'sail|servicemesh|istio' | xargs -r -n 1 ${OC} delete
+  infomsg "Delete the CRDs (anchored API group suffixes only)"
+  local crd_list
+  crd_list="$(${OC} get crds -o name 2>/dev/null | grep -E '\.istio\.io$|\.sailoperator\.io$|\.servicemesh.*\.io$' || true)"
+  echo "${crd_list}" | ossm_confirm_and_delete_resource_lines "CRDs (*.istio.io, *.sailoperator.io, *.servicemesh*.io)"
 }
 
 delete_istio() {
@@ -318,7 +391,7 @@ delete_istio() {
 status_servicemesh_operators() {
   infomsg ""
   infomsg "===== SERVICEMESH OPERATOR SUBSCRIPTION"
-  local sub_name="$(${OC} get subscriptions -n ${OLM_OPERATORS_NAMESPACE} -o name my-sailoperator)"
+  local sub_name="$(${OC} get subscriptions -n ${OLM_OPERATORS_NAMESPACE} -o name my-sailoperator 2>/dev/null)"
   if [ ! -z "${sub_name}" ]; then
     ${OC} get --namespace ${OLM_OPERATORS_NAMESPACE} ${sub_name}
     infomsg ""

@@ -72,7 +72,7 @@ Valid options:
 
   -c|--client <path to k8s client>
       A filename or path to the 'oc' or 'kubectl' client.
-      If this is a path to 'oc' then it will be assumed OpenShift is being used.
+      OpenShift is detected when the cluster exposes the route.openshift.io API (not from the binary name).
       Default: ${DEFAULT_OC}
 
   -cpn|--control-plane-namespace <name>
@@ -132,7 +132,7 @@ The command must be one of:
   * kiali-ui: Pops up a browser tab pointing to the Kiali UI.
 
 HELPMSG
-      exit 1
+      exit 0
       ;;
     *)
       errormsg "Unknown argument [$key]. Aborting."
@@ -165,25 +165,83 @@ infomsg "ISTIO_VERSION=$ISTIO_VERSION"
 infomsg "KIALI_VERSION=$KIALI_VERSION"
 infomsg "CATALOG_SOURCE=$CATALOG_SOURCE"
 
+# Open URL in the default browser when possible; otherwise print instructions (SSH, headless, unknown OS).
+ossm_open_url_in_browser() {
+  local url="$1"
+  if [ -z "${url}" ]; then
+    errormsg "No URL to open."
+    return 1
+  fi
+  infomsg "Kiali UI URL: ${url}"
+  if [ -n "${SSH_CONNECTION:-}" ] || [ -n "${SSH_CLIENT:-}" ]; then
+    infomsg "SSH session detected; not opening a browser automatically. Copy the URL above into a browser on your machine."
+    return 0
+  fi
+  local uname_s
+  uname_s="$(uname -s 2>/dev/null || true)"
+  case "${uname_s}" in
+    Darwin)
+      if command -v open >/dev/null 2>&1; then
+        open "${url}" && return 0
+      fi
+      ;;
+    Linux)
+      if { [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; } && command -v xdg-open >/dev/null 2>&1; then
+        xdg-open "${url}" >/dev/null 2>&1 && return 0
+      fi
+      if [ -n "${WSL_DISTRO_NAME:-}" ] && command -v wslview >/dev/null 2>&1; then
+        wslview "${url}" >/dev/null 2>&1 && return 0
+      fi
+      ;;
+    CYGWIN*|MSYS*|MINGW*)
+      if command -v cmd.exe >/dev/null 2>&1; then
+        cmd.exe /c start "" "${url}" >/dev/null 2>&1 && return 0
+      fi
+      ;;
+  esac
+  case "${OSTYPE:-}" in
+    msys*|cygwin*|mingw*)
+      if command -v cmd.exe >/dev/null 2>&1; then
+        cmd.exe /c start "" "${url}" >/dev/null 2>&1 && return 0
+      fi
+      ;;
+  esac
+  if [ "${OS:-}" = "Windows_NT" ] && command -v cmd.exe >/dev/null 2>&1; then
+    cmd.exe /c start "" "${url}" >/dev/null 2>&1 && return 0
+  fi
+  infomsg "Could not launch a graphical browser (no suitable opener). Open the URL above manually."
+}
+
 # Check the type of cluster we are talking to.
-# * If OpenShift, make sure we are logged in.
+# * OpenShift: cluster exposes route.openshift.io API (not inferred from client binary name).
+# * If OpenShift, make sure we are logged in (whoami).
+# * If the API probe fails but the client is oc, still require whoami so a logged-out OpenShift session fails clearly.
 # * Define the namespace where the operators are expected to run based on cluster type.
 
 if ! which ${OC} >& /dev/null; then
   errormsg "The client is not valid [${OC}]. Use --client to specify a valid path to 'oc' or 'kubectl'."
   exit 1
 fi
-if [[ "${OC}" = *"oc" ]]; then
-  # if we are using 'oc' (as opposed to 'kubectl') we therefore assume we are installing in an OpenShift cluster
+
+if ${OC} api-resources --api-group=route.openshift.io -o name 2>/dev/null | grep -q .
+then
   IS_OPENSHIFT="true"
   OLM_OPERATORS_NAMESPACE="openshift-operators"
+else
+  IS_OPENSHIFT="false"
+  OLM_OPERATORS_NAMESPACE="operators"
+fi
+
+if [ "${IS_OPENSHIFT}" = "true" ]; then
   if ! ${OC} whoami >& /dev/null; then
     errormsg "You are not logged into the OpenShift cluster. Use '${OC} login' to log into a cluster and then retry."
     exit 1
   fi
-else
-  IS_OPENSHIFT="false"
-  OLM_OPERATORS_NAMESPACE="operators"
+elif [ "$(basename -- "${OC}")" = "oc" ]; then
+  if ! ${OC} whoami >& /dev/null; then
+    errormsg "You are not logged into the OpenShift cluster. Use '${OC} login' to log into a cluster and then retry."
+    exit 1
+  fi
 fi
 
 if [ "${IS_OPENSHIFT}" == "true" -a "${CATALOG_SOURCE}" != "redhat" -a "${CATALOG_SOURCE}" != "community" ]; then
@@ -258,8 +316,7 @@ elif [ "${_CMD}" == "kiali-ui" ]; then
     kiali_url="http://$(${OC} -n ${CONTROL_PLANE_NAMESPACE} get svc kiali -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2> /dev/null):20001"
   fi
 
-  infomsg "Attempting to open browser to Kiali UI at URL [${kiali_url}]"
-  xdg-open ${kiali_url}
+  ossm_open_url_in_browser "${kiali_url}"
 
 else
   errormsg "Missing or unknown command. See --help for usage."
