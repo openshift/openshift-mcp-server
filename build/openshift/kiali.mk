@@ -1,6 +1,6 @@
 ##@ OpenShift/Kiali
 
-# OSSM/Sail install scripts vendored under hack/kiali/ (see hack/kiali/UPSTREAM.txt).
+# OSSM/Sail install scripts under hack/kiali/.
 OSSM_INSTALL_SCRIPT := $(abspath $(CURDIR)/hack/kiali/install-ossm-release.sh)
 # Tracing: Jaeger addon only (no Tempo in vendored OSSM scripts). Mesh Zipkin -> jaeger-collector.<cp-ns>:9411.
 # Sail Istio.spec.profile (not "demo" unless you want that preset). Passed to install-ossm-release.sh / func-sm.sh.

@@ -1,4 +1,5 @@
 _output/
+hack/kiali/bookinfo-hack/
 .idea/
 .vscode/
 .docusaurus/

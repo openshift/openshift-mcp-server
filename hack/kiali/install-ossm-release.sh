@@ -17,7 +17,6 @@ cd ${SCRIPT_ROOT}
 source ${SCRIPT_ROOT}/func-sm.sh
 source ${SCRIPT_ROOT}/func-kiali.sh
 source ${SCRIPT_ROOT}/func-addons.sh
-source ${SCRIPT_ROOT}/func-olm.sh
 source ${SCRIPT_ROOT}/func-log.sh
 
 DEFAULT_CONTROL_PLANE_NAMESPACE="istio-system"
@@ -195,11 +194,6 @@ fi
 # Process the command
 if [ "${_CMD}" == "install-operators" ]; then
 
-  # if not on OpenShift make sure OLM is available
-  if [ "${IS_OPENSHIFT}" == "false" ]; then
-    install_olm
-  fi
-
   if [ "${ENABLE_KIALI}" == "true" ]; then
     install_kiali_operator "${CATALOG_SOURCE}"
   fi
@@ -213,26 +207,15 @@ elif [ "${_CMD}" == "install-istio" ]; then
 
   wait_for_cluster_crd "istios.sailoperator.io" "Sail / Service Mesh operator" "${INSTALL_ISTIO_CRD_WAIT_SECONDS:-720}"
 
-  infomsg "Creating control plane namespace before Jaeger addon (install_istio runs after)"
-  if ! ${OC} get namespace "${CONTROL_PLANE_NAMESPACE}" >& /dev/null; then
-    ${OC} create namespace "${CONTROL_PLANE_NAMESPACE}"
-  fi
-  infomsg "Installing Jaeger addon before Istio CR so Zipkin collector (jaeger-collector:9411) exists"
-  if ! install_addon jaeger; then
-    errormsg "Jaeger addon install failed (check namespace, SCC, and image pull). Aborting."
-    exit 1
-  fi
-
   install_istio "${CONTROL_PLANE_NAMESPACE}" "${ISTIO_VERSION}"
 
   if [ -n "${ADDONS}" ]; then
     infomsg "Installing addons: ${ADDONS}"
     for addon in ${ADDONS}; do
-      if [ "${addon}" = "jaeger" ]; then
-        infomsg "Skipping duplicate jaeger addon (already installed before Istio CR)"
-        continue
+      if ! install_addon "${addon}"; then
+        errormsg "Addon [${addon}] install failed. Aborting."
+        exit 1
       fi
-      install_addon ${addon}
     done
   else
     infomsg "No addons will be installed"
