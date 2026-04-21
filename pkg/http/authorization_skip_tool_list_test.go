@@ -212,6 +212,7 @@ func (s *SkipToolListAuthSuite) TestFlagDisabledStillRequiresAuth() {
 
 func (s *SkipToolListAuthSuite) TestToolsListWithAuthStillWorks() {
 	s.StaticConfig.OAuthAudience = ""
+	s.StaticConfig.SkipJWTVerification = true
 	s.StartServer()
 	endpoint := fmt.Sprintf("http://127.0.0.1:%s/mcp", s.StaticConfig.Port)
 
