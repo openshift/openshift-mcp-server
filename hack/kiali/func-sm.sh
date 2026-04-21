@@ -56,9 +56,10 @@ install_istio() {
   local istio_version="${2}"
   local istio_yaml_file="${3:-}"
 
-  # Obtained this list of CRDs by "oc get crds -oname | grep istio.io". We can't actually do that here programatically
-  # because the CRDs may not even be created yet. That's why there is a while loop in here - to wait for them to be created.
-  infomsg "Waiting for CRDs to be established."
+  # CRD list from "oc get crds -oname | grep istio.io" (Sail/Istio). Each CRD is waited on with a bounded timeout
+  # (INSTALL_ISTIO_CRD_WAIT_SECONDS, default 720) via wait_for_cluster_crd (func-kiali.sh).
+  local crd_wait_seconds="${INSTALL_ISTIO_CRD_WAIT_SECONDS:-720}"
+  infomsg "Waiting for mesh CRDs to be established (up to ${crd_wait_seconds}s per CRD)."
   for crd in \
      authorizationpolicies.security.istio.io \
      destinationrules.networking.istio.io \
@@ -77,10 +78,7 @@ install_istio() {
      workloadentries.networking.istio.io \
      workloadgroups.networking.istio.io
   do
-    infomsg "Expecting CRD [${crd}] to be established"
-    echo -n "Waiting."
-    while ! ${OC} get crd ${crd} >& /dev/null ; do echo -n '.'; sleep 1; done
-    ${OC} wait --for condition=established crd/${crd}
+    wait_for_cluster_crd "${crd}" "${crd}" "${crd_wait_seconds}"
   done
 
   infomsg "Expecting Service Mesh operator deployment to be created"

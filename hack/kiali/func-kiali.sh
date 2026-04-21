@@ -67,7 +67,12 @@ install_kiali_cr() {
     exit 1
   fi
 
-  infomsg "Installing Kiali CR with Jaeger tracing (auth.strategy: anonymous)"
+  local kiali_auth_strategy="openshift"
+  if [ "${KIALI_ANONYMOUS:-}" = "true" ]; then
+    kiali_auth_strategy="anonymous"
+  fi
+
+  infomsg "Installing Kiali CR with Jaeger tracing (auth.strategy: ${kiali_auth_strategy}; set KIALI_ANONYMOUS=true for anonymous)"
   cat <<EOM | ${OC} apply -f -
 apiVersion: kiali.io/v1alpha1
 kind: Kiali
@@ -77,7 +82,7 @@ metadata:
 spec:
   version: ${KIALI_VERSION}
   auth:
-    strategy: anonymous
+    strategy: ${kiali_auth_strategy}
   external_services:
     tracing:
       enabled: true
