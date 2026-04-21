@@ -12,3 +12,4 @@ steps:
         toolPattern: "probe_http"
         args:
           url: "https://kubernetes.default.svc:443"
+          method: "GET"
