@@ -48,7 +48,7 @@ clean: ## Clean up all build artifacts
 	rm -rf $(CLEAN_TARGETS)
 
 .PHONY: build
-build: clean tidy format lint ## Build the project
+build: clean tidy format ## Build the project
 	go build $(COMMON_BUILD_ARGS) -o $(BINARY_NAME) ./cmd/kubernetes-mcp-server
 
 .PHONY: build-multiarch
