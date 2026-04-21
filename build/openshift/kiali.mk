@@ -2,46 +2,130 @@
 
 # OSSM/Sail install scripts vendored under hack/kiali/ (see hack/kiali/UPSTREAM.txt).
 OSSM_INSTALL_SCRIPT := $(abspath $(CURDIR)/hack/kiali/install-ossm-release.sh)
+# jaeger: skip Tempo, mesh Zipkin -> jaeger-collector.<cp-ns>:9411, minimal Kiali CR. tempo: upstream behaviour.
+OSSM_TRACING_BACKEND ?= jaeger
+export OSSM_TRACING_BACKEND
+# Sail Istio.spec.profile (not "demo" unless you want that preset). Passed to install-ossm-release.sh / func-sm.sh.
+OSSM_ISTIO_PROFILE ?= default
+export OSSM_ISTIO_PROFILE
+INSTALL_ISTIO_CRD_WAIT_SECONDS ?= 720
+export INSTALL_ISTIO_CRD_WAIT_SECONDS
 
-OSSM_SCRIPT_FILES := \
-	install-ossm-release.sh \
-	func-sm.sh \
-	func-kiali.sh \
-	func-tempo.sh \
-	func-minio.sh \
-	func-addons.sh \
-	func-olm.sh \
-	func-log.sh
+# Bookinfo: Kiali hack/istio scripts downloaded with curl into BOOKINFO_DEMO_DIR (see fetch-bookinfo-hack).
+BOOKINFO_DEMO_DIR ?= $(abspath $(CURDIR)/hack/kiali/bookinfo-hack)
+BOOKINFO_INSTALL_SCRIPT := $(BOOKINFO_DEMO_DIR)/install-bookinfo-demo.sh
+KIALI_BOOKINFO_REF ?= master
+BOOKINFO_RAW_BASE = https://raw.githubusercontent.com/kiali/kiali/$(KIALI_BOOKINFO_REF)/hack/istio
+# Istio full distro for Bookinfo (avoid install-bookinfo-demo.sh picking _output/istio-addons via istio-*).
+BOOKINFO_OUTPUT_DIR ?= $(abspath $(CURDIR)/_output)
+BOOKINFO_ISTIO_VERSION ?= 1.28.0
+BOOKINFO_ISTIO_HOME := $(BOOKINFO_OUTPUT_DIR)/istio-$(BOOKINFO_ISTIO_VERSION)
+# Optional: existing Istio tree with bin/istioctl + samples/bookinfo (skips download-bookinfo-istio).
+BOOKINFO_ISTIO_DIR ?=
+BOOKINFO_CLIENT ?= oc
+BOOKINFO_NAMESPACE ?= bookinfo
+BOOKINFO_CP_NAMESPACE ?= istio-system
+# Cluster-scoped Istio CR name (must match IstioRevisionTag metadata.name for stable istio.io/rev=...).
+BOOKINFO_ISTIO_CR_NAME ?= default
+# Injection label istio.io/rev=... — use the IstioRevisionTag name (same as Istio CR name when install_istio creates the tag).
+BOOKINFO_ISTIO_REVISION ?= $(BOOKINFO_ISTIO_CR_NAME)
+# Traffic generator ConfigMap route: in-cluster productpage avoids OpenShift Route TLS/503 issues.
+BOOKINFO_TRAFFIC_ROUTE ?= http://productpage.$(BOOKINFO_NAMESPACE).svc.cluster.local:9080/productpage
+# install-bookinfo-demo.sh: extra flags only (-ail is set from detected revision in the recipe).
+# -tg installs Kiali traffic generator (OpenShift routes must exist; script waits after expose).
+BOOKINFO_SCRIPT_EXTRA ?= -tg
+# Namespace labels after the script (istio.io/rev=... is appended after revision detection).
+# Do NOT set istio-injection=enabled together with istio.io/rev — use rev + istio-discovery only.
+BOOKINFO_MESH_LABELS ?= istio-discovery=enabled
 
-KIALI_OSSM_SCRIPT_REF ?= master
-OSSM_RAW_BASE := https://raw.githubusercontent.com/kiali/kiali/$(KIALI_OSSM_SCRIPT_REF)/hack/istio/sail
+.PHONY: fetch-bookinfo-hack
+fetch-bookinfo-hack: ## Download Kiali hack/istio bookinfo scripts (curl; ref KIALI_BOOKINFO_REF=branch|tag|commit)
+	@set -e; d='$(BOOKINFO_DEMO_DIR)'; ref='$(KIALI_BOOKINFO_REF)'; base='$(BOOKINFO_RAW_BASE)'; \
+	if [ -f "$$d/.fetched-ref" ] && [ "$$(cat "$$d/.fetched-ref")" = "$$ref" ] && [ -f "$$d/install-bookinfo-demo.sh" ] && [ -f "$$d/functions.sh" ]; then \
+	  echo "Bookinfo hack already present ($$ref) in $$d"; exit 0; \
+	fi; \
+	echo "Fetching Kiali bookinfo hack ($$ref) -> $$d"; \
+	mkdir -p "$$d/kustomization" "$$d/bookinfo-traffic"; \
+	for f in install-bookinfo-demo.sh functions.sh istio-gateway.yaml download-istio.sh; do \
+	  echo "  curl $$f"; curl -fsSL --connect-timeout 10 --max-time 120 "$$base/$$f" -o "$$d/$$f"; \
+	done; \
+	chmod a+x "$$d/install-bookinfo-demo.sh" "$$d/download-istio.sh"; \
+	curl -fsSL --max-time 120 "$$base/kustomization/bookinfo-ppc64le.yaml" -o "$$d/kustomization/bookinfo-ppc64le.yaml"; \
+	curl -fsSL --max-time 120 "$$base/kustomization/bookinfo-s390x.yaml" -o "$$d/kustomization/bookinfo-s390x.yaml"; \
+	curl -fsSL --max-time 120 "$$base/bookinfo-traffic/http-route-productpage-v1.yaml" -o "$$d/bookinfo-traffic/http-route-productpage-v1.yaml"; \
+	printf '%s\n' "$$ref" > "$$d/.fetched-ref"; \
+	echo "Done."
+
+.PHONY: download-bookinfo-istio
+download-bookinfo-istio: ## Download full Istio release (curl istio.io; same idea as build/kiali.mk istioctl) for Bookinfo
+	@if [ -n "$(BOOKINFO_ISTIO_DIR)" ]; then echo "BOOKINFO_ISTIO_DIR set to $(BOOKINFO_ISTIO_DIR); skip download"; exit 0; fi
+	@set -e; dest='$(BOOKINFO_ISTIO_HOME)'; ver='$(BOOKINFO_ISTIO_VERSION)'; out='$(BOOKINFO_OUTPUT_DIR)'; \
+	if [ -x "$$dest/bin/istioctl" ]; then echo "Istio already present at $$dest"; exit 0; fi; \
+	echo "Downloading Istio $$ver into $$dest ..."; \
+	mkdir -p "$$out"; tmp=$$(mktemp -d); \
+	( cd "$$tmp" && curl -fsSL --connect-timeout 15 --max-time 300 https://istio.io/downloadIstio | ISTIO_VERSION="$$ver" sh - ); \
+	rel=$$(ls -d "$$tmp"/istio-* | head -n1); \
+	rm -rf "$$dest"; mv "$$rel" "$$dest"; \
+	rm -rf "$$tmp"; \
+	echo "Istio $$ver ready at $$dest"
 
 .PHONY: setup-kiali-openshift
-setup-kiali-openshift: ## OpenShift: install operators + Istio/Kiali (hack/kiali/install-ossm-release.sh)
-	@test -f '$(OSSM_INSTALL_SCRIPT)' || { echo "Missing $(OSSM_INSTALL_SCRIPT). Run explicitly: make update-ossm-install-scripts"; exit 1; }
-	@echo "==> OSSM: installing operators (Sail, Kiali, Tempo) ..."
+setup-kiali-openshift: ## OpenShift: OSSM/Sail + Istio/Kiali + Bookinfo (Kiali hack script + OpenShift Routes)
+	@test -f '$(OSSM_INSTALL_SCRIPT)' || { echo "Missing $(OSSM_INSTALL_SCRIPT). Expected vendored scripts under hack/kiali/ in this repo."; exit 1; }
+	@echo "==> OSSM: installing operators (Sail, Kiali) ..."
 	bash '$(OSSM_INSTALL_SCRIPT)' install-operators
 	@echo "==> OSSM: installing Istio, addons, and Kiali CR ..."
 	bash '$(OSSM_INSTALL_SCRIPT)' install-istio
+	@$(MAKE) -s install-bookinfo-openshift
+	@echo "==> Bookinfo: OpenShift routes (productpage / gateways):"
+	@'$(BOOKINFO_CLIENT)' get route -n '$(BOOKINFO_NAMESPACE)' 2>/dev/null || true
 	@echo "==> setup-kiali-openshift: done."
 
 ifeq ($(words $(MAKEFILE_LIST)),1)
 .DEFAULT_GOAL := setup-kiali-openshift
 endif
 
+.PHONY: install-bookinfo-openshift
+install-bookinfo-openshift: fetch-bookinfo-hack download-bookinfo-istio ## Install Bookinfo via Kiali script (always -id to avoid wrong _output/istio-* match)
+	@test -f '$(BOOKINFO_INSTALL_SCRIPT)' || { echo "Missing $(BOOKINFO_INSTALL_SCRIPT) after fetch-bookinfo-hack."; exit 1; }
+	@set -e; \
+	cr='$(BOOKINFO_ISTIO_CR_NAME)'; \
+	rev='$(BOOKINFO_ISTIO_REVISION)'; \
+	[ -n "$$rev" ] || { echo "Bookinfo: BOOKINFO_ISTIO_REVISION is empty."; exit 1; }; \
+	echo "==> Bookinfo: using istio.io/rev=$$rev (IstioRevisionTag / Istio CR name $$cr)"; \
+	istio_home='$(BOOKINFO_ISTIO_HOME)'; \
+	istio_id='$(BOOKINFO_ISTIO_DIR)'; \
+	if [ -z "$$istio_id" ]; then istio_id="$$istio_home"; fi; \
+	OUTPUT_DIR='$(BOOKINFO_OUTPUT_DIR)' bash '$(BOOKINFO_INSTALL_SCRIPT)' \
+	  -c '$(BOOKINFO_CLIENT)' -n '$(BOOKINFO_NAMESPACE)' -in '$(BOOKINFO_CP_NAMESPACE)' -wt 5m -id "$$istio_id" \
+	  -ail "istio.io/rev=$$rev" $(BOOKINFO_SCRIPT_EXTRA); \
+	echo "==> Bookinfo: namespace labels for Sail sidecar injection ($(BOOKINFO_MESH_LABELS) istio.io/rev=$$rev)"; \
+	'$(BOOKINFO_CLIENT)' label namespace '$(BOOKINFO_NAMESPACE)' istio-injection- 2>/dev/null || true; \
+	'$(BOOKINFO_CLIENT)' label namespace '$(BOOKINFO_NAMESPACE)' $(BOOKINFO_MESH_LABELS) istio.io/rev="$$rev" --overwrite; \
+	echo "==> Bookinfo: rollout restart so pods join the mesh"; \
+	'$(BOOKINFO_CLIENT)' rollout restart deployment --all -n '$(BOOKINFO_NAMESPACE)' 2>/dev/null || true; \
+	'$(BOOKINFO_CLIENT)' rollout restart statefulset --all -n '$(BOOKINFO_NAMESPACE)' 2>/dev/null || true; \
+	tg_route='$(BOOKINFO_TRAFFIC_ROUTE)'; \
+	if '$(BOOKINFO_CLIENT)' get configmap traffic-generator-config -n '$(BOOKINFO_NAMESPACE)' -o name >/dev/null 2>&1; then \
+	  patch=$$(printf '%s' '[{"op":"replace","path":"/data/route","value":"'"$$tg_route"'"}]'); \
+	  '$(BOOKINFO_CLIENT)' patch configmap traffic-generator-config -n '$(BOOKINFO_NAMESPACE)' --type=json -p "$$patch"; \
+	  '$(BOOKINFO_CLIENT)' delete pod -n '$(BOOKINFO_NAMESPACE)' -l kiali-test=traffic-generator --ignore-not-found=true --wait=false 2>/dev/null || true; \
+	  echo "==> Bookinfo: traffic generator route -> $$tg_route"; \
+	fi
+
 .PHONY: ossm-install-operators
 ossm-install-operators: ## Install only operators (same as first step of setup-kiali-openshift)
-	@test -f '$(OSSM_INSTALL_SCRIPT)' || { echo "Missing $(OSSM_INSTALL_SCRIPT). Run explicitly: make update-ossm-install-scripts"; exit 1; }
+	@test -f '$(OSSM_INSTALL_SCRIPT)' || { echo "Missing $(OSSM_INSTALL_SCRIPT). Expected vendored scripts under hack/kiali/ in this repo."; exit 1; }
 	bash '$(OSSM_INSTALL_SCRIPT)' install-operators
 
 .PHONY: ossm-install-istio
 ossm-install-istio: ## Install only Istio + addons + Kiali CR (same as second step of setup-kiali-openshift)
-	@test -f '$(OSSM_INSTALL_SCRIPT)' || { echo "Missing $(OSSM_INSTALL_SCRIPT). Run explicitly: make update-ossm-install-scripts"; exit 1; }
+	@test -f '$(OSSM_INSTALL_SCRIPT)' || { echo "Missing $(OSSM_INSTALL_SCRIPT). Expected vendored scripts under hack/kiali/ in this repo."; exit 1; }
 	bash '$(OSSM_INSTALL_SCRIPT)' install-istio
 
 .PHONY: ossm-status
 ossm-status: ## Show OSSM/Sail/Kiali/Tempo status via vendored script
-	@test -f '$(OSSM_INSTALL_SCRIPT)' || { echo "Missing $(OSSM_INSTALL_SCRIPT). Run explicitly: make update-ossm-install-scripts"; exit 1; }
+	@test -f '$(OSSM_INSTALL_SCRIPT)' || { echo "Missing $(OSSM_INSTALL_SCRIPT). Expected vendored scripts under hack/kiali/ in this repo."; exit 1; }
 	bash '$(OSSM_INSTALL_SCRIPT)' status
 
 .PHONY: openshift-kiali-help
@@ -49,14 +133,3 @@ openshift-kiali-help: ## List OpenShift/Kiali targets (optional; from repo root 
 	@echo "OpenShift/Kiali — from repo root: make help"
 	@echo ""
 	@grep -E '^[a-zA-Z0-9_.-]+:.*?##' '$(abspath $(lastword $(MAKEFILE_LIST)))' | sed 's/:.*##/	/'
-
-.PHONY: update-ossm-install-scripts
-update-ossm-install-scripts: ## Re-download OSSM scripts from kiali/kiali (maintenance only; KIALI_OSSM_SCRIPT_REF=branch or tag)
-	@set -e; d=$$(dirname '$(OSSM_INSTALL_SCRIPT)'); mkdir -p "$$d"; \
-	echo "Downloading OSSM scripts (ref=$(KIALI_OSSM_SCRIPT_REF)) into $$d ..."; \
-	for f in $(OSSM_SCRIPT_FILES); do \
-		printf '  fetch %s ... ' "$$f"; \
-		curl -fsSL --connect-timeout 10 --max-time 60 "$(OSSM_RAW_BASE)/$$f" -o "$$d/$$f" && echo ok || { echo fail; exit 1; }; \
-	done; \
-	chmod a+x "$$d"/*.sh; \
-	echo "Done ($$(ls -1 "$$d"/*.sh 2>/dev/null | wc -l) shell files in $$d)."

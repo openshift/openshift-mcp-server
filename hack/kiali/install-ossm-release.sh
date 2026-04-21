@@ -25,6 +25,8 @@ DEFAULT_CONTROL_PLANE_NAMESPACE="istio-system"
 DEFAULT_ENABLE_KIALI="true"
 DEFAULT_ENABLE_OSSMCONSOLE="true"
 DEFAULT_ADDONS="prometheus grafana"
+# OSSM_TRACING_BACKEND: "jaeger" (Istio jaeger addon + Zipkin in mesh) or "tempo" (upstream TempoStack).
+DEFAULT_OSSM_TRACING_BACKEND="jaeger"
 DEFAULT_OC="oc"
 DEFAULT_ISTIO_VERSION="latest"
 DEFAULT_KIALI_VERSION="default"
@@ -111,6 +113,14 @@ Valid options:
       This is only used with the "install-istio" command.
       Default: ${DEFAULT_ISTIO_VERSION}
 
+  Environment OSSM_ISTIO_PROFILE
+      Sail Istio CR spec.profile (e.g. default, demo, empty). Default: default.
+
+  Stable revision label (istio.io/rev=default)
+      After install-istio, an IstioRevisionTag named like the Istio CR (default: "default")
+      references the Istio CR; Sail keeps it pointed at the active IstioRevision.
+      Workloads can use istio.io/rev=default instead of default-v1-28-x.
+
   -kv|--kiali-version
       The version of the Kiali Server and OSSM Console plugin that will be installed.
       This is only used with "install-istio" command and only if Kiali is to be installed.
@@ -137,15 +147,26 @@ done
 
 # Setup user-defined environment
 
+OSSM_TRACING_BACKEND="${OSSM_TRACING_BACKEND:-${DEFAULT_OSSM_TRACING_BACKEND}}"
+# Istio.spec.profile (Sail): e.g. default, demo, empty, openshift-ambient — not the Istio CR name.
+OSSM_ISTIO_PROFILE="${OSSM_ISTIO_PROFILE:-default}"
+if [ "${OSSM_TRACING_BACKEND}" = "jaeger" ]; then
+  DEFAULT_ADDONS="prometheus grafana jaeger"
+else
+  DEFAULT_ADDONS="prometheus grafana"
+fi
+
 CONTROL_PLANE_NAMESPACE="${CONTROL_PLANE_NAMESPACE:-${DEFAULT_CONTROL_PLANE_NAMESPACE}}"
 ENABLE_KIALI="${ENABLE_KIALI:-${DEFAULT_ENABLE_KIALI}}"
 ENABLE_OSSMCONSOLE="${ENABLE_OSSMCONSOLE:-${DEFAULT_ENABLE_OSSMCONSOLE}}"
-ADDONS="${ADDONS-${DEFAULT_ADDONS}}"
+ADDONS="${ADDONS:-${DEFAULT_ADDONS}}"
 OC="${OC:-${DEFAULT_OC}}"
 ISTIO_VERSION="${ISTIO_VERSION:-${DEFAULT_ISTIO_VERSION}}"
 KIALI_VERSION="${KIALI_VERSION:-${DEFAULT_KIALI_VERSION}}"
 CATALOG_SOURCE="${CATALOG_SOURCE:-${DEFAULT_CATALOG_SOURCE}}"
 
+infomsg "OSSM_TRACING_BACKEND=$OSSM_TRACING_BACKEND"
+infomsg "OSSM_ISTIO_PROFILE=$OSSM_ISTIO_PROFILE"
 infomsg "CONTROL_PLANE_NAMESPACE=$CONTROL_PLANE_NAMESPACE"
 infomsg "ENABLE_KIALI=$ENABLE_KIALI"
 infomsg "ENABLE_OSSMCONSOLE=$ENABLE_OSSMCONSOLE"
@@ -192,32 +213,46 @@ if [ "${_CMD}" == "install-operators" ]; then
   if [ "${ENABLE_KIALI}" == "true" ]; then
     install_kiali_operator "${CATALOG_SOURCE}"
   fi
-  install_tempo_operator "${CATALOG_SOURCE}"
+  if [ "${OSSM_TRACING_BACKEND}" != "jaeger" ]; then
+    install_tempo_operator "${CATALOG_SOURCE}"
+  else
+    infomsg "Skipping Tempo operator (OSSM_TRACING_BACKEND=jaeger)"
+  fi
   install_servicemesh_operators "${CATALOG_SOURCE}"
 
 elif [ "${_CMD}" == "install-istio" ]; then
 
-  if [ "${ENABLE_KIALI}" == "true" ] && ! ${OC} get crd kialis.kiali.io >& /dev/null; then
-    errormsg "Cannot install Istio with Kiali enabled because Kiali Operator is either not installed or installation is in progress."
-    exit 1
+  if [ "${ENABLE_KIALI}" == "true" ]; then
+    wait_for_cluster_crd "kialis.kiali.io" "Kiali Operator" "${INSTALL_ISTIO_CRD_WAIT_SECONDS:-720}"
   fi
 
-  if ! ${OC} get crd istios.sailoperator.io >& /dev/null; then
-    errormsg "Cannot install Istio because the Sail Operator is either not installed or installation is in progress."
-    exit 1
+  wait_for_cluster_crd "istios.sailoperator.io" "Sail / Service Mesh operator" "${INSTALL_ISTIO_CRD_WAIT_SECONDS:-720}"
+
+  if [ "${OSSM_TRACING_BACKEND}" != "jaeger" ]; then
+    wait_for_cluster_crd "tempostacks.tempo.grafana.com" "Tempo Operator" "${INSTALL_ISTIO_CRD_WAIT_SECONDS:-720}"
+    install_tempo
+  else
+    infomsg "Skipping Tempo CRD check and TempoStack (OSSM_TRACING_BACKEND=jaeger)"
+    infomsg "Creating control plane namespace before Jaeger addon (install_istio runs after)"
+    if ! ${OC} get namespace "${CONTROL_PLANE_NAMESPACE}" >& /dev/null; then
+      ${OC} create namespace "${CONTROL_PLANE_NAMESPACE}"
+    fi
+    infomsg "Installing Jaeger addon before Istio CR so Zipkin collector (jaeger-collector:9411) exists"
+    if ! install_addon jaeger; then
+      errormsg "Jaeger addon install failed (check namespace, SCC, and image pull). Aborting."
+      exit 1
+    fi
   fi
 
-  if ! ${OC} get crd tempostacks.tempo.grafana.com >& /dev/null; then
-    errormsg "Cannot install Istio because the Tempo Operator is either not installed or installation is in progress."
-    exit 1
-  fi
-
-  install_tempo
   install_istio "${CONTROL_PLANE_NAMESPACE}" "${ISTIO_VERSION}"
 
   if [ -n "${ADDONS}" ]; then
     infomsg "Installing addons: ${ADDONS}"
     for addon in ${ADDONS}; do
+      if [ "${OSSM_TRACING_BACKEND}" = "jaeger" ] && [ "${addon}" = "jaeger" ]; then
+        infomsg "Skipping duplicate jaeger addon (already installed before Istio CR)"
+        continue
+      fi
       install_addon ${addon}
     done
   else

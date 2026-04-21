@@ -67,6 +67,33 @@ install_kiali_cr() {
     exit 1
   fi
 
+  local auth_strategy="anonymous"
+  if [ "${IS_OPENSHIFT}" == "true" ]; then
+    auth_strategy="openshift"
+  fi
+
+  if [ "${OSSM_TRACING_BACKEND:-jaeger}" = "jaeger" ]; then
+    infomsg "Installing Kiali CR with Jaeger tracing (OSSM_TRACING_BACKEND=jaeger)"
+    cat <<EOM | ${OC} apply -f -
+apiVersion: kiali.io/v1alpha1
+kind: Kiali
+metadata:
+  name: kiali
+  namespace: ${control_plane_namespace}
+spec:
+  version: ${KIALI_VERSION}
+  auth:
+    strategy: ${auth_strategy}
+  external_services:
+    tracing:
+      enabled: true
+      provider: jaeger
+      in_cluster_url: "http://tracing.${control_plane_namespace}.svc.cluster.local:16685/jaeger"
+      use_grpc: true
+EOM
+    return 0
+  fi
+
   if [ -z "${TEMPO_NAMESPACE:-}" ]; then
     TEMPO_NAMESPACE="$(${OC} get pods -l app.kubernetes.io/name=tempo --all-namespaces --no-headers --ignore-not-found=true 2>/dev/null | head -n1 | awk '{print $1}')"
     if [ -z "${TEMPO_NAMESPACE:-}" ]; then
@@ -105,12 +132,6 @@ install_kiali_cr() {
     else
       infomsg "The Grafana external URL cannot be determined. Leaving it empty in the Kiali CR."
     fi
-  fi
-
-  # OpenShift should always use its own auth strategy. For vanilla Kubernetes, set it to anonymous.
-  local auth_strategy="anonymous"
-  if [ "${IS_OPENSHIFT}" == "true" ]; then
-    auth_strategy="openshift"
   fi
 
   cat <<EOM | ${OC} apply -f -
@@ -281,4 +302,26 @@ status_ossmconsole_cr() {
   else
     infomsg "There are no OSSMConsole CRs in the cluster"
   fi
+}
+
+# Wait until OLM has installed an operator that registers this CRD (install-istio runs right after install-operators).
+# $1 = crd name, $2 = human description, $3 = max seconds (default 720)
+wait_for_cluster_crd() {
+  local crd_name="${1}"
+  local human="${2:-${crd_name}}"
+  local max_wait="${3:-720}"
+  local waited=0
+  infomsg "Waiting for CRD [${crd_name}] (${human})..."
+  while ! ${OC} get crd "${crd_name}" >& /dev/null; do
+    if [ "${waited}" -ge "${max_wait}" ]; then
+      errormsg "Timeout after ${max_wait}s waiting for CRD [${crd_name}] (${human}). Check the operator Subscription in ${OLM_OPERATORS_NAMESPACE} and catalog source."
+      exit 1
+    fi
+    echo -n "."
+    sleep 5
+    waited=$((waited + 5))
+  done
+  echo ""
+  ${OC} wait --for condition=established "crd/${crd_name}" --timeout=3m 2>/dev/null || true
+  infomsg "CRD [${crd_name}] is ready"
 }

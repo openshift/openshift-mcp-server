@@ -168,18 +168,26 @@ EOMCNI
 
   infomsg "Installing Istio CR"
   if [ "${istio_yaml_file}" == "" ]; then
-    local istio_profile="demo"
-    if [ "${IS_OPENSHIFT}" == "true" ]; then
-      istio_profile="demo" # no need to specify openshift here - the operator will detect we are openshift and apply the openshift platform profile for us in addition to the demo profile values
-    fi
+    # Sail applies implicit "default" + on OpenShift adds "openshift". Avoid "demo" here —
+    # extra preset only; see OSSM_ISTIO_PROFILE (Makefile default: default).
+    local istio_profile="${OSSM_ISTIO_PROFILE:-default}"
 
-    # find out where Tempo is
-    if [ -z "${TEMPO_NAMESPACE:-}" ]; then
-      TEMPO_NAMESPACE="$(${OC} get pods -l app.kubernetes.io/name=tempo --all-namespaces --no-headers --ignore-not-found=true 2>/dev/null | head -n1 | awk '{print $1}')"
+    local zipkin_address=""
+    if [ "${OSSM_TRACING_BACKEND:-jaeger}" = "jaeger" ]; then
+      # Istio jaeger addon exposes Zipkin ingestion on jaeger-collector:9411 (not the tracing UI svc).
+      zipkin_address="jaeger-collector.${control_plane_namespace}.svc.cluster.local:9411"
+      infomsg "Mesh tracing Zipkin address (Jaeger collector): [${zipkin_address}]"
+    else
+      # find out where Tempo is
       if [ -z "${TEMPO_NAMESPACE:-}" ]; then
-        errormsg "TEMPO_NAMESPACE not defined and cannot be auto-detected. Is Tempo installed?"
-        exit 1
+        TEMPO_NAMESPACE="$(${OC} get pods -l app.kubernetes.io/name=tempo --all-namespaces --no-headers --ignore-not-found=true 2>/dev/null | head -n1 | awk '{print $1}')"
+        if [ -z "${TEMPO_NAMESPACE:-}" ]; then
+          errormsg "TEMPO_NAMESPACE not defined and cannot be auto-detected. Is Tempo installed?"
+          exit 1
+        fi
       fi
+      zipkin_address="tempo-tempo-distributor.${TEMPO_NAMESPACE}.svc.cluster.local:9411"
+      infomsg "Mesh tracing Zipkin address (Tempo distributor): [${zipkin_address}]"
     fi
 
     local istio_yaml_file="/tmp/istio-cr.yaml"
@@ -196,10 +204,12 @@ spec:
   profile: ${istio_profile}
   values:
     meshConfig:
+      enableTracing: true
       defaultConfig:
         tracing:
+          sampling: 100.0
           zipkin:
-            address: "tempo-tempo-distributor.${TEMPO_NAMESPACE}:9411"
+            address: "${zipkin_address}"
 EOM
   fi
 
@@ -209,6 +219,43 @@ EOM
     sleep 5
   done
   infomsg "[${istio_yaml_file}] has been successfully applied to namespace [${control_plane_namespace}]."
+
+  ensure_istio_revision_tag_default "${istio_yaml_file}"
+}
+
+# Maps stable injection label istio.io/rev=<name> to the active control plane (RevisionBased).
+# See: https://istio.io/latest/docs/setup/upgrade/canary/#stable-revision-labels
+ensure_istio_revision_tag_default() {
+  local istio_yaml_file="${1:-}"
+  local istio_cr_name="default"
+  if [ -n "${istio_yaml_file}" ] && [ -f "${istio_yaml_file}" ]; then
+    istio_cr_name="$(${OC} get -f "${istio_yaml_file}" -o jsonpath='{.metadata.name}' 2> /dev/null || true)"
+    if [ -z "${istio_cr_name}" ]; then
+      istio_cr_name="default"
+    fi
+  fi
+  if ! ${OC} get crd istiorevisiontags.sailoperator.io >& /dev/null; then
+    infomsg "IstioRevisionTag CRD not found; skip stable revision tag [${istio_cr_name}]"
+    return 0
+  fi
+  infomsg "Ensuring IstioRevisionTag [${istio_cr_name}] references Istio/${istio_cr_name} (namespaces may use istio.io/rev=${istio_cr_name})"
+  local tag_yaml="/tmp/istio-revision-tag-${istio_cr_name}.yaml"
+  cat <<EOM > "${tag_yaml}"
+apiVersion: sailoperator.io/v1
+kind: IstioRevisionTag
+metadata:
+  name: ${istio_cr_name}
+spec:
+  targetRef:
+    kind: Istio
+    name: ${istio_cr_name}
+EOM
+  while ! ${OC} apply -f "${tag_yaml}"
+  do
+    errormsg "WARNING: Failed to apply IstioRevisionTag [${istio_cr_name}] - retrying in 5 seconds..."
+    sleep 5
+  done
+  infomsg "IstioRevisionTag [${istio_cr_name}] applied."
 }
 
 delete_servicemesh_operators() {
