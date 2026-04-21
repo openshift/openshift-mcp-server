@@ -67,73 +67,7 @@ install_kiali_cr() {
     exit 1
   fi
 
-  local auth_strategy="anonymous"
-  if [ "${IS_OPENSHIFT}" == "true" ]; then
-    auth_strategy="openshift"
-  fi
-
-  if [ "${OSSM_TRACING_BACKEND:-jaeger}" = "jaeger" ]; then
-    infomsg "Installing Kiali CR with Jaeger tracing (OSSM_TRACING_BACKEND=jaeger)"
-    cat <<EOM | ${OC} apply -f -
-apiVersion: kiali.io/v1alpha1
-kind: Kiali
-metadata:
-  name: kiali
-  namespace: ${control_plane_namespace}
-spec:
-  version: ${KIALI_VERSION}
-  auth:
-    strategy: ${auth_strategy}
-  external_services:
-    tracing:
-      enabled: true
-      provider: jaeger
-      in_cluster_url: "http://tracing.${control_plane_namespace}.svc.cluster.local:16685/jaeger"
-      use_grpc: true
-EOM
-    return 0
-  fi
-
-  if [ -z "${TEMPO_NAMESPACE:-}" ]; then
-    TEMPO_NAMESPACE="$(${OC} get pods -l app.kubernetes.io/name=tempo --all-namespaces --no-headers --ignore-not-found=true 2>/dev/null | head -n1 | awk '{print $1}')"
-    if [ -z "${TEMPO_NAMESPACE:-}" ]; then
-      errormsg "TEMPO_NAMESPACE not defined and cannot be auto-detected. Is Tempo installed?"
-      exit 1
-    fi
-  fi
-
-  # Try to determine the external URL for the tracing UI
-  local tracing_external_url=""
-  if [ "${IS_OPENSHIFT}" == "true" ]; then
-    # we installed TempoStack CR configured for "route" when on OpenShift, so look for the route URL
-    tracing_external_url="$(${OC} get route -n ${TEMPO_NAMESPACE} -l app.kubernetes.io/name=tempo,app.kubernetes.io/component=query-frontend -o jsonpath='https://{..spec.host}')"
-    infomsg "The tracing external URL is the OpenShift route located at [${tracing_external_url}]"
-  else
-    # we installed TempoStack CR configured for "ingress" when on vanilla Kubernetes, so look for the ingress URL
-    local tracing_ingress_host="$(${OC} -n ${TEMPO_NAMESPACE} get ingress -l app.kubernetes.io/name=tempo,app.kubernetes.io/component=query-frontend -o jsonpath='{..status.loadBalancer.ingress[0].ip}' 2> /dev/null)"
-    if [ -n "${tracing_ingress_host}" ]; then
-      tracing_external_url="http://${tracing_ingress_host}:80"
-      infomsg "The tracing external URL is the LoadBalancer endpoint located at [${tracing_external_url}]"
-    else
-      infomsg "The tracing external URL cannot be determined. Leaving it empty in the Kiali CR."
-    fi
-  fi
-
-  # Try to determine the external URL for the Grafana UI
-  local grafana_external_url=""
-  if [ "${IS_OPENSHIFT}" == "true" ]; then
-    grafana_external_url="$(${OC} get route -n ${CONTROL_PLANE_NAMESPACE} grafana -o jsonpath='http://{..spec.host}')"
-    infomsg "The Grafana external URL is the OpenShift route located at [${grafana_external_url}]"
-  else
-    local grafana_ingress_host="$(${OC} -n ${CONTROL_PLANE_NAMESPACE} get svc grafana -o jsonpath='{..status.loadBalancer.ingress[0].ip}' 2> /dev/null)"
-    if [ -n "${grafana_ingress_host}" ]; then
-      grafana_external_url="http://${grafana_ingress_host}:3000"
-      infomsg "The Grafana external URL is the LoadBalancer endpoint located at [${grafana_external_url}]"
-    else
-      infomsg "The Grafana external URL cannot be determined. Leaving it empty in the Kiali CR."
-    fi
-  fi
-
+  infomsg "Installing Kiali CR with Jaeger tracing (auth.strategy: anonymous)"
   cat <<EOM | ${OC} apply -f -
 apiVersion: kiali.io/v1alpha1
 kind: Kiali
@@ -143,22 +77,13 @@ metadata:
 spec:
   version: ${KIALI_VERSION}
   auth:
-    strategy: ${auth_strategy}
+    strategy: anonymous
   external_services:
-    grafana:
-      enabled: true
-      internal_url: "http://grafana.${CONTROL_PLANE_NAMESPACE}:3000"
-      external_url: "${grafana_external_url}"
-      in_cluster_url: "http://grafana.${CONTROL_PLANE_NAMESPACE}:3000"
-      url: "${grafana_external_url}"
     tracing:
       enabled: true
-      provider: tempo
-      internal_url: "http://tempo-tempo-query-frontend.${TEMPO_NAMESPACE}:3200"
-      external_url: "${tracing_external_url}"
-      in_cluster_url: "http://tempo-tempo-query-frontend.${TEMPO_NAMESPACE}:3200"
-      url: "${tracing_external_url}"
-      use_grpc: false
+      provider: jaeger
+      in_cluster_url: "http://tracing.${control_plane_namespace}.svc.cluster.local:16685/jaeger"
+      use_grpc: true
 EOM
 }
 

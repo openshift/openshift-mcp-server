@@ -2,9 +2,7 @@
 
 # OSSM/Sail install scripts vendored under hack/kiali/ (see hack/kiali/UPSTREAM.txt).
 OSSM_INSTALL_SCRIPT := $(abspath $(CURDIR)/hack/kiali/install-ossm-release.sh)
-# jaeger: skip Tempo, mesh Zipkin -> jaeger-collector.<cp-ns>:9411, minimal Kiali CR. tempo: upstream behaviour.
-OSSM_TRACING_BACKEND ?= jaeger
-export OSSM_TRACING_BACKEND
+# Tracing: Jaeger addon only (no Tempo in vendored OSSM scripts). Mesh Zipkin -> jaeger-collector.<cp-ns>:9411.
 # Sail Istio.spec.profile (not "demo" unless you want that preset). Passed to install-ossm-release.sh / func-sm.sh.
 OSSM_ISTIO_PROFILE ?= default
 export OSSM_ISTIO_PROFILE

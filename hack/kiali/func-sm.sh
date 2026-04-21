@@ -172,23 +172,9 @@ EOMCNI
     # extra preset only; see OSSM_ISTIO_PROFILE (Makefile default: default).
     local istio_profile="${OSSM_ISTIO_PROFILE:-default}"
 
-    local zipkin_address=""
-    if [ "${OSSM_TRACING_BACKEND:-jaeger}" = "jaeger" ]; then
-      # Istio jaeger addon exposes Zipkin ingestion on jaeger-collector:9411 (not the tracing UI svc).
-      zipkin_address="jaeger-collector.${control_plane_namespace}.svc.cluster.local:9411"
-      infomsg "Mesh tracing Zipkin address (Jaeger collector): [${zipkin_address}]"
-    else
-      # find out where Tempo is
-      if [ -z "${TEMPO_NAMESPACE:-}" ]; then
-        TEMPO_NAMESPACE="$(${OC} get pods -l app.kubernetes.io/name=tempo --all-namespaces --no-headers --ignore-not-found=true 2>/dev/null | head -n1 | awk '{print $1}')"
-        if [ -z "${TEMPO_NAMESPACE:-}" ]; then
-          errormsg "TEMPO_NAMESPACE not defined and cannot be auto-detected. Is Tempo installed?"
-          exit 1
-        fi
-      fi
-      zipkin_address="tempo-tempo-distributor.${TEMPO_NAMESPACE}.svc.cluster.local:9411"
-      infomsg "Mesh tracing Zipkin address (Tempo distributor): [${zipkin_address}]"
-    fi
+    # Istio jaeger addon: Zipkin ingestion on jaeger-collector:9411 (not the tracing query UI svc).
+    local zipkin_address="jaeger-collector.${control_plane_namespace}.svc.cluster.local:9411"
+    infomsg "Mesh tracing Zipkin address (Jaeger collector): [${zipkin_address}]"
 
     local istio_yaml_file="/tmp/istio-cr.yaml"
     cat <<EOM > ${istio_yaml_file}
