@@ -103,5 +103,5 @@ func obsMCPToolsetParser(_ context.Context, primitive toml.Primitive, md toml.Me
 }
 
 func init() {
-	serverconfig.RegisterToolsetConfig("obs-mcp", obsMCPToolsetParser)
+	serverconfig.RegisterToolsetConfig("metrics", obsMCPToolsetParser)
 }
