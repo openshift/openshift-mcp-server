@@ -1,0 +1,15 @@
+kind: Task
+metadata:
+  name: probe-http
+steps:
+  verify:
+    contains: "status_code"
+  prompt:
+    inline: You have a specialized tool called probe_http. Use it to send an HTTP GET request to https://kubernetes.default.svc:443 from the MCP server host to verify reachability. Report the status code and response headers.
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "probe_http"
+        args:
+          url: "https://kubernetes.default.svc:443"
+          method: "GET"
