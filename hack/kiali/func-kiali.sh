@@ -58,9 +58,7 @@ EOM
 install_kiali_cr() {
   local control_plane_namespace="${1}"
   infomsg "Installing the Kiali CR after CRD has been established"
-  echo -n "Waiting."
-  while ! ${OC} get crd kialis.kiali.io >& /dev/null ; do echo -n '.'; sleep 1; done
-  ${OC} wait --for condition=established crd/kialis.kiali.io
+  wait_for_cluster_crd "kialis.kiali.io" "Kiali Operator" "${INSTALL_ISTIO_CRD_WAIT_SECONDS:-720}"
 
   if ! ${OC} get namespace ${control_plane_namespace} >& /dev/null; then
     errormsg "Control plane namespace does not exist [${control_plane_namespace}]"
@@ -95,9 +93,7 @@ EOM
 install_ossmconsole_cr() {
   local ossmconsole_namespace="${1}"
   infomsg "Installing the OSSMConsole CR after CRD has been established"
-  echo -n "Waiting."
-  while ! ${OC} get crd ossmconsoles.kiali.io >& /dev/null ; do echo -n '.'; sleep 1; done
-  ${OC} wait --for condition=established crd/ossmconsoles.kiali.io
+  wait_for_cluster_crd "ossmconsoles.kiali.io" "Kiali Operator (OSSMConsole)" "${INSTALL_ISTIO_CRD_WAIT_SECONDS:-720}"
 
   if ! ${OC} get kiali --all-namespaces -o name 2>/dev/null | grep -q .; then
     errormsg "OSSMC cannot be installed because Kiali is not yet installed."

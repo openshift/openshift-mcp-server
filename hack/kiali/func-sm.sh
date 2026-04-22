@@ -82,10 +82,26 @@ install_istio() {
   done
 
   infomsg "Expecting Service Mesh operator deployment to be created"
-  echo -n "Waiting."
-  while ! ${OC} get deployment -n ${OLM_OPERATORS_NAMESPACE} -o name | grep -E 'sail|servicemesh|istio' >& /dev/null ; do echo -n '.'; sleep 1; done
-  echo "done."
-  local servicemesh_deployment="$(${OC} get deployment -n ${OLM_OPERATORS_NAMESPACE} -o name | grep -E 'sail|servicemesh|istio')"
+  local mesh_deploy_wait="${INSTALL_ISTIO_CRD_WAIT_SECONDS:-720}"
+  local mesh_deploy_waited=0
+  local servicemesh_deployment=""
+  infomsg "Waiting for operator Deployment(s) in [${OLM_OPERATORS_NAMESPACE}] matching sail|servicemesh|istio (up to ${mesh_deploy_wait}s)..."
+  while true; do
+    servicemesh_deployment="$(${OC} get deployment -n "${OLM_OPERATORS_NAMESPACE}" -o name 2>/dev/null | grep -E 'sail|servicemesh|istio' || true)"
+    if echo "${servicemesh_deployment}" | grep -q '[^[:space:]]'; then
+      echo ""
+      infomsg "Service Mesh operator deployment(s) found."
+      break
+    fi
+    if [ "${mesh_deploy_waited}" -ge "${mesh_deploy_wait}" ]; then
+      echo ""
+      errormsg "Timeout after ${mesh_deploy_wait}s waiting for Sail/ServiceMesh operator Deployment in [${OLM_OPERATORS_NAMESPACE}]. Check Subscription [my-sailoperator], InstallPlans, and catalog source in that namespace."
+      exit 1
+    fi
+    echo -n "."
+    sleep 5
+    mesh_deploy_waited=$((mesh_deploy_waited + 5))
+  done
 
   infomsg "Waiting for operator deployments to start..."
   for op in ${servicemesh_deployment}
