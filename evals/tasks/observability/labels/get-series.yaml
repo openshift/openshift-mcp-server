@@ -16,11 +16,11 @@ metadata:
 spec:
   verify:
     - llmJudge:
-        contains: "series"
-        reason: "Verify the output reports time series information"
+        contains: "namespace"
+        reason: "Verify the agent called get_series and reported the results: either listing actual series data containing label dimensions like namespace, or confirming no series were found"
     - llmJudge:
-        contains: "kube_pod_info"
-        reason: "Verify the agent queried the correct metric"
+        contains: "node"
+        reason: "Verify the agent called get_series and reported series data with node label values, or explicitly confirmed the metric has no series with node labels"
   prompt:
     inline: |
       How many time series exist for the kube_pod_info metric? Show the cardinality.

@@ -17,7 +17,7 @@ spec:
   verify:
     - llmJudge:
         contains: "kube_pod_status_phase"
-        reason: "Verify the agent used the correct metric for pod phase status"
+        reason: "Verify the agent called execute_instant_query with the correct metric kube_pod_status_phase and reported the results: either listing pending pods, or explicitly confirming no pods are in pending state"
   prompt:
     inline: |
       Which pods are stuck in pending state?

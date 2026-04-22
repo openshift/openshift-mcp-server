@@ -15,8 +15,8 @@ metadata:
 spec:
   verify:
     - llmJudge:
-        contains: "node"
-        reason: "Verify the output lists node-related metrics"
+        contains: "node_"
+        reason: "Verify the agent called list_metrics and reported the results: the output should list specific node metrics discovered from Prometheus (e.g. node_cpu_seconds_total)"
   prompt:
     inline: |
       What node-related metrics are available in Prometheus?

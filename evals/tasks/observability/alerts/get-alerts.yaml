@@ -15,8 +15,8 @@ metadata:
 spec:
   verify:
     - llmJudge:
-        contains: "alerts"
-        reason: "Verify the output reports on the alert state, whether alerts are firing or not"
+        contains: "alertname"
+        reason: "Verify the agent called get_alerts and reported the results: either listing specific alert names with their status, or explicitly confirming that no alerts are currently firing"
   prompt:
     inline: |
       Check the cluster for any firing alerts and report what you find.

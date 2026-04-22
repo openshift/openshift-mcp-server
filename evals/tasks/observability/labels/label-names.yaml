@@ -17,10 +17,10 @@ spec:
   verify:
     - llmJudge:
         contains: "namespace"
-        reason: "Verify the output includes the namespace label which is a standard Kubernetes label"
+        reason: "Verify the agent called get_label_names and reported the results: the output should include the namespace label which is a standard Kubernetes label"
     - llmJudge:
         contains: "pod"
-        reason: "Verify the output includes the pod label"
+        reason: "Verify the agent called get_label_names and reported the results: the output should include the pod label"
   prompt:
     inline: |
       What labels are available for the kube_pod_info metric?

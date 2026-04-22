@@ -16,10 +16,10 @@ spec:
   verify:
     - llmJudge:
         contains: "container_network_receive_bytes_total"
-        reason: "Verify the agent queried the correct network metric"
+        reason: "Verify the agent called execute_instant_query with the correct network metric container_network_receive_bytes_total and reported the results"
     - llmJudge:
         contains: "pod"
-        reason: "Verify the response identifies specific pods"
+        reason: "Verify the agent reported query results identifying specific pods, or explicitly confirmed no network data is available"
   prompt:
     inline: |
       Which pods are receiving the most network traffic?
