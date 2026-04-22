@@ -9,4 +9,4 @@ steps:
   assertions:
     toolsUsed:
       - server: kubernetes
-        toolPattern: "netedge__get_router_sessions"
+        toolPattern: "get_router_sessions"
