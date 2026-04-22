@@ -15,8 +15,8 @@ metadata:
 spec:
   verify:
     - llmJudge:
-        contains: "kube"
-        reason: "Verify the output lists Kubernetes metrics matching the kube prefix"
+        contains: "kube_pod_info"
+        reason: "Verify the agent called list_metrics and reported the results: the output should list specific kube metrics discovered from Prometheus"
   prompt:
     inline: |
       List all available Prometheus metrics that contain 'kube' in the name.

@@ -15,8 +15,8 @@ metadata:
 spec:
   verify:
     - llmJudge:
-        contains: "namespace"
-        reason: "Verify the output lists actual namespace values from the cluster"
+        contains: "kube-system"
+        reason: "Verify the agent called get_label_values and reported the results: the output should list actual namespace values from the cluster such as kube-system"
   prompt:
     inline: |
       What are the unique namespace values for the kube_pod_info metric?

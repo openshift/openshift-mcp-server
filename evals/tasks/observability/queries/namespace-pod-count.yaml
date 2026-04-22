@@ -17,11 +17,11 @@ metadata:
 spec:
   verify:
     - llmJudge:
-        contains: "namespace"
-        reason: "Verify the response lists namespaces"
+        contains: "kube-system"
+        reason: "Verify the agent called execute_instant_query and reported the results: the response should list actual namespace names from the cluster such as kube-system"
     - llmJudge:
-        contains: "pod"
-        reason: "Verify the response includes pod counts"
+        contains: "kube_pod"
+        reason: "Verify the agent called execute_instant_query with a kube_pod metric to count pods and reported the results"
   prompt:
     inline: |
       Which namespaces have the most running pods? Show me the top 5.

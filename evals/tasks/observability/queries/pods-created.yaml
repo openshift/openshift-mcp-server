@@ -16,7 +16,7 @@ spec:
   verify:
     - llmJudge:
         contains: "kube_pod_created"
-        reason: "Verify the agent used the correct metric for pod creation timestamps"
+        reason: "Verify the agent called execute_range_query with the kube_pod_created metric and reported the results: either listing recently created pods, or explicitly confirming no pods were created in the time window"
   prompt:
     inline: |
       How many pods were created in the last 5 minutes?

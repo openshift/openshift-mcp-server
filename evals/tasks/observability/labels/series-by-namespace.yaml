@@ -17,11 +17,11 @@ metadata:
 spec:
   verify:
     - llmJudge:
-        contains: "series"
-        reason: "Verify the agent reported series information"
+        contains: "pod"
+        reason: "Verify the agent called get_series and reported the results: either listing actual series data containing label dimensions like pod, or confirming no series were found for the given namespace"
     - llmJudge:
-        contains: "monitoring"
-        reason: "Verify the agent scoped to the monitoring namespace"
+        contains: "container"
+        reason: "Verify the agent called get_series and reported series with container label values from the monitoring namespace, or explicitly confirmed no matching series exist"
   prompt:
     inline: |
       How many time series exist for container_cpu_usage_seconds_total

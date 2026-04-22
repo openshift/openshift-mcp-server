@@ -16,7 +16,7 @@ spec:
   verify:
     - llmJudge:
         contains: "prometheus_tsdb_wal_storage_size_bytes"
-        reason: "Verify the agent used the correct WAL storage metric"
+        reason: "Verify the agent called execute_instant_query with the correct WAL storage metric prometheus_tsdb_wal_storage_size_bytes and reported the current WAL size"
   prompt:
     inline: |
       What is the current storage size of the Prometheus WAL?

@@ -16,7 +16,7 @@ spec:
   verify:
     - llmJudge:
         contains: "prometheus_http_requests_total"
-        reason: "Verify the agent used the correct HTTP requests metric"
+        reason: "Verify the agent called execute_instant_query with the correct HTTP requests metric prometheus_http_requests_total and reported the request rate"
   prompt:
     inline: |
       How many requests per second are being made to Prometheus?

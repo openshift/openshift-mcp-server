@@ -17,11 +17,11 @@ metadata:
 spec:
   verify:
     - llmJudge:
-        contains: "alert"
-        reason: "Verify the agent retrieved and reported on alerts"
+        contains: "alertname"
+        reason: "Verify the agent called get_alerts and reported the results: either listing specific alert names with their status, or explicitly confirming that no critical alerts exist"
     - llmJudge:
-        contains: "critical"
-        reason: "Verify the agent filtered or addressed the critical severity"
+        contains: "severity"
+        reason: "Verify the agent addressed the severity filter in its response"
   prompt:
     inline: |
       Are there any firing alerts with severity=critical? Show only active alerts.

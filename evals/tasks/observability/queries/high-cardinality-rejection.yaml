@@ -16,8 +16,8 @@ metadata:
 spec:
   verify:
     - llmJudge:
-        contains: "namespace"
-        reason: "Verify the agent suggests scoping the query by namespace or another dimension"
+        contains: "guardrail"
+        reason: "Verify the agent attempted a query that was rejected by a guardrail and reported the result: the response should explain the guardrail rejection and suggest a scoped alternative"
   prompt:
     inline: |
       Show me the CPU, memory, network, and disk usage for every single container

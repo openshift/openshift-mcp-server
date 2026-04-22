@@ -16,8 +16,8 @@ metadata:
 spec:
   verify:
     - llmJudge:
-        contains: "up"
-        reason: "Verify the agent confirmed the metrics backend is reachable and targets are up"
+        contains: "prometheus-k8s"
+        reason: "Verify the agent called execute_instant_query with the up metric and reported the results: the response should confirm the prometheus-k8s target status"
   prompt:
     inline: |
       Is the metrics backend reachable? Query up{job="prometheus-k8s"} and report the status.
