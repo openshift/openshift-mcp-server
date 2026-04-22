@@ -78,6 +78,7 @@ install_istio() {
   local control_plane_namespace="${1}"
   local istio_version="${2}"
   local istio_yaml_file="${3:-}"
+  local istio_yaml_owned="false"
 
   # CRD list from "oc get crds -oname | grep istio.io" (Sail/Istio). Each CRD is waited on with a bounded timeout
   # (INSTALL_ISTIO_CRD_WAIT_SECONDS, default 720) via wait_for_cluster_crd (func-kiali.sh).
@@ -161,6 +162,10 @@ install_istio() {
   # "latest" is not a supported version when using a released version of Sail operator.
   # We try to determine the latest version of Istio supported by examining the CRD.
   if [ "${istio_version}" == "latest" ]; then
+    if ! command -v jq >/dev/null 2>&1; then
+      errormsg "Resolving Istio version 'latest' requires jq. Install jq (e.g. dnf install jq / apt install jq) or pass an explicit version with --istio-version."
+      exit 1
+    fi
     istio_version="$(${OC} get crd istios.sailoperator.io -o json | jq -r '
       (.spec.versions | map(select(.storage == true)) | first) as $st
       | (if ($st | type) == "object" then $st
@@ -182,15 +187,16 @@ install_istio() {
   # IstioCNI is required for OpenShift. When on OpenShift, ensure there is one and only one IstioCNI installed.
   # It must be named "default". It will always refer to the namespace "istio-cni".
   if [ "${IS_OPENSHIFT}" == "true" ]; then
-    local istiocni_yaml_file="/tmp/istiocni-cr.yaml"
     local istiocni_name="default"
     if ! ${OC} get istiocni ${istiocni_name} >& /dev/null; then
+      local istiocni_yaml_file
+      istiocni_yaml_file="$(mktemp "${TMPDIR:-/tmp}/istiocni-cr.XXXXXX.yaml" 2>/dev/null || mktemp "${TMPDIR:-/tmp}/istiocni-cr.XXXXXX")"
       if ! ${OC} get namespace istio-cni >& /dev/null; then
         infomsg "Creating istio-cni namespace"
         ${OC} create namespace istio-cni
       fi
       infomsg "Installing IstioCNI CR"
-      cat <<EOMCNI > ${istiocni_yaml_file}
+      cat <<EOMCNI > "${istiocni_yaml_file}"
 apiVersion: sailoperator.io/v1
 kind: IstioCNI
 metadata:
@@ -200,6 +206,7 @@ spec:
   namespace: istio-cni
 EOMCNI
       ossm_apply_with_retries "${istiocni_yaml_file}" "IstioCNI CR"
+      rm -f "${istiocni_yaml_file}"
       infomsg "IstioCNI has been successfully created"
     else
       infomsg "IstioCNI already exists; will not create another one"
@@ -218,8 +225,9 @@ EOMCNI
     local zipkin_address="jaeger-collector.${control_plane_namespace}.svc.cluster.local:9411"
     infomsg "Mesh tracing Zipkin address (Jaeger collector): [${zipkin_address}]"
 
-    local istio_yaml_file="/tmp/istio-cr.yaml"
-    cat <<EOM > ${istio_yaml_file}
+    istio_yaml_file="$(mktemp "${TMPDIR:-/tmp}/istio-cr.XXXXXX.yaml" 2>/dev/null || mktemp "${TMPDIR:-/tmp}/istio-cr.XXXXXX")"
+    istio_yaml_owned="true"
+    cat <<EOM > "${istio_yaml_file}"
 apiVersion: sailoperator.io/v1
 kind: Istio
 metadata:
@@ -245,6 +253,9 @@ EOM
   infomsg "[${istio_yaml_file}] has been successfully applied to namespace [${control_plane_namespace}]."
 
   ensure_istio_revision_tag_default "${istio_yaml_file}"
+  if [ "${istio_yaml_owned}" = "true" ] && [ -n "${istio_yaml_file}" ] && [ -f "${istio_yaml_file}" ]; then
+    rm -f "${istio_yaml_file}"
+  fi
 }
 
 # Maps stable injection label istio.io/rev=<name> to the active control plane (RevisionBased).
@@ -263,7 +274,8 @@ ensure_istio_revision_tag_default() {
     return 0
   fi
   infomsg "Ensuring IstioRevisionTag [${istio_cr_name}] references Istio/${istio_cr_name} (namespaces may use istio.io/rev=${istio_cr_name})"
-  local tag_yaml="/tmp/istio-revision-tag-${istio_cr_name}.yaml"
+  local tag_yaml
+  tag_yaml="$(mktemp "${TMPDIR:-/tmp}/istio-revision-tag.XXXXXX.yaml" 2>/dev/null || mktemp "${TMPDIR:-/tmp}/istio-revision-tag.XXXXXX")"
   cat <<EOM > "${tag_yaml}"
 apiVersion: sailoperator.io/v1
 kind: IstioRevisionTag
@@ -275,6 +287,7 @@ spec:
     name: ${istio_cr_name}
 EOM
   ossm_apply_with_retries "${tag_yaml}" "IstioRevisionTag [${istio_cr_name}]"
+  rm -f "${tag_yaml}"
   infomsg "IstioRevisionTag [${istio_cr_name}] applied."
 }
 
@@ -411,13 +424,21 @@ delete_istio() {
     fi
   done
 
-  infomsg "Deleting the control plane and CNI namespaces"
-  for ns in ${doomed_namespaces}
-  do
-    [ -z "$(echo "${ns}" | tr -d '[:space:]')" ] && continue
-    [ "${ns}" = "<none>" ] && continue
-    ${OC} delete namespace "${ns}"
-  done
+  if [ "${OSSM_DELETE_ISTIO_NAMESPACES:-}" != "yes" ]; then
+    infomsg "Skipping namespace deletion (namespaces from CRs: $(echo "${doomed_namespaces}" | tr '\n' ' ')). To delete them, run delete-istio with -dn/--delete-namespaces or set OSSM_DELETE_ISTIO_NAMESPACES=yes."
+  else
+    local cp_ns="${CONTROL_PLANE_NAMESPACE:-}"
+    if [ -n "${cp_ns}" ] && echo "${doomed_namespaces}" | grep -Fxq "${cp_ns}"; then
+      ossm_prompt_yes_or_env_confirm "Deletion includes control-plane namespace [${cp_ns}]. Type 'yes' to delete namespaces: "
+    fi
+    infomsg "Deleting the control plane and CNI namespaces (OSSM_DELETE_ISTIO_NAMESPACES=yes)"
+    for ns in ${doomed_namespaces}
+    do
+      [ -z "$(echo "${ns}" | tr -d '[:space:]')" ] && continue
+      [ "${ns}" = "<none>" ] && continue
+      ${OC} delete namespace "${ns}"
+    done
+  fi
 }
 
 status_servicemesh_operators() {

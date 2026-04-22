@@ -19,6 +19,16 @@ source ${SCRIPT_ROOT}/func-kiali.sh
 source ${SCRIPT_ROOT}/func-addons.sh
 source ${SCRIPT_ROOT}/func-log.sh
 
+# Next-arg must be present and not look like another flag (avoids set -u blow-up on missing values).
+ossm_install_require_opt_value() {
+  local flag="$1"
+  local val="${2:-}"
+  if [ -z "${val}" ] || [ "${val#-}" != "${val}" ]; then
+    errormsg "Option [${flag}] requires a value. The next argument is missing or starts with '-' (use a non-flag value)."
+    exit 1
+  fi
+}
+
 DEFAULT_CONTROL_PLANE_NAMESPACE="istio-system"
 DEFAULT_ENABLE_KIALI="true"
 DEFAULT_ENABLE_OSSMCONSOLE="true"
@@ -27,6 +37,8 @@ DEFAULT_OC="oc"
 DEFAULT_ISTIO_VERSION="latest"
 DEFAULT_KIALI_VERSION="default"
 DEFAULT_CATALOG_SOURCE="redhat"
+
+OSSM_DELETE_ISTIO_NAMESPACES="${OSSM_DELETE_ISTIO_NAMESPACES:-}"
 
 _CMD=""
 while [[ $# -gt 0 ]]; do
@@ -44,14 +56,16 @@ while [[ $# -gt 0 ]]; do
 
     # OPTIONS
 
-    -a|--addons)                    ADDONS="${2}"                  ; shift;shift ;;
-    -c|--client)                    OC="${2}"                      ; shift;shift ;;
-    -cpn|--control-plane-namespace) CONTROL_PLANE_NAMESPACE="${2}" ; shift;shift ;;
-    -cs|--catalog-source)           CATALOG_SOURCE="${2}"          ; shift;shift ;;
-    -ek|--enable-kiali)             ENABLE_KIALI="${2}"            ; shift;shift ;;
-    -eo|--enable-ossmconsole)       ENABLE_OSSMCONSOLE="${2}"      ; shift;shift ;;
-    -iv|--istio-version)            ISTIO_VERSION="${2}"           ; shift;shift ;;
-    -kv|--kiali-version)            KIALI_VERSION="${2}"           ; shift;shift ;;
+    -dn|--delete-namespaces)        OSSM_DELETE_ISTIO_NAMESPACES="yes" ; shift ;;
+
+    -a|--addons)                    ossm_install_require_opt_value "${key}" "${2:-}"; ADDONS="${2}"                  ; shift;shift ;;
+    -c|--client)                    ossm_install_require_opt_value "${key}" "${2:-}"; OC="${2}"                      ; shift;shift ;;
+    -cpn|--control-plane-namespace) ossm_install_require_opt_value "${key}" "${2:-}"; CONTROL_PLANE_NAMESPACE="${2}" ; shift;shift ;;
+    -cs|--catalog-source)           ossm_install_require_opt_value "${key}" "${2:-}"; CATALOG_SOURCE="${2}"          ; shift;shift ;;
+    -ek|--enable-kiali)             ossm_install_require_opt_value "${key}" "${2:-}"; ENABLE_KIALI="${2}"            ; shift;shift ;;
+    -eo|--enable-ossmconsole)       ossm_install_require_opt_value "${key}" "${2:-}"; ENABLE_OSSMCONSOLE="${2}"      ; shift;shift ;;
+    -iv|--istio-version)            ossm_install_require_opt_value "${key}" "${2:-}"; ISTIO_VERSION="${2}"           ; shift;shift ;;
+    -kv|--kiali-version)            ossm_install_require_opt_value "${key}" "${2:-}"; KIALI_VERSION="${2}"           ; shift;shift ;;
 
     # HELP
 
@@ -79,6 +93,11 @@ Valid options:
       The name of the control plane namespace if Istio is to be installed.
       This is only used with the "install-istio" command.
       Default: ${DEFAULT_CONTROL_PLANE_NAMESPACE}
+
+  -dn|--delete-namespaces
+      Only with delete-istio: after removing CRs, delete the control plane and CNI namespaces
+      inferred from Istio/IstioCNI (destructive). Omitted by default so shared namespaces are not removed.
+      If the list includes the namespace from --control-plane-namespace, you must confirm (type yes), or set OSSM_DELETE_CONFIRM=yes when not on a TTY.
 
   -cs|--catalog-source <redhat|community>
       The name of the OpenShift catalog source where the operators will come from. You can choose
@@ -127,7 +146,7 @@ The command must be one of:
   * install-operators: Install the latest version of the Sail operator and (if --enable-kiali is "true") the Kiali operator.
   * install-istio: Install Istio control plane (you must first have installed the operators). Also installs the configured addons.
   * delete-operators: Delete the Sail and Kiali operators (you must first delete all Istio control planes and Kiali CRs manually).
-  * delete-istio: Uninstalls Istio control plane, Kiali, as well as uninstalls any and all addons.
+  * delete-istio: Uninstalls Istio control plane, Kiali, and addons. Namespaces are only deleted if -dn/--delete-namespaces is set (or OSSM_DELETE_ISTIO_NAMESPACES=yes).
   * status: Provides details about resources that have been installed (not including the addons).
   * kiali-ui: Pops up a browser tab pointing to the Kiali UI.
 
@@ -311,19 +330,24 @@ elif [ "${_CMD}" == "status" ]; then
 elif [ "${_CMD}" == "kiali-ui" ]; then
 
   if [ "${IS_OPENSHIFT}" == "true" ]; then
-     kiali_host="$(${OC} -n "${CONTROL_PLANE_NAMESPACE}" get route kiali -o jsonpath='{.spec.host}' 2>/dev/null)"
+    kiali_host="$(${OC} -n "${CONTROL_PLANE_NAMESPACE}" get route kiali -o jsonpath='{.spec.host}' 2>/dev/null)"
     if [ -z "${kiali_host}" ]; then
       errormsg "Kiali Route not found in namespace [${CONTROL_PLANE_NAMESPACE}]. Is the Kiali CR ready?"
       exit 1
     fi
     kiali_url="http://${kiali_host}"
   else
-    kiali_ip="$(${OC} -n "${CONTROL_PLANE_NAMESPACE}" get svc kiali -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)"
-    if [ -z "${kiali_ip}" ]; then
-      errormsg "Kiali Service LoadBalancer ingress IP is not yet assigned in [${CONTROL_PLANE_NAMESPACE}]."
+    kiali_lb_hostname="$(${OC} -n "${CONTROL_PLANE_NAMESPACE}" get svc kiali -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)"
+    kiali_lb_ip="$(${OC} -n "${CONTROL_PLANE_NAMESPACE}" get svc kiali -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)"
+    if [ -n "${kiali_lb_hostname}" ]; then
+      kiali_lb_host_or_ip="${kiali_lb_hostname}"
+    elif [ -n "${kiali_lb_ip}" ]; then
+      kiali_lb_host_or_ip="${kiali_lb_ip}"
+    else
+      errormsg "Kiali Service LoadBalancer ingress is not yet assigned in [${CONTROL_PLANE_NAMESPACE}]."
       exit 1
     fi
-    kiali_url="http://${kiali_ip}:20001"
+    kiali_url="http://${kiali_lb_host_or_ip}:20001"
   fi
 
   ossm_open_url_in_browser "${kiali_url}"
