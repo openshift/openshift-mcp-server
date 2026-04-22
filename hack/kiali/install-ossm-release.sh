@@ -311,9 +311,19 @@ elif [ "${_CMD}" == "status" ]; then
 elif [ "${_CMD}" == "kiali-ui" ]; then
 
   if [ "${IS_OPENSHIFT}" == "true" ]; then
-    kiali_url="http://$(${OC} -n ${CONTROL_PLANE_NAMESPACE} get route kiali -o jsonpath='{.spec.host}' 2> /dev/null)"
+     kiali_host="$(${OC} -n "${CONTROL_PLANE_NAMESPACE}" get route kiali -o jsonpath='{.spec.host}' 2>/dev/null)"
+    if [ -z "${kiali_host}" ]; then
+      errormsg "Kiali Route not found in namespace [${CONTROL_PLANE_NAMESPACE}]. Is the Kiali CR ready?"
+      exit 1
+    fi
+    kiali_url="http://${kiali_host}"
   else
-    kiali_url="http://$(${OC} -n ${CONTROL_PLANE_NAMESPACE} get svc kiali -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2> /dev/null):20001"
+    kiali_ip="$(${OC} -n "${CONTROL_PLANE_NAMESPACE}" get svc kiali -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)"
+    if [ -z "${kiali_ip}" ]; then
+      errormsg "Kiali Service LoadBalancer ingress IP is not yet assigned in [${CONTROL_PLANE_NAMESPACE}]."
+      exit 1
+    fi
+    kiali_url="http://${kiali_ip}:20001"
   fi
 
   ossm_open_url_in_browser "${kiali_url}"
