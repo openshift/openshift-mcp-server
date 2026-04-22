@@ -185,7 +185,7 @@ status_kiali_operator() {
 status_kiali_cr() {
   infomsg ""
   infomsg "===== Kiali CRs"
-  if [ "$(${OC} get kiali --all-namespaces 2> /dev/null | wc -l)" -gt "0" ] ; then
+  if ${OC} get kiali --all-namespaces -o name 2>/dev/null | grep -q .; then
     infomsg "One or more Kiali CRs exist in the cluster"
     ${OC} get kiali --all-namespaces
     infomsg ""
@@ -212,7 +212,7 @@ status_kiali_cr() {
 status_ossmconsole_cr() {
   infomsg ""
   infomsg "===== OSSMConsole CRs"
-  if [ "$(${OC} get ossmconsole --all-namespaces 2> /dev/null | wc -l)" -gt "0" ] ; then
+  if ${OC} get ossmconsole --all-namespaces -o name 2>/dev/null | grep -q .; then
     infomsg "One or more OSSMConsole CRs exist in the cluster"
     ${OC} get ossmconsole --all-namespaces
     infomsg ""

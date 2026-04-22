@@ -130,12 +130,12 @@ install-bookinfo-openshift: fetch-bookinfo-hack download-bookinfo-istio ## Insta
 .PHONY: ossm-install-operators
 ossm-install-operators: ## Install only operators (same as first step of setup-kiali-openshift)
 	@test -f '$(OSSM_INSTALL_SCRIPT)' || { echo "Missing $(OSSM_INSTALL_SCRIPT). Expected vendored scripts under hack/kiali/ in this repo."; exit 1; }
-	bash '$(OSSM_INSTALL_SCRIPT)' install-operators
+	bash '$(OSSM_INSTALL_SCRIPT)' -c '$(BOOKINFO_CLIENT)' -cpn '$(BOOKINFO_CP_NAMESPACE)' install-operators
 
 .PHONY: ossm-install-istio
 ossm-install-istio: ## Install only Istio + addons + Kiali CR (same as second step of setup-kiali-openshift)
 	@test -f '$(OSSM_INSTALL_SCRIPT)' || { echo "Missing $(OSSM_INSTALL_SCRIPT). Expected vendored scripts under hack/kiali/ in this repo."; exit 1; }
-	bash '$(OSSM_INSTALL_SCRIPT)' install-istio
+	bash '$(OSSM_INSTALL_SCRIPT)' -c '$(BOOKINFO_CLIENT)' -cpn '$(BOOKINFO_CP_NAMESPACE)' install-istio
 
 .PHONY: ossm-status
 ossm-status: ## Show OSSM/Sail/Kiali status via vendored script

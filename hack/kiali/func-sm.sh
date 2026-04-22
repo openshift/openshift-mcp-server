@@ -8,6 +8,29 @@
 
 set -u
 
+# Apply a manifest with bounded retries (shape aligned with download_istio_addon_yaml in func-addons.sh).
+# $1 = yaml path, $2 = human label for logs/errors. Env: OSSM_APPLY_MAX_ATTEMPTS (default 30).
+ossm_apply_with_retries() {
+  local yaml_file="$1"
+  local human="$2"
+  local max_attempts="${OSSM_APPLY_MAX_ATTEMPTS:-30}"
+  local attempt=1
+  local last_err=""
+  while [ "${attempt}" -le "${max_attempts}" ]; do
+    if last_err="$(${OC} apply -f "${yaml_file}" 2>&1)"; then
+      return 0
+    fi
+    errormsg "Failed to apply [${human}] (attempt ${attempt}/${max_attempts}): ${last_err}"
+    if [ "${attempt}" -eq "${max_attempts}" ]; then
+      errormsg "Giving up after ${max_attempts} attempts applying [${human}]. Last error output: ${last_err}"
+      exit 1
+    fi
+    errormsg "Will retry in 5 seconds..."
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
 install_servicemesh_operators() {
   # if not OpenShift, install from OperatorHub.io
   if [ "${IS_OPENSHIFT}" == "false" ]; then
@@ -120,7 +143,10 @@ install_istio() {
     errormsg "No Sail/ServiceMesh operator pods found in namespace [${OLM_OPERATORS_NAMESPACE}] (cannot oc wait on an empty list)."
     exit 1
   fi
-  ${OC} wait --for condition=Ready ${operator_pods} --timeout 300s -n ${OLM_OPERATORS_NAMESPACE}
+  if ! ${OC} wait --for condition=Ready ${operator_pods} --timeout 300s -n "${OLM_OPERATORS_NAMESPACE}"; then
+    errormsg "Timed out or failed: ${OC} wait --for condition=Ready ${operator_pods} --timeout 300s -n ${OLM_OPERATORS_NAMESPACE}"
+    exit 1
+  fi
   infomsg "Servicemesh operator pod(s) Ready (done)."
 
   # TODO: Sail has no webhooks (yet)
@@ -135,7 +161,12 @@ install_istio() {
   # "latest" is not a supported version when using a released version of Sail operator.
   # We try to determine the latest version of Istio supported by examining the CRD.
   if [ "${istio_version}" == "latest" ]; then
-    istio_version="$(${OC} get crd istios.sailoperator.io -o json | jq -r '.spec.versions | sort_by(.name) | .[-1].schema.openAPIV3Schema.properties.spec.properties.version.default')"
+    istio_version="$(${OC} get crd istios.sailoperator.io -o json | jq -r '
+      (.spec.versions | map(select(.storage == true)) | first) as $st
+      | (if ($st | type) == "object" then $st
+         else (.spec.versions | map(select(.served == true and (.name | test("^v[0-9]+$")))) | sort_by(.name) | last)
+         end)
+      | .schema.openAPIV3Schema.properties.spec.properties.version.default // empty')"
     if [ -z "${istio_version}" -o "${istio_version}" == "null" ]; then
       errormsg "Cannot determine the latest supported version of Istio. You must provide an explicit vX.Y.Z version to install via the --istio-version option"
       exit 1
@@ -168,11 +199,7 @@ spec:
   version: ${istio_version}
   namespace: istio-cni
 EOMCNI
-      while ! ${OC} apply -f ${istiocni_yaml_file}
-      do
-        errormsg "WARNING: Failed to create IstioCNI CR - will retry in 5 seconds to see if the error condition clears up..."
-        sleep 5
-      done
+      ossm_apply_with_retries "${istiocni_yaml_file}" "IstioCNI CR"
       infomsg "IstioCNI has been successfully created"
     else
       infomsg "IstioCNI already exists; will not create another one"
@@ -214,11 +241,7 @@ spec:
 EOM
   fi
 
-  while ! ${OC} apply -f ${istio_yaml_file}
-  do
-    errormsg "WARNING: Failed to apply [${istio_yaml_file}] to namespace [${control_plane_namespace}] - will retry in 5 seconds to see if the error condition clears up..."
-    sleep 5
-  done
+  ossm_apply_with_retries "${istio_yaml_file}" "Istio CR (${control_plane_namespace})"
   infomsg "[${istio_yaml_file}] has been successfully applied to namespace [${control_plane_namespace}]."
 
   ensure_istio_revision_tag_default "${istio_yaml_file}"
@@ -251,11 +274,7 @@ spec:
     kind: Istio
     name: ${istio_cr_name}
 EOM
-  while ! ${OC} apply -f "${tag_yaml}"
-  do
-    errormsg "WARNING: Failed to apply IstioRevisionTag [${istio_cr_name}] - retrying in 5 seconds..."
-    sleep 5
-  done
+  ossm_apply_with_retries "${tag_yaml}" "IstioRevisionTag [${istio_cr_name}]"
   infomsg "IstioRevisionTag [${istio_cr_name}] applied."
 }
 
@@ -387,13 +406,17 @@ delete_istio() {
     local res_name=$(echo ${cr} | cut -d: -f2)
     local doomed_ns=$(echo ${cr} | cut -d: -f3)
     ${OC} delete ${res_kind} ${res_name}
-    doomed_namespaces="$(echo ${doomed_ns} ${doomed_namespaces} | tr ' ' '\n' | sort -u)"
+    if [ -n "${doomed_ns}" ] && [ "${doomed_ns}" != "<none>" ]; then
+      doomed_namespaces="$(printf '%s\n%s\n' "${doomed_ns}" "${doomed_namespaces}" | awk 'NF && $0 != "<none>"' | sort -u)"
+    fi
   done
 
   infomsg "Deleting the control plane and CNI namespaces"
   for ns in ${doomed_namespaces}
   do
-    ${OC} delete namespace ${ns}
+    [ -z "$(echo "${ns}" | tr -d '[:space:]')" ] && continue
+    [ "${ns}" = "<none>" ] && continue
+    ${OC} delete namespace "${ns}"
   done
 }
 
@@ -415,7 +438,7 @@ status_servicemesh_operators() {
 status_istio() {
   infomsg ""
   infomsg "===== Istio CRs"
-  if [ "$(${OC} get istio 2> /dev/null | wc -l)" -gt "0" ] ; then
+  if ${OC} get istio -o name 2>/dev/null | grep -q .; then
     infomsg "One or more Istio CRs exist in the cluster"
     ${OC} get istio
     infomsg ""
@@ -433,7 +456,7 @@ status_istio() {
 
   infomsg ""
   infomsg "===== IstioCNI CRs"
-  if [ "$(${OC} get istiocni 2> /dev/null | wc -l)" -gt "0" ] ; then
+  if ${OC} get istiocni -o name 2>/dev/null | grep -q .; then
     infomsg "One or more Istio CNI CRs exist in the cluster"
     ${OC} get istiocni
     infomsg ""
