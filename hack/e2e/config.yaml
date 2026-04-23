@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mcp-server-e2e-config
+  namespace: openshift-mcp-server-e2e
+data:
+  config.toml: |
+    log_level = 3
+    port = "8080"
+    read_only = true
+    toolsets = ["core"]
