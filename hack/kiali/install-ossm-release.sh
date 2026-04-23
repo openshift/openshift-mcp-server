@@ -47,7 +47,8 @@ while [[ $# -gt 0 ]]; do
 
     # COMMANDS
 
-    install-operators) _CMD="install-operators" ; shift ;;
+    install-operators)   _CMD="install-operators"   ; shift ;;
+    install-kiali-support) _CMD="install-kiali-support" ; shift ;;
     install-istio)     _CMD="install-istio"     ; shift ;;
     delete-operators)  _CMD="delete-operators"  ; shift ;;
     delete-istio)      _CMD="delete-istio"      ; shift ;;
@@ -141,9 +142,17 @@ Valid options:
       This is only used with "install-istio" command and only if Kiali is to be installed.
       Default: ${DEFAULT_KIALI_VERSION}
 
+  Environment (install-kiali-support)
+      OSSM_KIALI_SUPPORT_MIN_VERSION  Minimum Kiali image tag to accept without upgrading (default: v2.25)
+      OSSM_KIALI_SUPPORT_TARGET_VERSION  Tag to set when upgrading (default: v2.25)
+      OSSM_KIALI_SUPPORT_IMAGE_NAME  Image for spec.deployment.image_name (default: quay.io/kiali/kiali)
+      OSSM_KIALI_DEPLOYMENT_NAME  Kiali Deployment name if not the same as the Kiali CR name (default: same as CR, usually kiali)
+      OSSM_KIALI_POD_WAIT_LABEL  Pod selector for oc wait after upgrade (e.g. app.kubernetes.io/name=kiali); autodetected if unset
+
 The command must be one of:
 
   * install-operators: Install the latest version of the Sail operator and (if --enable-kiali is "true") the Kiali operator.
+  * install-kiali-support: On OpenShift, check the running Kiali server version; if it is below v2.25 (or OSSM_KIALI_SUPPORT_MIN_VERSION), set ALLOW_AD_HOC_KIALI_IMAGE on the operator and patch the Kiali CR to upgrade. Uses --control-plane-namespace (default ${DEFAULT_CONTROL_PLANE_NAMESPACE}).
   * install-istio: Install Istio control plane (you must first have installed the operators). Also installs the configured addons.
   * delete-operators: Delete the Sail and Kiali operators (you must first delete all Istio control planes and Kiali CRs manually).
   * delete-istio: Uninstalls Istio control plane, Kiali, and addons. Namespaces are only deleted if -dn/--delete-namespaces is set (or OSSM_DELETE_ISTIO_NAMESPACES=yes).
@@ -275,6 +284,10 @@ if [ "${_CMD}" == "install-operators" ]; then
     install_kiali_operator "${CATALOG_SOURCE}"
   fi
   install_servicemesh_operators "${CATALOG_SOURCE}"
+
+elif [ "${_CMD}" == "install-kiali-support" ]; then
+
+  ossm_install_kiali_support "${CONTROL_PLANE_NAMESPACE}"
 
 elif [ "${_CMD}" == "install-istio" ]; then
 

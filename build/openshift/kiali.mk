@@ -20,9 +20,17 @@ BOOKINFO_ISTIO_VERSION ?= 1.28.0
 BOOKINFO_ISTIO_HOME := $(BOOKINFO_OUTPUT_DIR)/istio-$(BOOKINFO_ISTIO_VERSION)
 # Optional: existing Istio tree with bin/istioctl + samples/bookinfo (skips download-bookinfo-istio).
 BOOKINFO_ISTIO_DIR ?=
-BOOKINFO_CLIENT ?= oc
+KUBERNETES_CLI ?= oc
 BOOKINFO_NAMESPACE ?= bookinfo
 BOOKINFO_CP_NAMESPACE ?= istio-system
+# After install-istio: wait for this Deployment (Kiali server) to exist, then rollout completes before install-kiali-support.
+KIALI_DEPLOYMENT_NAME ?= kiali
+# Max seconds to poll for deployment/$(KIALI_DEPLOYMENT_NAME) to be created by the operator.
+KIALI_DEPLOYMENT_WAIT_MAX ?= 600
+# Passed to $(KUBERNETES_CLI) rollout status --timeout=...
+KIALI_ROLLOUT_TIMEOUT ?= 600s
+# Optional: extra wait for Ready pods (app.kubernetes.io/name=kiali, else app=kiali) if rollout alone is not enough.
+KIALI_POD_READY_TIMEOUT ?= 300s
 # Cluster-scoped Istio CR name (must match IstioRevisionTag metadata.name for stable istio.io/rev=...).
 BOOKINFO_ISTIO_CR_NAME ?= default
 # Injection label istio.io/rev=... — use the IstioRevisionTag name (same as Istio CR name when install_istio creates the tag).
@@ -87,12 +95,31 @@ download-bookinfo-istio: ## Download Istio release from GitHub (tar.gz + .sha256
 setup-kiali-openshift: ## OpenShift: OSSM/Sail + Istio/Kiali + Bookinfo (Kiali hack script + OpenShift Routes)
 	@test -f '$(OSSM_INSTALL_SCRIPT)' || { echo "Missing $(OSSM_INSTALL_SCRIPT). Expected vendored scripts under hack/kiali/ in this repo."; exit 1; }
 	@echo "==> OSSM: installing operators (Sail, Kiali) ..."
-	bash '$(OSSM_INSTALL_SCRIPT)' -c '$(BOOKINFO_CLIENT)' install-operators
+	bash '$(OSSM_INSTALL_SCRIPT)' -c '$(KUBERNETES_CLI)' install-operators
 	@echo "==> OSSM: installing Istio, addons, and Kiali CR ..."
-	bash '$(OSSM_INSTALL_SCRIPT)' -c '$(BOOKINFO_CLIENT)' -cpn '$(BOOKINFO_CP_NAMESPACE)' install-istio
+	bash '$(OSSM_INSTALL_SCRIPT)' -c '$(KUBERNETES_CLI)' -cpn '$(BOOKINFO_CP_NAMESPACE)' install-istio
+	@echo "==> Kiali: waiting for server workload (deployment/$(KIALI_DEPLOYMENT_NAME), then ready) ..."
+	@set -e; \
+	ns='$(BOOKINFO_CP_NAMESPACE)'; d='$(KIALI_DEPLOYMENT_NAME)'; m='$(KIALI_DEPLOYMENT_WAIT_MAX)'; t=0; \
+	while ! '$(KUBERNETES_CLI)' get "deployment/$$d" -n "$$ns" -o name >/dev/null 2>&1; do \
+	  if [ "$$t" -ge "$$m" ]; then echo "Timeout ($${m}s) waiting for deployment/$$d in namespace $$ns (Kiali operator still reconciling?)." >&2; exit 1; fi; \
+	  echo "  ... waiting for deployment/$$d ($$t/$$m s)"; \
+	  sleep 5; t=$$((t+5)); \
+	done; \
+	echo "==> Kiali: rollout status (pods become ready) ..."; \
+	'$(KUBERNETES_CLI)' rollout status "deployment/$$d" -n "$$ns" --timeout='$(KIALI_ROLLOUT_TIMEOUT)'; \
+	if '$(KUBERNETES_CLI)' get pod -n "$$ns" -l 'app.kubernetes.io/name=kiali' -o name >/dev/null 2>&1; then \
+	  '$(KUBERNETES_CLI)' wait --for=condition=Ready pod -l 'app.kubernetes.io/name=kiali' -n "$$ns" --timeout='$(KIALI_POD_READY_TIMEOUT)'; \
+	elif '$(KUBERNETES_CLI)' get pod -n "$$ns" -l 'app=kiali' -o name >/dev/null 2>&1; then \
+	  '$(KUBERNETES_CLI)' wait --for=condition=Ready pod -l 'app=kiali' -n "$$ns" --timeout='$(KIALI_POD_READY_TIMEOUT)'; \
+	else \
+	  echo "  (no pod with app.kubernetes.io/name=kiali or app=kiali; assuming deployment readiness is enough)"; \
+	fi
+	@echo "==> Kiali: checking version ..."
+	bash '$(OSSM_INSTALL_SCRIPT)' -c '$(KUBERNETES_CLI)' install-kiali-support
 	@$(MAKE) -s install-bookinfo-openshift
 	@echo "==> Bookinfo: OpenShift routes (productpage / gateways):"
-	@'$(BOOKINFO_CLIENT)' get route -n '$(BOOKINFO_NAMESPACE)' 2>/dev/null || true
+	@'$(KUBERNETES_CLI)' get route -n '$(BOOKINFO_NAMESPACE)' 2>/dev/null || true	
 	@echo "==> setup-kiali-openshift: done."
 
 ifeq ($(words $(MAKEFILE_LIST)),1)
@@ -111,31 +138,31 @@ install-bookinfo-openshift: fetch-bookinfo-hack download-bookinfo-istio ## Insta
 	istio_id='$(BOOKINFO_ISTIO_DIR)'; \
 	if [ -z "$$istio_id" ]; then istio_id="$$istio_home"; fi; \
 	OUTPUT_DIR='$(BOOKINFO_OUTPUT_DIR)' bash '$(BOOKINFO_INSTALL_SCRIPT)' \
-	  -c '$(BOOKINFO_CLIENT)' -n '$(BOOKINFO_NAMESPACE)' -in '$(BOOKINFO_CP_NAMESPACE)' -wt 5m -id "$$istio_id" \
+	  -c '$(KUBERNETES_CLI)' -n '$(BOOKINFO_NAMESPACE)' -in '$(BOOKINFO_CP_NAMESPACE)' -wt 5m -id "$$istio_id" \
 	  -ail "istio.io/rev=$$rev" $(BOOKINFO_SCRIPT_EXTRA); \
 	echo "==> Bookinfo: namespace labels for Sail sidecar injection ($(BOOKINFO_MESH_LABELS) istio.io/rev=$$rev)"; \
-	'$(BOOKINFO_CLIENT)' label namespace '$(BOOKINFO_NAMESPACE)' istio-injection- 2>/dev/null || true; \
-	'$(BOOKINFO_CLIENT)' label namespace '$(BOOKINFO_NAMESPACE)' $(BOOKINFO_MESH_LABELS) istio.io/rev="$$rev" --overwrite; \
+	'$(KUBERNETES_CLI)' label namespace '$(BOOKINFO_NAMESPACE)' istio-injection- 2>/dev/null || true; \
+	'$(KUBERNETES_CLI)' label namespace '$(BOOKINFO_NAMESPACE)' $(BOOKINFO_MESH_LABELS) istio.io/rev="$$rev" --overwrite; \
 	echo "==> Bookinfo: rollout restart so pods join the mesh"; \
-	'$(BOOKINFO_CLIENT)' rollout restart deployment --all -n '$(BOOKINFO_NAMESPACE)' 2>/dev/null || true; \
-	'$(BOOKINFO_CLIENT)' rollout restart statefulset --all -n '$(BOOKINFO_NAMESPACE)' 2>/dev/null || true; \
+	'$(KUBERNETES_CLI)' rollout restart deployment --all -n '$(BOOKINFO_NAMESPACE)' 2>/dev/null || true; \
+	'$(KUBERNETES_CLI)' rollout restart statefulset --all -n '$(BOOKINFO_NAMESPACE)' 2>/dev/null || true; \
 	tg_route='$(BOOKINFO_TRAFFIC_ROUTE)'; \
-	if '$(BOOKINFO_CLIENT)' get configmap traffic-generator-config -n '$(BOOKINFO_NAMESPACE)' -o name >/dev/null 2>&1; then \
+	if '$(KUBERNETES_CLI)' get configmap traffic-generator-config -n '$(BOOKINFO_NAMESPACE)' -o name >/dev/null 2>&1; then \
 	  patch=$$(printf '%s' '[{"op":"replace","path":"/data/route","value":"'"$$tg_route"'"}]'); \
-	  '$(BOOKINFO_CLIENT)' patch configmap traffic-generator-config -n '$(BOOKINFO_NAMESPACE)' --type=json -p "$$patch"; \
-	  '$(BOOKINFO_CLIENT)' delete pod -n '$(BOOKINFO_NAMESPACE)' -l kiali-test=traffic-generator --ignore-not-found=true --wait=false 2>/dev/null || true; \
+	  '$(KUBERNETES_CLI)' patch configmap traffic-generator-config -n '$(BOOKINFO_NAMESPACE)' --type=json -p "$$patch"; \
+	  '$(KUBERNETES_CLI)' delete pod -n '$(BOOKINFO_NAMESPACE)' -l kiali-test=traffic-generator --ignore-not-found=true --wait=false 2>/dev/null || true; \
 	  echo "==> Bookinfo: traffic generator route -> $$tg_route"; \
 	fi
 
 .PHONY: ossm-install-operators
 ossm-install-operators: ## Install only operators (same as first step of setup-kiali-openshift)
 	@test -f '$(OSSM_INSTALL_SCRIPT)' || { echo "Missing $(OSSM_INSTALL_SCRIPT). Expected vendored scripts under hack/kiali/ in this repo."; exit 1; }
-	bash '$(OSSM_INSTALL_SCRIPT)' -c '$(BOOKINFO_CLIENT)' -cpn '$(BOOKINFO_CP_NAMESPACE)' install-operators
+	bash '$(OSSM_INSTALL_SCRIPT)' -c '$(KUBERNETES_CLI)' -cpn '$(BOOKINFO_CP_NAMESPACE)' install-operators
 
 .PHONY: ossm-install-istio
 ossm-install-istio: ## Install only Istio + addons + Kiali CR (same as second step of setup-kiali-openshift)
 	@test -f '$(OSSM_INSTALL_SCRIPT)' || { echo "Missing $(OSSM_INSTALL_SCRIPT). Expected vendored scripts under hack/kiali/ in this repo."; exit 1; }
-	bash '$(OSSM_INSTALL_SCRIPT)' -c '$(BOOKINFO_CLIENT)' -cpn '$(BOOKINFO_CP_NAMESPACE)' install-istio
+	bash '$(OSSM_INSTALL_SCRIPT)' -c '$(KUBERNETES_CLI)' -cpn '$(BOOKINFO_CP_NAMESPACE)' install-istio
 
 .PHONY: ossm-status
 ossm-status: ## Show OSSM/Sail/Kiali status via vendored script
