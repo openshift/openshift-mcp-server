@@ -29,6 +29,9 @@ BOOKINFO_ISTIO_CR_NAME ?= default
 BOOKINFO_ISTIO_REVISION ?= $(BOOKINFO_ISTIO_CR_NAME)
 # Traffic generator ConfigMap route: in-cluster productpage avoids OpenShift Route TLS/503 issues.
 BOOKINFO_TRAFFIC_ROUTE ?= http://productpage.$(BOOKINFO_NAMESPACE).svc.cluster.local:9080/productpage
+# Final health check through Kiali API after Bookinfo is installed.
+BOOKINFO_KIALI_CLUSTER_NAME ?= Kubernetes
+BOOKINFO_HEALTH_WORKLOAD ?= productpage-v1
 # install-bookinfo-demo.sh: extra flags only (-ail is set from detected revision in the recipe).
 # -tg installs Kiali traffic generator (OpenShift routes must exist; script waits after expose).
 BOOKINFO_SCRIPT_EXTRA ?= -tg
@@ -91,6 +94,7 @@ setup-kiali-openshift: ## OpenShift: OSSM/Sail + Istio/Kiali + Bookinfo (Kiali h
 	@echo "==> OSSM: installing Istio, addons, and Kiali CR ..."
 	bash '$(OSSM_INSTALL_SCRIPT)' -c '$(BOOKINFO_CLIENT)' -cpn '$(BOOKINFO_CP_NAMESPACE)' install-istio
 	@$(MAKE) -s install-bookinfo-openshift
+	@$(MAKE) -s validate-bookinfo-kiali-health
 	@echo "==> Bookinfo: OpenShift routes (productpage / gateways):"
 	@'$(BOOKINFO_CLIENT)' get route -n '$(BOOKINFO_NAMESPACE)' 2>/dev/null || true
 	@echo "==> setup-kiali-openshift: done."
@@ -126,6 +130,73 @@ install-bookinfo-openshift: fetch-bookinfo-hack download-bookinfo-istio ## Insta
 	  '$(BOOKINFO_CLIENT)' delete pod -n '$(BOOKINFO_NAMESPACE)' -l kiali-test=traffic-generator --ignore-not-found=true --wait=false 2>/dev/null || true; \
 	  echo "==> Bookinfo: traffic generator route -> $$tg_route"; \
 	fi
+
+.PHONY: validate-bookinfo-kiali-health
+validate-bookinfo-kiali-health: ## Wait until Bookinfo workload is Healthy according to Kiali API
+	@set -e; \
+	client='$(BOOKINFO_CLIENT)'; \
+	cpns='$(BOOKINFO_CP_NAMESPACE)'; \
+	ns='$(BOOKINFO_NAMESPACE)'; \
+	wl='$(BOOKINFO_HEALTH_WORKLOAD)'; \
+	cluster_name='$(BOOKINFO_KIALI_CLUSTER_NAME)'; \
+	max_wait="$${BOOKINFO_HEALTH_WAIT_SECONDS:-300}"; \
+	retry="$${BOOKINFO_HEALTH_RETRY_SECONDS:-5}"; \
+	elapsed=0; \
+	echo "==> Kiali health check: waiting for $$ns/$$wl to be Healthy (cluster=$$cluster_name)"; \
+	kiali_host="$$( $$client -n "$$cpns" get route kiali -o jsonpath='{.spec.host}' 2>/dev/null || true )"; \
+	if [ -z "$$kiali_host" ]; then \
+	  echo "Kiali route not found in namespace $$cpns"; \
+	  exit 1; \
+	fi; \
+	kiali_token="$$( $$client whoami -t 2>/dev/null || true )"; \
+	if [ -z "$$kiali_token" ]; then \
+	  echo "Cannot obtain token from $$client whoami -t (required for Kiali API auth)."; \
+	  exit 1; \
+	fi; \
+	api_path="/api/clusters/workloads?health=true&istioResources=true&namespaces=$$ns&clusterName=$$cluster_name"; \
+	api_url_kiali_prefix="https://$$kiali_host/kiali$$api_path"; \
+	api_url_root_prefix="https://$$kiali_host$$api_path"; \
+	echo "==> Kiali route: https://$$kiali_host"; \
+	echo "==> Kiali API check (try #1): $$api_url_kiali_prefix"; \
+	echo "==> Kiali API check (try #2): $$api_url_root_prefix"; \
+	while true; do \
+	  checked_url="$$api_url_kiali_prefix"; \
+	  response="$$(curl -ksS --max-time 20 -H "Authorization: Bearer $$kiali_token" "$$checked_url" 2>/dev/null || true)"; \
+	  status=""; \
+	  if command -v jq >/dev/null 2>&1; then \
+	    status="$$(printf '%s' "$$response" | jq -r --arg ns "$$ns" --arg wl "$$wl" '.workloads[]? | select(.namespace == $$ns and .name == $$wl) | .health.status.status' 2>/dev/null | head -n 1)"; \
+	  else \
+	    if echo "$$response" | tr -d '\n\r' | grep -Eq "\"name\":\"$$wl\".*\"namespace\":\"$$ns\".*\"status\":\\{\"status\":\"Healthy\""; then \
+	      status="Healthy"; \
+	    fi; \
+	  fi; \
+	  if [ -z "$$status" ]; then \
+	    checked_url="$$api_url_root_prefix"; \
+	    response="$$(curl -ksS --max-time 20 -H "Authorization: Bearer $$kiali_token" "$$checked_url" 2>/dev/null || true)"; \
+	    if command -v jq >/dev/null 2>&1; then \
+	      status="$$(printf '%s' "$$response" | jq -r --arg ns "$$ns" --arg wl "$$wl" '.workloads[]? | select(.namespace == $$ns and .name == $$wl) | .health.status.status' 2>/dev/null | head -n 1)"; \
+	    else \
+	      if echo "$$response" | tr -d '\n\r' | grep -Eq "\"name\":\"$$wl\".*\"namespace\":\"$$ns\".*\"status\":\\{\"status\":\"Healthy\""; then \
+	        status="Healthy"; \
+	      fi; \
+	    fi; \
+	  fi; \
+	  if [ "$$status" = "Healthy" ]; then \
+	    echo "==> Kiali health check OK: $$ns/$$wl is Healthy (url=$$checked_url)"; \
+	    break; \
+	  fi; \
+	  if [ "$$elapsed" -ge "$$max_wait" ]; then \
+	    echo "Timed out after $$max_wait seconds waiting for $$ns/$$wl to be Healthy via Kiali API."; \
+	    echo "Last observed status: [$${status:-<missing>}]"; \
+	    echo "Last checked URL: $$checked_url"; \
+	    echo "Queried path: $$api_path"; \
+	    exit 1; \
+	  fi; \
+	  echo -n "."; \
+	  sleep "$$retry"; \
+	  elapsed=$$((elapsed + retry)); \
+	done; \
+	echo ""
 
 .PHONY: ossm-install-operators
 ossm-install-operators: ## Install only operators (same as first step of setup-kiali-openshift)
