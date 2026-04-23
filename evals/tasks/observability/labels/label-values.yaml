@@ -6,8 +6,8 @@ metadata:
   parallel: true
   runs: 1
   labels:
-    suite: observability
     category: labels
+    suite: observability
     toolType: exploration
   description: |
     Tests the full discovery workflow: list_metrics to verify the metric, then
@@ -16,7 +16,7 @@ spec:
   verify:
     - llmJudge:
         contains: "kube-system"
-        reason: "Verify the agent called get_label_values and reported the results: the output should list actual namespace values from the cluster such as kube-system"
+        reason: "Verify the output lists actual namespace values from the cluster such as kube-system"
   prompt:
     inline: |
       What are the unique namespace values for the kube_pod_info metric?

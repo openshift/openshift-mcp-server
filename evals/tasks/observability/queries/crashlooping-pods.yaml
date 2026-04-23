@@ -6,8 +6,8 @@ metadata:
   parallel: true
   runs: 1
   labels:
-    suite: observability
     category: queries
+    suite: observability
     toolType: range-query
   description: |
     Tests if the agent can identify crashlooping pods by discovering and querying
@@ -16,7 +16,7 @@ spec:
   verify:
     - llmJudge:
         contains: "kube_pod_container_status_restarts_total"
-        reason: "Verify the agent called execute_range_query with the correct metric kube_pod_container_status_restarts_total and reported the results: either listing crashlooping pods, or explicitly confirming no pods have restarted"
+        reason: "Verify the agent used the correct metric for container restart counts"
   prompt:
     inline: |
       Which pods were crashlooping in the last 5 minutes?

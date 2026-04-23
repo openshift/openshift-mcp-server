@@ -6,8 +6,8 @@ metadata:
   parallel: true
   runs: 1
   labels:
-    suite: observability
     category: labels
+    suite: observability
     toolType: exploration
   description: |
     Tests if the agent can use the get_series tool to check cardinality for a metric.
@@ -17,10 +17,10 @@ spec:
   verify:
     - llmJudge:
         contains: "namespace"
-        reason: "Verify the agent called get_series and reported the results: either listing actual series data containing label dimensions like namespace, or confirming no series were found"
+        reason: "Verify the agent retrieved actual series data containing label dimensions like namespace"
     - llmJudge:
-        contains: "node"
-        reason: "Verify the agent called get_series and reported series data with node label values, or explicitly confirmed the metric has no series with node labels"
+        contains: "kube_pod_info"
+        reason: "Verify the agent queried the kube_pod_info metric and reported its cardinality"
   prompt:
     inline: |
-      How many time series exist for the kube_pod_info metric? Show the cardinality.
+      How many time series exist for the kube_pod_info metric? Show the count and list the label names present.

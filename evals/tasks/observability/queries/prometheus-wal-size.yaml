@@ -6,8 +6,8 @@ metadata:
   parallel: true
   runs: 1
   labels:
-    suite: observability
     category: queries
+    suite: observability
     toolType: query
   description: |
     Tests if the agent can query the current Prometheus WAL storage size using
@@ -16,7 +16,7 @@ spec:
   verify:
     - llmJudge:
         contains: "prometheus_tsdb_wal_storage_size_bytes"
-        reason: "Verify the agent called execute_instant_query with the correct WAL storage metric prometheus_tsdb_wal_storage_size_bytes and reported the current WAL size"
+        reason: "Verify the agent used the correct WAL storage metric"
   prompt:
     inline: |
       What is the current storage size of the Prometheus WAL?

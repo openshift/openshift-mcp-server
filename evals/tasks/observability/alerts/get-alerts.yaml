@@ -6,8 +6,8 @@ metadata:
   parallel: true
   runs: 1
   labels:
-    suite: observability
     category: alerts
+    suite: observability
     toolType: alertmanager
   description: |
     Tests if the agent can discover and use the get_alerts tool to retrieve
@@ -15,8 +15,8 @@ metadata:
 spec:
   verify:
     - llmJudge:
-        contains: "alertname"
-        reason: "Verify the agent called get_alerts and reported the results: either listing specific alert names with their status, or explicitly confirming that no alerts are currently firing"
+        contains: "Watchdog"
+        reason: "Verify the agent retrieved firing alerts and reported the Watchdog alert"
   prompt:
     inline: |
       Check the cluster for any firing alerts and report what you find.

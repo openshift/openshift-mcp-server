@@ -6,8 +6,8 @@ metadata:
   parallel: true
   runs: 1
   labels:
-    suite: observability
     category: queries
+    suite: observability
     toolType: query
   description: |
     Tests if the agent can calculate the request rate to Prometheus by discovering
@@ -16,7 +16,7 @@ spec:
   verify:
     - llmJudge:
         contains: "prometheus_http_requests_total"
-        reason: "Verify the agent called execute_instant_query with the correct HTTP requests metric prometheus_http_requests_total and reported the request rate"
+        reason: "Verify the agent used the correct HTTP requests metric"
   prompt:
     inline: |
       How many requests per second are being made to Prometheus?

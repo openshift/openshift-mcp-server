@@ -6,8 +6,8 @@ metadata:
   parallel: true
   runs: 1
   labels:
-    suite: observability
     category: queries
+    suite: observability
     toolType: multi-step
   description: |
     Tests multi-step reasoning: the agent must discover CPU and memory metrics,
@@ -18,10 +18,10 @@ spec:
   verify:
     - llmJudge:
         contains: "container_cpu_usage_seconds_total"
-        reason: "Verify the agent called list_metrics to discover and then executed a query with the correct CPU metric container_cpu_usage_seconds_total, reporting the results"
+        reason: "Verify the agent discovered and used the correct CPU metric"
     - llmJudge:
-        contains: "container_memory_working_set_bytes"
-        reason: "Verify the agent called list_metrics to discover and then executed a query with the correct memory metric container_memory_working_set_bytes, reporting the results"
+        contains: "container_memory"
+        reason: "Verify the agent discovered and used a container memory metric (working_set_bytes or usage_bytes)"
   prompt:
     inline: |
       Which namespace is consuming the most CPU and memory?

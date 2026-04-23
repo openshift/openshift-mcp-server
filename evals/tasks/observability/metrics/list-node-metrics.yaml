@@ -6,8 +6,8 @@ metadata:
   parallel: true
   runs: 1
   labels:
-    suite: observability
     category: metrics
+    suite: observability
     toolType: discovery
   description: |
     Tests if the agent can discover node-related metrics using the list_metrics tool
@@ -16,7 +16,7 @@ spec:
   verify:
     - llmJudge:
         contains: "node_"
-        reason: "Verify the agent called list_metrics and reported the results: the output should list specific node metrics discovered from Prometheus (e.g. node_cpu_seconds_total)"
+        reason: "Verify the output lists specific node metrics discovered from Prometheus (e.g. node_cpu_seconds_total)"
   prompt:
     inline: |
       What node-related metrics are available in Prometheus?

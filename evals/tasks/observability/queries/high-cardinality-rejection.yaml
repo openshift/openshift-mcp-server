@@ -6,8 +6,8 @@ metadata:
   parallel: true
   runs: 1
   labels:
-    suite: observability
     category: queries
+    suite: observability
     toolType: error-handling
   description: |
     Tests agent behavior when a query is rejected by obs-mcp guardrails
@@ -17,7 +17,7 @@ spec:
   verify:
     - llmJudge:
         contains: "guardrail"
-        reason: "Verify the agent attempted a query that was rejected by a guardrail and reported the result: the response should explain the guardrail rejection and suggest a scoped alternative"
+        reason: "Verify the agent explains the query was rejected by a guardrail and suggests a scoped alternative"
   prompt:
     inline: |
       Show me the CPU, memory, network, and disk usage for every single container

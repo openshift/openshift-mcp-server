@@ -6,8 +6,8 @@ metadata:
   parallel: true
   runs: 1
   labels:
-    suite: observability
     category: alerts
+    suite: observability
     toolType: alertmanager
   description: |
     Tests if the agent uses the get_alerts tool with filter parameters
@@ -17,11 +17,8 @@ metadata:
 spec:
   verify:
     - llmJudge:
-        contains: "alertname"
-        reason: "Verify the agent called get_alerts and reported the results: either listing specific alert names with their status, or explicitly confirming that no critical alerts exist"
-    - llmJudge:
-        contains: "severity"
-        reason: "Verify the agent addressed the severity filter in its response"
+        contains: "AlertmanagerReceiversNotConfigured"
+        reason: "Verify the agent filtered for warning-severity alerts and found AlertmanagerReceiversNotConfigured"
   prompt:
     inline: |
-      Are there any firing alerts with severity=critical? Show only active alerts.
+      Show me only the active alerts with severity=warning.

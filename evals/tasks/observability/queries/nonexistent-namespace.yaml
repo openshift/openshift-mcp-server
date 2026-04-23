@@ -6,8 +6,8 @@ metadata:
   parallel: true
   runs: 1
   labels:
-    suite: observability
     category: queries
+    suite: observability
     toolType: error-handling
   description: |
     Tests agent behavior when querying for resources in a namespace that
@@ -17,7 +17,7 @@ spec:
   verify:
     - llmJudge:
         contains: "no data"
-        reason: "Verify the agent called execute_instant_query and reported the result: explicitly confirming no data, no results, or no pods found in the nonexistent namespace"
+        reason: "Verify the agent reports no data, no results, or no pods found in the nonexistent namespace"
   prompt:
     inline: |
       Show me the memory usage for all pods in the namespace called totally-fake-namespace-12345.

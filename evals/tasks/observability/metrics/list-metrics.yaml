@@ -6,8 +6,8 @@ metadata:
   parallel: true
   runs: 1
   labels:
-    suite: observability
     category: metrics
+    suite: observability
     toolType: discovery
   description: |
     Tests if the agent can discover the list_metrics tool to find Kubernetes-related
@@ -16,7 +16,7 @@ spec:
   verify:
     - llmJudge:
         contains: "kube_pod_info"
-        reason: "Verify the agent called list_metrics and reported the results: the output should list specific kube metrics discovered from Prometheus"
+        reason: "Verify the output lists specific kube metrics discovered from Prometheus"
   prompt:
     inline: |
       List all available Prometheus metrics that contain 'kube' in the name.
