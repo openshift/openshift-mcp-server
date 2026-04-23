@@ -1,0 +1,46 @@
+kind: Task
+metadata:
+  labels:
+    suite: openshift
+  name: plan-mustgather-audit-logs
+  difficulty: easy
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # Cleanup any existing must-gather resources from previous runs
+      kubectl get ns -o name 2>/dev/null | grep openshift-must-gather | xargs -r kubectl delete --wait=false 2>/dev/null || true
+      kubectl get clusterrolebinding -o name 2>/dev/null | grep must-gather-collector | xargs -r kubectl delete 2>/dev/null || true
+  verify:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # Find must-gather pod and verify it uses gather_audit_logs command
+      POD_JSON=$(kubectl get pods -A -o json | jq -r '.items[] | select(.metadata.namespace | startswith("openshift-must-gather"))')
+      if [ -z "$POD_JSON" ]; then
+        echo "No must-gather pod found"
+        exit 1
+      fi
+      NS=$(echo "$POD_JSON" | jq -r '.metadata.namespace' | head -1)
+      POD=$(echo "$POD_JSON" | jq -r '.metadata.name' | head -1)
+      # Verify pod uses gather_audit_logs command
+      kubectl get pod "$POD" -n "$NS" -o yaml | grep -q "gather_audit_logs"
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # Delete all must-gather namespaces and clusterrolebindings
+      kubectl get ns -o name 2>/dev/null | grep openshift-must-gather | xargs -r kubectl delete --wait=false 2>/dev/null || true
+      kubectl get clusterrolebinding -o name 2>/dev/null | grep must-gather-collector | xargs -r kubectl delete 2>/dev/null || true
+  prompt:
+    inline: I need to collect audit logs from my OpenShift cluster for a security investigation. Please set up a must-gather that specifically gathers audit logs and apply it.
+  assertions:
+    promptsUsed:
+      - server: kubernetes
+        prompt: plan_mustgather
+    toolsUsed:
+      - server: kubernetes
+        tool: resource_create_or_update
+    minToolCalls: 1
+    maxToolCalls: 15

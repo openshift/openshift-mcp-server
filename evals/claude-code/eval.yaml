@@ -72,3 +72,16 @@ config:
             toolPattern: ".*"
         minToolCalls: 1
         maxToolCalls: 20
+    # OpenShift tasks
+    - glob: ../tasks/openshift/*/*.yaml
+      labelSelector:
+        suite: openshift
+      assertions:
+        promptsUsed:
+          - server: kubernetes
+            prompt: plan_mustgather
+        toolsUsed:
+          - server: kubernetes
+            tool: resource_create_or_update
+        minToolCalls: 1
+        maxToolCalls: 15
