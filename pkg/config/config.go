@@ -149,13 +149,16 @@ type StaticConfig struct {
 	// Defaults to false.
 	ValidationEnabled bool `toml:"validation_enabled,omitempty"`
 
-	// ExperimentalSkipToolListAuth skips OAuth validation for MCP tools/list
-	// requests on the StreamableHTTP transport (/mcp endpoint).
+	// ExperimentalSkipGatewayAuth skips OAuth validation for MCP gateway
+	// discovery requests on the StreamableHTTP transport (/mcp endpoint).
+	// This covers the full connection lifecycle needed by MCP gateways:
+	// initialize, notifications/initialized, tools/list, ping, and GET
+	// (SSE notification stream).
 	// This is intended for gateway integrations where the gateway cannot set
-	// auth headers on tool discovery requests.
+	// auth headers on discovery and handshake requests.
 	// No auth context is injected — tool calls still require authentication.
 	// Defaults to false.
-	ExperimentalSkipToolListAuth bool `toml:"experimental_skip_tool_list_auth,omitempty"`
+	ExperimentalSkipGatewayAuth bool `toml:"experimental_skip_gateway_auth,omitempty"`
 
 	// ConfirmationFallback is the global default fallback behavior when a client
 	// does not support elicitation. Valid values are "deny" and "allow".

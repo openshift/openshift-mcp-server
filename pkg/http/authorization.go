@@ -21,20 +21,31 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/oauth"
 )
 
-// mcpJSONRPCRequest contains only the fields needed to identify a tools/list
-// request. ID uses json.RawMessage so we can distinguish "present" (request)
-// from "absent" (notification).
+// mcpJSONRPCRequest contains only the fields needed to identify a JSON-RPC
+// request method. ID uses json.RawMessage so we can distinguish "present"
+// (request) from "absent" (notification).
 type mcpJSONRPCRequest struct {
 	JSONRPC string          `json:"jsonrpc"`
 	Method  string          `json:"method"`
 	ID      json.RawMessage `json:"id"`
 }
 
-// isToolsListRequest checks whether the request body is a single JSON-RPC
-// tools/list request. It always restores r.Body so downstream handlers can
-// read the full payload regardless of the outcome.
+// gatewayDiscoveryMethods lists the JSON-RPC methods that are safe to serve
+// without authentication for gateway discovery. These expose only metadata
+// (server info, tool catalog) and carry no cluster data or secrets.
+var gatewayDiscoveryMethods = map[string]bool{
+	"initialize":                true,
+	"notifications/initialized": true,
+	"tools/list":                true,
+	"ping":                      true,
+}
+
+// isGatewayDiscoveryRequest checks whether the request body is a single
+// JSON-RPC request whose method is in the gateway discovery safe-list.
+// It always restores r.Body so downstream handlers can read the full payload
+// regardless of the outcome.
 // Body size is expected to already be bounded by MaxBodyMiddleware.
-func isToolsListRequest(r *http.Request) bool {
+func isGatewayDiscoveryRequest(r *http.Request) bool {
 	if r.Body == nil || r.Body == http.NoBody {
 		return false
 	}
@@ -57,9 +68,7 @@ func isToolsListRequest(r *http.Request) bool {
 		return false
 	}
 
-	return msg.JSONRPC == "2.0" &&
-		msg.Method == "tools/list" &&
-		len(msg.ID) > 0 && string(msg.ID) != "null"
+	return msg.JSONRPC == "2.0" && gatewayDiscoveryMethods[msg.Method]
 }
 
 // write401 sends a 401/Unauthorized response with WWW-Authenticate header.
@@ -123,15 +132,23 @@ func AuthorizationMiddleware(staticConfig *config.StaticConfig, oauthState *oaut
 				return
 			}
 
-			// Skip auth for tools/list requests on the StreamableHTTP endpoint
-			// when configured. No auth context is injected — tool calls still
-			// require authentication.
-			if staticConfig.ExperimentalSkipToolListAuth &&
-				r.Method == http.MethodPost && r.URL.Path == mcpEndpoint &&
-				isToolsListRequest(r) {
-				klog.V(3).Infof("Skipping auth for tools/list request: %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
-				next.ServeHTTP(w, r)
-				return
+			// Skip auth for gateway discovery requests on the StreamableHTTP
+			// endpoint when configured. This covers the full MCP gateway
+			// handshake: initialize, notifications/initialized, tools/list,
+			// ping (POST), and GET (SSE notification stream).
+			// No auth context is injected — tool calls still require
+			// authentication.
+			if staticConfig.ExperimentalSkipGatewayAuth && r.URL.Path == mcpEndpoint {
+				if r.Method == http.MethodGet {
+					klog.V(3).Infof("Skipping auth for gateway GET request: %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
+					next.ServeHTTP(w, r)
+					return
+				}
+				if r.Method == http.MethodPost && isGatewayDiscoveryRequest(r) {
+					klog.V(3).Infof("Skipping auth for gateway discovery request: %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
+					next.ServeHTTP(w, r)
+					return
+				}
 			}
 
 			wwwAuthenticateHeader := "Bearer realm=\"Kubernetes MCP Server\""
