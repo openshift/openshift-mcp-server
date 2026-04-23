@@ -7,20 +7,19 @@ This document outlines the procedure for validating the NetEdge (NIDS) toolset o
 - **Go**: v1.22+ (Ensure `GOROOT` is set correctly)
 - **OpenShift Cluster**: Running and accessible (OCP, CRC, or similar). **Note: Evaluations WILL FAIL on Kind.**
 - **oc** or **kubectl**: Installed and configured to talk to your cluster.
-- **gevals**: Built and in the root directory (see Setup below).
+- **mcpchecker**: Built and in the root directory (see Setup below).
 - **Gemini CLI**: Installed (`npm install -g @google/gemini-cli`)
-- **RH_GEMINI_API_KEY**: Required for the Agent.
-- **OPENAI_API_KEY**: Required for the Judge (until Gemini compatibility is fully verified).
+- **RH_GEMINI_API_KEY**: Required for the Agent and Judge.
 
 ## Setup
 
-1.  **Build/Install gevals**:
+1.  **Build/Install mcpchecker**:
     if not already present:
     ```bash
     git clone https://github.com/mcpchecker/mcpchecker.git ../mcpchecker
     cd ../mcpchecker
-    go build -o gevals ./cmd/mcpchecker
-    mv gevals ../openshift-mcp-server/
+    go build -o mcpchecker ./cmd/mcpchecker
+    mv mcpchecker ../openshift-mcp-server/
     ```
 
 2.  **Connect to OpenShift Cluster**:
@@ -45,24 +44,44 @@ This document outlines the procedure for validating the NetEdge (NIDS) toolset o
     ```
 
 3.  **Run the Evaluations**:
-    Run `mcpchecker` (gevals) checks using the Gemini Agent.
+    Run `mcpchecker` checks using the Gemini Agent.
     
     **Test 1: Get CoreDNS Configuration**
     ```bash
-    export RH_GEMINI_API_KEY=$RH_GEMINI_API_KEY && export JUDGE_API_KEY=$OPENAI_API_KEY && export JUDGE_BASE_URL="https://api.openai.com/v1" && export JUDGE_MODEL_NAME="gpt-4o" && ./gevals check evals/gemini-agent/eval.yaml --run "get-coredns-config" -v
+    export RH_GEMINI_API_KEY=$RH_GEMINI_API_KEY && ./mcpchecker check evals/gemini-agent/eval.yaml --run "get-coredns-config" -v
     ```
 
     **Test 2: Query Prometheus Diagnostics**
     ```bash
-    export RH_GEMINI_API_KEY=$RH_GEMINI_API_KEY && export JUDGE_API_KEY=$OPENAI_API_KEY && export JUDGE_BASE_URL="https://api.openai.com/v1" && export JUDGE_MODEL_NAME="gpt-4o" && ./gevals check evals/gemini-agent/eval.yaml --run "query-prometheus-ingress" -v
+    export RH_GEMINI_API_KEY=$RH_GEMINI_API_KEY && ./mcpchecker check evals/gemini-agent/eval.yaml --run "query-prometheus-ingress" -v
+    ```
+
+    **Test 3: Inspect Route**
+    ```bash
+    export RH_GEMINI_API_KEY=$RH_GEMINI_API_KEY && ./mcpchecker check evals/gemini-agent/eval.yaml --run "inspect-route" -v
+    ```
+
+    **Test 4: Get Service Endpoints**
+    ```bash
+    export RH_GEMINI_API_KEY=$RH_GEMINI_API_KEY && ./mcpchecker check evals/gemini-agent/eval.yaml --run "get-service-endpoints" -v
+    ```
+
+    **Test 5: Probe DNS Local**
+    ```bash
+    export RH_GEMINI_API_KEY=$RH_GEMINI_API_KEY && ./mcpchecker check evals/gemini-agent/eval.yaml --run "probe-dns-local" -v
+    ```
+
+    **Test 6: Probe HTTP**
+    ```bash
+    export RH_GEMINI_API_KEY=$RH_GEMINI_API_KEY && ./mcpchecker check evals/gemini-agent/eval.yaml --run "probe-http" -v
     ```
 
     **Tip**: To see the full agent conversation and debug details:
     ```bash
-    ./gevals view mcpchecker-gemini-agent-netedge-eval-out.json
+    ./mcpchecker view mcpchecker-gemini-agent-netedge-eval-out.json
     ```
 
 ## Observing Results
 
-- **Console Output**: `gevals` will show the Gemini agent's progress.
+- **Console Output**: `mcpchecker` will show the Gemini agent's progress.
 - **Server Logs**: Watch `server.log` to see the `netedge` toolset servicing requests from Gemini.

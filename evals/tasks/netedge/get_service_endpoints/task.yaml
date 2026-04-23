@@ -1,0 +1,15 @@
+kind: Task
+metadata:
+  name: get-service-endpoints
+steps:
+  verify:
+    contains: "Addresses"
+  prompt:
+    inline: Use the get_service_endpoints tool to list the endpoint slices for the router-default service in the openshift-ingress namespace. Report the backend pod addresses and node names from the result.
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "get_service_endpoints"
+        args:
+          namespace: "openshift-ingress"
+          service: "router-default"
