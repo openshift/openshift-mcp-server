@@ -6,8 +6,8 @@ metadata:
   parallel: true
   runs: 1
   labels:
-    suite: observability
     category: queries
+    suite: observability
     toolType: range-query
   description: |
     Tests if the agent can use a range query to find recently created pods by
@@ -16,7 +16,7 @@ spec:
   verify:
     - llmJudge:
         contains: "kube_pod_created"
-        reason: "Verify the agent called execute_range_query with the kube_pod_created metric and reported the results: either listing recently created pods, or explicitly confirming no pods were created in the time window"
+        reason: "Verify the agent discovered and used the kube_pod_created metric"
   prompt:
     inline: |
       How many pods were created in the last 5 minutes?

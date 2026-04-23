@@ -6,8 +6,8 @@ metadata:
   parallel: true
   runs: 1
   labels:
-    suite: observability
     category: alerts
+    suite: observability
     toolType: alertmanager
   description: |
     Tests if the agent can discover and use the get_silences tool to retrieve
@@ -15,8 +15,8 @@ metadata:
 spec:
   verify:
     - llmJudge:
-        contains: "silence"
-        reason: "Verify the output discusses alert silences, including when no active silences exist"
+        contains: "silences"
+        reason: "Verify the response mentions silences. The agent should report either active silences with their matchers or that no active silences exist — both are valid outcomes"
   prompt:
     inline: |
       Are there any active silences in Alertmanager?

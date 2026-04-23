@@ -6,8 +6,8 @@ metadata:
   parallel: true
   runs: 1
   labels:
-    suite: observability
     category: labels
+    suite: observability
     toolType: exploration
   description: |
     Tests if the agent can use the get_series tool with a label selector
@@ -18,11 +18,11 @@ spec:
   verify:
     - llmJudge:
         contains: "pod"
-        reason: "Verify the agent called get_series and reported the results: either listing actual series data containing label dimensions like pod, or confirming no series were found for the given namespace"
+        reason: "Verify the agent retrieved actual series data containing label dimensions like pod"
     - llmJudge:
         contains: "container"
-        reason: "Verify the agent called get_series and reported series with container label values from the monitoring namespace, or explicitly confirmed no matching series exist"
+        reason: "Verify the agent reported series with container label values from the namespace"
   prompt:
     inline: |
       How many time series exist for container_cpu_usage_seconds_total
-      in the monitoring namespace?
+      in the openshift-monitoring namespace?

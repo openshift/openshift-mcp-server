@@ -6,8 +6,8 @@ metadata:
   parallel: true
   runs: 1
   labels:
-    suite: observability
     category: queries
+    suite: observability
     toolType: multi-step
   description: |
     Tests multi-step reasoning: the agent must discover a suitable metric
@@ -18,10 +18,10 @@ spec:
   verify:
     - llmJudge:
         contains: "kube-system"
-        reason: "Verify the agent called execute_instant_query and reported the results: the response should list actual namespace names from the cluster such as kube-system"
+        reason: "Verify the response lists actual namespace names from the cluster such as kube-system"
     - llmJudge:
         contains: "kube_pod"
-        reason: "Verify the agent called execute_instant_query with a kube_pod metric to count pods and reported the results"
+        reason: "Verify the agent used a kube_pod metric to count pods"
   prompt:
     inline: |
       Which namespaces have the most running pods? Show me the top 5.

@@ -6,8 +6,8 @@ metadata:
   parallel: true
   runs: 1
   labels:
-    suite: observability
     category: queries
+    suite: observability
     toolType: diagnostic
   description: |
     Tests the agent's ability to handle an ambiguous diagnostic prompt.
@@ -17,11 +17,11 @@ metadata:
 spec:
   verify:
     - llmJudge:
-        contains: "alertname"
-        reason: "Verify the agent called get_alerts and reported the results: either listing specific alert names, or explicitly confirming that no alerts are currently firing"
+        contains: "Watchdog"
+        reason: "Verify the agent checked alerts and reported specific alert names such as Watchdog"
     - llmJudge:
         contains: "kube_"
-        reason: "Verify the agent called execute_instant_query with Kubernetes metrics (e.g. kube_node_status_condition) and reported the results for health assessment"
+        reason: "Verify the agent queried Kubernetes metrics (e.g. kube_node_status_condition) for health assessment"
   prompt:
     inline: |
       Is the cluster healthy? Give me an overview of any issues.

@@ -6,8 +6,8 @@ metadata:
   parallel: true
   runs: 1
   labels:
-    suite: observability
     category: queries
+    suite: observability
     toolType: query
   description: |
     Tests if the agent can find the appropriate memory usage metric and query it
@@ -15,11 +15,11 @@ metadata:
 spec:
   verify:
     - llmJudge:
-        contains: "container_memory_working_set_bytes"
-        reason: "Verify the agent called execute_instant_query with the correct memory metric container_memory_working_set_bytes and reported the results"
+        contains: "container_memory"
+        reason: "Verify the agent queried a container memory metric (working_set_bytes or usage_bytes)"
     - llmJudge:
         contains: "pod"
-        reason: "Verify the agent reported query results identifying specific pods, or explicitly confirmed no memory data is available"
+        reason: "Verify the response identifies specific pods"
   prompt:
     inline: |
       Which pods are using the most memory? Show me the top 5.

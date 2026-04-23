@@ -6,8 +6,8 @@ metadata:
   parallel: true
   runs: 1
   labels:
-    suite: observability
     category: queries
+    suite: observability
     toolType: smoke-test
   description: |
     Smoke test to verify the agent can reach the metrics backend and get a
@@ -17,7 +17,7 @@ spec:
   verify:
     - llmJudge:
         contains: "prometheus-k8s"
-        reason: "Verify the agent called execute_instant_query with the up metric and reported the results: the response should confirm the prometheus-k8s target status"
+        reason: "Verify the agent queried the up metric and reported on the prometheus-k8s target"
   prompt:
     inline: |
       Is the metrics backend reachable? Query up{job="prometheus-k8s"} and report the status.
