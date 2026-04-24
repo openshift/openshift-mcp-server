@@ -22,8 +22,10 @@ BOOKINFO_ISTIO_HOME := $(BOOKINFO_OUTPUT_DIR)/istio-$(BOOKINFO_ISTIO_VERSION)
 BOOKINFO_ISTIO_DIR ?=
 BOOKINFO_CLIENT ?= oc
 KUBERNETES_CLI ?= oc
+OSSM_OPERATORS_NAMESPACE ?= openshift-operators
 BOOKINFO_NAMESPACE ?= bookinfo
 BOOKINFO_CP_NAMESPACE ?= istio-system
+OSSM_CONSOLE_NAMESPACE ?= ossmconsole
 # After install-istio: wait for this Deployment (Kiali server) to exist, then rollout completes before install-kiali-support.
 KIALI_DEPLOYMENT_NAME ?= kiali
 # Max seconds to poll for deployment/$(KIALI_DEPLOYMENT_NAME) to be created by the operator.
@@ -126,6 +128,48 @@ setup-kiali-openshift: ## OpenShift: OSSM/Sail + Istio/Kiali + Bookinfo (Kiali h
 	@echo "==> Bookinfo: OpenShift routes (productpage / gateways):"
 	@'$(KUBERNETES_CLI)' get route -n '$(BOOKINFO_NAMESPACE)' 2>/dev/null || true
 	@echo "==> setup-kiali-openshift: done."
+
+OSSM_DELETE_NAMESPACES ?= yes
+
+.PHONY: clean-kiali-openshift
+clean-kiali-openshift: ## OpenShift: remove Bookinfo + Istio/Kiali + operators installed by setup-kiali-openshift
+	@test -f '$(OSSM_INSTALL_SCRIPT)' || { echo "Missing $(OSSM_INSTALL_SCRIPT). Expected vendored scripts under hack/kiali/ in this repo."; exit 1; }
+	@set -e; \
+	cli='$(KUBERNETES_CLI)'; ns='$(BOOKINFO_NAMESPACE)'; \
+	echo "==> Step 1/4 - Cleaning mesh resources (Istio/Kiali/addons CRs) ..."; \
+	OSSM_DELETE_CONFIRM=yes bash '$(OSSM_INSTALL_SCRIPT)' -c '$(KUBERNETES_CLI)' -cpn '$(BOOKINFO_CP_NAMESPACE)' delete-istio; \
+	echo "==> Step 2/4 - Cleaning namespaces (Bookinfo + OSSM Console, then control-plane when enabled) ..."; \
+	if [ "$$(basename -- "$$cli")" = "oc" ]; then \
+	  $$cli delete project "$$ns" --ignore-not-found=true || true; \
+	  $$cli delete project '$(OSSM_CONSOLE_NAMESPACE)' --ignore-not-found=true || true; \
+	fi; \
+	$$cli delete namespace "$$ns" --ignore-not-found=true || true; \
+	$$cli wait --for=delete "namespace/$$ns" --timeout=180s >/dev/null 2>&1 || true; \
+	$$cli delete namespace '$(OSSM_CONSOLE_NAMESPACE)' --ignore-not-found=true || true; \
+	$$cli wait --for=delete "namespace/$(OSSM_CONSOLE_NAMESPACE)" --timeout=180s >/dev/null 2>&1 || true; \
+	if [ "$(OSSM_DELETE_NAMESPACES)" = "yes" ]; then \
+	  for doomed_ns in '$(BOOKINFO_CP_NAMESPACE)' istio-cni; do \
+	    $$cli delete namespace "$$doomed_ns" --ignore-not-found=true || true; \
+	    $$cli wait --for=delete "namespace/$$doomed_ns" --timeout=180s >/dev/null 2>&1 || true; \
+	  done; \
+	fi; \
+	echo "==> Step 3/4 - Cleaning Sail/Kiali operators ..."; \
+	OSSM_DELETE_CONFIRM=yes bash '$(OSSM_INSTALL_SCRIPT)' -c '$(KUBERNETES_CLI)' -cpn '$(BOOKINFO_CP_NAMESPACE)' delete-operators; \
+	echo "==> Step 4/4 - Final residual cleanup (subscriptions/CSVs/CRDs/routes/SCC) ..."; \
+	opns='$(OSSM_OPERATORS_NAMESPACE)'; cpns='$(BOOKINFO_CP_NAMESPACE)'; \
+	$$cli delete subscription --ignore-not-found=true -n "$$opns" my-kiali my-sailoperator; \
+	csvs="$$( $$cli get csv --all-namespaces --no-headers -o custom-columns=NS:.metadata.namespace,N:.metadata.name 2>/dev/null | awk '$$2 ~ /(kiali-operator|sailoperator|servicemeshoperator3|servicemeshoperator\.|istio-operator|istiooperator)/ {print $$1 ":" $$2}' )"; \
+	if [ -n "$$csvs" ]; then \
+	  echo "$$csvs" | while IFS=: read -r csv_ns csv_name; do $$cli delete csv -n "$$csv_ns" "$$csv_name" --ignore-not-found=true; done; \
+	fi; \
+	crds="$$( $$cli get crds -o name 2>/dev/null | awk '$$0 ~ /\.istio\.io$$|\.sailoperator\.io$$|\.servicemesh.*\.io$$/ {print $$0}' )"; \
+	if [ -n "$$crds" ]; then echo "$$crds" | while IFS= read -r crd; do $$cli delete "$$crd" --ignore-not-found=true; done; fi; \
+	$$cli -n "$$cpns" delete route --ignore-not-found=true kiali istio-ingressgateway; \
+	$$cli delete scc istio-addons-scc --ignore-not-found=true 2>/dev/null || true; \
+	echo "==> clean-kiali-openshift: done."
+
+.PHONY: setup-kiali-openshift-clean
+setup-kiali-openshift-clean: clean-kiali-openshift ## Alias for clean-kiali-openshift
 
 ifeq ($(words $(MAKEFILE_LIST)),1)
 .DEFAULT_GOAL := setup-kiali-openshift
