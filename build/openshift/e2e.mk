@@ -21,6 +21,10 @@ e2e-install-operator: ## Install the MCP Lifecycle Operator from upstream releas
 .PHONY: e2e-install-gateway
 e2e-install-gateway: ## Install the MCP Gateway controller and broker
 	@echo "Installing MCP Gateway $(MCP_GATEWAY_VERSION)..."
+	oc apply -k $(MCP_GATEWAY_INSTALL_URL) || true
+	@echo "Waiting for MCP Gateway CRDs to be established..."
+	oc wait crd/mcpgatewayextensions.mcp.kuadrant.io --for=condition=Established --timeout=60s
+	oc wait crd/mcpserverregistrations.mcp.kuadrant.io --for=condition=Established --timeout=60s
 	oc apply -k $(MCP_GATEWAY_INSTALL_URL)
 	@echo "Applying Gateway and ReferenceGrants..."
 	oc apply -f hack/e2e/gateway.yaml
