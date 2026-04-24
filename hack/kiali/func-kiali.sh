@@ -116,6 +116,171 @@ spec:
 EOM
 }
 
+ossm_kiali_workload_container_images() {
+  local cp_ns="${1}"
+  local deploy_name="${2}"
+  local images=""
+
+  if ${OC} get "deployment/${deploy_name}" -n "${cp_ns}" >/dev/null 2>&1; then
+    images="$(${OC} get "deployment/${deploy_name}" -n "${cp_ns}" -o jsonpath='{range .spec.template.spec.containers[*]}{.image}{" "}{end}' 2>/dev/null || true)"
+  fi
+
+  if [ -z "${images}" ]; then
+    images="$(${OC} get pods -n "${cp_ns}" -l app.kubernetes.io/name=kiali -o jsonpath='{range .items[*]}{range .spec.containers[*]}{.image}{" "}{end}{end}' 2>/dev/null || true)"
+  fi
+
+  if [ -z "${images}" ]; then
+    images="$(${OC} get pods -n "${cp_ns}" -l app=kiali -o jsonpath='{range .items[*]}{range .spec.containers[*]}{.image}{" "}{end}{end}' 2>/dev/null || true)"
+  fi
+
+  if [ -z "${images}" ]; then
+    return 1
+  fi
+
+  echo "${images}"
+  return 0
+}
+
+ossm_kiali_image_tag() {
+  local image="${1}"
+  local no_digest="${image%%@*}"
+  if [ "${no_digest}" = "${image}" ] && [ "${image#*:}" = "${image}" ]; then
+    return 1
+  fi
+  local tag="${no_digest##*:}"
+  if [ -z "${tag}" ]; then
+    return 1
+  fi
+  echo "${tag}"
+}
+
+ossm_kiali_clean_semver() {
+  local raw="${1#v}"
+  raw="${raw%%-*}"
+  raw="${raw%%+*}"
+  echo "${raw}"
+}
+
+ossm_kiali_semver_ge() {
+  local a
+  local b
+  a="$(ossm_kiali_clean_semver "${1}")"
+  b="$(ossm_kiali_clean_semver "${2}")"
+  local a1=0 a2=0 a3=0 b1=0 b2=0 b3=0
+  IFS='.' read -r a1 a2 a3 <<<"${a}"
+  IFS='.' read -r b1 b2 b3 <<<"${b}"
+  a1="${a1:-0}"; a2="${a2:-0}"; a3="${a3:-0}"
+  b1="${b1:-0}"; b2="${b2:-0}"; b3="${b3:-0}"
+  if [ "${a1}" -gt "${b1}" ]; then return 0; fi
+  if [ "${a1}" -lt "${b1}" ]; then return 1; fi
+  if [ "${a2}" -gt "${b2}" ]; then return 0; fi
+  if [ "${a2}" -lt "${b2}" ]; then return 1; fi
+  if [ "${a3}" -ge "${b3}" ]; then return 0; fi
+  return 1
+}
+
+ossm_kiali_pod_wait_label() {
+  local cp_ns="${1}"
+  if ${OC} get pods -n "${cp_ns}" -l app.kubernetes.io/name=kiali -o name 2>/dev/null | grep -q .; then
+    echo "app.kubernetes.io/name=kiali"
+    return 0
+  fi
+  if ${OC} get pods -n "${cp_ns}" -l app=kiali -o name 2>/dev/null | grep -q .; then
+    echo "app=kiali"
+    return 0
+  fi
+  return 1
+}
+
+# Ensure Kiali server image is at least OSSM_KIALI_SUPPORT_MIN_VERSION (default v2.25).
+# If below, set ALLOW_AD_HOC_KIALI_IMAGE on the operator and patch the Kiali CR to OSSM_KIALI_SUPPORT_TARGET_VERSION.
+# $1 = control plane namespace (e.g. istio-system), $2 = Kiali CR name (default: kiali). Deployment is usually the same name.
+ossm_install_kiali_support() {
+  local cp_ns="${1:-istio-system}"
+  local kiali_name="${2:-kiali}"
+  local min_ver="${OSSM_KIALI_SUPPORT_MIN_VERSION:-v2.25}"
+  local target_ver="${OSSM_KIALI_SUPPORT_TARGET_VERSION:-v2.25}"
+  local image_name="${OSSM_KIALI_SUPPORT_IMAGE_NAME:-quay.io/kiali/kiali}"
+  local op_ns="${OLM_OPERATORS_NAMESPACE:-openshift-operators}"
+  local deploy_name="${OSSM_KIALI_DEPLOYMENT_NAME:-${kiali_name}}"
+
+  if [ "${IS_OPENSHIFT}" != "true" ]; then
+    errormsg "install-kiali-support is only supported on OpenShift (requires kiali-operator in ${op_ns})."
+    return 1
+  fi
+
+  if ! ${OC} get "kiali/${kiali_name}" -n "${cp_ns}" >/dev/null 2>&1; then
+    errormsg "No Kiali CR [${kiali_name}] in namespace [${cp_ns}]. Run install-istio (with Kiali) first."
+    return 1
+  fi
+
+  local images
+  if ! images="$(ossm_kiali_workload_container_images "${cp_ns}" "${deploy_name}")"; then
+    errormsg "No Kiali workload found in [${cp_ns}]: no Deployment/${deploy_name} and no pods with labels app.kubernetes.io/name=kiali or app=kiali. Is Kiali still provisioning?"
+    return 1
+  fi
+
+  local first_img="${images%% *}"
+  local current_tag
+  if ! current_tag="$(ossm_kiali_image_tag "${first_img}")"; then
+    errormsg "Could not parse a version tag from image [${first_img}] (digest-based image?)."
+    return 1
+  fi
+  if [ -z "${current_tag}" ]; then
+    errormsg "Empty image tag from [${first_img}]."
+    return 1
+  fi
+
+  infomsg "Detected Kiali image [${first_img}] (tag: [${current_tag}]). Required minimum: [${min_ver}]."
+
+  if ossm_kiali_semver_ge "${current_tag}" "${min_ver}"; then
+    infomsg "Kiali server version is OK: [${current_tag}] is greater than or equal to [${min_ver}]. No upgrade needed."
+    return 0
+  fi
+
+  infomsg "Kiali tag [${current_tag}] is below [${min_ver}]. Enabling ad-hoc image and upgrading to [${target_ver}]..."
+
+  if ! ${OC} set env deploy/kiali-operator -n "${op_ns}" ALLOW_AD_HOC_KIALI_IMAGE=true; then
+    errormsg "Failed to set ALLOW_AD_HOC_KIALI_IMAGE on kiali-operator in [${op_ns}]."
+    return 1
+  fi
+
+  local merge_patch
+  merge_patch="{\"spec\":{\"deployment\":{\"image_name\":\"${image_name}\",\"image_version\":\"${target_ver}\",\"override_install_check\":true}}}"
+  if ! ${OC} patch "kiali" "${kiali_name}" -n "${cp_ns}" --type merge -p "${merge_patch}"; then
+    errormsg "Failed to patch Kiali [${kiali_name}] in [${cp_ns}]."
+    return 1
+  fi
+
+  infomsg "Waiting for Kiali deployment and pods to become ready..."
+  if ${OC} get "deployment/${deploy_name}" -n "${cp_ns}" >/dev/null 2>&1; then
+    ${OC} rollout status "deployment/${deploy_name}" -n "${cp_ns}" --timeout=600s
+  else
+    infomsg "No deployment/${deploy_name} in [${cp_ns}]; waiting on Kiali-labeled pods..."
+  fi
+
+  local wait_label="${OSSM_KIALI_POD_WAIT_LABEL:-}"
+  if [ -z "${wait_label}" ]; then
+    wait_label="$(ossm_kiali_pod_wait_label "${cp_ns}" 2>/dev/null)" || wait_label=""
+  fi
+  if [ -n "${wait_label}" ]; then
+    if ! ${OC} wait --for=condition=Ready pod -l "${wait_label}" -n "${cp_ns}" --timeout=600s; then
+      errormsg "Kiali pod did not become Ready within 600s (label ${wait_label}). Check pods in [${cp_ns}]."
+      return 1
+    fi
+  elif ${OC} get "deployment/${deploy_name}" -n "${cp_ns}" >/dev/null 2>&1; then
+    if ! ${OC} wait --for=condition=Available "deployment/${deploy_name}" -n "${cp_ns}" --timeout=600s; then
+      errormsg "Kiali deployment [${deploy_name}] did not become Available within 600s."
+      return 1
+    fi
+  else
+    errormsg "Could not find Kiali pods to wait on (and no deployment/${deploy_name}). Check [${cp_ns}]."
+    return 1
+  fi
+
+  infomsg "Updated the Kiali server to version [${target_ver}]."
+}
+
 delete_kiali_operator() {
   local abort_operation="false"
   for cr in \
@@ -228,165 +393,6 @@ status_ossmconsole_cr() {
   else
     infomsg "There are no OSSMConsole CRs in the cluster"
   fi
-}
-
-# --- install-kiali-support (OpenShift): ensure Kiali server is at least a given version ---
-
-# Parse a container image reference and return the tag part (last ":" segment; strips @sha256... if present).
-ossm_kiali_image_tag() {
-  local img="${1}"
-  local after_colon="${img##*:}"
-  if [[ "${after_colon}" == sha256:* ]]; then
-    echo ""
-    return 1
-  fi
-  echo "${after_colon}"
-}
-
-# Return 0 if semver a >= b (only numeric dot-separated parts; optional leading "v" is ignored).
-ossm_kiali_semver_ge() {
-  local a="${1#v}"
-  local b="${2#v}"
-  IFS='.' read -r a1 a2 a3 _ <<< "${a}."
-  IFS='.' read -r b1 b2 b3 _ <<< "${b}."
-  a1=${a1:-0}
-  a2=${a2:-0}
-  a3=${a3:-0}
-  b1=${b1:-0}
-  b2=${b2:-0}
-  b3=${b3:-0}
-  if [ "${a1}" -gt "${b1}" ]; then return 0; fi
-  if [ "${a1}" -lt "${b1}" ]; then return 1; fi
-  if [ "${a2}" -gt "${b2}" ]; then return 0; fi
-  if [ "${a2}" -lt "${b2}" ]; then return 1; fi
-  if [ "${a3}" -ge "${b3}" ]; then return 0; fi
-  return 1
-}
-
-# Resolve Kiali container images: Deployment spec first (matches operator defaults), then pod label selectors
-# (OSSM often uses app.kubernetes.io/name=kiali, not app=kiali).
-# Prints non-empty image list to stdout, or nothing if not found.
-ossm_kiali_workload_container_images() {
-  local cp_ns="${1}"
-  local deploy_name="${2:-kiali}"
-  local images
-
-  if images=$(${OC} get "deployment/${deploy_name}" -n "${cp_ns}" -o jsonpath='{.spec.template.spec.containers[*].image}' 2>/dev/null) && [ -n "${images// /}" ]; then
-    echo "${images}"
-    return 0
-  fi
-
-  for _label in 'app.kubernetes.io/name=kiali' 'app=kiali'; do
-    if images=$(${OC} get pods -n "${cp_ns}" -l "${_label}" -o jsonpath='{.items[*].spec.containers[*].image}' 2>/dev/null) && [ -n "${images// /}" ]; then
-      echo "${images}"
-      return 0
-    fi
-  done
-
-  return 1
-}
-
-# Pod label selector for "oc wait" (comma-separated for multiple labels not needed — use the first that matches deployment).
-# Prefer app.kubernetes.io/name=kiali; override with OSSM_KIALI_POD_WAIT_LABEL=app=... if needed.
-ossm_kiali_pod_wait_label() {
-  local cp_ns="${1}"
-  local try
-  for try in 'app.kubernetes.io/name=kiali' 'app=kiali'; do
-    if ${OC} get pods -n "${cp_ns}" -l "${try}" -o name 2>/dev/null | grep -q .; then
-      echo "${try}"
-      return 0
-    fi
-  done
-  return 1
-}
-
-# Ensure Kiali server image is at least OSSM_KIALI_SUPPORT_MIN_VERSION (default v2.25).
-# If below, set ALLOW_AD_HOC_KIALI_IMAGE on the operator and patch the Kiali CR to OSSM_KIALI_SUPPORT_TARGET_VERSION.
-# $1 = control plane namespace (e.g. istio-system), $2 = Kiali CR name (default: kiali). Deployment is usually the same name.
-ossm_install_kiali_support() {
-  local cp_ns="${1:-istio-system}"
-  local kiali_name="${2:-kiali}"
-  local min_ver="${OSSM_KIALI_SUPPORT_MIN_VERSION:-v2.25}"
-  local target_ver="${OSSM_KIALI_SUPPORT_TARGET_VERSION:-v2.25}"
-  local image_name="${OSSM_KIALI_SUPPORT_IMAGE_NAME:-quay.io/kiali/kiali}"
-  local op_ns="${OLM_OPERATORS_NAMESPACE:-openshift-operators}"
-  local deploy_name="${OSSM_KIALI_DEPLOYMENT_NAME:-${kiali_name}}"
-
-  if [ "${IS_OPENSHIFT}" != "true" ]; then
-    errormsg "install-kiali-support is only supported on OpenShift (requires kiali-operator in ${op_ns})."
-    return 1
-  fi
-
-  if ! ${OC} get "kiali/${kiali_name}" -n "${cp_ns}" >&/dev/null; then
-    errormsg "No Kiali CR [${kiali_name}] in namespace [${cp_ns}]. Run install-istio (with Kiali) first."
-    return 1
-  fi
-
-  local images
-  if ! images=$(ossm_kiali_workload_container_images "${cp_ns}" "${deploy_name}"); then
-    errormsg "No Kiali workload found in [${cp_ns}]: no Deployment/${deploy_name} and no pods with labels app.kubernetes.io/name=kiali or app=kiali. Is Kiali still provisioning?"
-    return 1
-  fi
-
-  # First image in the list (in case of multiple values).
-  local first_img="${images%% *}"
-  local current_tag
-  if ! current_tag=$(ossm_kiali_image_tag "${first_img}"); then
-    errormsg "Could not parse a version tag from image [${first_img}] (digest-based image?)."
-    return 1
-  fi
-  if [ -z "${current_tag}" ]; then
-    errormsg "Empty image tag from [${first_img}]."
-    return 1
-  fi
-
-  infomsg "Detected Kiali image [${first_img}] (tag: [${current_tag}]). Required minimum: [${min_ver}]."
-
-  if ossm_kiali_semver_ge "${current_tag}" "${min_ver}"; then
-    infomsg "Kiali server version is OK: [${current_tag}] is greater than or equal to [${min_ver}]. No upgrade needed."
-    return 0
-  fi
-
-  infomsg "Kiali tag [${current_tag}] is below [${min_ver}]. Enabling ad-hoc image and upgrading to [${target_ver}]..."
-
-  if ! ${OC} set env deploy/kiali-operator -n "${op_ns}" ALLOW_AD_HOC_KIALI_IMAGE=true; then
-    errormsg "Failed to set ALLOW_AD_HOC_KIALI_IMAGE on kiali-operator in [${op_ns}]."
-    return 1
-  fi
-
-  local merge_patch
-  merge_patch="{\"spec\":{\"deployment\":{\"image_name\":\"${image_name}\",\"image_version\":\"${target_ver}\",\"override_install_check\":true}}}"
-  if ! ${OC} patch "kiali" "${kiali_name}" -n "${cp_ns}" --type merge -p "${merge_patch}"; then
-    errormsg "Failed to patch Kiali [${kiali_name}] in [${cp_ns}]."
-    return 1
-  fi
-
-  infomsg "Waiting for Kiali deployment and pods to become ready..."
-  if ${OC} get "deployment/${deploy_name}" -n "${cp_ns}" >&/dev/null; then
-    ${OC} rollout status "deployment/${deploy_name}" -n "${cp_ns}" --timeout=600s
-  else
-    infomsg "No deployment/${deploy_name} in [${cp_ns}]; waiting on Kiali-labeled pods..."
-  fi
-  local wait_label="${OSSM_KIALI_POD_WAIT_LABEL:-}"
-  if [ -z "${wait_label}" ]; then
-    wait_label=$(ossm_kiali_pod_wait_label "${cp_ns}" 2>/dev/null) || wait_label=""
-  fi
-  if [ -n "${wait_label}" ]; then
-    if ! ${OC} wait --for=condition=Ready pod -l "${wait_label}" -n "${cp_ns}" --timeout=600s; then
-      errormsg "Kiali pod did not become Ready within 600s (label ${wait_label}). Check pods in [${cp_ns}]."
-      return 1
-    fi
-  elif ${OC} get "deployment/${deploy_name}" -n "${cp_ns}" >&/dev/null; then
-    if ! ${OC} wait --for=condition=Available "deployment/${deploy_name}" -n "${cp_ns}" --timeout=600s; then
-      errormsg "Kiali deployment [${deploy_name}] did not become Available within 600s."
-      return 1
-    fi
-  else
-    errormsg "Could not find Kiali pods to wait on (and no deployment/${deploy_name}). Check [${cp_ns}]."
-    return 1
-  fi
-
-  infomsg "Updated the Kiali server to version [${target_ver}]."
 }
 
 # Wait until OLM has installed an operator that registers this CRD (install-istio runs right after install-operators).
