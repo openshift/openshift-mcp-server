@@ -68,6 +68,10 @@ build-all-platforms: clean tidy format lint ## Build the project for all platfor
 test: ## Run the tests
 	go test -count=1 -v ./...
 
+.PHONY: test-observability-e2e
+test-observability-e2e: ## Run obs-mcp e2e tests against an OpenShift cluster
+	go test -tags observability_e2e -count=1 -v ./pkg/observability/tests/
+
 .PHONY: test-update-snapshots
 test-update-snapshots: ## Update test snapshots for toolset tests
 	UPDATE_TOOLSETS_JSON=1 go test -count=1 -v ./pkg/mcp
