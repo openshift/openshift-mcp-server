@@ -11,6 +11,8 @@ import (
 	"github.com/rhobs/obs-mcp/pkg/prometheus"
 )
 
+const MetricsToolSetName = "metrics"
+
 // Config holds obs-mcp toolset configuration
 type Config struct {
 	// PrometheusURL is the URL of the Prometheus/Thanos Querier endpoint.
@@ -103,5 +105,5 @@ func obsMCPToolsetParser(_ context.Context, primitive toml.Primitive, md toml.Me
 }
 
 func init() {
-	serverconfig.RegisterToolsetConfig("metrics", obsMCPToolsetParser)
+	serverconfig.RegisterToolsetConfig(MetricsToolSetName, obsMCPToolsetParser)
 }
