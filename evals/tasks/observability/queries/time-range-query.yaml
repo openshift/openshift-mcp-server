@@ -1,0 +1,26 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "time-range-query"
+  difficulty: medium
+  parallel: true
+  runs: 1
+  labels:
+    category: queries
+    suite: observability
+    toolType: multi-step
+  description: |
+    Tests whether the agent correctly uses execute_range_query with
+    appropriate start/end/step parameters when asked for data over
+    a specific time window.
+spec:
+  verify:
+    - llmJudge:
+        contains: "container_cpu_usage_seconds_total"
+        reason: "Verify the agent discovered and used the correct CPU metric"
+    - llmJudge:
+        contains: "pod"
+        reason: "Verify the response includes specific pod names from the query results"
+  prompt:
+    inline: |
+      Show me the CPU usage trend for pods in the default namespace over the last 30 minutes.

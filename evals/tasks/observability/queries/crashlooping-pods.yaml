@@ -1,0 +1,22 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "crashlooping-pods"
+  difficulty: medium
+  parallel: true
+  runs: 1
+  labels:
+    category: queries
+    suite: observability
+    toolType: range-query
+  description: |
+    Tests if the agent can identify crashlooping pods by discovering and querying
+    the kube_pod_container_status_restarts_total metric over a time range.
+spec:
+  verify:
+    - llmJudge:
+        contains: "kube_pod_container_status_restarts_total"
+        reason: "Verify the agent used the correct metric for container restart counts"
+  prompt:
+    inline: |
+      Which pods were crashlooping in the last 5 minutes?

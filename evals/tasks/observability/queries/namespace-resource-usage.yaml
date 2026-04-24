@@ -1,0 +1,28 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "namespace-resource-usage"
+  difficulty: hard
+  parallel: true
+  runs: 1
+  labels:
+    category: queries
+    suite: observability
+    toolType: multi-step
+  description: |
+    Tests multi-step reasoning: the agent must discover CPU and memory metrics,
+    then query them with namespace-level aggregation to identify the top
+    resource-consuming namespaces. Requires chaining list_metrics, label
+    exploration, and multiple instant queries.
+spec:
+  verify:
+    - llmJudge:
+        contains: "container_cpu_usage_seconds_total"
+        reason: "Verify the agent discovered and used the correct CPU metric"
+    - llmJudge:
+        contains: "container_memory"
+        reason: "Verify the agent discovered and used a container memory metric (working_set_bytes or usage_bytes)"
+  prompt:
+    inline: |
+      Which namespace is consuming the most CPU and memory?
+      Show me the top namespace for each.

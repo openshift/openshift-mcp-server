@@ -1,0 +1,26 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "label-names"
+  difficulty: easy
+  parallel: true
+  runs: 1
+  labels:
+    category: labels
+    suite: observability
+    toolType: exploration
+  description: |
+    Tests if the agent follows the correct workflow: first calling list_metrics to
+    verify kube_pod_info exists, then calling get_label_names to discover available
+    labels for that metric.
+spec:
+  verify:
+    - llmJudge:
+        contains: "namespace"
+        reason: "Verify the output includes the namespace label which is a standard Kubernetes label"
+    - llmJudge:
+        contains: "pod"
+        reason: "Verify the output includes the pod label"
+  prompt:
+    inline: |
+      What labels are available for the kube_pod_info metric?
