@@ -1,0 +1,22 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "prometheus-head-series"
+  difficulty: easy
+  parallel: true
+  runs: 1
+  labels:
+    category: queries
+    suite: observability
+    toolType: query
+  description: |
+    Tests if the agent can query Prometheus internal metrics to report the current
+    number of head series using prometheus_tsdb_head_series.
+spec:
+  verify:
+    - llmJudge:
+        contains: "prometheus_tsdb_head_series"
+        reason: "Verify the agent used the correct Prometheus TSDB metric"
+  prompt:
+    inline: |
+      How many head series does Prometheus have?

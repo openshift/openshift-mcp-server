@@ -72,3 +72,13 @@ config:
             toolPattern: ".*"
         minToolCalls: 1
         maxToolCalls: 20
+    # Observability tasks
+    - glob: ../tasks/observability/*/*.yaml
+      labelSelector:
+        suite: observability
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            toolPattern: ".*"
+        minToolCalls: 1
+        maxToolCalls: 20
