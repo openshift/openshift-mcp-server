@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gateway-system
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: mcp-gateway
+  namespace: gateway-system
+spec:
+  gatewayClassName: openshift-default
+  listeners:
+  - name: mcp
+    protocol: HTTP
+    port: 8080
+    allowedRoutes:
+      namespaces:
+        from: All
+---
+# Allow MCPGatewayExtension in mcp-system to reference Gateway in gateway-system
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-mcp-gateway-extension
+  namespace: gateway-system
+spec:
+  from:
+  - group: mcp.kuadrant.io
+    kind: MCPGatewayExtension
+    namespace: mcp-system
+  to:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+---
+# Allow HTTPRoutes in e2e namespace to reference Gateway in gateway-system
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-mcp-server-routes
+  namespace: gateway-system
+spec:
+  from:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    namespace: openshift-mcp-server-e2e
+  to:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
