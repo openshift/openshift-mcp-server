@@ -26,7 +26,7 @@ const (
 
 // getConfig retrieves the obs-mcp toolset configuration from params.
 func getConfig(params api.ToolHandlerParams) *toolsetconfig.Config {
-	if cfg, ok := params.GetToolsetConfig("obs-mcp"); ok {
+	if cfg, ok := params.GetToolsetConfig(toolsetconfig.MetricsToolSetName); ok {
 		if obsCfg, ok := cfg.(*toolsetconfig.Config); ok {
 			return obsCfg
 		}

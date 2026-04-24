@@ -6,6 +6,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
 
+	"github.com/rhobs/obs-mcp/pkg/toolset/config"
 	toolset_tools "github.com/rhobs/obs-mcp/pkg/toolset/tools"
 )
 
@@ -16,7 +17,7 @@ var _ api.Toolset = (*Toolset)(nil)
 
 // GetName returns the name of the toolset.
 func (t *Toolset) GetName() string {
-	return "metrics"
+	return config.MetricsToolSetName
 }
 
 // GetDescription returns a human-readable description of the toolset.
