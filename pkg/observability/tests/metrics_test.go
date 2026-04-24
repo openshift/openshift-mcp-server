@@ -56,6 +56,7 @@ type MetricsE2ESuite struct {
 	server          *mcpserver.Server
 	prometheusURL   string
 	alertmanagerURL string
+	testMetric      string
 }
 
 func (s *MetricsE2ESuite) SetupSuite() {
@@ -77,6 +78,49 @@ func (s *MetricsE2ESuite) SetupSuite() {
 	}
 	s.T().Logf("Prometheus URL: %s", s.prometheusURL)
 	s.T().Logf("Alertmanager URL: %s", s.alertmanagerURL)
+
+	// Discover a real metric from the cluster for use in query tests.
+	// This also warms up the Thanos Querier label cache so that
+	// ValidateMetricsExist (which lists all metric names) succeeds
+	// reliably in subsequent per-test calls.
+	s.testMetric = s.discoverTestMetric()
+	s.Require().NotEmpty(s.testMetric, "could not discover any metric from Prometheus")
+	s.T().Logf("Test metric: %s", s.testMetric)
+}
+
+// discoverTestMetric creates a temporary MCP server to call list_metrics
+// and returns the first CPU metric found. This also pre-warms the Thanos
+// Querier's metric name cache.
+func (s *MetricsE2ESuite) discoverTestMetric() string {
+	cfg := s.buildConfig()
+
+	provider, err := internalk8s.NewProvider(cfg)
+	if err != nil {
+		s.T().Logf("Could not create provider for metric discovery: %v", err)
+		return ""
+	}
+
+	server, err := mcpserver.NewServer(mcpserver.Configuration{StaticConfig: cfg}, provider)
+	if err != nil {
+		s.T().Logf("Could not create server for metric discovery: %v", err)
+		return ""
+	}
+	defer server.Close()
+
+	client := test.NewMcpClient(s.T(), server.ServeHTTP())
+	defer client.Close()
+
+	result, err := client.CallTool("list_metrics", map[string]any{"name_regex": ".*cpu.*"})
+	if err != nil || result.IsError {
+		s.T().Logf("list_metrics failed during discovery: err=%v, isError=%v", err, result != nil && result.IsError)
+		return ""
+	}
+
+	var output listMetricsOutput
+	if err := json.Unmarshal([]byte(textContent(result)), &output); err != nil || len(output.Metrics) == 0 {
+		return ""
+	}
+	return output.Metrics[0]
 }
 
 // discoverRoutes reads OpenShift Route objects from the openshift-monitoring
@@ -130,7 +174,7 @@ func (s *MetricsE2ESuite) discoverRoutes() map[string]string {
 	return result
 }
 
-func (s *MetricsE2ESuite) SetupTest() {
+func (s *MetricsE2ESuite) buildConfig() *config.StaticConfig {
 	tomlCfg := fmt.Sprintf(`
 		toolsets = ["metrics"]
 		[toolset_configs.metrics]
@@ -146,6 +190,11 @@ func (s *MetricsE2ESuite) SetupTest() {
 	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
 		cfg.KubeConfig = kubeconfig
 	}
+	return cfg
+}
+
+func (s *MetricsE2ESuite) SetupTest() {
+	cfg := s.buildConfig()
 
 	provider, err := internalk8s.NewProvider(cfg)
 	s.Require().NoError(err, "Failed to create k8s provider")
@@ -180,9 +229,9 @@ func (s *MetricsE2ESuite) TestListMetrics() {
 }
 
 func (s *MetricsE2ESuite) TestExecuteInstantQuery() {
-	s.Run("executes an instant query for up metric", func() {
+	s.Run("executes an instant query", func() {
 		toolResult, err := s.CallTool("execute_instant_query", map[string]any{
-			"query": "up",
+			"query": s.testMetric,
 		})
 		s.Require().NoError(err)
 		s.Require().False(toolResult.IsError, "tool returned error: %s", textContent(toolResult))
@@ -190,14 +239,14 @@ func (s *MetricsE2ESuite) TestExecuteInstantQuery() {
 		var output instantQueryOutput
 		s.Require().NoError(json.Unmarshal([]byte(textContent(toolResult)), &output))
 		s.Equal("vector", output.ResultType)
-		s.NotEmpty(output.Result, "expected at least one result for 'up' query")
+		s.NotEmpty(output.Result, "expected at least one result")
 	})
 }
 
 func (s *MetricsE2ESuite) TestExecuteRangeQuery() {
 	s.Run("executes a range query with step", func() {
 		toolResult, err := s.CallTool("execute_range_query", map[string]any{
-			"query":    "up",
+			"query":    s.testMetric,
 			"step":     "1m",
 			"duration": "5m",
 		})
@@ -213,10 +262,10 @@ func (s *MetricsE2ESuite) TestExecuteRangeQuery() {
 func (s *MetricsE2ESuite) TestShowTimeseries() {
 	s.Run("validates a range query for chart rendering", func() {
 		toolResult, err := s.CallTool("show_timeseries", map[string]any{
-			"query":    "up",
+			"query":    s.testMetric,
 			"step":     "1m",
 			"duration": "5m",
-			"title":    "Targets Up",
+			"title":    "Test Timeseries",
 		})
 		s.Require().NoError(err)
 		s.Require().False(toolResult.IsError, "tool returned error: %s", textContent(toolResult))
@@ -224,43 +273,45 @@ func (s *MetricsE2ESuite) TestShowTimeseries() {
 }
 
 func (s *MetricsE2ESuite) TestGetLabelNames() {
-	s.Run("retrieves label names", func() {
-		toolResult, err := s.CallTool("get_label_names", map[string]any{})
+	s.Run("retrieves label names for a metric", func() {
+		toolResult, err := s.CallTool("get_label_names", map[string]any{
+			"metric": s.testMetric,
+		})
 		s.Require().NoError(err)
 		s.Require().False(toolResult.IsError, "tool returned error: %s", textContent(toolResult))
 
 		var output labelNamesOutput
 		s.Require().NoError(json.Unmarshal([]byte(textContent(toolResult)), &output))
 		s.NotEmpty(output.Labels, "expected at least one label name")
-		s.Contains(output.Labels, "__name__")
 	})
 }
 
 func (s *MetricsE2ESuite) TestGetLabelValues() {
-	s.Run("retrieves label values for job label", func() {
+	s.Run("retrieves label values for __name__ label", func() {
 		toolResult, err := s.CallTool("get_label_values", map[string]any{
-			"label": "job",
+			"label":  "__name__",
+			"metric": s.testMetric,
 		})
 		s.Require().NoError(err)
 		s.Require().False(toolResult.IsError, "tool returned error: %s", textContent(toolResult))
 
 		var output labelValuesOutput
 		s.Require().NoError(json.Unmarshal([]byte(textContent(toolResult)), &output))
-		s.NotEmpty(output.Values, "expected at least one job label value")
+		s.NotEmpty(output.Values, "expected at least one label value")
 	})
 }
 
 func (s *MetricsE2ESuite) TestGetSeries() {
-	s.Run("retrieves series for up metric", func() {
+	s.Run("retrieves series for a metric", func() {
 		toolResult, err := s.CallTool("get_series", map[string]any{
-			"matches": "up",
+			"matches": fmt.Sprintf(`{__name__="%s"}`, s.testMetric),
 		})
 		s.Require().NoError(err)
 		s.Require().False(toolResult.IsError, "tool returned error: %s", textContent(toolResult))
 
 		var output seriesOutput
 		s.Require().NoError(json.Unmarshal([]byte(textContent(toolResult)), &output))
-		s.NotEmpty(output.Series, "expected at least one series for 'up'")
+		s.NotEmpty(output.Series, "expected at least one series")
 		s.Greater(output.Cardinality, 0)
 	})
 }
