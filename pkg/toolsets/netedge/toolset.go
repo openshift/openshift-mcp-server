@@ -30,6 +30,7 @@ func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
 		initProbeHTTP(),
 		initRoutes(),
 		initExecDNSInPod(),
+		initRouter(),
 	)
 }
 
