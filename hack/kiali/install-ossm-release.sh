@@ -47,9 +47,9 @@ while [[ $# -gt 0 ]]; do
 
     # COMMANDS
 
-    install-operators)   _CMD="install-operators"   ; shift ;;
-    install-kiali-support) _CMD="install-kiali-support" ; shift ;;
+    install-operators) _CMD="install-operators" ; shift ;;
     install-istio)     _CMD="install-istio"     ; shift ;;
+    install-kiali-support) _CMD="install-kiali-support" ; shift ;;
     delete-operators)  _CMD="delete-operators"  ; shift ;;
     delete-istio)      _CMD="delete-istio"      ; shift ;;
     status)            _CMD="status"            ; shift ;;
@@ -143,11 +143,16 @@ Valid options:
       Default: ${DEFAULT_KIALI_VERSION}
 
   Environment (install-kiali-support)
-      OSSM_KIALI_SUPPORT_MIN_VERSION  Minimum Kiali image tag to accept without upgrading (default: v2.25)
-      OSSM_KIALI_SUPPORT_TARGET_VERSION  Tag to set when upgrading (default: v2.25)
-      OSSM_KIALI_SUPPORT_IMAGE_NAME  Image for spec.deployment.image_name (default: quay.io/kiali/kiali)
-      OSSM_KIALI_DEPLOYMENT_NAME  Kiali Deployment name if not the same as the Kiali CR name (default: same as CR, usually kiali)
-      OSSM_KIALI_POD_WAIT_LABEL  Pod selector for oc wait after upgrade (e.g. app.kubernetes.io/name=kiali); autodetected if unset
+      OSSM_KIALI_SUPPORT_MIN_VERSION
+          Minimum Kiali image tag to accept without upgrading (default: v2.25)
+      OSSM_KIALI_SUPPORT_TARGET_VERSION
+          Tag to set when upgrading (default: v2.25)
+      OSSM_KIALI_SUPPORT_IMAGE_NAME
+          Image for spec.deployment.image_name (default: quay.io/kiali/kiali)
+      OSSM_KIALI_DEPLOYMENT_NAME
+          Kiali Deployment name if not the same as the Kiali CR name (default: same as CR, usually kiali)
+      OSSM_KIALI_POD_WAIT_LABEL
+          Pod selector for oc wait after upgrade (e.g. app.kubernetes.io/name=kiali); autodetected if unset
 
 The command must be one of:
 
@@ -240,6 +245,55 @@ ossm_open_url_in_browser() {
   infomsg "Could not launch a graphical browser (no suitable opener). Open the URL above manually."
 }
 
+# Post-install validation: ensure Kiali resources are ready.
+ossm_validate_kiali_ready() {
+  local max_wait="${OSSM_POST_INSTALL_WAIT_SECONDS:-300}"
+  local retry_interval="${OSSM_POST_INSTALL_RETRY_SECONDS:-5}"
+  local waited=0
+
+  if [ "${ENABLE_KIALI}" != "true" ]; then
+    infomsg "Skipping post-install validation because ENABLE_KIALI is not true."
+    return 0
+  fi
+
+  infomsg "Post-install validation: waiting for Kiali pod(s) to become ready."
+  waited=0
+  while true; do
+    local kiali_pods
+    kiali_pods="$(${OC} -n "${CONTROL_PLANE_NAMESPACE}" get pods -l app.kubernetes.io/name=kiali -o name 2>/dev/null || true)"
+    if echo "${kiali_pods}" | grep -q '[^[:space:]]'; then
+      if ${OC} -n "${CONTROL_PLANE_NAMESPACE}" wait --for=condition=Ready ${kiali_pods} --timeout="${retry_interval}s" >/dev/null 2>&1; then
+        break
+      fi
+    fi
+    if [ "${waited}" -ge "${max_wait}" ]; then
+      errormsg "Kiali pod(s) are not ready after ${max_wait}s in namespace [${CONTROL_PLANE_NAMESPACE}]."
+      exit 1
+    fi
+    echo -n "."
+    sleep "${retry_interval}"
+    waited=$((waited + retry_interval))
+  done
+  echo ""
+
+  infomsg "Post-install validation: waiting for Kiali service endpoints."
+  waited=0
+  while true; do
+    if ${OC} -n "${CONTROL_PLANE_NAMESPACE}" get endpoints kiali -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null | grep -q .; then
+      break
+    fi
+    if [ "${waited}" -ge "${max_wait}" ]; then
+      errormsg "Kiali service has no ready endpoints after ${max_wait}s in namespace [${CONTROL_PLANE_NAMESPACE}]."
+      exit 1
+    fi
+    echo -n "."
+    sleep "${retry_interval}"
+    waited=$((waited + retry_interval))
+  done
+  echo ""
+  infomsg "Kiali validation succeeded."
+}
+
 # Check the type of cluster we are talking to.
 # * OpenShift: cluster exposes route.openshift.io API (not inferred from client binary name).
 # * If OpenShift, make sure we are logged in (whoami).
@@ -285,10 +339,6 @@ if [ "${_CMD}" == "install-operators" ]; then
   fi
   install_servicemesh_operators "${CATALOG_SOURCE}"
 
-elif [ "${_CMD}" == "install-kiali-support" ]; then
-
-  ossm_install_kiali_support "${CONTROL_PLANE_NAMESPACE}"
-
 elif [ "${_CMD}" == "install-istio" ]; then
 
   if [ "${ENABLE_KIALI}" == "true" ]; then
@@ -320,10 +370,16 @@ elif [ "${_CMD}" == "install-istio" ]; then
     fi
   fi
 
+  ossm_validate_kiali_ready
+
 elif [ "${_CMD}" == "delete-operators" ]; then
 
   delete_kiali_operator
   delete_servicemesh_operators
+
+elif [ "${_CMD}" == "install-kiali-support" ]; then
+
+  ossm_install_kiali_support "${CONTROL_PLANE_NAMESPACE}"
 
 elif [ "${_CMD}" == "delete-istio" ]; then
 

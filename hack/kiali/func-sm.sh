@@ -295,6 +295,9 @@ EOM
 # Otherwise require OSSM_DELETE_CONFIRM=yes (e.g. CI or fully non-interactive).
 ossm_prompt_yes_or_env_confirm() {
   local prompt="$1"
+  if [ "${OSSM_DELETE_CONFIRM:-}" = "yes" ]; then
+    return 0
+  fi
   if [ -r /dev/tty ] && [ -w /dev/tty ]; then
     local ans
     read -r -p "${prompt}" ans < /dev/tty || true

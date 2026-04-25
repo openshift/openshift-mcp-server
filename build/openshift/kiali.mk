@@ -20,9 +20,12 @@ BOOKINFO_ISTIO_VERSION ?= 1.28.0
 BOOKINFO_ISTIO_HOME := $(BOOKINFO_OUTPUT_DIR)/istio-$(BOOKINFO_ISTIO_VERSION)
 # Optional: existing Istio tree with bin/istioctl + samples/bookinfo (skips download-bookinfo-istio).
 BOOKINFO_ISTIO_DIR ?=
+BOOKINFO_CLIENT ?= oc
 KUBERNETES_CLI ?= oc
+OSSM_OPERATORS_NAMESPACE ?= openshift-operators
 BOOKINFO_NAMESPACE ?= bookinfo
 BOOKINFO_CP_NAMESPACE ?= istio-system
+OSSM_CONSOLE_NAMESPACE ?= ossmconsole
 # After install-istio: wait for this Deployment (Kiali server) to exist, then rollout completes before install-kiali-support.
 KIALI_DEPLOYMENT_NAME ?= kiali
 # Max seconds to poll for deployment/$(KIALI_DEPLOYMENT_NAME) to be created by the operator.
@@ -37,6 +40,9 @@ BOOKINFO_ISTIO_CR_NAME ?= default
 BOOKINFO_ISTIO_REVISION ?= $(BOOKINFO_ISTIO_CR_NAME)
 # Traffic generator ConfigMap route: in-cluster productpage avoids OpenShift Route TLS/503 issues.
 BOOKINFO_TRAFFIC_ROUTE ?= http://productpage.$(BOOKINFO_NAMESPACE).svc.cluster.local:9080/productpage
+# Final health check through Kiali API after Bookinfo is installed.
+BOOKINFO_KIALI_CLUSTER_NAME ?= Kubernetes
+BOOKINFO_HEALTH_WORKLOAD ?= productpage-v1
 # install-bookinfo-demo.sh: extra flags only (-ail is set from detected revision in the recipe).
 # -tg installs Kiali traffic generator (OpenShift routes must exist; script waits after expose).
 BOOKINFO_SCRIPT_EXTRA ?= -tg
@@ -103,7 +109,7 @@ setup-kiali-openshift: ## OpenShift: OSSM/Sail + Istio/Kiali + Bookinfo (Kiali h
 	ns='$(BOOKINFO_CP_NAMESPACE)'; d='$(KIALI_DEPLOYMENT_NAME)'; m='$(KIALI_DEPLOYMENT_WAIT_MAX)'; t=0; \
 	while ! '$(KUBERNETES_CLI)' get "deployment/$$d" -n "$$ns" -o name >/dev/null 2>&1; do \
 	  if [ "$$t" -ge "$$m" ]; then echo "Timeout ($${m}s) waiting for deployment/$$d in namespace $$ns (Kiali operator still reconciling?)." >&2; exit 1; fi; \
-	  echo "  ... waiting for deployment/$$d ($$t/$$m s)"; \
+	  echo " ... waiting for deployment/$$d ($$t/$$m s)"; \
 	  sleep 5; t=$$((t+5)); \
 	done; \
 	echo "==> Kiali: rollout status (pods become ready) ..."; \
@@ -113,14 +119,57 @@ setup-kiali-openshift: ## OpenShift: OSSM/Sail + Istio/Kiali + Bookinfo (Kiali h
 	elif '$(KUBERNETES_CLI)' get pod -n "$$ns" -l 'app=kiali' -o name >/dev/null 2>&1; then \
 	  '$(KUBERNETES_CLI)' wait --for=condition=Ready pod -l 'app=kiali' -n "$$ns" --timeout='$(KIALI_POD_READY_TIMEOUT)'; \
 	else \
-	  echo "  (no pod with app.kubernetes.io/name=kiali or app=kiali; assuming deployment readiness is enough)"; \
+	  echo " (no pod with app.kubernetes.io/name=kiali or app=kiali; assuming deployment readiness is enough)"; \
 	fi
 	@echo "==> Kiali: checking version ..."
 	bash '$(OSSM_INSTALL_SCRIPT)' -c '$(KUBERNETES_CLI)' install-kiali-support
 	@$(MAKE) -s install-bookinfo-openshift
+	@$(MAKE) -s validate-bookinfo-kiali-health
 	@echo "==> Bookinfo: OpenShift routes (productpage / gateways):"
-	@'$(KUBERNETES_CLI)' get route -n '$(BOOKINFO_NAMESPACE)' 2>/dev/null || true	
+	@'$(KUBERNETES_CLI)' get route -n '$(BOOKINFO_NAMESPACE)' 2>/dev/null || true
 	@echo "==> setup-kiali-openshift: done."
+
+OSSM_DELETE_NAMESPACES ?= yes
+
+.PHONY: clean-kiali-openshift
+clean-kiali-openshift: ## OpenShift: remove Bookinfo + Istio/Kiali + operators installed by setup-kiali-openshift
+	@test -f '$(OSSM_INSTALL_SCRIPT)' || { echo "Missing $(OSSM_INSTALL_SCRIPT). Expected vendored scripts under hack/kiali/ in this repo."; exit 1; }
+	@set -e; \
+	cli='$(KUBERNETES_CLI)'; ns='$(BOOKINFO_NAMESPACE)'; \
+	echo "==> Step 1/4 - Cleaning mesh resources (Istio/Kiali/addons CRs) ..."; \
+	OSSM_DELETE_CONFIRM=yes bash '$(OSSM_INSTALL_SCRIPT)' -c '$(KUBERNETES_CLI)' -cpn '$(BOOKINFO_CP_NAMESPACE)' delete-istio; \
+	echo "==> Step 2/4 - Cleaning namespaces (Bookinfo + OSSM Console, then control-plane when enabled) ..."; \
+	if [ "$$(basename -- "$$cli")" = "oc" ]; then \
+	  $$cli delete project "$$ns" --ignore-not-found=true || true; \
+	  $$cli delete project '$(OSSM_CONSOLE_NAMESPACE)' --ignore-not-found=true || true; \
+	fi; \
+	$$cli delete namespace "$$ns" --ignore-not-found=true || true; \
+	$$cli wait --for=delete "namespace/$$ns" --timeout=180s >/dev/null 2>&1 || true; \
+	$$cli delete namespace '$(OSSM_CONSOLE_NAMESPACE)' --ignore-not-found=true || true; \
+	$$cli wait --for=delete "namespace/$(OSSM_CONSOLE_NAMESPACE)" --timeout=180s >/dev/null 2>&1 || true; \
+	if [ "$(OSSM_DELETE_NAMESPACES)" = "yes" ]; then \
+	  for doomed_ns in '$(BOOKINFO_CP_NAMESPACE)' istio-cni; do \
+	    $$cli delete namespace "$$doomed_ns" --ignore-not-found=true || true; \
+	    $$cli wait --for=delete "namespace/$$doomed_ns" --timeout=180s >/dev/null 2>&1 || true; \
+	  done; \
+	fi; \
+	echo "==> Step 3/4 - Cleaning Sail/Kiali operators ..."; \
+	OSSM_DELETE_CONFIRM=yes bash '$(OSSM_INSTALL_SCRIPT)' -c '$(KUBERNETES_CLI)' -cpn '$(BOOKINFO_CP_NAMESPACE)' delete-operators; \
+	echo "==> Step 4/4 - Final residual cleanup (subscriptions/CSVs/CRDs/routes/SCC) ..."; \
+	opns='$(OSSM_OPERATORS_NAMESPACE)'; cpns='$(BOOKINFO_CP_NAMESPACE)'; \
+	$$cli delete subscription --ignore-not-found=true -n "$$opns" my-kiali my-sailoperator; \
+	csvs="$$( $$cli get csv --all-namespaces --no-headers -o custom-columns=NS:.metadata.namespace,N:.metadata.name 2>/dev/null | awk '$$2 ~ /(kiali-operator|sailoperator|servicemeshoperator3|servicemeshoperator\.|istio-operator|istiooperator)/ {print $$1 ":" $$2}' )"; \
+	if [ -n "$$csvs" ]; then \
+	  echo "$$csvs" | while IFS=: read -r csv_ns csv_name; do $$cli delete csv -n "$$csv_ns" "$$csv_name" --ignore-not-found=true; done; \
+	fi; \
+	crds="$$( $$cli get crds -o name 2>/dev/null | awk '$$0 ~ /\.istio\.io$$|\.sailoperator\.io$$|\.servicemesh.*\.io$$/ {print $$0}' )"; \
+	if [ -n "$$crds" ]; then echo "$$crds" | while IFS= read -r crd; do $$cli delete "$$crd" --ignore-not-found=true; done; fi; \
+	$$cli -n "$$cpns" delete route --ignore-not-found=true kiali istio-ingressgateway; \
+	$$cli delete scc istio-addons-scc --ignore-not-found=true 2>/dev/null || true; \
+	echo "==> clean-kiali-openshift: done."
+
+.PHONY: setup-kiali-openshift-clean
+setup-kiali-openshift-clean: clean-kiali-openshift ## Alias for clean-kiali-openshift
 
 ifeq ($(words $(MAKEFILE_LIST)),1)
 .DEFAULT_GOAL := setup-kiali-openshift
@@ -153,6 +202,73 @@ install-bookinfo-openshift: fetch-bookinfo-hack download-bookinfo-istio ## Insta
 	  '$(KUBERNETES_CLI)' delete pod -n '$(BOOKINFO_NAMESPACE)' -l kiali-test=traffic-generator --ignore-not-found=true --wait=false 2>/dev/null || true; \
 	  echo "==> Bookinfo: traffic generator route -> $$tg_route"; \
 	fi
+
+.PHONY: validate-bookinfo-kiali-health
+validate-bookinfo-kiali-health: ## Wait until Bookinfo workload is Healthy according to Kiali API
+	@set -e; \
+	client='$(KUBERNETES_CLI)'; \
+	cpns='$(BOOKINFO_CP_NAMESPACE)'; \
+	ns='$(BOOKINFO_NAMESPACE)'; \
+	wl='$(BOOKINFO_HEALTH_WORKLOAD)'; \
+	cluster_name='$(BOOKINFO_KIALI_CLUSTER_NAME)'; \
+	max_wait="$${BOOKINFO_HEALTH_WAIT_SECONDS:-300}"; \
+	retry="$${BOOKINFO_HEALTH_RETRY_SECONDS:-5}"; \
+	elapsed=0; \
+	echo "==> Kiali health check: waiting for $$ns/$$wl to be Healthy (cluster=$$cluster_name)"; \
+	kiali_host="$$( $$client -n "$$cpns" get route kiali -o jsonpath='{.spec.host}' 2>/dev/null || true )"; \
+	if [ -z "$$kiali_host" ]; then \
+	  echo "Kiali route not found in namespace $$cpns"; \
+	  exit 1; \
+	fi; \
+	kiali_token="$$( $$client whoami -t 2>/dev/null || true )"; \
+	if [ -z "$$kiali_token" ]; then \
+	  echo "Cannot obtain token from $$client whoami -t (required for Kiali API auth)."; \
+	  exit 1; \
+	fi; \
+	api_path="/api/clusters/workloads?health=true&istioResources=true&namespaces=$$ns&clusterName=$$cluster_name"; \
+	api_url_kiali_prefix="https://$$kiali_host/kiali$$api_path"; \
+	api_url_root_prefix="https://$$kiali_host$$api_path"; \
+	echo "==> Kiali route: https://$$kiali_host"; \
+	echo "==> Kiali API check (try #1): $$api_url_kiali_prefix"; \
+	echo "==> Kiali API check (try #2): $$api_url_root_prefix"; \
+	while true; do \
+	  checked_url="$$api_url_kiali_prefix"; \
+	  response="$$(curl -ksS --max-time 20 -H "Authorization: Bearer $$kiali_token" "$$checked_url" 2>/dev/null || true)"; \
+	  status=""; \
+	  if command -v jq >/dev/null 2>&1; then \
+	    status="$$(printf '%s' "$$response" | jq -r --arg ns "$$ns" --arg wl "$$wl" '.workloads[]? | select(.namespace == $$ns and .name == $$wl) | .health.status.status' 2>/dev/null | head -n 1)"; \
+	  else \
+	    if echo "$$response" | tr -d '\n\r' | grep -Eq "\"name\":\"$$wl\".*\"namespace\":\"$$ns\".*\"status\":\\{\"status\":\"Healthy\""; then \
+	      status="Healthy"; \
+	    fi; \
+	  fi; \
+	  if [ -z "$$status" ]; then \
+	    checked_url="$$api_url_root_prefix"; \
+	    response="$$(curl -ksS --max-time 20 -H "Authorization: Bearer $$kiali_token" "$$checked_url" 2>/dev/null || true)"; \
+	    if command -v jq >/dev/null 2>&1; then \
+	      status="$$(printf '%s' "$$response" | jq -r --arg ns "$$ns" --arg wl "$$wl" '.workloads[]? | select(.namespace == $$ns and .name == $$wl) | .health.status.status' 2>/dev/null | head -n 1)"; \
+	    else \
+	      if echo "$$response" | tr -d '\n\r' | grep -Eq "\"name\":\"$$wl\".*\"namespace\":\"$$ns\".*\"status\":\\{\"status\":\"Healthy\""; then \
+	        status="Healthy"; \
+	      fi; \
+	    fi; \
+	  fi; \
+	  if [ "$$status" = "Healthy" ]; then \
+	    echo "==> Kiali health check OK: $$ns/$$wl is Healthy (url=$$checked_url)"; \
+	    break; \
+	  fi; \
+	  if [ "$$elapsed" -ge "$$max_wait" ]; then \
+	    echo "Timed out after $$max_wait seconds waiting for $$ns/$$wl to be Healthy via Kiali API."; \
+	    echo "Last observed status: [$${status:-<missing>}]"; \
+	    echo "Last checked URL: $$checked_url"; \
+	    echo "Queried path: $$api_path"; \
+	    exit 1; \
+	  fi; \
+	  echo -n "."; \
+	  sleep "$$retry"; \
+	  elapsed=$$((elapsed + retry)); \
+	done; \
+	echo ""
 
 .PHONY: ossm-install-operators
 ossm-install-operators: ## Install only operators (same as first step of setup-kiali-openshift)
