@@ -38,7 +38,7 @@ spec:
         emptyDir: {}
       containers:
       - name: minio
-        image: minio/minio:latest
+        image: docker.io/minio/minio:latest
         imagePullPolicy: IfNotPresent
         args:
         - server
@@ -137,7 +137,7 @@ oadp-install: velero-cli ## Install Velero + MinIO for OADP eval testing
 	@echo ""
 	@echo "Creating MinIO bucket..."
 	@kubectl run minio-bucket-setup --rm -i --restart=Never --namespace $(OADP_NAMESPACE) \
-		--image=minio/mc:latest --command -- sh -c \
+		--image=docker.io/minio/mc:latest --command -- sh -c \
 		"mc alias set velero http://minio:9000 minio minio123 && mc mb -p velero/velero"
 	@echo "✅ MinIO bucket created"
 	@echo ""

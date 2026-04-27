@@ -277,10 +277,22 @@ func fetchBSLStatus(ctx context.Context, dynamicClient dynamic.Interface, namesp
 	var result strings.Builder
 	result.WriteString("### BackupStorageLocations\n\n")
 	for _, bsl := range bsls.Items {
-		phase, _, _ := unstructured.NestedString(bsl.Object, "status", "phase")
-		lastValidation, _, _ := unstructured.NestedString(bsl.Object, "status", "lastValidationTime")
-		provider, _, _ := unstructured.NestedString(bsl.Object, "spec", "provider")
-		bucket, _, _ := unstructured.NestedString(bsl.Object, "spec", "objectStorage", "bucket")
+		phase, _, err := unstructured.NestedString(bsl.Object, "status", "phase")
+		if err != nil {
+			phase = ""
+		}
+		lastValidation, _, err := unstructured.NestedString(bsl.Object, "status", "lastValidationTime")
+		if err != nil {
+			lastValidation = ""
+		}
+		provider, _, err := unstructured.NestedString(bsl.Object, "spec", "provider")
+		if err != nil {
+			provider = ""
+		}
+		bucket, _, err := unstructured.NestedString(bsl.Object, "spec", "objectStorage", "bucket")
+		if err != nil {
+			bucket = ""
+		}
 
 		fmt.Fprintf(&result, "#### %s\n\n", bsl.GetName())
 		fmt.Fprintf(&result, "- **Phase:** %s\n", valueOrNA(phase))
@@ -309,11 +321,26 @@ func fetchRecentBackups(ctx context.Context, dynamicClient dynamic.Interface, na
 	result.WriteString("|------|-------|---------|-----------|--------|----------|\n")
 
 	for _, backup := range backups.Items {
-		phase, _, _ := unstructured.NestedString(backup.Object, "status", "phase")
-		startTime, _, _ := unstructured.NestedString(backup.Object, "status", "startTimestamp")
-		completionTime, _, _ := unstructured.NestedString(backup.Object, "status", "completionTimestamp")
-		errors, _, _ := unstructured.NestedInt64(backup.Object, "status", "errors")
-		warnings, _, _ := unstructured.NestedInt64(backup.Object, "status", "warnings")
+		phase, _, err := unstructured.NestedString(backup.Object, "status", "phase")
+		if err != nil {
+			phase = ""
+		}
+		startTime, _, err := unstructured.NestedString(backup.Object, "status", "startTimestamp")
+		if err != nil {
+			startTime = ""
+		}
+		completionTime, _, err := unstructured.NestedString(backup.Object, "status", "completionTimestamp")
+		if err != nil {
+			completionTime = ""
+		}
+		errors, _, err := unstructured.NestedInt64(backup.Object, "status", "errors")
+		if err != nil {
+			errors = 0
+		}
+		warnings, _, err := unstructured.NestedInt64(backup.Object, "status", "warnings")
+		if err != nil {
+			warnings = 0
+		}
 
 		fmt.Fprintf(&result, "| %s | %s | %s | %s | %d | %d |\n",
 			backup.GetName(), valueOrNA(phase), valueOrNA(startTime), valueOrNA(completionTime), errors, warnings)
@@ -338,7 +365,10 @@ func fetchBackupDetails(ctx context.Context, dynamicClient dynamic.Interface, na
 		return fmt.Sprintf("### Backup: %s\n\n*No status found (backup may not have started)*", name)
 	}
 
-	spec, _, _ := unstructured.NestedMap(backup.Object, "spec")
+	spec, _, err := unstructured.NestedMap(backup.Object, "spec")
+	if err != nil {
+		spec = nil
+	}
 
 	var result strings.Builder
 	fmt.Fprintf(&result, "### Backup: %s\n\n", name)
@@ -375,12 +405,30 @@ func fetchRecentRestores(ctx context.Context, dynamicClient dynamic.Interface, n
 	result.WriteString("|------|-------|--------|---------|-----------|--------|----------|\n")
 
 	for _, restore := range restores.Items {
-		phase, _, _ := unstructured.NestedString(restore.Object, "status", "phase")
-		backupName, _, _ := unstructured.NestedString(restore.Object, "spec", "backupName")
-		startTime, _, _ := unstructured.NestedString(restore.Object, "status", "startTimestamp")
-		completionTime, _, _ := unstructured.NestedString(restore.Object, "status", "completionTimestamp")
-		errors, _, _ := unstructured.NestedInt64(restore.Object, "status", "errors")
-		warnings, _, _ := unstructured.NestedInt64(restore.Object, "status", "warnings")
+		phase, _, err := unstructured.NestedString(restore.Object, "status", "phase")
+		if err != nil {
+			phase = ""
+		}
+		backupName, _, err := unstructured.NestedString(restore.Object, "spec", "backupName")
+		if err != nil {
+			backupName = ""
+		}
+		startTime, _, err := unstructured.NestedString(restore.Object, "status", "startTimestamp")
+		if err != nil {
+			startTime = ""
+		}
+		completionTime, _, err := unstructured.NestedString(restore.Object, "status", "completionTimestamp")
+		if err != nil {
+			completionTime = ""
+		}
+		errors, _, err := unstructured.NestedInt64(restore.Object, "status", "errors")
+		if err != nil {
+			errors = 0
+		}
+		warnings, _, err := unstructured.NestedInt64(restore.Object, "status", "warnings")
+		if err != nil {
+			warnings = 0
+		}
 
 		fmt.Fprintf(&result, "| %s | %s | %s | %s | %s | %d | %d |\n",
 			restore.GetName(), valueOrNA(phase), valueOrNA(backupName), valueOrNA(startTime), valueOrNA(completionTime), errors, warnings)
@@ -405,7 +453,10 @@ func fetchRestoreDetails(ctx context.Context, dynamicClient dynamic.Interface, n
 		return fmt.Sprintf("### Restore: %s\n\n*No status found (restore may not have started)*", name)
 	}
 
-	spec, _, _ := unstructured.NestedMap(restore.Object, "spec")
+	spec, _, err := unstructured.NestedMap(restore.Object, "spec")
+	if err != nil {
+		spec = nil
+	}
 
 	var result strings.Builder
 	fmt.Fprintf(&result, "### Restore: %s\n\n", name)
@@ -457,7 +508,10 @@ func fetchVeleroPods(ctx context.Context, dynamicClient dynamic.Interface, names
 
 	for _, pod := range podList.Items {
 		podNames = append(podNames, pod.GetName())
-		phase, _, _ := unstructured.NestedString(pod.Object, "status", "phase")
+		phase, _, err := unstructured.NestedString(pod.Object, "status", "phase")
+		if err != nil {
+			phase = ""
+		}
 		creationTime := pod.GetCreationTimestamp().Format("2006-01-02T15:04:05Z")
 
 		// Get ready and restart counts from container statuses
