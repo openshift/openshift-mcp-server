@@ -4,6 +4,8 @@ metadata:
   name: kubernetes-mcp-server
   namespace: openshift-mcp-server-e2e
 spec:
+  hostnames:
+  - kubernetes-mcp-server.mcp.local
   parentRefs:
   - name: mcp-gateway
     namespace: gateway-system
