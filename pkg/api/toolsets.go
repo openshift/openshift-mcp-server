@@ -103,6 +103,21 @@ func NewToolCallResultStructured(structured any, err error) *ToolCallResult {
 	return NewToolCallResultFull(content, structured, err)
 }
 
+// ResourceRegistrar allows tools to register MCP resources at runtime.
+type ResourceRegistrar interface {
+	AddResource(uri, name, description, mimeType, content string)
+	RemoveResources(uris ...string)
+}
+
+// ResourceTemplateHandler is called when a client reads a resource matching a template.
+type ResourceTemplateHandler func(ctx context.Context, uri string) (content string, err error)
+
+// ResourceTemplateRegistrar allows tools to register MCP resource templates at runtime.
+type ResourceTemplateRegistrar interface {
+	AddResourceTemplate(uriTemplate, name, description, mimeType string, handler ResourceTemplateHandler)
+	RemoveResourceTemplates(uriTemplates ...string)
+}
+
 type ToolHandlerParams struct {
 	context.Context
 	BaseConfig
@@ -110,6 +125,8 @@ type ToolHandlerParams struct {
 	ToolCallRequest
 	ListOutput output.Output
 	Elicitor
+	ResourceRegistrar         ResourceRegistrar
+	ResourceTemplateRegistrar ResourceTemplateRegistrar
 }
 
 type ToolHandlerFunc func(params ToolHandlerParams) (*ToolCallResult, error)
