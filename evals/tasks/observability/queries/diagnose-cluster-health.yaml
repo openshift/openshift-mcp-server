@@ -25,4 +25,5 @@ spec:
   prompt:
     inline: |
       Is the cluster healthy? Give me an overview of any issues.
-      Check alerts, node status, and pod health.
+      Check alerts, node status, and pod health using Prometheus metrics.
+      Include the metric names and PromQL queries you used.

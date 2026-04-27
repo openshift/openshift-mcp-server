@@ -20,3 +20,4 @@ spec:
   prompt:
     inline: |
       How many head series does Prometheus have?
+      Include the Prometheus metric name and PromQL query you used.

@@ -20,3 +20,4 @@ spec:
   prompt:
     inline: |
       Which pods were crashlooping in the last 5 minutes?
+      Use Prometheus metrics and include the metric name and PromQL query you used.

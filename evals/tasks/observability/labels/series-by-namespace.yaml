@@ -25,4 +25,5 @@ spec:
   prompt:
     inline: |
       How many time series exist for container_cpu_usage_seconds_total
-      in the openshift-monitoring namespace?
+      in the openshift-monitoring namespace? List the label dimensions
+      (such as pod, container) present in the series.
