@@ -22,8 +22,10 @@ Choose the guide that matches your needs:
 
 ## Toolset Guides
 
+- **[OADP](OADP.md)** - Tools for OpenShift API for Data Protection (Velero backups, restores, schedules)
 - **[Kiali](KIALI.md)** - Tools for Kiali ServiceMesh with Istio
 - **[KubeVirt](kubevirt.md)** - KubeVirt virtual machine management tools
+- **[Observability](OBSERVABILITY.md)** - Tools for Prometheus metrics and Alertmanager alerts
 
 ## Feature Specifications
 

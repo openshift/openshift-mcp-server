@@ -1,0 +1,60 @@
+kind: Task
+metadata:
+  name: "create-oadp-backup-auto-bsl"
+  difficulty: medium
+  description: "Create a backup without specifying storage location — the tool should auto-discover the available BSL"
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="openshift-adp"
+
+      kubectl get namespace "$NS" > /dev/null 2>&1 || { echo "OADP namespace not found"; exit 1; }
+      kubectl get crd backups.velero.io > /dev/null 2>&1 || { echo "Velero Backup CRD not found"; exit 1; }
+
+      # Ensure a test namespace exists to back up
+      kubectl create namespace backup-auto-test --dry-run=client -o yaml | kubectl apply -f -
+
+      # Clean up any existing backup
+      kubectl delete backup.velero.io auto-bsl-backup -n "$NS" --ignore-not-found 2>/dev/null || true
+
+      echo "Ready — BSL should be auto-discovered by the tool"
+  verify:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="openshift-adp"
+
+      echo "=== Verification: Checking backup with auto-discovered BSL ==="
+
+      # Check backup was created
+      if ! kubectl get backup.velero.io auto-bsl-backup -n "$NS" > /dev/null 2>&1; then
+          echo "FAIL: Backup 'auto-bsl-backup' not found"
+          exit 1
+      fi
+
+      # Check it targets the correct namespace
+      INCLUDED_NS=$(kubectl get backup.velero.io auto-bsl-backup -n "$NS" -o jsonpath='{.spec.includedNamespaces[0]}')
+      if [ "$INCLUDED_NS" != "backup-auto-test" ]; then
+          echo "FAIL: Backup does not include 'backup-auto-test' namespace (got: $INCLUDED_NS)"
+          exit 1
+      fi
+
+      # Check that a storage location was set (either auto-discovered or explicit)
+      BSL=$(kubectl get backup.velero.io auto-bsl-backup -n "$NS" -o jsonpath='{.spec.storageLocation}')
+      if [ -n "$BSL" ]; then
+          echo "PASS: Backup created with storage location: $BSL"
+      else
+          echo "PASS: Backup created (storage location will use cluster default)"
+      fi
+
+      exit 0
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="openshift-adp"
+      kubectl delete backup.velero.io auto-bsl-backup -n "$NS" --ignore-not-found 2>/dev/null || true
+      kubectl delete namespace backup-auto-test --ignore-not-found 2>/dev/null || true
+  prompt:
+    inline: |-
+      Create an OADP backup named 'auto-bsl-backup' that backs up the 'backup-auto-test' namespace.
+      Do NOT specify a storage location — the tool should figure out which one to use automatically.
