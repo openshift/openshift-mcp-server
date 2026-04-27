@@ -26,3 +26,4 @@ spec:
     inline: |
       Which namespace is consuming the most CPU and memory?
       Show me the top namespace for each.
+      Use Prometheus metrics and include the metric names and PromQL queries you used.

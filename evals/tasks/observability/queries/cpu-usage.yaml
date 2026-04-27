@@ -22,4 +22,5 @@ spec:
         reason: "Verify the response identifies specific pods"
   prompt:
     inline: |
-      Which pods are using the most CPU?
+      Which pods are using the most CPU? Show me the top 5.
+      Use Prometheus metrics and include the metric name and PromQL query you used.

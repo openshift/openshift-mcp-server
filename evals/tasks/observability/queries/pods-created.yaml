@@ -20,3 +20,4 @@ spec:
   prompt:
     inline: |
       How many pods were created in the last 5 minutes?
+      Include the Prometheus metric name and PromQL query you used.

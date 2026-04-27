@@ -23,3 +23,4 @@ spec:
   prompt:
     inline: |
       Which pods are receiving the most network traffic?
+      Use Prometheus metrics and include the metric name and PromQL query you used.
