@@ -4,15 +4,15 @@
 # namespace. Also applies the OADP CRDs (DPA, DataProtectionTest) and creates a
 # sample DataProtectionApplication so that all OADP evals can run on a Kind cluster.
 
-VELERO_VERSION ?= v1.15.2
-VELERO_PLUGIN_AWS_VERSION ?= v1.12.0
+VELERO_VERSION ?= v1.16.2
+VELERO_PLUGIN_AWS_VERSION ?= v1.12.2
 VELERO_CLI = $(shell pwd)/_output/tools/bin/velero
 VELERO_OS = $(shell uname -s | tr '[:upper:]' '[:lower:]')
 VELERO_ARCH = $(shell uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')
 OADP_NAMESPACE = openshift-adp
 
 VELERO_RELEASE_URL = https://github.com/vmware-tanzu/velero/releases/download/$(VELERO_VERSION)
-OADP_CRD_BASE_URL = https://raw.githubusercontent.com/openshift/oadp-operator/oadp-dev/config/crd/bases
+OADP_CRD_BASE_URL = https://raw.githubusercontent.com/openshift/oadp-operator/oadp-1.5/config/crd/bases
 
 define MINIO_DEPLOYMENT
 apiVersion: apps/v1
@@ -38,7 +38,7 @@ spec:
         emptyDir: {}
       containers:
       - name: minio
-        image: docker.io/minio/minio:latest
+        image: quay.io/minio/minio:latest
         imagePullPolicy: IfNotPresent
         args:
         - server
@@ -137,7 +137,7 @@ oadp-install: velero-cli ## Install Velero + MinIO for OADP eval testing
 	@echo ""
 	@echo "Creating MinIO bucket..."
 	@kubectl run minio-bucket-setup --rm -i --restart=Never --namespace $(OADP_NAMESPACE) \
-		--image=docker.io/minio/mc:latest --command -- sh -c \
+		--image=quay.io/minio/mc:latest --command -- sh -c \
 		"mc alias set velero http://minio:9000 minio minio123 && mc mb -p velero/velero"
 	@echo "✅ MinIO bucket created"
 	@echo ""
