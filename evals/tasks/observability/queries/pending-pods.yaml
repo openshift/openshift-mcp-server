@@ -21,3 +21,4 @@ spec:
   prompt:
     inline: |
       Which pods are stuck in pending state?
+      Use Prometheus metrics and include the metric name and PromQL query you used.

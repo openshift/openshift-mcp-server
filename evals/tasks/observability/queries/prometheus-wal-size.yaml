@@ -20,3 +20,4 @@ spec:
   prompt:
     inline: |
       What is the current storage size of the Prometheus WAL?
+      Include the Prometheus metric name and PromQL query you used.
