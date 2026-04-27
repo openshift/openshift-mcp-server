@@ -1,0 +1,30 @@
+# OLM components for installing the MCP Gateway controller on OpenShift
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: mcp-gateway-catalog
+  namespace: openshift-marketplace
+spec:
+  sourceType: grpc
+  image: ghcr.io/kuadrant/mcp-controller-catalog:v0.6.0
+  displayName: MCP Gateway
+  grpcPodConfig:
+    securityContextConfig: restricted
+  publisher: Kuadrant
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: mcp-gateway
+  namespace: mcp-system
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: mcp-gateway
+  namespace: mcp-system
+spec:
+  source: mcp-gateway-catalog
+  sourceNamespace: openshift-marketplace
+  name: mcp-gateway
+  channel: preview

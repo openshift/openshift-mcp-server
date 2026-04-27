@@ -1,0 +1,32 @@
+# GatewayClass for OpenShift - required for the Gateway API to work.
+# On OCP 4.17+, this may already exist; applying is idempotent.
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: openshift-default
+spec:
+  controllerName: openshift.io/gateway-controller/v1
+---
+# EnvoyFilter CRD stub - the MCP Gateway controller watches this Istio CRD.
+# On clusters without Service Mesh, we install a minimal CRD so the controller
+# cache can sync without crashing.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: envoyfilters.networking.istio.io
+spec:
+  group: networking.istio.io
+  names:
+    kind: EnvoyFilter
+    listKind: EnvoyFilterList
+    plural: envoyfilters
+    singular: envoyfilter
+  scope: Namespaced
+  versions:
+  - name: v1alpha3
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        x-kubernetes-preserve-unknown-fields: true
