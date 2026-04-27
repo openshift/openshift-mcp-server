@@ -45,12 +45,30 @@ func GetRestoreStatus(ctx context.Context, client dynamic.Interface, namespace, 
 		return "", fmt.Errorf("failed to get restore: %w", err)
 	}
 
-	phase, _, _ := GetRestorePhase(restore)
-	errors, _, _ := unstructured.NestedInt64(restore.Object, "status", "errors")
-	warnings, _, _ := unstructured.NestedInt64(restore.Object, "status", "warnings")
-	startTime, _, _ := unstructured.NestedString(restore.Object, "status", "startTimestamp")
-	completionTime, _, _ := unstructured.NestedString(restore.Object, "status", "completionTimestamp")
-	failureReason, _, _ := unstructured.NestedString(restore.Object, "status", "failureReason")
+	phase, _, err := GetRestorePhase(restore)
+	if err != nil {
+		return "", fmt.Errorf("failed to read restore phase: %w", err)
+	}
+	errors, _, err := unstructured.NestedInt64(restore.Object, "status", "errors")
+	if err != nil {
+		return "", fmt.Errorf("failed to read restore errors: %w", err)
+	}
+	warnings, _, err := unstructured.NestedInt64(restore.Object, "status", "warnings")
+	if err != nil {
+		return "", fmt.Errorf("failed to read restore warnings: %w", err)
+	}
+	startTime, _, err := unstructured.NestedString(restore.Object, "status", "startTimestamp")
+	if err != nil {
+		return "", fmt.Errorf("failed to read restore start time: %w", err)
+	}
+	completionTime, _, err := unstructured.NestedString(restore.Object, "status", "completionTimestamp")
+	if err != nil {
+		return "", fmt.Errorf("failed to read restore completion time: %w", err)
+	}
+	failureReason, _, err := unstructured.NestedString(restore.Object, "status", "failureReason")
+	if err != nil {
+		return "", fmt.Errorf("failed to read restore failure reason: %w", err)
+	}
 
 	result := fmt.Sprintf("Restore: %s/%s\nPhase: %s\nStart Time: %s\nCompletion Time: %s\nErrors: %d\nWarnings: %d",
 		namespace, name, phase, startTime, completionTime, errors, warnings)

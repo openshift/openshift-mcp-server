@@ -36,14 +36,14 @@ func DeleteBackup(ctx context.Context, client dynamic.Interface, namespace, name
 	// Create a DeleteBackupRequest which will trigger the Velero controller
 	// to delete the backup and its data from object storage
 	deleteRequest := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": VeleroGroup + "/" + VeleroVersion,
 			"kind":       "DeleteBackupRequest",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      name + "-delete-" + strconv.FormatInt(time.Now().UnixMilli(), 10),
 				"namespace": namespace,
 			},
-			"spec": map[string]interface{}{
+			"spec": map[string]any{
 				"backupName": name,
 			},
 		},
@@ -65,12 +65,30 @@ func GetBackupStatus(ctx context.Context, client dynamic.Interface, namespace, n
 		return "", fmt.Errorf("failed to get backup: %w", err)
 	}
 
-	phase, _, _ := GetBackupPhase(backup)
-	errors, _, _ := unstructured.NestedInt64(backup.Object, "status", "errors")
-	warnings, _, _ := unstructured.NestedInt64(backup.Object, "status", "warnings")
-	startTime, _, _ := unstructured.NestedString(backup.Object, "status", "startTimestamp")
-	completionTime, _, _ := unstructured.NestedString(backup.Object, "status", "completionTimestamp")
-	failureReason, _, _ := unstructured.NestedString(backup.Object, "status", "failureReason")
+	phase, _, err := GetBackupPhase(backup)
+	if err != nil {
+		return "", fmt.Errorf("failed to read backup phase: %w", err)
+	}
+	errors, _, err := unstructured.NestedInt64(backup.Object, "status", "errors")
+	if err != nil {
+		return "", fmt.Errorf("failed to read backup errors: %w", err)
+	}
+	warnings, _, err := unstructured.NestedInt64(backup.Object, "status", "warnings")
+	if err != nil {
+		return "", fmt.Errorf("failed to read backup warnings: %w", err)
+	}
+	startTime, _, err := unstructured.NestedString(backup.Object, "status", "startTimestamp")
+	if err != nil {
+		return "", fmt.Errorf("failed to read backup start time: %w", err)
+	}
+	completionTime, _, err := unstructured.NestedString(backup.Object, "status", "completionTimestamp")
+	if err != nil {
+		return "", fmt.Errorf("failed to read backup completion time: %w", err)
+	}
+	failureReason, _, err := unstructured.NestedString(backup.Object, "status", "failureReason")
+	if err != nil {
+		return "", fmt.Errorf("failed to read backup failure reason: %w", err)
+	}
 
 	result := fmt.Sprintf("Backup: %s/%s\nPhase: %s\nStart Time: %s\nCompletion Time: %s\nErrors: %d\nWarnings: %d",
 		namespace, name, phase, startTime, completionTime, errors, warnings)
