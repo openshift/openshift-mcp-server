@@ -13,8 +13,26 @@ import (
 
 const MetricsToolSetName = "metrics"
 
+// AuthMode defines where the bearer token is obtained for authenticating
+// against Prometheus and Alertmanager endpoints.
+type AuthMode string
+
+const (
+	// AuthModeHeader reads the bearer token from the request context (authorization header).
+	// This is the default.
+	AuthModeHeader AuthMode = "header"
+
+	// AuthModeKubeConfig reads the bearer token from the kubeconfig/REST config only.
+	AuthModeKubeConfig AuthMode = "kubeconfig"
+)
+
 // Config holds obs-mcp toolset configuration
 type Config struct {
+	// AuthMode controls where the bearer token is obtained for authenticating
+	// against Prometheus and Alertmanager endpoints.
+	// Valid values: "header" (default) - read from the request context authorization header,
+	//              "kubeconfig" - read from the kubeconfig/REST config.
+	AuthMode AuthMode `toml:"auth_mode,omitempty"`
 	// PrometheusURL is the URL of the Prometheus/Thanos Querier endpoint.
 	// This field is required. Example: "https://thanos-querier-openshift-monitoring.apps.example.com"
 	PrometheusURL string `toml:"prometheus_url,omitempty"`
@@ -55,7 +73,10 @@ var _ api.ExtendedConfig = (*Config)(nil)
 
 // Validate checks that the configuration values are valid.
 func (c *Config) Validate() error {
-	// Validate guardrails configuration
+	if c.AuthMode != "" && c.AuthMode != AuthModeHeader && c.AuthMode != AuthModeKubeConfig {
+		return fmt.Errorf("invalid auth_mode: %q (valid options: %q, %q)", c.AuthMode, AuthModeHeader, AuthModeKubeConfig)
+	}
+
 	if c.Guardrails != "" {
 		_, err := prometheus.ParseGuardrails(c.Guardrails)
 		if err != nil {
@@ -64,6 +85,14 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// GetAuthMode returns the configured token source, defaulting to TokenSourceHeader.
+func (c *Config) GetAuthMode() AuthMode {
+	if c.AuthMode == "" {
+		return AuthModeHeader
+	}
+	return c.AuthMode
 }
 
 // GetGuardrails returns the parsed guardrails configuration with cardinality limits applied.

@@ -14,7 +14,7 @@ require (
 	github.com/miekg/dns v1.1.68
 	github.com/modelcontextprotocol/go-sdk v1.5.0
 	github.com/prometheus/client_golang v1.23.2
-	github.com/rhobs/obs-mcp v0.1.1
+	github.com/rhobs/obs-mcp v0.1.3
 	github.com/spf13/afero v1.15.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10

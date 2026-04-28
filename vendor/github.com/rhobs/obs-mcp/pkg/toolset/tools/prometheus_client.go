@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	promapi "github.com/prometheus/client_golang/api"
 	promcfg "github.com/prometheus/common/config"
 	"k8s.io/client-go/rest"
@@ -52,7 +53,7 @@ func getPromClient(params api.ToolHandlerParams) (prometheus.Loader, error) {
 		slog.Warn("Failed to parse guardrails configuration", "err", err)
 	}
 
-	apiConfig, err := createAPIConfigFromRESTConfig(params, metricsBackendURL, cfg.Insecure)
+	apiConfig, err := buildAPIConfig(params, metricsBackendURL, cfg.Insecure, cfg.GetAuthMode())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create API config: %w", err)
 	}
@@ -67,18 +68,32 @@ func getPromClient(params api.ToolHandlerParams) (prometheus.Loader, error) {
 	return promClient, nil
 }
 
-// createAPIConfigFromRESTConfig creates a Prometheus API config from Kubernetes REST config.
-// It builds a fresh HTTP transport without the AccessControlRoundTripper to avoid
-// Kubernetes API validation on Prometheus endpoints.
-func createAPIConfigFromRESTConfig(params api.ToolHandlerParams, prometheusURL string, insecure bool) (promapi.Config, error) {
+func resolveToken(params api.ToolHandlerParams, restConfig *rest.Config, authMode toolsetconfig.AuthMode) (string, error) {
+	slog.Info("Obtaining authentication token", "authMode", authMode)
+	switch authMode { //nolint:exhaustive // the default auth_mode value is header
+	case toolsetconfig.AuthModeKubeConfig:
+		return extractBearerToken(restConfig), nil
+	default:
+		token := readTokenFromCtx(params)
+		if token == "" {
+			return "", fmt.Errorf("no bearer token found in request context authorization header")
+		}
+		return token, nil
+	}
+}
+
+// buildAPIConfig creates a Prometheus API config using the configured auth mode.
+func buildAPIConfig(params api.ToolHandlerParams, prometheusURL string, insecure bool, authMode toolsetconfig.AuthMode) (promapi.Config, error) {
 	restConfig := params.RESTConfig()
 	if restConfig == nil {
 		return promapi.Config{}, fmt.Errorf("no REST config available")
 	}
 
-	token := extractBearerToken(restConfig)
+	token, err := resolveToken(params, restConfig, authMode)
+	if err != nil {
+		return promapi.Config{}, err
+	}
 
-	// Use the same pattern as createAPIConfigWithToken from obs-mcp/pkg/mcp/auth.go
 	return createAPIConfigWithToken(restConfig, prometheusURL, token, insecure)
 }
 
@@ -190,6 +205,18 @@ func extractBearerToken(restConfig *rest.Config) string {
 	return ""
 }
 
+func readTokenFromCtx(params api.ToolHandlerParams) string {
+	authHeader, ok := params.Value(kubernetes.OAuthAuthorizationHeader).(string)
+	if !ok {
+		return ""
+	}
+	parts := strings.Fields(authHeader)
+	if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
+		return parts[1]
+	}
+	return strings.TrimSpace(authHeader)
+}
+
 // getAlertmanagerClient creates an Alertmanager client using the toolset configuration.
 func getAlertmanagerClient(params api.ToolHandlerParams) (alertmanager.Loader, error) {
 	cfg := getConfig(params)
@@ -204,8 +231,10 @@ func getAlertmanagerClient(params api.ToolHandlerParams) (alertmanager.Loader, e
 		return nil, fmt.Errorf("no REST config available")
 	}
 
-	// Extract bearer token from REST config
-	token := extractBearerToken(restConfig)
+	token, err := resolveToken(params, restConfig, cfg.GetAuthMode())
+	if err != nil {
+		return nil, err
+	}
 
 	apiConfig, err := createAPIConfigWithToken(restConfig, alertmanagerURL, token, cfg.Insecure)
 	if err != nil {
