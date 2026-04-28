@@ -34,7 +34,14 @@ func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
 }
 
 func (t *Toolset) GetPrompts() []api.ServerPrompt {
-	// NetEdge toolset presently does not provide prompts
+	return nil
+}
+
+func (t *Toolset) GetResources() []api.ServerResource {
+	return nil
+}
+
+func (t *Toolset) GetResourceTemplates() []api.ServerResourceTemplate {
 	return nil
 }
 
