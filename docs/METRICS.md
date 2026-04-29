@@ -152,6 +152,11 @@ The toolset is configured via a `[metrics]` section in the TOML config file.
 
 ```toml
 [toolset_configs.metrics]
+# Where to read the bearer token from: "header" (default) or "kubeconfig".
+# Set to "kubeconfig" when running locally (STDIO mode) so the token is read
+# from your kubeconfig session (e.g. after `oc login`).
+auth_mode = "kubeconfig"
+
 # URL of the Prometheus or Thanos Querier endpoint.
 # Required for metric/query tools. Defaults to http://localhost:9090 if unset.
 # Example for OpenShift in-cluster Thanos:
@@ -204,6 +209,7 @@ range_query_full_response = false
 
 | Option | Type | Default | Description |
 |---|---|---|---|
+| `auth_mode` | string | `"header"` | Token source: `"header"` (from request Authorization header) or `"kubeconfig"` (from kubeconfig/REST config) |
 | `prometheus_url` | string | `http://localhost:9090` | Prometheus or Thanos Querier endpoint URL |
 | `alertmanager_url` | string | — | Alertmanager endpoint URL (required for alert/silence tools) |
 | `insecure` | bool | `false` | Skip TLS certificate verification |
@@ -216,11 +222,10 @@ range_query_full_response = false
 
 ## Authentication and TLS
 
-The toolset reuses the bearer token from the active Kubernetes/OpenShift kubeconfig (or the
-in-cluster service account token when running inside a pod). No separate credentials are needed.
+The toolset authenticates using a bearer token. The `auth_mode` option controls where it comes from:
 
-Currently there's a limitation here, as kubeconfig using client certificates, will get a 401 from Thanos Querier. 
-So users need to `oc login` first to get a token-based session.
+- `"header"` (default) — from the incoming request's Authorization header. Use when running remotely behind an OAuth proxy.
+- `"kubeconfig"` — from the kubeconfig / in-cluster REST config. Use when running **locally** (STDIO mode, e.g. via `npx` or the binary). Requires a token-based session (e.g. `oc login`) — client-certificate kubeconfigs will get a 401 from Thanos Querier.
 
 **TLS certificate resolution order:**
 
