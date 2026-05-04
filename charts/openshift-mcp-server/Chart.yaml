@@ -1,5 +1,5 @@
 apiVersion: v2
-name: openshift-mcp-server
+name: redhat-openshift-mcp-server
 description: Helm Chart for MCP server for Red Hat OpenShift
 home: https://github.com/openshift/openshift-mcp-server
 keywords:
