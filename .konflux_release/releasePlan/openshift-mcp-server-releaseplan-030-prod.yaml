@@ -17,4 +17,4 @@ spec:
       description: "The Tech Preview 0.3.0 (TP) release of Model Context Protocol server for Red Hat OpenShift."
       topic: |
         The 0.3.0 Tech Preview (TP) release of Model Context Protocol server for Red Hat OpenShift. This release introduces early access to MCP server capabilities on OpenShift
-      synopsis: "MCP Server for Red Hat OpenShift Tech Preview 0.3.0"
+      synopsis: "Model Context Protocol server for Red Hat OpenShift Tech Preview 0.3.0"
