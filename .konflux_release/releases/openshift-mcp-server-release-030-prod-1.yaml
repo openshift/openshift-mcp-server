@@ -1,0 +1,16 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Release
+metadata:
+  name: openshift-mcp-server-release-030-prod-1
+  namespace: ocp-mcp-server-tenant
+  labels:
+    release.appstudio.openshift.io/automated: "false"
+    release.appstudio.openshift.io/author: kpande
+spec:
+  releasePlan: openshift-mcp-server-releaseplan-030-prod
+  snapshot: openshift-mcp-server-030-override-snapshot-4
+  data:
+    releaseNotes:
+      references:
+        - "https://github.com/openshift/openshift-mcp-server/blob/release-0.3/docs/openshift/user-guide.md"
+      type: "RHEA"
