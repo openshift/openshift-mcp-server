@@ -12,3 +12,6 @@ maintainers:
     email: marc.nuri@redhat.com
 version: 0.3.0
 appVersion: "latest"
+kubeVersion: ">=1.25.0-0"
+annotations:
+  charts.openshift.io/name: RedHat Openshift MCP Server

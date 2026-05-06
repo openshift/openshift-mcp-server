@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "openshift": { "type": "boolean" },
+    "replicaCount": { "type": "integer", "minimum": 0 },
+    "image": {
+      "type": "object",
+      "properties": {
+        "registry":   { "type": "string" },
+        "repository": { "type": "string" },
+        "version":    { "type": "string" },
+        "pullPolicy": { "type": "string", "enum": ["Always", "Never", "IfNotPresent"] }
+      }
+    },
+    "imagePullSecrets":  { "type": "array" },
+    "nameOverride":      { "type": "string" },
+    "fullnameOverride":  { "type": "string" },
+    "serviceAccount": {
+      "type": "object",
+      "properties": {
+        "create":         { "type": "boolean" },
+        "annotations":    { "type": "object" },
+        "name":           { "type": "string" },
+        "automountToken": { "type": "boolean" }
+      }
+    },
+    "rbac": {
+      "type": "object",
+      "properties": {
+        "create":                   { "type": "boolean" },
+        "extraClusterRoles":        { "type": "array" },
+        "extraClusterRoleBindings": { "type": "array" },
+        "extraRoles":               { "type": "array" },
+        "extraRoleBindings":        { "type": "array" }
+      }
+    },
+    "podAnnotations":            { "type": "object" },
+    "podLabels":                 { "type": "object" },
+    "defaultPodSecurityContext": { "type": "object" },
+    "podSecurityContext":        { "type": "object" },
+    "defaultSecurityContext":    { "type": "object" },
+    "securityContext":           { "type": "object" },
+    "service": {
+      "type": "object",
+      "properties": {
+        "type":        { "type": "string" },
+        "port":        { "type": "integer" },
+        "targetPort":  {},
+        "annotations": { "type": "object" }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "enabled":     { "type": "boolean" },
+        "className":   { "type": "string" },
+        "annotations": { "type": "object" },
+        "host":        { "type": "string" },
+        "path":        { "type": "string" },
+        "pathType":    { "type": "string" },
+        "termination": { "type": "string" },
+        "hosts":       { "type": ["array", "null"] },
+        "tls": { "type": ["object", "null"] }
+      }
+    },
+    "httpRoute": {
+      "type": "object",
+      "properties": {
+        "enabled":     { "type": "boolean" },
+        "annotations": { "type": "object" },
+        "labels":      { "type": "object" },
+        "parentRefs":  { "type": "array" },
+        "hostnames":   { "type": "array" },
+        "rules":       { "type": "array" }
+      }
+    },
+    "resources":         { "type": "object" },
+    "livenessProbe":     { "type": "object" },
+    "readinessProbe":    { "type": "object" },
+    "extraVolumes":      { "type": "array" },
+    "extraVolumeMounts": { "type": "array" },
+    "initContainers":    { "type": "array" },
+    "tls": {
+      "type": "object",
+      "properties": {
+        "enabled":    { "type": "boolean" },
+        "secretName": { "type": "string" },
+        "mountPath":  { "type": "string" },
+        "certFile":   { "type": "string" },
+        "keyFile":    { "type": "string" }
+      }
+    },
+    "extraArgs":       { "type": "array" },
+    "extraContainers": { "type": "array" },
+    "nodeSelector":    { "type": "object" },
+    "tolerations":     { "type": "array" },
+    "affinity":        { "type": "object" },
+    "configFilePath":  { "type": "string" },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "serviceMonitor": {
+          "type": "object",
+          "properties": {
+            "enabled":           { "type": "boolean" },
+            "labels":            { "type": "object" },
+            "annotations":       { "type": "object" },
+            "interval":          { "type": "string" },
+            "scrapeTimeout":     { "type": "string" },
+            "scheme":            { "type": "string" },
+            "tlsConfig":         { "type": "object" },
+            "relabelings":       { "type": "array" },
+            "metricRelabelings": { "type": "array" }
+          }
+        },
+        "prometheusRule": {
+          "type": "object",
+          "properties": {
+            "enabled":     { "type": "boolean" },
+            "labels":      { "type": "object" },
+            "annotations": { "type": "object" },
+            "defaultRules": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" }
+              }
+            },
+            "additionalRules": { "type": "array" }
+          }
+        }
+      }
+    },
+    "config": { "type": "object" }
+  }
+}
