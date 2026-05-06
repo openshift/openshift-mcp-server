@@ -53,7 +53,7 @@ func NewPrometheusClient(apiConfig api.Config) (*RealLoader, error) {
 	v1api := v1.NewAPI(client)
 	return &RealLoader{
 		client:     v1api,
-		guardrails: DefaultGuardrails(),
+		guardrails: DefaultGuardrails(true),
 		backend:    backend,
 	}, nil
 }
