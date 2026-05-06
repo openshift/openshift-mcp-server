@@ -1,4 +1,4 @@
-package tekton
+package mustgather
 
 import (
 	"slices"
@@ -7,25 +7,26 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
 )
 
-// Toolset provides Tekton pipeline management tools.
+// Toolset provides tools for analyzing OpenShift must-gather archives offline.
 type Toolset struct{}
 
-var _ api.Toolset = (*Toolset)(nil)
-
 func (t *Toolset) GetName() string {
-	return "tekton"
+	return "openshift/mustgather"
 }
 
 func (t *Toolset) GetDescription() string {
-	return "Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns."
+	return "Analyze OpenShift must-gather archives offline without a live cluster connection"
 }
 
 func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
 	return slices.Concat(
-		pipelineTools(),
-		pipelineRunTools(),
-		taskTools(),
-		taskRunTools(),
+		initUse(),
+		initResources(),
+		initEvents(),
+		initPodLogs(),
+		initNodes(),
+		initEtcd(),
+		initMonitoring(),
 	)
 }
 
@@ -34,11 +35,11 @@ func (t *Toolset) GetPrompts() []api.ServerPrompt {
 }
 
 func (t *Toolset) GetResources() []api.ServerResource {
-	return nil
+	return initMCPResources()
 }
 
 func (t *Toolset) GetResourceTemplates() []api.ServerResourceTemplate {
-	return nil
+	return initMCPResourceTemplates()
 }
 
 func init() {
