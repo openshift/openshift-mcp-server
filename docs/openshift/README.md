@@ -7,6 +7,7 @@ This directory contains OpenShift-specific documentation for the OpenShift MCP S
 | Guide                           | Description                                                                                           |
 |---------------------------------|-------------------------------------------------------------------------------------------------------|
 | **[ACM Support](acm.md)** | Support for ACM and notes on its environment |
+| **[NetEdge Toolset](NETEDGE.md)** | Guide for the Network Ingress & DNS troubleshooting tools |
 | **[ACM Setup](acm_setup.md)**   | Setting up Advanced Cluster Management (ACM) and using the MCP Server with multi-cluster environments |
 | **[ACM with Keycloak Setup](acm_keycloak_setup.md)** | Setting up ACM with Keycloak-based OIDC authentication for secure multi-cluster access |
 

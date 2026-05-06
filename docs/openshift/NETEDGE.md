@@ -1,149 +1,195 @@
-# Network Ingress&DNS (netedge) Toolset
+# Network Ingress & DNS Toolset (`netedge`)
 
-This document provides guidance on using the Network Ingress&DNS (formerly known as Network Edge) toolset with the Kubernetes MCP Server.
+This toolset provides a ModelContextProtocol-based troubleshooting framework for OpenShift Network Ingress and DNS (NIDS). It exposes existing NIDS troubleshooting tools (e.g., router logs, DNS pods, ingress controllers, diagnostic metrics) in a structured, model-accessible way to reduce time-to-diagnosis.
 
-## Available Tools
+It is registered into the openshift-mcp-server as the `netedge` toolset.
 
-The netedge toolset provides tools for monitoring and troubleshooting OpenShift network ingress and DNS components.
+## Tools
 
-### Router Tools
+The NetEdge toolset is divided into four main categories: Diagnostics, Ingress & Routes, DNS & Services, and Connectivity Probes.
 
-Tools to inspect and monitor OpenShift router pods (HAProxy):
+### Diagnostics
 
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `get_router_config` | Retrieve the current router's HAProxy configuration | `pod` (optional) - Router pod name |
-| `get_router_info` | Retrieve HAProxy runtime information from the router | `pod` (optional) - Router pod name |
-| `get_router_sessions` | Retrieve all active sessions from the router | `pod` (optional) - Router pod name |
+#### netedge_query_prometheus
 
-### DNS Tools
+Executes specialized diagnostic queries for specific NetEdge components. This is the recommended starting point for investigating high-level health issues.
 
-Tools to inspect and monitor CoreDNS configuration:
+**Parameters:**
+- `diagnostic_target` (string, required) — Run specialized diagnostics for a specific component. Enum: `"ingress"`, `"dns"`, `"operators"`.
 
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `get_coredns_config` | Retrieve the current CoreDNS configuration (Corefile) | None |
+**Example:** `diagnostic_target: "ingress"`
 
-**Notes**:
-- Router tools have an optional `pod` parameter. If not provided, they automatically select any available router pod from the default ingress controller.
-- Currently, the default ingress controller name (`default`) is hard-coded. Support for custom ingress controller names may be added in future versions.
+---
 
-## Examples
+### Ingress & Routes
 
-### View Router Configuration
+#### inspect_route
 
-View the router configuration file from any router pod:
+Inspect an OpenShift Route to view its full configuration and status. Sensitive TLS fields (like private keys and certificates) are automatically redacted for safety.
 
-```text
-Show me the router configuration
+**Parameters:**
+- `namespace` (string, required) — Route namespace.
+- `route` (string, required) — Route name.
 
-● I'll get the router configuration for you.
-  ⎿  # Router configuration (pod: router-default-6fbcf6cb84-vqthh)
-     ```
-     global
-     … +333 lines (ctrl+o to expand)
-
-● Here's the router configuration from pod router-default-6fbcf6cb84-vqthh. This is an HAProxy configuration for the OpenShift router with the following key settings:
-
-  Global Settings:
-  - Max connections: 50,000
-  - 4 worker threads
-  - TLS: Minimum version TLSv1.2
-  - Cipher suites: Modern secure ciphers (ECDHE-ECDSA, ECDHE-RSA, etc.)
-  - DH parameter size: 2048 bits
-
-  Timeout Settings:
-  - Connect: 5s
-  - Client/Server: 30s
-  - HTTP request: 10s
-  - HTTP keep-alive: 300s
-  - WebSocket tunnel: 1h
-  - Console: 5 minutes
+**Example:**
+```yaml
+namespace: "openshift-console"
+route: "console"
 ```
 
-Or specify a particular router pod:
+#### get_router_config
 
-```text
-Show me the router configuration from pod router-default-6fbcf6cb84-vqthh
+Retrieve the current router's HAProxy configuration from the cluster. This reads the live configuration directly from the router pod.
+
+**Parameters:**
+- `pod` (string, optional) — Router pod name. If omitted, it automatically chooses an existing pod from the default ingress controller.
+
+#### get_router_info
+
+Retrieve HAProxy runtime statistics (uptime, session limits, memory usage) from the router via the admin socket.
+
+**Parameters:**
+- `pod` (string, optional) — Router pod name.
+
+#### get_router_sessions
+
+Retrieve all active sessions from the router. Useful for deep traffic analysis.
+
+**Parameters:**
+- `pod` (string, optional) — Router pod name.
+
+---
+
+### DNS & Services
+
+#### get_coredns_config
+
+Retrieve the current CoreDNS configuration (`Corefile`) from the `dns-default` ConfigMap in the cluster.
+
+**Parameters:**
+- None
+
+#### get_service_endpoints
+
+Return `EndpointSlice` objects for a Service to verify backend pod availability.
+
+**Parameters:**
+- `namespace` (string, required) — Service namespace.
+- `service` (string, required) — Service name.
+
+#### exec_dns_in_pod
+
+Spin up a temporary, ephemeral pod in the cluster to execute a DNS lookup using `dig`. This verifies internal cluster networking and the DNS resolution path from a pod's perspective. The pod is automatically cleaned up after execution.
+
+**Parameters:**
+- `namespace` (string, required) — Namespace to run the ephemeral pod in.
+- `target_server` (string, required) — DNS server IP to query (e.g., `"172.30.0.10"`).
+- `target_name` (string, required) — DNS name to query (e.g., `"kubernetes.default.svc.cluster.local"`).
+- `record_type` (string, optional) — DNS record type (A, AAAA, CNAME, etc.). Defaults to `"A"`.
+
+**Example:**
+```yaml
+namespace: "default"
+target_server: "172.30.0.10"
+target_name: "my-service.default.svc.cluster.local"
 ```
 
-### View Router Runtime Information
+---
 
-Get router runtime statistics and information:
+### Connectivity Probes
 
-```text
-Show me the router info
-  ⎿  # Router HAProxy info (pod: router-default-6fbcf6cb84-vqthh)
-     ```
-     Name: HAProxy
-     … +76 lines (ctrl+o to expand)
+#### probe_dns_local
 
-● Here's the HAProxy runtime information for the router (pod: router-default-6fbcf6cb84-vqthh):
+Run a DNS query using local libraries on the MCP server host to verify connectivity and resolution from the external perspective.
 
-  Version Information:
-  - HAProxy Version: 2.8.10-f28885f
-  - Release Date: 2024/06/14
-  - Uptime: 1h 45m 7s
+**Parameters:**
+- `server` (string, required) — DNS server IP (e.g., `"8.8.8.8"`, `"10.0.0.10"`).
+- `name` (string, required) — FQDN to query.
+- `type` (string, optional) — Record type. Defaults to `"A"`.
 
-  Process Information:
-  - PID: 138
-  - Threads: 4
-  - Processes: 1
+#### probe_http
 
-  Connection Statistics:
-  - Current Connections: 10
-  - Max Connections: 50,000
-  - Cumulative Connections: 2,253
-  - Cumulative Requests: 4,668
-  - Max Connection Rate: 12/sec
+Send an HTTP(S) request from the MCP server host to verify reachability and inspect the response status code and headers.
 
-  SSL/TLS Statistics:
-  - Current SSL Connections: 1
-  - Cumulative SSL Connections: 862
-  - SSL Frontend Max Key Rate: 4/sec
-  - SSL Backend Max Key Rate: 1/sec
+**Parameters:**
+- `url` (string, required) — The URL to probe (e.g., `"https://example.com/path"`).
+- `method` (string, optional) — HTTP method to use. Defaults to `"GET"`.
+- `timeout_seconds` (integer, optional) — Request timeout in seconds. Defaults to `5`.
+
+---
+
+## Enable the Toolset
+
+### Command line
+
+```bash
+kubernetes-mcp-server --toolsets core,netedge
 ```
 
-This displays:
-- Router version and uptime
-- Process information
-- Connection statistics
-- Request rates
-- Memory usage
+### Configuration file (TOML)
 
-### View Active Sessions
-
-View all active sessions in the router:
-
-```text
-Show me active router sessions
-  ⎿  # Router active sessions (pod: router-default-6fbcf6cb84-vqthh)
-     ```
-     0x7f223405ae50: [12/Jan/2026:22:35:39.393119] id=4697 proto=unix_stream source=unix:1
-     … +17 lines (ctrl+o to expand)
-
-● Here are the active sessions in the router (pod: router-default-6fbcf6cb84-vqthh):
-
-  There is currently 1 active session:
-
-  Session ID 4697 (CLI Connection)
-  - Protocol: Unix stream socket
-  - Frontend: GLOBAL (HAProxy admin socket)
-  - State: ESTABLISHED
-  - Age: 0s (just created)
-  - Type: CLI applet connection
-
-  Details:
-  - Connection flags: 0x8
-  - Task state: running with high priority (nice=-64)
-  - File descriptor: 23
-  - Buffers: 32KB request/response buffers allocated
-  - Request data: 14 bytes total (the command itself)
-  - Timeouts: 2 minutes for client, no write timeout
+```toml
+toolsets = ["core", "netedge"]
 ```
 
-This displays detailed information about each active connection including:
-- Session ID and protocol
-- Connection state
-- Frontend and backend information
-- Task and file descriptor details
+### MCP client configuration
+
+```json
+{
+  "mcpServers": {
+    "kubernetes": {
+      "command": "npx",
+      "args": ["-y", "kubernetes-mcp-server@latest", "--toolsets", "core,netedge"]
+    }
+  }
+}
+```
+
+---
+
+## Configuration
+
+The toolset can be configured via a `[toolset_configs.netedge]` section in the TOML config file.
+
+```toml
+[toolset_configs.netedge]
+# Where to read the bearer token from: "header" (default) or "kubeconfig".
+# Set to "kubeconfig" when running locally (STDIO mode) so the token is read
+# from your kubeconfig session (e.g. after `oc login`).
+auth_mode = "kubeconfig"
+
+# Allow insecure TLS connections for diagnostic probes.
+# Default: false
+insecure = false
+```
+
+---
+
+## Authentication and TLS
+
+The toolset authenticates using the OpenShift cluster's credentials. The `auth_mode` option controls where the token is sourced:
+
+- `"header"` (default) — from the incoming request's Authorization header. Use when running remotely behind an OAuth proxy.
+- `"kubeconfig"` — from the kubeconfig / in-cluster REST config. Use when running **locally** (STDIO mode).
+
+Diagnostic metrics (via `netedge_query_prometheus`) interact with the in-cluster Thanos Querier and resolve TLS certificates using the system CA or the OpenShift service account CA.
+
+---
+
+## Offline Analysis (Must-Gather)
+
+The NetEdge toolset is designed to support both live-cluster and offline analysis modes. Currently, tools like `get_router_config`, `get_router_info`, and `exec_dns_in_pod` require a live cluster connection because they rely on `exec` commands or dynamic resource creation.
+
+However, an upcoming integration will enable "Virtual Cluster" environments. By pointing the MCP server to a local `must-gather` archive or a remote Prow CI job URL, the agent will be able to debug past failures without live access.
+
+*Note: The exact configuration mechanism for offline mode (e.g., `cluster="file:///path/to/must-gather"`) is under active development and will integrate with the `omc` (OpenShift Must-Gather Client).*
+
+---
+
+## Safety Guardrails
+
+The NetEdge toolset incorporates several safety mechanisms to prevent disruption to the cluster:
+
+1. **TLS Redaction:** The `inspect_route` tool automatically redacts sensitive fields like private keys and certificates from the returned payload.
+2. **Ephemeral Resources:** The `exec_dns_in_pod` tool creates a temporary pod to run network diagnostics. This pod is tightly scoped with minimal CPU/Memory limits, drops all capabilities, and is guaranteed to be deleted after the timeout (120 seconds), even if the context is cancelled.
+3. **Read-Only Scope:** Router inspection tools (`get_router_config`, `get_router_info`, `get_router_sessions`) access the HAProxy admin socket exclusively in read-only modes to gather diagnostics without mutating state.

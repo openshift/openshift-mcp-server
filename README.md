@@ -273,6 +273,7 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 | kcp      | Manage kcp workspaces and multi-tenancy features                                                                                                                                |         |
 | kubevirt | KubeVirt virtual machine management tools, check the [KubeVirt documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/kubevirt.md) for more details. |         |
 | metrics  | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                   |         |
+| netedge  | Tools for Network Ingress and DNS troubleshooting, check the [NetEdge documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/openshift/NETEDGE.md) for more details. |         |
 | ossm     | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                 |         |
 | tekton   | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns.                                                                                              |         |
 
