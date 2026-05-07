@@ -1,0 +1,5 @@
+Thank you for installing {{ .Chart.Name }} {{ .Chart.Version }}.
+
+MCP server for Red Hat OpenShift has been deployed successfully.
+
+For more information, visit: {{ .Chart.Home }}
