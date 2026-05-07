@@ -53,15 +53,14 @@ type Config struct {
 	Guardrails string `toml:"guardrails,omitempty"`
 
 	// MaxMetricCardinality is the maximum allowed series count per metric.
-	// Set to 0 to disable this check.
-	// Default: 20000
-	MaxMetricCardinality uint64 `toml:"max_metric_cardinality,omitempty"`
+	// When unset, the default of 20000 is used.
+	MaxMetricCardinality *uint64 `toml:"max_metric_cardinality,omitempty"`
 
 	// MaxLabelCardinality is the maximum allowed label value count for blanket regex.
 	// Only takes effect if disallow-blanket-regex is enabled.
-	// Set to 0 to always disallow blanket regex.
-	// Default: 500
-	MaxLabelCardinality uint64 `toml:"max_label_cardinality,omitempty"`
+	// When unset, the default of 500 is used.
+	// Set to 0 to always disallow blanket regex regardless of cardinality.
+	MaxLabelCardinality *uint64 `toml:"max_label_cardinality,omitempty"`
 
 	// RangeQueryFullResponse controls whether range queries return full data points
 	// instead of summary statistics.
@@ -77,11 +76,8 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid auth_mode: %q (valid options: %q, %q)", c.AuthMode, AuthModeHeader, AuthModeKubeConfig)
 	}
 
-	if c.Guardrails != "" {
-		_, err := prometheus.ParseGuardrails(c.Guardrails)
-		if err != nil {
-			return fmt.Errorf("invalid guardrails configuration: %w", err)
-		}
+	if _, err := c.GetGuardrails(); err != nil {
+		return err
 	}
 
 	return nil
@@ -107,19 +103,26 @@ func (c *Config) GetGuardrails() (*prometheus.Guardrails, error) {
 		return nil, err
 	}
 
-	if guardrails != nil {
-		// Apply cardinality limits
-		maxMetricCard := c.MaxMetricCardinality
-		if maxMetricCard == 0 {
-			maxMetricCard = 20000 // default
+	if c.MaxMetricCardinality != nil {
+		if guardrails == nil || !guardrails.ForceMaxMetricCardinality {
+			return nil, fmt.Errorf(
+				"max_metric_cardinality is set but the %q guardrail is not enabled",
+				prometheus.GuardrailMaxMetricCardinality)
 		}
-		guardrails.MaxMetricCardinality = maxMetricCard
-
-		maxLabelCard := c.MaxLabelCardinality
-		if maxLabelCard == 0 {
-			maxLabelCard = 500 // default
+		if *c.MaxMetricCardinality == 0 {
+			return nil, fmt.Errorf(
+				"max_metric_cardinality = 0 is not supported to disable the guardrail; use '!%s' in guardrails instead",
+				prometheus.GuardrailMaxMetricCardinality)
 		}
-		guardrails.MaxLabelCardinality = maxLabelCard
+		guardrails.MaxMetricCardinality = *c.MaxMetricCardinality
+	}
+	if c.MaxLabelCardinality != nil {
+		if guardrails == nil || !guardrails.DisallowBlanketRegex {
+			return nil, fmt.Errorf(
+				"max_label_cardinality is set but the %q guardrail is not enabled",
+				prometheus.GuardrailDisallowBlanketRegex)
+		}
+		guardrails.MaxLabelCardinality = *c.MaxLabelCardinality
 	}
 
 	return guardrails, nil

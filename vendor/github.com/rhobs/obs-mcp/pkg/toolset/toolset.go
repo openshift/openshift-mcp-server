@@ -47,6 +47,16 @@ func (t *Toolset) GetPrompts() []api.ServerPrompt {
 	return nil
 }
 
+// GetResources returns resources provided by this toolset.
+func (t *Toolset) GetResources() []api.ServerResource {
+	return nil
+}
+
+// GetResourceTemplates returns resource templates provided by this toolset.
+func (t *Toolset) GetResourceTemplates() []api.ServerResourceTemplate {
+	return nil
+}
+
 func init() {
 	toolsets.Register(&Toolset{})
 }

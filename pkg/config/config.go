@@ -424,6 +424,10 @@ func (c *StaticConfig) GetStsClientKeyFile() string {
 	return c.StsClientKeyFile
 }
 
+func (c *StaticConfig) GetCertificateAuthority() string {
+	return c.CertificateAuthority
+}
+
 func (c *StaticConfig) IsValidationEnabled() bool {
 	return c.ValidationEnabled
 }
@@ -643,6 +647,9 @@ func (c *StaticConfig) ResolveClusterAuthMode() string {
 func (c *StaticConfig) ValidateClusterAuthMode() error {
 	if c.ClusterAuthMode != "" && c.ClusterAuthMode != api.ClusterAuthPassthrough && c.ClusterAuthMode != api.ClusterAuthKubeconfig {
 		return fmt.Errorf("invalid cluster_auth_mode %q: must be %q or %q", c.ClusterAuthMode, api.ClusterAuthPassthrough, api.ClusterAuthKubeconfig)
+	}
+	if c.ClusterAuthMode == api.ClusterAuthKubeconfig && c.RequireOAuth {
+		return fmt.Errorf("cluster_auth_mode %q is not compatible with require_oauth=true: all authenticated users would share a single cluster identity, breaking per-user audit trails; use passthrough or token exchange to preserve user identity on the cluster", api.ClusterAuthKubeconfig)
 	}
 	hasTokenExchange := c.TokenExchangeStrategy != "" || c.StsAudience != ""
 	if c.ClusterAuthMode == api.ClusterAuthKubeconfig && hasTokenExchange {
