@@ -13,4 +13,4 @@ spec:
         - sh
         - -c
         - |
-          wget -qO- http://{{ .Release.Name }}-redhat-openshift-mcp-server:{{ .Values.service.port }}/healthz || exit 1
+          wget -qO- http://{{ include "openshift-mcp-server.fullname" . }}:{{ .Values.service.port }}/healthz || exit 1

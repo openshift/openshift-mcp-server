@@ -14,4 +14,4 @@ version: 0.3.0
 appVersion: "latest"
 kubeVersion: ">=1.34.0-0"
 annotations:
-  charts.openshift.io/name: RedHat Openshift MCP Server
+  charts.openshift.io/name: MCP server for Red Hat OpenShift
