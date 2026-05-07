@@ -210,7 +210,7 @@ func (w *WellKnown) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 }
 
 // fetchWellKnownEndpoint creates a new request from the incoming request's method and context,
-// then fetches the well-known endpoint. Returns nil metadata if the endpoint returns 404.
+// then fetches the well-known endpoint. Returns nil metadata if the endpoint returns 404 or an empty body (to allow fallback).
 func (w *WellKnown) fetchWellKnownEndpoint(request *http.Request, url string) (map[string]interface{}, http.Header, error) {
 	req, err := http.NewRequestWithContext(request.Context(), request.Method, url, nil)
 	if err != nil {
@@ -220,7 +220,7 @@ func (w *WellKnown) fetchWellKnownEndpoint(request *http.Request, url string) (m
 }
 
 // fetchWellKnownEndpointFromRequest performs the HTTP fetch using a pre-built request.
-// Returns nil metadata if the endpoint returns 404 (to allow fallback).
+// Returns nil metadata if the endpoint returns 404 or an empty body (to allow fallback).
 func (w *WellKnown) fetchWellKnownEndpointFromRequest(req *http.Request) (map[string]interface{}, http.Header, error) {
 	resp, err := w.wellKnownHTTPClient().Do(req)
 	if err != nil {
@@ -239,6 +239,11 @@ func (w *WellKnown) fetchWellKnownEndpointFromRequest(req *http.Request) (map[st
 
 	var resourceMetadata map[string]interface{}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, maxWellKnownResponseSize)).Decode(&resourceMetadata); err != nil {
+		// Treat empty body (io.EOF) as equivalent to 404 — some providers (e.g., Entra ID)
+		// return HTTP 200 with content-length: 0 for unsupported well-known paths.
+		if err == io.EOF {
+			return nil, nil, nil
+		}
 		return nil, nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
@@ -331,12 +336,12 @@ func (w *WellKnown) generateProtectedResourceMetadata(request *http.Request) (ma
 // when trust_proxy_headers is explicitly enabled. Otherwise uses request.Host directly.
 func (w *WellKnown) buildResourceURL(request *http.Request) string {
 	cfg := w.cfgState.Load()
-	if cfg != nil && cfg.ServerURL != "" {
+	if cfg.ServerURL != "" {
 		return strings.TrimSuffix(cfg.ServerURL, "/")
 	}
 	scheme := "https"
 	host := request.Host
-	if cfg != nil && cfg.TrustProxyHeaders {
+	if cfg.TrustProxyHeaders {
 		if request.TLS == nil && !strings.HasPrefix(request.Header.Get("X-Forwarded-Proto"), "https") {
 			scheme = "http"
 		}
