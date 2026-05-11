@@ -39,10 +39,20 @@ route: "console"
 
 #### get_router_config
 
-Retrieve the current router's HAProxy configuration from the cluster. This reads the live configuration directly from the router pod.
+Retrieve the current router's HAProxy configuration from the cluster. Supports filtering by section type, substring filter on section headers, and line-count limiting via `tail_lines`.
 
 **Parameters:**
 - `pod` (string, optional) — Router pod name. If omitted, it automatically chooses an existing pod from the default ingress controller.
+- `tail_lines` (integer, optional) — Maximum number of lines to return from the end of the config output. Default: `200`.
+- `section` (string, optional) — Filter to a specific HAProxy config section type. Enum: `"global"`, `"defaults"`, `"frontend"`, `"backend"`, `"listen"`.
+- `filter` (string, optional) — Substring filter applied to section headers (e.g. a route or backend name). Only sections whose header contains this string are returned.
+
+**Example:**
+```yaml
+section: "backend"
+filter: "my-route"
+tail_lines: 100
+```
 
 #### get_router_info
 
@@ -53,10 +63,18 @@ Retrieve HAProxy runtime statistics (uptime, session limits, memory usage) from 
 
 #### get_router_sessions
 
-Retrieve all active sessions from the router. Useful for deep traffic analysis.
+Retrieve active sessions from the router. Supports limiting the number of sessions returned and filtering by substring (e.g. backend name or source IP).
 
 **Parameters:**
-- `pod` (string, optional) — Router pod name.
+- `pod` (string, optional) — Router pod name. If omitted, it automatically chooses an existing pod from the default ingress controller.
+- `limit` (integer, optional) — Maximum number of session blocks to return. Default: `50`.
+- `filter` (string, optional) — Substring filter applied to each session block. Only sessions containing this string are returned (e.g. a backend name or source IP).
+
+**Example:**
+```yaml
+filter: "be_http"
+limit: 10
+```
 
 ---
 
