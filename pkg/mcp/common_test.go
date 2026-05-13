@@ -71,6 +71,9 @@ func TestMain(m *testing.M) {
 			// OpenShift
 			CRD("project.openshift.io", "v1", "projects", "Project", "project", false),
 			CRD("route.openshift.io", "v1", "routes", "Route", "route", true),
+			// ArgoCD / GitOps
+			CRD("argoproj.io", "v1alpha1", "applications", "Application", "application", true),
+			CRD("argoproj.io", "v1alpha1", "appprojects", "AppProject", "appproject", true),
 			// Kubevirt
 			CRD("kubevirt.io", "v1", "virtualmachines", "VirtualMachine", "virtualmachine", true),
 			CRD("clone.kubevirt.io", "v1beta1", "virtualmachineclones", "VirtualMachineClone", "virtualmachineclone", true),
