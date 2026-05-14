@@ -4,6 +4,8 @@ This toolset provides tools for querying Prometheus/Thanos metrics and Alertmana
 It is implemented by the [`rhobs/obs-mcp`](https://github.com/rhobs/obs-mcp) package and registered
 into the openshift-mcp-server as the `metrics` toolset.
 
+For Grafana Tempo and TraceQL (`traces` toolset), see the [tracing toolset guide](./tracing.md).
+
 ## Tools
 
 ### list_metrics
