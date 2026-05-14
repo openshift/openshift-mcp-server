@@ -58,7 +58,7 @@ func getPromClient(params api.ToolHandlerParams) (prometheus.Loader, error) {
 		return nil, fmt.Errorf("failed to create API config: %w", err)
 	}
 
-	promClient, err := prometheus.NewPrometheusClient(apiConfig)
+	promClient, err := prometheus.NewPrometheusLoader(apiConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Prometheus client: %w", err)
 	}
