@@ -1,0 +1,24 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: latency-investigation
+  difficulty: medium
+  parallel: true
+  runs: 1
+  labels:
+    category: traces
+    toolType: query
+  description: |
+    Tests if the agent can find high latency traces for a specific service
+    by constructing a TraceQL query with service name and duration filters.
+spec:
+  prompt:
+    inline: |
+      Find traces where the shop-backend service took more than 500ms. Use instance tempo1.
+  verify:
+    - llmJudge:
+        contains: "article-to-cart"
+        reason: "Verify the agent found spans of the shop-backend service which took more than 500ms"
+    - llmJudge:
+        contains: "500ms"
+        reason: "Verify the agent applied a latency threshold of 500ms"

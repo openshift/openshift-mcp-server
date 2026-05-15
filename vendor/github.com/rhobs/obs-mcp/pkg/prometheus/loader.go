@@ -39,7 +39,7 @@ type RealLoader struct {
 
 var _ Loader = (*RealLoader)(nil)
 
-func NewPrometheusClient(apiConfig api.Config) (*RealLoader, error) {
+func NewPrometheusLoader(apiConfig api.Config) (*RealLoader, error) {
 	client, err := api.NewClient(apiConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error creating prometheus client: %w", err)

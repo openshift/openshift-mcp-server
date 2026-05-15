@@ -1,0 +1,21 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: search-error-traces
+  difficulty: medium
+  parallel: true
+  runs: 1
+  labels:
+    category: traces
+    toolType: query
+  description: |
+    Tests if the agent can discover Tempo instances and search for
+    traces with errors using TraceQL.
+spec:
+  prompt:
+    inline: |
+      Find traces with errors in the last hour. Use instance tempo1.
+  verify:
+    - llmJudge:
+        contains: "status=error"
+        reason: "Verify the agent used the TraceQL filter status=error to search for error traces. The term status=error is TraceQL query syntax, not an indication that the operation failed."

@@ -22,6 +22,8 @@ Choose the guide that matches your needs:
 
 ## Toolset Guides
 
+- **[Metrics](./metrics.md)** - Prometheus and Alertmanager tools (`metrics` toolset, via [obs-mcp](https://github.com/rhobs/obs-mcp))
+- **[Tracing](./tracing.md)** - Grafana Tempo and TraceQL (`traces` toolset, via [obs-mcp](https://github.com/rhobs/obs-mcp))
 - **[Kiali](KIALI.md)** - Tools for Kiali ServiceMesh with Istio
 - **[KubeVirt](kubevirt.md)** - KubeVirt virtual machine management tools
 
