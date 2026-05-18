@@ -1,5 +1,8 @@
 kind: Task
 metadata:
+  labels:
+    suite: oadp
+    requires: oadp
   name: "list-oadp-backups"
   difficulty: easy
 steps:

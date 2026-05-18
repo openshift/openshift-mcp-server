@@ -53,6 +53,16 @@ func (t *Toolset) GetPrompts() []api.ServerPrompt {
 	return initOADPTroubleshoot()
 }
 
+// GetResources returns the resources provided by this toolset.
+func (t *Toolset) GetResources() []api.ServerResource {
+	return nil
+}
+
+// GetResourceTemplates returns the resource templates provided by this toolset.
+func (t *Toolset) GetResourceTemplates() []api.ServerResourceTemplate {
+	return nil
+}
+
 func init() {
 	toolsets.Register(&Toolset{})
 }
