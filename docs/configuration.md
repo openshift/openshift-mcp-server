@@ -131,6 +131,7 @@ The server will:
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `log_level` | integer | `0` | Logging verbosity level (0-9). Higher values produce more verbose output. Similar to [kubectl logging levels](https://kubernetes.io/docs/reference/kubectl/quick-reference/#kubectl-output-verbosity-and-debugging). |
+| `log_file` | string | `""` | Path to a server log file. Required for logging in stdio mode (where stdout is reserved for the MCP protocol); replaces stdout logging in HTTP mode. The file is created if it does not exist and opened in append mode (`O_APPEND`, `0o600`). Use the special value `stderr` to route logs to stderr without opening a file. |
 | `port` | string | `""` | When set, starts the MCP server in HTTP mode (Streamable HTTP at `/mcp`, SSE at `/sse`) on the specified port. |
 | `sse_base_url` | string | `""` | Base URL for Server-Sent Events (SSE) connections. Used when the server is behind a reverse proxy. |
 | `list_output` | string | `"table"` | Output format for resource list operations. Valid values: `yaml`, `table`. |
@@ -142,6 +143,7 @@ The server will:
 **Example:**
 ```toml
 log_level = 2
+log_file = "/var/log/kubernetes-mcp-server.log"
 port = "8080"
 list_output = "yaml"
 stateless = true
@@ -303,6 +305,7 @@ Toolsets group related tools together. Enable only the toolsets you need to redu
 | metrics  | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                   |         |
 | ossm     | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                 |         |
 | tekton   | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns.                                                                                              |         |
+| traces   | Toolset for querying Tempo                                                                                                                                                      |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -490,9 +493,10 @@ Configure OAuth/OIDC authentication for HTTP mode deployments.
 | `sts_audience` | string | `""` | Audience for STS token exchange. |
 | `sts_scopes` | string[] | `[]` | Scopes for STS token exchange. |
 | `token_exchange_strategy` | string | `""` | Token exchange strategy: `rfc8693`, `keycloak-v1`, or `entra-obo`. |
-| `sts_auth_style` | string | `"params"` | How client credentials are sent: `params` (body), `header` (Basic Auth), or `assertion` (JWT). |
+| `sts_auth_style` | string | `"params"` | How client credentials are sent: `params` (body), `header` (Basic Auth), `assertion` (JWT), or `federated` (external IdP token file). |
 | `sts_client_cert_file` | string | `""` | Path to client certificate PEM file (for `assertion` auth style). |
 | `sts_client_key_file` | string | `""` | Path to client private key PEM file (for `assertion` auth style). |
+| `sts_federated_token_file` | string | `""` | Path to a JWT file from an external identity provider, e.g., SPIRE JWT-SVID (for `federated` auth style). |
 | `cluster_auth_mode` | string | `""` | Cluster auth mode: `passthrough` (forward Authorization header when present, fall back to kubeconfig when absent) or `kubeconfig` (always use kubeconfig credentials). Defaults to `passthrough`. |
 | `certificate_authority` | string | `""` | Path to CA certificate for validating authorization server connections. |
 | `server_url` | string | `""` | Public URL of the MCP server (used for OAuth metadata). |
@@ -694,6 +698,7 @@ The following options can be set via command-line arguments. CLI arguments overr
 |--------|-------------|
 | `--port` | Start in HTTP mode on the specified port |
 | `--log-level` | Logging verbosity (0-9) |
+| `--log-file` | Path to a server log file. Required for logging in stdio mode; replaces stdout logging in HTTP mode. Use `stderr` to log to the standard error stream. |
 | `--config` | Path to main TOML configuration file |
 | `--config-dir` | Path to drop-in configuration directory |
 | `--kubeconfig` | Path to Kubernetes configuration file |
@@ -715,6 +720,7 @@ A comprehensive configuration file demonstrating all major options:
 ```toml
 # Server settings
 log_level = 2
+log_file = "/var/log/kubernetes-mcp-server.log"
 port = "8080"
 list_output = "table"
 stateless = false
