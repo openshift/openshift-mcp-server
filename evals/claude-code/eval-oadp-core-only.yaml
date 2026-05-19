@@ -1,0 +1,20 @@
+kind: Eval
+metadata:
+  name: "oadp-with-core-only"
+config:
+  agent:
+    type: "file"
+    path: agent.yaml
+  mcpConfigFile: ../mcp-config.yaml
+  extensions:
+    kubernetes:
+      package: https://github.com/mcpchecker/kubernetes-extension@v0.0.3
+  taskSets:
+    # OADP tasks using only core toolset (generic resource tools)
+    - glob: ../tasks/oadp/*/*.yaml
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            toolPattern: ".*"
+        minToolCalls: 1
+        maxToolCalls: 20
