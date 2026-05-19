@@ -77,15 +77,13 @@ For a secure production setup with dedicated ServiceAccount and read-only access
 If you have npm installed, this is the fastest way to get started with `kubernetes-mcp-server` on Claude Desktop.
 
 Open your `claude_desktop_config.json` and add the mcp server to the list of `mcpServers`:
-``` json
+
+```json
 {
   "mcpServers": {
     "kubernetes": {
       "command": "npx",
-      "args": [
-        "-y",
-        "kubernetes-mcp-server@latest"
-      ]
+      "args": ["-y", "kubernetes-mcp-server@latest"]
     }
   }
 }
@@ -135,6 +133,7 @@ Alternatively, you can install the extension manually by editing the `mcp.json` 
 If you have npm installed, this is the fastest way to get started with `kubernetes-mcp-server`.
 
 Open your goose `config.yaml` and add the mcp server to the list of `mcpServers`:
+
 ```yaml
 extensions:
   kubernetes:
@@ -142,7 +141,6 @@ extensions:
     args:
       - -y
       - kubernetes-mcp-server@latest
-
 ```
 
 ## 🎥 Demos <a id="demos"></a>
@@ -193,11 +191,11 @@ uvx kubernetes-mcp-server@latest --help
 ### Configuration Options
 
 | Option                    | Description                                                                                                                                                                                                                                                                                   |
-|---------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--port`                  | Starts the MCP server in Streamable HTTP mode (path /mcp) and Server-Sent Event (SSE) (path /sse) mode and listens on the specified port .                                                                                                                                                    |
 | `--log-level`             | Sets the logging level (values [from 0-9](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-instrumentation/logging.md)). Similar to [kubectl logging levels](https://kubernetes.io/docs/reference/kubectl/quick-reference/#kubectl-output-verbosity-and-debugging). |
 | `--config`                | (Optional) Path to the main TOML configuration file. See [Configuration Reference](docs/configuration.md) for details.                                                                                                                                                                        |
-| `--config-dir`            | (Optional) Path to drop-in configuration directory. Files are loaded in lexical (alphabetical) order. Defaults to `conf.d` relative to the main config file if `--config` is specified. See [Configuration Reference](docs/configuration.md) for details.                                    |
+| `--config-dir`            | (Optional) Path to drop-in configuration directory. Files are loaded in lexical (alphabetical) order. Defaults to `conf.d` relative to the main config file if `--config` is specified. See [Configuration Reference](docs/configuration.md) for details.                                     |
 | `--kubeconfig`            | Path to the Kubernetes configuration file. If not provided, it will try to resolve the configuration (in-cluster, default location, etc.).                                                                                                                                                    |
 | `--list-output`           | Output format for resource list operations (one of: yaml, table) (default "table")                                                                                                                                                                                                            |
 | `--read-only`             | If set, the MCP server will run in read-only mode, meaning it will not allow any write operations (create, update, delete) on the Kubernetes cluster. This is useful for debugging or inspecting the cluster without making changes.                                                          |
@@ -235,6 +233,7 @@ endpoint = "http://localhost:4317"
 ```
 
 For comprehensive TOML configuration documentation, including:
+
 - All configuration options and their defaults
 - Drop-in configuration files for modular settings
 - Dynamic configuration reload via SIGHUP
@@ -275,6 +274,7 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 | metrics  | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                   |         |
 | ossm     | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                 |         |
 | tekton   | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns.                                                                                              |         |
+| traces   | Toolset for querying Tempo                                                                                                                                                      |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -449,6 +449,11 @@ In case multi-cluster support is enabled (default) and you have access to multip
   - `size` (`string`) - Optional workload size hint for the VM (e.g., 'small', 'medium', 'large', 'xlarge'). Used to auto-select an appropriate instance type if not explicitly specified.
   - `storage` (`string`) - Optional storage size for the VM's root disk when using DataSources (e.g., '30Gi', '50Gi', '100Gi'). Defaults to 30Gi. Ignored when using container disks.
   - `workload` (`string`) - The workload for the VM. Accepts OS names (e.g., 'fedora' (default), 'ubuntu', 'centos', 'centos-stream', 'debian', 'rhel', 'opensuse', 'opensuse-tumbleweed', 'opensuse-leap') or full container disk image URLs
+
+- **vm_guest_info** - Get guest operating system information from a VirtualMachine's QEMU guest agent. Requires the guest agent to be installed and running inside the VM. Provides detailed information about the OS, filesystems, network interfaces, and logged-in users.
+  - `info_type` (`string`) - Type of information to retrieve: 'all' (default - all available info), 'os' (operating system details), 'filesystem' (disk and filesystem info), 'users' (logged-in users), 'network' (network interfaces and IPs)
+  - `name` (`string`) **(required)** - The name of the virtual machine
+  - `namespace` (`string`) **(required)** - The namespace of the virtual machine
 
 - **vm_lifecycle** - Manage KubeVirt VirtualMachine lifecycle: start, stop, or restart a VM
   - `action` (`string`) **(required)** - The lifecycle action to perform: 'start' (changes runStrategy to Always), 'stop' (changes runStrategy to Halted), or 'restart' (stops then starts the VM)
@@ -656,7 +661,7 @@ Silences are used to temporarily mute alerts based on label matchers. This tool 
   - `clusterName` (`string`) - Optional. Name of the cluster to get resources from. If not provided, will use the default cluster name in the Kiali KubeConfig
   - `namespaces` (`string`) - Comma-separated list of namespaces to query (e.g., 'bookinfo' or 'bookinfo,default'). If not provided, it will query across all accessible namespaces.
   - `resourceName` (`string`) - Optional. The specific name of the resource. If left empty, the tool returns a list of all resources of the specified type. If provided, the tool returns deep details for this specific resource.
-  - `resourceType` (`string`) **(required)** - The type of resource to query.
+  - `resourceType` (`string`) **(required)** - The type of resource to query. Use 'app' for Kiali applications (grouped by the Kubernetes 'app' label). Use 'argoapp' for ArgoCD Application CRDs (requires ArgoCD installed and the Kiali service account must have read permissions on applications.argoproj.io).
 
 - **ossm_list_traces** - Lists distributed traces for a service in a namespace. Returns a summary (namespace, service, total_found, avg_duration_ms) and a list of traces with id, duration_ms, spans_count, root_op, slowest_service, has_errors. Use get_trace_details with a trace id to get full hierarchy.
   - `clusterName` (`string`) - Optional cluster name. Defaults to the cluster name in the Kiali configuration.
@@ -729,6 +734,104 @@ Silences are used to temporarily mute alerts based on label matchers. This tool 
   - `name` (`string`) **(required)** - Name of the TaskRun to get logs from
   - `namespace` (`string`) - Namespace of the TaskRun
   - `tail` (`integer`) - Number of lines to retrieve from the end of the logs (Optional, default: 100)
+
+</details>
+
+<details>
+
+<summary>traces</summary>
+
+- **tempo_list_instances** - List all Tempo instances available in the Kubernetes cluster.
+Call this tool first to discover available Tempo instances before using other Tempo tools,
+as the returned namespace, name, and tenant values are required parameters for all other Tempo tools.
+Always print the output of this tool in a table.
+
+- **tempo_get_trace_by_id** - Retrieve a single distributed trace by its trace ID from Tempo.
+Returns the full trace with all its spans, including service names, operation names, durations, and attributes.
+Use this tool when you already have a specific trace ID, e.g. from search results or logs.
+  - `end` (`string`) - Optional end of the time range in RFC 3339 format, e.g. "2025-01-02T00:00:00Z".
+Narrows the time range to improve query performance.
+  - `start` (`string`) - Optional start of the time range in RFC 3339 format, e.g. "2025-01-01T00:00:00Z".
+Narrows the time range to improve query performance.
+  - `tempoName` (`string`) **(required)** - The name of the Tempo instance to query. Use tempo_list_instances to discover available instance names.
+  - `tempoNamespace` (`string`) **(required)** - The Kubernetes namespace where the Tempo instance is deployed. Use tempo_list_instances to discover available namespaces.
+  - `tenant` (`string`) - The tenant to query. This parameter is required for multi-tenant instances. Use tempo_list_instances to discover available tenants for each instance.
+  - `traceid` (`string`) **(required)** - The trace ID to retrieve, e.g. "26dad4a0e2b0dd9a440dd5ff203a24a4".
+
+- **tempo_search_traces** - Search for distributed traces in Tempo using TraceQL.
+Use this tool to find traces matching specific criteria such as service name, HTTP status code, duration, or other span or resource attributes.
+  - `end` (`string`) - End of the time range in RFC 3339 format, e.g. "2025-01-01T00:00:00Z".
+Use "NOW" for current time.
+Both start and end should be provided to search the full time range; if omitted, only a small window of recent data is searched.
+  - `limit` (`number`) - Maximum number of traces to return. Defaults to the server-side limit if not specified.
+  - `query` (`string`) **(required)** - A TraceQL query expression. Format:
+query: "{ <filters joined by &&> }"
+
+Filters:
+- service name:     resource.service.name="<value>" (string, use quotes)
+- HTTP status code: span.http.response.status_code=<code> (number, no quotes)
+- duration:         duration><value like 100ms, 2s, 5m> (no quotes)
+- error status:     status=error (keyword, NO quotes — do NOT write status="error")
+
+IMPORTANT: status values (error, ok, unset) are keywords, NOT strings. Write status=error, NEVER status="error".
+
+Operators: =, !=, >, <, >=, <=
+
+Common attributes:
+- resource.service.name (service name)
+- span.http.response.status_code (HTTP response code)
+- span.http.request.method (HTTP method like GET, POST)
+- span.url.full (request URL)
+- duration (trace duration, e.g. 100ms, 2s)
+- status (trace status: ok, error, unset)
+
+IMPORTANT: Always wrap filters in curly braces { }.
+Do NOT use SQL, PromQL, or Lucene syntax.
+Do NOT omit the "resource." or "span." prefix from attribute names
+
+If unsure which attributes to filter on, start with {} to return all traces, then use tempo_search_tags to discover available attributes.
+
+  - `spss` (`number`) - Maximum number of matching spans to return per trace.
+  - `start` (`string`) - Start of the time range in RFC 3339 format, e.g. "2025-01-01T00:00:00Z".
+Use "NOW" for current time.
+Both start and end should be provided to search the full time range; if omitted, only a small window of recent data is searched.
+  - `tempoName` (`string`) **(required)** - The name of the Tempo instance to query. Use tempo_list_instances to discover available instance names.
+  - `tempoNamespace` (`string`) **(required)** - The Kubernetes namespace where the Tempo instance is deployed. Use tempo_list_instances to discover available namespaces.
+  - `tenant` (`string`) - The tenant to query. This parameter is required for multi-tenant instances. Use tempo_list_instances to discover available tenants for each instance.
+
+- **tempo_search_tags** - List available tag names (attribute keys) in Tempo, grouped by scope.
+Use this tool to discover which attributes are available for building TraceQL queries with tempo_search_traces.
+For example, this tool may reveal tag names like "service.name" (in the "resource" scope) or "http.response.status_code" (in the "span" scope).
+To use these in TraceQL queries, prefix them with their scope, e.g. "resource.service.name" or "span.http.response.status_code".
+  - `end` (`string`) - Optional end of the time range (in RFC 3339 format, e.g. "2025-01-01T00:00:00Z") to filter which traces are considered when listing tags.
+  - `limit` (`number`) - Maximum number of tag names to return per scope.
+  - `maxStaleValues` (`number`) - Maximum number of consecutive blocks without new tag names before the search stops early. Higher values are more thorough but slower.
+  - `query` (`string`) - Optional TraceQL query to filter which traces are considered when listing tags,
+e.g. '{ resource.service.name="payment-service" }' to only show tags present in traces from the 'payment-service' service.
+  - `scope` (`string`) - Filter tags to a specific scope. One of:
+"resource" (service-level attributes like service.name),
+"span" (individual span attributes like http.response.status_code),
+"intrinsic" (built-in fields like duration, status, name).
+If omitted, tags from all scopes are returned.
+  - `start` (`string`) - Optional start of the time range (in RFC 3339 format, e.g. "2025-01-01T00:00:00Z") to filter which traces are considered when listing tags.
+  - `tempoName` (`string`) **(required)** - The name of the Tempo instance to query. Use tempo_list_instances to discover available instance names.
+  - `tempoNamespace` (`string`) **(required)** - The Kubernetes namespace where the Tempo instance is deployed. Use tempo_list_instances to discover available namespaces.
+  - `tenant` (`string`) - The tenant to query. This parameter is required for multi-tenant instances. Use tempo_list_instances to discover available tenants for each instance.
+
+- **tempo_search_tag_values** - List the known values for a specific tag (attribute key) in Tempo.
+Use this tool to discover what values exist for a given tag, e.g. to find all service names (values of "resource.service.name") or all HTTP methods (values of "span.http.request.method").
+This is useful for building accurate TraceQL queries with tempo_search_traces.
+  - `end` (`string`) - Optional end of the time range (in RFC 3339 format, e.g. "2025-01-01T00:00:00Z") to filter which traces are considered when listing values.
+  - `limit` (`number`) - Maximum number of tag values to return.
+  - `maxStaleValues` (`number`) - Maximum number of consecutive blocks without new values before the search stops early. Higher values are more thorough but slower.
+  - `query` (`string`) - Optional TraceQL query to filter which traces are considered when listing values,
+e.g. '{ resource.service.name="payment-service" }' to only show tag values from the 'payment-service' service.
+  - `start` (`string`) - Optional start of the time range (in RFC 3339 format, e.g. "2025-01-01T00:00:00Z") to filter which traces are considered when listing values.
+  - `tag` (`string`) **(required)** - The fully qualified tag name to get values for, including its scope prefix, e.g. "resource.service.name" or "span.http.response.status_code".
+Use tempo_search_tags to discover available tag names.
+  - `tempoName` (`string`) **(required)** - The name of the Tempo instance to query. Use tempo_list_instances to discover available instance names.
+  - `tempoNamespace` (`string`) **(required)** - The Kubernetes namespace where the Tempo instance is deployed. Use tempo_list_instances to discover available namespaces.
+  - `tenant` (`string`) - The tenant to query. This parameter is required for multi-tenant instances. Use tempo_list_instances to discover available tenants for each instance.
 
 </details>
 
