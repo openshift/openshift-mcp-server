@@ -9,6 +9,7 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
       == "release-0.3"
+    pipelinesascode.tekton.dev/target-namespace: "ocp-mcp-server-tenant"
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: mcp-server-03
