@@ -247,7 +247,7 @@
     "inputSchema": {
       "properties": {
         "include": {
-          "description": "Comma-separated diagnostics to include: kubelet,sysinfo,cpu,irq,pods,lscpu,lspci,dmesg,cmdline (default: all)",
+          "description": "Comma-separated diagnostics to include: kubelet,sysinfo,cpu,irq,pods,podresources,lscpu,lspci,dmesg,cmdline (default: all)",
           "type": "string"
         },
         "kubeletTail": {
