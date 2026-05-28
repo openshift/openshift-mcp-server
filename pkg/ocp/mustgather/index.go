@@ -73,12 +73,8 @@ func (idx *ResourceIndex) Add(obj *unstructured.Unstructured) {
 }
 
 func (idx *ResourceIndex) buildNamespaceList() {
-	nsSet := make(map[string]struct{})
+	idx.namespaces = make([]string, 0, len(idx.byNamespace))
 	for ns := range idx.byNamespace {
-		nsSet[ns] = struct{}{}
-	}
-	idx.namespaces = make([]string, 0, len(nsSet))
-	for ns := range nsSet {
 		idx.namespaces = append(idx.namespaces, ns)
 	}
 	sort.Strings(idx.namespaces)
