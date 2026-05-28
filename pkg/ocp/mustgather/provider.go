@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -173,6 +174,8 @@ func readTextFile(path string) (string, error) {
 }
 
 // readGzipFile reads and decompresses a gzipped file
+const maxDecompressedSize = 64 * 1024 * 1024 // 64 MB
+
 func readGzipFile(path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -186,19 +189,13 @@ func readGzipFile(path string) (string, error) {
 	}
 	defer func() { _ = reader.Close() }()
 
-	var sb strings.Builder
-	buf := make([]byte, 32*1024)
-	for {
-		n, readErr := reader.Read(buf)
-		if n > 0 {
-			sb.Write(buf[:n])
-		}
-		if readErr != nil {
-			break
-		}
+	limited := io.LimitReader(reader, maxDecompressedSize)
+	data, err := io.ReadAll(limited)
+	if err != nil {
+		return "", fmt.Errorf("failed to decompress %s: %w", path, err)
 	}
 
-	return sb.String(), nil
+	return string(data), nil
 }
 
 // TailLines returns the last n lines of a string
