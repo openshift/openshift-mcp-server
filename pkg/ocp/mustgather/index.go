@@ -2,10 +2,12 @@ package mustgather
 
 import (
 	"context"
+	"fmt"
 	"sort"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -102,21 +104,26 @@ func (idx *ResourceIndex) Get(gvk schema.GroupVersionKind, name, namespace strin
 }
 
 // List returns all resources matching the given GVK and optional namespace
-func (idx *ResourceIndex) List(_ context.Context, gvk schema.GroupVersionKind, namespace string, opts ListOptions) *unstructured.UnstructuredList {
+func (idx *ResourceIndex) List(_ context.Context, gvk schema.GroupVersionKind, namespace string, opts ListOptions) (*unstructured.UnstructuredList, error) {
+	matcher, err := newListMatcher(opts)
+	if err != nil {
+		return nil, err
+	}
+
 	result := &unstructured.UnstructuredList{}
 
 	if namespace != "" {
 		// Namespace-scoped query
 		nsMap, ok := idx.byNamespace[namespace]
 		if !ok {
-			return result
+			return result, nil
 		}
 		gvkMap, ok := nsMap[gvk]
 		if !ok {
-			return result
+			return result, nil
 		}
 		for _, obj := range gvkMap {
-			if matchesListOptions(obj, opts) {
+			if matcher.matches(obj) {
 				result.Items = append(result.Items, *obj.DeepCopy())
 			}
 		}
@@ -124,10 +131,10 @@ func (idx *ResourceIndex) List(_ context.Context, gvk schema.GroupVersionKind, n
 		// Cluster-wide query
 		gvkMap, ok := idx.byGVK[gvk]
 		if !ok {
-			return result
+			return result, nil
 		}
 		for _, obj := range gvkMap {
-			if matchesListOptions(obj, opts) {
+			if matcher.matches(obj) {
 				result.Items = append(result.Items, *obj.DeepCopy())
 			}
 		}
@@ -138,7 +145,7 @@ func (idx *ResourceIndex) List(_ context.Context, gvk schema.GroupVersionKind, n
 		result.Items = result.Items[:opts.Limit]
 	}
 
-	return result
+	return result, nil
 }
 
 // ListNamespaces returns all namespaces in the index
@@ -153,64 +160,46 @@ func (idx *ResourceIndex) Count() int {
 	return idx.count
 }
 
-func matchesListOptions(obj *unstructured.Unstructured, opts ListOptions) bool {
+type listMatcher struct {
+	labelSel    labels.Selector
+	fieldSel    fields.Selector
+	hasFieldSel bool
+}
+
+func newListMatcher(opts ListOptions) (*listMatcher, error) {
+	m := &listMatcher{}
+
 	if opts.LabelSelector != "" {
-		labels := obj.GetLabels()
-		if !matchesLabelSelector(labels, opts.LabelSelector) {
-			return false
+		sel, err := labels.Parse(opts.LabelSelector)
+		if err != nil {
+			return nil, fmt.Errorf("invalid label selector %q: %w", opts.LabelSelector, err)
 		}
+		m.labelSel = sel
 	}
+
 	if opts.FieldSelector != "" {
-		if !matchesFieldSelector(obj, opts.FieldSelector) {
-			return false
+		sel, err := fields.ParseSelector(opts.FieldSelector)
+		if err != nil {
+			return nil, fmt.Errorf("invalid field selector %q: %w", opts.FieldSelector, err)
 		}
+		m.fieldSel = sel
+		m.hasFieldSel = true
 	}
-	return true
+
+	return m, nil
 }
 
-func matchesLabelSelector(labels map[string]string, selector string) bool {
-	parts := strings.Split(selector, ",")
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		kv := strings.SplitN(part, "=", 2)
-		if len(kv) != 2 {
-			continue
-		}
-		key := strings.TrimSpace(kv[0])
-		value := strings.TrimSpace(kv[1])
-		if labels[key] != value {
-			return false
-		}
+func (m *listMatcher) matches(obj *unstructured.Unstructured) bool {
+	if m.labelSel != nil && !m.labelSel.Matches(labels.Set(obj.GetLabels())) {
+		return false
 	}
-	return true
-}
-
-func matchesFieldSelector(obj *unstructured.Unstructured, selector string) bool {
-	parts := strings.Split(selector, ",")
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
+	if m.hasFieldSel {
+		objFields := fields.Set{
+			"metadata.name":      obj.GetName(),
+			"metadata.namespace": obj.GetNamespace(),
 		}
-		kv := strings.SplitN(part, "=", 2)
-		if len(kv) != 2 {
-			continue
-		}
-		key := strings.TrimSpace(kv[0])
-		value := strings.TrimSpace(kv[1])
-
-		switch key {
-		case "metadata.name":
-			if obj.GetName() != value {
-				return false
-			}
-		case "metadata.namespace":
-			if obj.GetNamespace() != value {
-				return false
-			}
+		if !m.fieldSel.Matches(objFields) {
+			return false
 		}
 	}
 	return true

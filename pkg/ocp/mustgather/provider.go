@@ -46,7 +46,7 @@ func (p *Provider) GetResource(gvk schema.GroupVersionKind, name, namespace stri
 }
 
 // ListResources returns resources matching the given criteria
-func (p *Provider) ListResources(ctx context.Context, gvk schema.GroupVersionKind, namespace string, opts ListOptions) *unstructured.UnstructuredList {
+func (p *Provider) ListResources(ctx context.Context, gvk schema.GroupVersionKind, namespace string, opts ListOptions) (*unstructured.UnstructuredList, error) {
 	return p.index.List(ctx, gvk, namespace, opts)
 }
 

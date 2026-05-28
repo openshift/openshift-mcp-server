@@ -100,7 +100,10 @@ func mustgatherEventsList(params api.ToolHandlerParams) (*api.ToolCallResult, er
 	reasonFilter := getString(args, "reason", "")
 	limit := getInt(args, "limit", 100)
 
-	list := p.ListResources(params.Context, eventGVK, namespace, mg.ListOptions{})
+	list, err := p.ListResources(params.Context, eventGVK, namespace, mg.ListOptions{})
+	if err != nil {
+		return api.NewToolCallResult("", err), nil
+	}
 
 	// Filter and collect events
 	var filtered []unstructured.Unstructured
@@ -170,7 +173,10 @@ func mustgatherEventsByResource(params api.ToolHandlerParams) (*api.ToolCallResu
 		return api.NewToolCallResult("", fmt.Errorf("name is required")), nil
 	}
 
-	list := p.ListResources(params.Context, eventGVK, namespace, mg.ListOptions{})
+	list, err := p.ListResources(params.Context, eventGVK, namespace, mg.ListOptions{})
+	if err != nil {
+		return api.NewToolCallResult("", err), nil
+	}
 
 	// Filter events for the specific resource
 	var matched []unstructured.Unstructured
@@ -239,7 +245,10 @@ func mustgatherEventsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, 
 		}
 	}
 
-	list := p.ListResources(params.Context, eventGVK, namespace, mg.ListOptions{})
+	list, err := p.ListResources(params.Context, eventGVK, namespace, mg.ListOptions{})
+	if err != nil {
+		return api.NewToolCallResult("", err), nil
+	}
 
 	var filtered []unstructured.Unstructured
 	for i := range list.Items {

@@ -60,11 +60,14 @@ func mustgatherResourcesList(params api.ToolHandlerParams) (*api.ToolCallResult,
 	}
 
 	gvk := parseGVK(apiVersion, kind)
-	list := p.ListResources(params.Context, gvk, namespace, mg.ListOptions{
+	list, err := p.ListResources(params.Context, gvk, namespace, mg.ListOptions{
 		LabelSelector: labelSelector,
 		FieldSelector: fieldSelector,
 		Limit:         limit,
 	})
+	if err != nil {
+		return api.NewToolCallResult("", err), nil
+	}
 
 	if len(list.Items) == 0 {
 		return api.NewToolCallResult(fmt.Sprintf("No %s resources found", kind), nil), nil
