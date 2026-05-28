@@ -21,14 +21,9 @@ func initMCPResources() []api.ServerResource {
 			},
 			Handler: resourceCurrentArchive,
 		},
-	}
-}
-
-func initMCPResourceTemplates() []api.ServerResourceTemplate {
-	return []api.ServerResourceTemplate{
 		{
-			ResourceTemplate: api.ResourceTemplate{
-				URITemplate: "must-gather://current/namespaces",
+			Resource: api.Resource{
+				URI:         "must-gather://current/namespaces",
 				Name:        "must-gather-namespaces",
 				Description: "List of all namespaces in the must-gather archive",
 				MIMEType:    "text/plain",
@@ -36,8 +31,8 @@ func initMCPResourceTemplates() []api.ServerResourceTemplate {
 			Handler: resourceNamespaces,
 		},
 		{
-			ResourceTemplate: api.ResourceTemplate{
-				URITemplate: "must-gather://current/etcd/members",
+			Resource: api.Resource{
+				URI:         "must-gather://current/etcd/members",
 				Name:        "must-gather-etcd-members",
 				Description: "ETCD cluster member list from the must-gather archive",
 				MIMEType:    "application/json",
@@ -45,8 +40,8 @@ func initMCPResourceTemplates() []api.ServerResourceTemplate {
 			Handler: resourceETCDMembers,
 		},
 		{
-			ResourceTemplate: api.ResourceTemplate{
-				URITemplate: "must-gather://current/etcd/endpoint-status",
+			Resource: api.Resource{
+				URI:         "must-gather://current/etcd/endpoint-status",
 				Name:        "must-gather-etcd-endpoint-status",
 				Description: "ETCD endpoint status from the must-gather archive",
 				MIMEType:    "application/json",
@@ -54,8 +49,8 @@ func initMCPResourceTemplates() []api.ServerResourceTemplate {
 			Handler: resourceETCDEndpointStatus,
 		},
 		{
-			ResourceTemplate: api.ResourceTemplate{
-				URITemplate: "must-gather://current/prometheus/config",
+			Resource: api.Resource{
+				URI:         "must-gather://current/prometheus/config",
 				Name:        "must-gather-prometheus-config",
 				Description: "Prometheus configuration summary from the must-gather archive",
 				MIMEType:    "text/plain",
@@ -63,14 +58,19 @@ func initMCPResourceTemplates() []api.ServerResourceTemplate {
 			Handler: resourcePrometheusConfig,
 		},
 		{
-			ResourceTemplate: api.ResourceTemplate{
-				URITemplate: "must-gather://current/alertmanager/status",
+			Resource: api.Resource{
+				URI:         "must-gather://current/alertmanager/status",
 				Name:        "must-gather-alertmanager-status",
 				Description: "AlertManager status from the must-gather archive",
 				MIMEType:    "text/plain",
 			},
 			Handler: resourceAlertManagerStatus,
 		},
+	}
+}
+
+func initMCPResourceTemplates() []api.ServerResourceTemplate {
+	return []api.ServerResourceTemplate{
 		{
 			ResourceTemplate: api.ResourceTemplate{
 				URITemplate: "must-gather://current/resources/{group}/{version}/{kind}/{namespace}/{name}",
@@ -95,7 +95,7 @@ func resourceCurrentArchive(_ context.Context) (*api.ResourceContent, error) {
 	return &api.ResourceContent{Text: content}, nil
 }
 
-func resourceNamespaces(_ context.Context, _ string) (*api.ResourceContent, error) {
+func resourceNamespaces(_ context.Context) (*api.ResourceContent, error) {
 	p, err := getProvider()
 	if err != nil {
 		return nil, err
@@ -107,7 +107,7 @@ func resourceNamespaces(_ context.Context, _ string) (*api.ResourceContent, erro
 	return &api.ResourceContent{Text: output}, nil
 }
 
-func resourceETCDMembers(_ context.Context, _ string) (*api.ResourceContent, error) {
+func resourceETCDMembers(_ context.Context) (*api.ResourceContent, error) {
 	p, err := getProvider()
 	if err != nil {
 		return nil, err
@@ -119,7 +119,7 @@ func resourceETCDMembers(_ context.Context, _ string) (*api.ResourceContent, err
 	return &api.ResourceContent{Text: string(data)}, nil
 }
 
-func resourceETCDEndpointStatus(_ context.Context, _ string) (*api.ResourceContent, error) {
+func resourceETCDEndpointStatus(_ context.Context) (*api.ResourceContent, error) {
 	p, err := getProvider()
 	if err != nil {
 		return nil, err
@@ -131,7 +131,7 @@ func resourceETCDEndpointStatus(_ context.Context, _ string) (*api.ResourceConte
 	return &api.ResourceContent{Text: string(data)}, nil
 }
 
-func resourcePrometheusConfig(_ context.Context, _ string) (*api.ResourceContent, error) {
+func resourcePrometheusConfig(_ context.Context) (*api.ResourceContent, error) {
 	p, err := getProvider()
 	if err != nil {
 		return nil, err
@@ -178,7 +178,7 @@ func resourcePrometheusConfig(_ context.Context, _ string) (*api.ResourceContent
 	return &api.ResourceContent{Text: output}, nil
 }
 
-func resourceAlertManagerStatus(_ context.Context, _ string) (*api.ResourceContent, error) {
+func resourceAlertManagerStatus(_ context.Context) (*api.ResourceContent, error) {
 	p, err := getProvider()
 	if err != nil {
 		return nil, err
