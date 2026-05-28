@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // GetETCDHealth reads ETCD health from the archive
@@ -76,7 +77,11 @@ func (p *Provider) GetETCDObjectCount() (map[string]int64, error) {
 
 // ReadETCDFile reads a raw ETCD info JSON file and returns its content
 func (p *Provider) ReadETCDFile(filename string) ([]byte, error) {
-	filePath := filepath.Join(p.metadata.ContainerDir, "etcd_info", filename)
+	etcdDir := filepath.Join(p.metadata.ContainerDir, "etcd_info")
+	filePath := filepath.Join(etcdDir, filename)
+	if !strings.HasPrefix(filepath.Clean(filePath), filepath.Clean(etcdDir)+string(os.PathSeparator)) {
+		return nil, fmt.Errorf("invalid ETCD filename: %s", filename)
+	}
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("ETCD file %s not found: %w", filename, err)
