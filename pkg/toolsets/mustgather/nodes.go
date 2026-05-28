@@ -24,7 +24,7 @@ func initNodes() []api.ServerTool {
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
 						"node":        {Type: "string", Description: "Node name"},
-						"include":     {Type: "string", Description: "Comma-separated diagnostics to include: kubelet,sysinfo,cpu,irq,pods,lscpu,lspci,dmesg,cmdline (default: all)"},
+						"include":     {Type: "string", Description: "Comma-separated diagnostics to include: kubelet,sysinfo,cpu,irq,pods,podresources,lscpu,lspci,dmesg,cmdline (default: all)"},
 						"kubeletTail": {Type: "integer", Description: "Number of lines from end of kubelet log (0 for all, default: 100)"},
 					},
 					Required: []string{"node"},
@@ -133,7 +133,7 @@ func mustgatherNodeDiagnosticsGet(params api.ToolHandlerParams) (*api.ToolCallRe
 		{"dmesg", "Kernel Messages (dmesg)", diag.Dmesg},
 		{"cmdline", "Kernel Boot Parameters", diag.ProcCmdline},
 		{"pods", "Pods Info", diag.PodsInfo},
-		{"pods", "Pod Resources", diag.PodResources},
+		{"podresources", "Pod Resources", diag.PodResources},
 	}
 
 	for _, s := range sections {
