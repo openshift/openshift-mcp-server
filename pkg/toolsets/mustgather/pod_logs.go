@@ -1,7 +1,9 @@
 package mustgather
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -10,6 +12,8 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"k8s.io/utils/ptr"
 )
+
+const maxScanLineSize = 1024 * 1024 // 1 MB
 
 func initPodLogs() []api.ServerTool {
 	return []api.ServerTool{
@@ -164,7 +168,7 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 		logType = mg.LogTypePrevious
 	}
 
-	logs, err := p.GetPodLog(mg.PodLogOptions{
+	logPath, err := p.GetPodLogPath(mg.PodLogOptions{
 		Namespace: namespace,
 		Pod:       pod,
 		Container: container,
@@ -174,25 +178,54 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 		return api.NewToolCallResult("", fmt.Errorf("failed to get pod logs: %w", err)), nil
 	}
 
-	lines := strings.Split(logs, "\n")
+	f, err := os.Open(logPath)
+	if err != nil {
+		return api.NewToolCallResult("", fmt.Errorf("failed to open log file: %w", err)), nil
+	}
+	defer func() { _ = f.Close() }()
+
 	searchFilter := filter
 	if caseInsensitive {
 		searchFilter = strings.ToLower(filter)
 	}
 
 	var matchingLines []string
-	for _, line := range lines {
+	var ringIdx int
+	totalMatches := 0
+
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), maxScanLineSize)
+	for scanner.Scan() {
+		line := scanner.Text()
 		compareLine := line
 		if caseInsensitive {
 			compareLine = strings.ToLower(line)
 		}
-		if strings.Contains(compareLine, searchFilter) {
+		if !strings.Contains(compareLine, searchFilter) {
+			continue
+		}
+		totalMatches++
+		if tail > 0 {
+			if len(matchingLines) < tail {
+				matchingLines = append(matchingLines, line)
+			} else {
+				matchingLines[ringIdx] = line
+				ringIdx = (ringIdx + 1) % tail
+			}
+		} else {
 			matchingLines = append(matchingLines, line)
 		}
 	}
+	if err := scanner.Err(); err != nil {
+		return api.NewToolCallResult("", fmt.Errorf("failed to read log file: %w", err)), nil
+	}
 
-	if tail > 0 && len(matchingLines) > tail {
-		matchingLines = matchingLines[len(matchingLines)-tail:]
+	if tail > 0 && len(matchingLines) == tail {
+		ordered := make([]string, tail)
+		for i := range tail {
+			ordered[i] = matchingLines[(ringIdx+i)%tail]
+		}
+		matchingLines = ordered
 	}
 
 	header := fmt.Sprintf("Logs for pod %s/%s filtered by '%s'", namespace, pod, filter)
@@ -208,9 +241,9 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 	if tail > 0 {
 		header += fmt.Sprintf(" (last %d matches)", tail)
 	}
-	header += fmt.Sprintf(":\n\nFound %d matching line(s)\n\n", len(matchingLines))
+	header += fmt.Sprintf(":\n\nFound %d matching line(s)\n\n", totalMatches)
 
-	if len(matchingLines) == 0 {
+	if totalMatches == 0 {
 		return api.NewToolCallResult(header+"No matching lines found.", nil), nil
 	}
 
@@ -258,7 +291,7 @@ func mustgatherPodLogsByTime(params api.ToolHandlerParams) (*api.ToolCallResult,
 		logType = mg.LogTypePrevious
 	}
 
-	logs, err := p.GetPodLog(mg.PodLogOptions{
+	logPath, err := p.GetPodLogPath(mg.PodLogOptions{
 		Namespace: namespace,
 		Pod:       pod,
 		Container: container,
@@ -268,18 +301,25 @@ func mustgatherPodLogsByTime(params api.ToolHandlerParams) (*api.ToolCallResult,
 		return api.NewToolCallResult("", fmt.Errorf("failed to get pod logs: %w", err)), nil
 	}
 
-	lines := strings.Split(logs, "\n")
+	f, err := os.Open(logPath)
+	if err != nil {
+		return api.NewToolCallResult("", fmt.Errorf("failed to open log file: %w", err)), nil
+	}
+	defer func() { _ = f.Close() }()
+
 	var matchingLines []string
-	for _, line := range lines {
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), maxScanLineSize)
+	for scanner.Scan() {
+		line := scanner.Text()
 		if line == "" {
 			continue
 		}
-		// Each line starts with an RFC3339Nano timestamp followed by a space
-		spaceIdx := strings.IndexByte(line, ' ')
-		if spaceIdx == -1 {
+		tsStr, _, ok := strings.Cut(line, " ")
+		if !ok {
 			continue
 		}
-		lineTime, err := time.Parse(time.RFC3339Nano, line[:spaceIdx])
+		lineTime, err := time.Parse(time.RFC3339Nano, tsStr)
 		if err != nil {
 			continue
 		}
@@ -290,10 +330,12 @@ func mustgatherPodLogsByTime(params api.ToolHandlerParams) (*api.ToolCallResult,
 			continue
 		}
 		matchingLines = append(matchingLines, line)
+		if limit > 0 && len(matchingLines) >= limit {
+			break
+		}
 	}
-
-	if limit > 0 && len(matchingLines) > limit {
-		matchingLines = matchingLines[:limit]
+	if err := scanner.Err(); err != nil {
+		return api.NewToolCallResult("", fmt.Errorf("failed to read log file: %w", err)), nil
 	}
 
 	header := fmt.Sprintf("Logs for pod %s/%s between %s and ", namespace, pod, sinceStr)

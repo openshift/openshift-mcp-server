@@ -55,11 +55,12 @@ func (p *Provider) ListNamespaces() []string {
 	return p.index.ListNamespaces()
 }
 
-// GetPodLog reads pod container logs from the archive
-func (p *Provider) GetPodLog(opts PodLogOptions) (string, error) {
+// GetPodLogPath resolves the filesystem path for a pod's container log file
+// without reading it. Returns the path or an error if the container cannot be
+// determined or the log file does not exist.
+func (p *Provider) GetPodLogPath(opts PodLogOptions) (string, error) {
 	container := opts.Container
 
-	// If container not specified, try to find first available
 	if container == "" {
 		containers, err := p.ListPodContainers(opts.Namespace, opts.Pod)
 		if err != nil {
@@ -80,6 +81,20 @@ func (p *Provider) GetPodLog(opts PodLogOptions) (string, error) {
 		p.metadata.ContainerDir, "namespaces", opts.Namespace,
 		"pods", opts.Pod, container, container, "logs", logType+".log",
 	)
+
+	if _, err := os.Stat(logPath); err != nil {
+		return "", fmt.Errorf("log file not found: %w", err)
+	}
+
+	return logPath, nil
+}
+
+// GetPodLog reads pod container logs from the archive
+func (p *Provider) GetPodLog(opts PodLogOptions) (string, error) {
+	logPath, err := p.GetPodLogPath(opts)
+	if err != nil {
+		return "", err
+	}
 
 	content, err := readTextFile(logPath)
 	if err != nil {
