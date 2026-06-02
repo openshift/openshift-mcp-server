@@ -23,7 +23,6 @@ COPY --from=builder /workspace/LICENSE /licenses/.
 USER 65532:65532
 
 COPY mcp_config.toml /mcp_config.toml
-ENV CONFIG_PATH=/mcp_config.toml
 
 # Labels for enterprise contract
 LABEL com.redhat.component=openshift-mcp-server
@@ -40,4 +39,4 @@ LABEL version=0.0.1
 LABEL summary="Red Hat OpenShift MCP Server"
 LABEL konflux.additional-tags="latest"
 
-ENTRYPOINT ["/openshift-mcp-server", "--config", "$CONFIG_PATH"]
+ENTRYPOINT ["/openshift-mcp-server", "--config", "/mcp_config.toml"]
