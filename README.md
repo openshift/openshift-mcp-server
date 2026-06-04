@@ -272,6 +272,7 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 | kcp      | Manage kcp workspaces and multi-tenancy features                                                                                                                                |         |
 | kubevirt | KubeVirt virtual machine management tools, check the [KubeVirt documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/kubevirt.md) for more details. |         |
 | metrics  | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                   |         |
+| oadp     | OADP (OpenShift API for Data Protection) tools for managing Velero backups, restores, and schedules                                                                             |         |
 | ossm     | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                 |         |
 | tekton   | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns.                                                                                              |         |
 | traces   | Toolset for querying Tempo                                                                                                                                                      |         |
@@ -861,6 +862,17 @@ Use tempo_search_tags to discover available tag names.
 - **vm-troubleshoot** - Generate a step-by-step troubleshooting guide for diagnosing KubeVirt VirtualMachine issues
   - `namespace` (`string`) **(required)** - The namespace of the VirtualMachine to troubleshoot
   - `name` (`string`) **(required)** - The name of the VirtualMachine to troubleshoot
+
+</details>
+
+<details>
+
+<summary>oadp</summary>
+
+- **oadp-troubleshoot** - Generate a step-by-step troubleshooting guide for diagnosing OADP backup and restore issues
+  - `namespace` (`string`) - The OADP namespace (default: openshift-adp)
+  - `backup` (`string`) - The name of a specific backup to troubleshoot
+  - `restore` (`string`) - The name of a specific restore to troubleshoot
 
 </details>
 
