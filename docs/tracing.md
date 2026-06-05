@@ -4,6 +4,7 @@ This toolset provides tools for querying [Grafana Tempo](https://grafana.com/doc
 It is implemented by the [`rhobs/obs-mcp`](https://github.com/rhobs/obs-mcp) package and registered into the openshift-mcp-server as the `traces` toolset.
 
 For Prometheus and Alertmanager MCP tools, see the [metrics toolset guide](./metrics.md).
+For OpenTelemetry Collector configuration assistance (`otelcol` toolset), see the [otelcol toolset guide](./otelcol.md).
 
 ## Workflow
 

@@ -5,6 +5,7 @@ It is implemented by the [`rhobs/obs-mcp`](https://github.com/rhobs/obs-mcp) pac
 into the openshift-mcp-server as the `metrics` toolset.
 
 For Grafana Tempo and TraceQL (`traces` toolset), see the [tracing toolset guide](./tracing.md).
+For OpenTelemetry Collector configuration assistance (`otelcol` toolset), see the [otelcol toolset guide](./otelcol.md).
 
 ## Tools
 
