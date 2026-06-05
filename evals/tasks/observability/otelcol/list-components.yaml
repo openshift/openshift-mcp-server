@@ -1,0 +1,24 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "list-otelcol-components"
+  difficulty: easy
+  parallel: true
+  runs: 1
+  labels:
+    category: otelcol
+    suite: observability
+    toolType: components
+  description: |
+    Tests if the agent can list available OpenTelemetry Collector components.
+spec:
+  verify:
+    - llmJudge:
+        contains: "otlp"
+        reason: "Verify the response includes the OTLP component"
+    - llmJudge:
+        contains: "batch"
+        reason: "Verify the response includes the batch processor"
+  prompt:
+    inline: |
+      What components are available in the OpenTelemetry Collector?
