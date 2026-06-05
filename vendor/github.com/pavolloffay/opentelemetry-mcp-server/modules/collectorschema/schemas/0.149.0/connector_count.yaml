@@ -1,0 +1,29 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: count connector configuration
+type: object
+properties:
+    datapoints:
+        type: object
+        additionalProperties:
+            type: object
+    logs:
+        type: object
+        additionalProperties:
+            type: object
+    metrics:
+        type: object
+        additionalProperties:
+            type: object
+    profiles:
+        type: object
+        additionalProperties:
+            type: object
+    spanevents:
+        type: object
+        additionalProperties:
+            type: object
+    spans:
+        type: object
+        additionalProperties:
+            type: object
+additionalProperties: false

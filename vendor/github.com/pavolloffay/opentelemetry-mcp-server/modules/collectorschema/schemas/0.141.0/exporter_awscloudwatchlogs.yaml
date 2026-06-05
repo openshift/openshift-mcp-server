@@ -1,0 +1,115 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+properties:
+    enabled:
+        description: Enabled indicates whether to not retry sending batches in case of export failure.
+        type: boolean
+    endpoint:
+        description: X-Ray service endpoint to which the collector sends segment documents.
+        type: string
+    external_id:
+        description: External ID to verify third party role assumption
+        type: string
+    initial_interval:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    local_mode:
+        description: Local mode to skip EC2 instance metadata check.
+        type: boolean
+    log_group_name:
+        description: LogGroupName is the name of CloudWatch log group which defines group of log streams that share the same retention, monitoring, and access control settings.
+        type: string
+    log_retention:
+        description: LogRetention is the option to set the log retention policy for the CloudWatch Log Group. Defaults to Never Expire if not specified or set to 0 Possible values are 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 2192, 2557, 2922, 3288, or 3653
+        type: integer
+    log_stream_name:
+        description: LogStreamName is the name of CloudWatch log stream which is a sequence of log events that share the same source.
+        type: string
+    max_elapsed_time:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    max_interval:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    max_retries:
+        description: Maximum number of retries before abandoning an attempt to post data.
+        type: integer
+    multiplier:
+        description: Multiplier is the value multiplied by the backoff interval bounds
+        type: number
+    no_verify_ssl:
+        description: Enable or disable TLS certificate verification.
+        type: boolean
+    num_workers:
+        description: Maximum number of concurrent calls to AWS X-Ray to upload documents.
+        type: integer
+    proxy_address:
+        description: Upload segments to AWS X-Ray through a proxy.
+        type: string
+    randomization_factor:
+        description: RandomizationFactor is a random factor used to calculate next backoffs Randomized interval = RetryInterval * (1 ± RandomizationFactor)
+        type: number
+    raw_log:
+        description: Export raw log string instead of log wrapper Required for emf logs
+        type: boolean
+    region:
+        description: Send segments to AWS X-Ray service in a specific region.
+        type: string
+    request_timeout_seconds:
+        description: Number of seconds before timing out a request.
+        type: integer
+    resource_arn:
+        description: Amazon Resource Name (ARN) of the AWS resource running the collector.
+        type: string
+    role_arn:
+        description: IAM role to upload segments to a different account.
+        type: string
+    sending_queue:
+        description: Queue settings frm the exporterhelper
+        properties:
+            batch:
+                properties:
+                    flush_timeout:
+                        description: Duration string (e.g., '1s', '5m', '1h')
+                        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                        type: string
+                    max_size:
+                        description: MaxSize defines the configuration for the maximum size of a batch.
+                        type: integer
+                    min_size:
+                        description: MinSize defines the configuration for the minimum size of a batch.
+                        type: integer
+                    sizer:
+                        description: Sizer determines the type of size measurement used by the batch. If not configured, use the same configuration as the queue. It accepts "requests", "items", or "bytes".
+                        type: object
+                type: object
+            block_on_overflow:
+                description: BlockOnOverflow determines the behavior when the component's TotalSize limit is reached. If true, the component will wait for space; otherwise, operations will immediately return a retryable error.
+                type: boolean
+            enabled:
+                description: Enabled indicates whether to not enqueue and batch before exporting.
+                type: boolean
+            num_consumers:
+                description: NumConsumers is the maximum number of concurrent consumers from the queue. This applies across all different optional configurations from above (e.g. wait_for_result, block_on_overflow, storage, etc.).
+                type: integer
+            queue_size:
+                description: QueueSize represents the maximum data size allowed for concurrent storage and processing.
+                type: integer
+            sizer:
+                description: Sizer determines the type of size measurement used by this component. It accepts "requests", "items", or "bytes".
+                type: object
+            storage:
+                description: 'StorageID if not empty, enables the persistent storage and uses the component specified as a storage extension for the persistent queue. TODO: This will be changed to Optional when available. See https://github.com/open-telemetry/opentelemetry-collector/issues/13822'
+                type: object
+            wait_for_result:
+                description: WaitForResult determines if incoming requests are blocked until the request is processed or not. Currently, this option is not available when persistent queue is configured using the storage configuration.
+                type: boolean
+        type: object
+    tags:
+        additionalProperties:
+            type: string
+        description: 'Tags is the option to set tags for the CloudWatch Log Group.  If specified, please add at least 1 and at most 50 tags.  Input is a string to string map like so: { ''key'': ''value'' } Keys must be between 1-128 characters and follow the regex pattern: ^([\p{L}\p{Z}\p{N}_.:/=+\-@]+)$ Values must be between 1-256 characters and follow the regex pattern: ^([\p{L}\p{Z}\p{N}_.:/=+\-@]*)$'
+        type: object
+type: object

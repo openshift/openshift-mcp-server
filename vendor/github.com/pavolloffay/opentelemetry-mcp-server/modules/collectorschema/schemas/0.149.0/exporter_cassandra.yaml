@@ -1,0 +1,40 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: cassandra exporter configuration
+type: object
+properties:
+    auth:
+        type: object
+        properties:
+            password:
+                type: string
+            username:
+                type: string
+        additionalProperties: false
+    compression:
+        type: object
+        properties:
+            algorithm:
+                type: string
+        additionalProperties: false
+    dsn:
+        type: string
+    keyspace:
+        type: string
+    logs_table:
+        type: string
+    port:
+        type: integer
+    replication:
+        type: object
+        properties:
+            class:
+                type: string
+            replication_factor:
+                type: integer
+        additionalProperties: false
+    timeout:
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    trace_table:
+        type: string
+additionalProperties: false

@@ -1,0 +1,607 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: redis receiver configuration
+type: object
+properties:
+    collection_interval:
+        description: |-
+            CollectionInterval sets how frequently the scraper
+            should be called and used as the context timeout
+            to ensure that scrapers don't exceed the interval.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    dialer:
+        description: DialerConfig contains options for connecting to an address.
+        type: object
+        properties:
+            timeout:
+                description: |-
+                    Timeout is the maximum amount of time a dial will wait for
+                    a connect to complete. The default is no timeout.
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+        additionalProperties: false
+    endpoint:
+        description: |-
+            Endpoint configures the address for this network connection.
+            For TCP and UDP networks, the address has the form "host:port". The host must be a literal IP address,
+            or a host name that can be resolved to IP addresses. The port must be a literal port number or a service name.
+            If the host is a literal IPv6 address it must be enclosed in square brackets, as in "[2001:db8::1]:80" or
+            "[fe80::1%zone]:80". The zone specifies the scope of the literal IPv6 address as defined in RFC 4007.
+        type: string
+    initial_delay:
+        description: |-
+            InitialDelay sets the initial start delay for the scraper,
+            any non positive value is assumed to be immediately.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    metrics:
+        type: object
+        properties:
+            redis.clients.blocked:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.clients.connected:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.clients.max_input_buffer:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.clients.max_output_buffer:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.cluster.cluster_enabled:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.cluster.known_nodes:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.cluster.links_buffer_limit_exceeded.count:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.cluster.node.count:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.cluster.node.uptime:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.cluster.slots_assigned:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.cluster.slots_fail:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.cluster.slots_ok:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.cluster.slots_pfail:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.cluster.state:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.cluster.stats_messages_received:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.cluster.stats_messages_sent:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.cluster.uptime:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.cmd.calls:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.cmd.latency:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.cmd.usec:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.commands:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.commands.processed:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.connections.received:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.connections.rejected:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.cpu.time:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.db.avg_ttl:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.db.expires:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.db.keys:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.keys.evicted:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.keys.expired:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.keyspace.hits:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.keyspace.misses:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.latest_fork:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.maxmemory:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.memory.fragmentation_ratio:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.memory.lua:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.memory.peak:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.memory.rss:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.memory.used:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.memory.used_memory_overhead:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.memory.used_memory_startup:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.mode:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.net.input:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.net.output:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.rdb.changes_since_last_save:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.replication.backlog_first_byte_offset:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.replication.offset:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.replication.replica_offset:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.role:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.sentinel.masters:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.sentinel.running_scripts:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.sentinel.scripts_queue_length:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.sentinel.simulate_failure_flags:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.sentinel.tilt_since_seconds:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.sentinel.total_tilt:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.slaves.connected:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.tracking_total_keys:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            redis.uptime:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+        additionalProperties: false
+    password:
+        description: |-
+            Optional password. Must match the password specified in the
+            requirepass server configuration option, or the user's password when connecting
+            to a Redis 6.0 instance, or greater, that is using the Redis ACL system.
+        type: string
+    resource_attributes:
+        type: object
+        properties:
+            redis.version:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            server.address:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            server.port:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    timeout:
+        description: Timeout is an optional value used to set scraper's context deadline.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    tls:
+        type: object
+        properties:
+            ca_file:
+                description: |-
+                    Path to the CA cert. For a client this verifies the server certificate.
+                    For a server this verifies client certificates. If empty uses system root CA.
+                    (optional)
+                type: string
+            ca_pem:
+                description: In memory PEM encoded cert. (optional)
+                type: string
+            cert_file:
+                description: Path to the TLS cert to use for TLS required connections. (optional)
+                type: string
+            cert_pem:
+                description: In memory PEM encoded TLS cert to use for TLS required connections. (optional)
+                type: string
+            cipher_suites:
+                description: |-
+                    CipherSuites is a list of TLS cipher suites that the TLS transport can use.
+                    If left blank, a safe default list is used.
+                    See https://go.dev/src/crypto/tls/cipher_suites.go for a list of supported cipher suites.
+                type: array
+                items:
+                    type: string
+            curve_preferences:
+                description: |-
+                    contains the elliptic curves that will be used in
+                    an ECDHE handshake, in preference order
+                    Defaults to empty list and "crypto/tls" defaults are used, internally.
+                type: array
+                items:
+                    type: string
+            include_system_ca_certs_pool:
+                description: |-
+                    If true, load system CA certificates pool in addition to the certificates
+                    configured in this struct.
+                type: boolean
+            insecure:
+                description: |-
+                    In gRPC and HTTP when set to true, this is used to disable the client transport security.
+                    See https://godoc.org/google.golang.org/grpc#WithInsecure for gRPC.
+                    Please refer to https://godoc.org/crypto/tls#Config for more information.
+                    (optional, default false)
+                type: boolean
+            insecure_skip_verify:
+                description: InsecureSkipVerify will enable TLS but not verify the certificate.
+                type: boolean
+            key_file:
+                description: Path to the TLS key to use for TLS required connections. (optional)
+                type: string
+            key_pem:
+                description: In memory PEM encoded TLS key to use for TLS required connections. (optional)
+                type: string
+            max_version:
+                description: |-
+                    MaxVersion sets the maximum TLS version that is acceptable.
+                    If not set, refer to crypto/tls for defaults. (optional)
+                type: string
+            min_version:
+                description: |-
+                    MinVersion sets the minimum TLS version that is acceptable.
+                    If not set, TLS 1.2 will be used. (optional)
+                type: string
+            reload_interval:
+                description: |-
+                    ReloadInterval specifies the duration after which the certificate will be reloaded
+                    If not set, it will never be reloaded (optional)
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+            server_name_override:
+                description: |-
+                    ServerName requested by client for virtual hosting.
+                    This sets the ServerName in the TLSConfig. Please refer to
+                    https://godoc.org/crypto/tls#Config for more information. (optional)
+                type: string
+            tpm:
+                description: Trusted platform module configuration
+                type: object
+                properties:
+                    auth:
+                        type: string
+                    enabled:
+                        type: boolean
+                    owner_auth:
+                        type: string
+                    path:
+                        description: |-
+                            The path to the TPM device or Unix domain socket.
+                            For instance /dev/tpm0 or /dev/tpmrm0.
+                        type: string
+                additionalProperties: false
+        additionalProperties: false
+    transport:
+        description: |-
+            Transport to use. Allowed protocols are "tcp", "tcp4" (IPv4-only), "tcp6" (IPv6-only), "udp", "udp4" (IPv4-only),
+            "udp6" (IPv6-only), "ip", "ip4" (IPv4-only), "ip6" (IPv6-only), "unix", "unixgram" and "unixpacket".
+        type: string
+    username:
+        description: |-
+            Optional username. Use the specified Username to authenticate the current connection
+            with one of the connections defined in the ACL list when connecting
+            to a Redis 6.0 instance, or greater, that is using the Redis ACL system.
+        type: string
+additionalProperties: false

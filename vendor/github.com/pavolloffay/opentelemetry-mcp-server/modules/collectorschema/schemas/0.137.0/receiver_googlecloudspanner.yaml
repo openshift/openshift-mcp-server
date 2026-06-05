@@ -1,0 +1,45 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+properties:
+    backfill_enabled:
+        type: boolean
+    cardinality_total_limit:
+        type: integer
+    collection_interval:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    hide_topn_lockstats_rowrangestartkey:
+        type: boolean
+    initial_delay:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    projects:
+        items:
+            properties:
+                instances:
+                    items:
+                        properties:
+                            databases:
+                                items:
+                                    type: string
+                                type: array
+                            instance_id:
+                                type: string
+                        type: object
+                    type: array
+                project_id:
+                    type: string
+                service_account_key:
+                    type: string
+            type: object
+        type: array
+    timeout:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    top_metrics_query_max_rows:
+        type: integer
+    truncate_text:
+        type: boolean
+type: object

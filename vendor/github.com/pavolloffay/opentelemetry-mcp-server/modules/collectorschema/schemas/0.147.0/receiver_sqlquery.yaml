@@ -1,0 +1,112 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: sqlquery receiver configuration
+type: object
+properties:
+    additional_params:
+        type: object
+        additionalProperties: {}
+    collection_interval:
+        description: |-
+            CollectionInterval sets how frequently the scraper
+            should be called and used as the context timeout
+            to ensure that scrapers don't exceed the interval.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    database:
+        type: string
+    datasource:
+        type: string
+    driver:
+        type: string
+    host:
+        type: string
+    initial_delay:
+        description: |-
+            InitialDelay sets the initial start delay for the scraper,
+            any non positive value is assumed to be immediately.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    max_open_conn:
+        description: The maximumn number of open connections to the sql server. <= 0 means unlimited
+        type: integer
+    password:
+        type: string
+    port:
+        type: integer
+    queries:
+        type: array
+        items:
+            type: object
+            properties:
+                logs:
+                    type: array
+                    items:
+                        type: object
+                        properties:
+                            attribute_columns:
+                                type: array
+                                items:
+                                    type: string
+                            body_column:
+                                type: string
+                        additionalProperties: false
+                metrics:
+                    type: array
+                    items:
+                        type: object
+                        properties:
+                            aggregation:
+                                type: string
+                            attribute_columns:
+                                type: array
+                                items:
+                                    type: string
+                            data_type:
+                                type: string
+                            description:
+                                type: string
+                            metric_name:
+                                type: string
+                            monotonic:
+                                type: boolean
+                            start_ts_column:
+                                type: string
+                            static_attributes:
+                                type: object
+                                additionalProperties:
+                                    type: string
+                            ts_column:
+                                type: string
+                            unit:
+                                type: string
+                            value_column:
+                                type: string
+                            value_type:
+                                type: string
+                        additionalProperties: false
+                sql:
+                    type: string
+                tracking_column:
+                    type: string
+                tracking_start_value:
+                    type: string
+            additionalProperties: false
+    storage:
+        type: string
+    telemetry:
+        type: object
+        properties:
+            logs:
+                type: object
+                properties:
+                    query:
+                        type: boolean
+                additionalProperties: false
+        additionalProperties: false
+    timeout:
+        description: Timeout is an optional value used to set scraper's context deadline.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    username:
+        type: string
+additionalProperties: false

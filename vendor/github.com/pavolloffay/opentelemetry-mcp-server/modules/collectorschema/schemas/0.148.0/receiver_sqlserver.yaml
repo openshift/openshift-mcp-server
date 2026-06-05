@@ -1,0 +1,791 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: sqlserver receiver configuration
+type: object
+properties:
+    collection_interval:
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    computer_name:
+        type: string
+    datasource:
+        type: string
+    events:
+        type: object
+        properties:
+            db.server.query_sample:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            db.server.top_query:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+        additionalProperties: false
+    initial_delay:
+        description: |-
+            InitialDelay sets the initial start delay for the scraper,
+            any non positive value is assumed to be immediately.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    instance_name:
+        type: string
+    lookback_time:
+        description: |-
+            Enabled enables the collection of the top queries by the execution time.
+            It will collect the top N queries based on totalElapsedTimeDiffs during the last collection interval.
+            The query statement will also be reported, hence, it is not ideal to send it as a metric. Hence
+            we are reporting them as logs.
+            The `N` is configured via `TopQueryCount`
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    max_query_sample_count:
+        type: integer
+    max_rows_per_query:
+        type: integer
+    metrics:
+        type: object
+        properties:
+            sqlserver.batch.request.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.batch.sql_compilation.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.batch.sql_recompilation.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.computer.uptime:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.cpu.count:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.database.backup_or_restore.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.database.count:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.database.execution.errors:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.database.full_scan.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.database.io:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.database.latency:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.database.operations:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.database.tempdb.space:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.database.tempdb.version_store.size:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.deadlock.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.index.search.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.lock.timeout.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.lock.wait.count:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.lock.wait.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.lock.wait_time.avg:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.login.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.logout.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.memory.grants.pending.count:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.memory.usage:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.os.wait.duration:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.page.buffer_cache.free_list.stalls.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.page.buffer_cache.hit_ratio:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.page.checkpoint.flush.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.page.lazy_write.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.page.life_expectancy:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.page.lookup.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.page.operation.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.page.split.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.processes.blocked:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.replica.data.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.resource_pool.disk.operations:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.resource_pool.disk.throttled.read.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.resource_pool.disk.throttled.write.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.table.count:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.transaction.delay:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.transaction.mirror_write.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.transaction.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.transaction.write.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.transaction_log.flush.data.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.transaction_log.flush.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.transaction_log.flush.wait.rate:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.transaction_log.growth.count:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.transaction_log.shrink.count:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.transaction_log.usage:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            sqlserver.user.connection.count:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+        additionalProperties: false
+    password:
+        type: string
+    port:
+        type: integer
+    resource_attributes:
+        type: object
+        properties:
+            host.name:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    events_exclude:
+                        description: |-
+                            Experimental: EventsExclude defines a list of filters for attribute values.
+                            If the list is not empty, events with matching resource attribute values will not be emitted.
+                            EventsInclude has higher priority than EventsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    events_include:
+                        description: |-
+                            Experimental: EventsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only events with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            server.address:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    events_exclude:
+                        description: |-
+                            Experimental: EventsExclude defines a list of filters for attribute values.
+                            If the list is not empty, events with matching resource attribute values will not be emitted.
+                            EventsInclude has higher priority than EventsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    events_include:
+                        description: |-
+                            Experimental: EventsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only events with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            server.port:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    events_exclude:
+                        description: |-
+                            Experimental: EventsExclude defines a list of filters for attribute values.
+                            If the list is not empty, events with matching resource attribute values will not be emitted.
+                            EventsInclude has higher priority than EventsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    events_include:
+                        description: |-
+                            Experimental: EventsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only events with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            service.instance.id:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    events_exclude:
+                        description: |-
+                            Experimental: EventsExclude defines a list of filters for attribute values.
+                            If the list is not empty, events with matching resource attribute values will not be emitted.
+                            EventsInclude has higher priority than EventsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    events_include:
+                        description: |-
+                            Experimental: EventsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only events with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            sqlserver.computer.name:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    events_exclude:
+                        description: |-
+                            Experimental: EventsExclude defines a list of filters for attribute values.
+                            If the list is not empty, events with matching resource attribute values will not be emitted.
+                            EventsInclude has higher priority than EventsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    events_include:
+                        description: |-
+                            Experimental: EventsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only events with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            sqlserver.database.name:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    events_exclude:
+                        description: |-
+                            Experimental: EventsExclude defines a list of filters for attribute values.
+                            If the list is not empty, events with matching resource attribute values will not be emitted.
+                            EventsInclude has higher priority than EventsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    events_include:
+                        description: |-
+                            Experimental: EventsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only events with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            sqlserver.instance.name:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    events_exclude:
+                        description: |-
+                            Experimental: EventsExclude defines a list of filters for attribute values.
+                            If the list is not empty, events with matching resource attribute values will not be emitted.
+                            EventsInclude has higher priority than EventsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    events_include:
+                        description: |-
+                            Experimental: EventsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only events with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    server:
+        type: string
+    timeout:
+        description: Timeout is an optional value used to set scraper's context deadline.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    top_query_count:
+        type: integer
+    username:
+        type: string
+additionalProperties: false

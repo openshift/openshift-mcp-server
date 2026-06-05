@@ -1,0 +1,129 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+properties:
+    api_key:
+        type: string
+    dataset_url:
+        type: string
+    debug:
+        type: boolean
+    decompose_complex_message_field:
+        description: DecomposeComplexMessageField is an optional flag to signal that message / body of complex types (e.g. a map) should be decomposed / deconstructed into multiple fields. This is usually done outside of the main DataSet integration on the client side (e.g. as part of the attribute processor or similar) or on the server side (DataSet server side JSON parser for message field) and that's why this functionality is disabled by default.
+        type: boolean
+    decomposed_complex_message_prefix:
+        description: 'DecomposedComplexMessagePrefix is prefix for the decomposed complex message (see DecomposeComplexMessageField). Default value: body.map.'
+        type: string
+    enabled:
+        description: Enabled indicates whether to not retry sending batches in case of export failure.
+        type: boolean
+    export_resource_info_on_event:
+        description: 'ExportResourceInfo is optional flag to signal that the resource info is being exported to DataSet while exporting Logs. This is especially useful when reducing DataSet billable log volume. Default value: false'
+        type: boolean
+    export_resource_prefix:
+        description: 'ExportResourcePrefix is prefix for the resource attributes when they are exported (see ExportResourceInfo). Default value: resource.attributes.'
+        type: string
+    export_scope_info_on_event:
+        description: 'ExportScopeInfo is an optional flag that signals if scope info should be exported (when available) with each event. If scope information is not utilized, it makes sense to disable exporting it since it will result in increased billable log volume. Default value: true'
+        type: boolean
+    export_scope_prefix:
+        description: 'ExportScopePrefix is prefix for the scope attributes when they are exported (see ExportScopeInfo). Default value: scope.attributes.'
+        type: string
+    group_by:
+        items:
+            type: string
+        type: array
+    initial_interval:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    max_elapsed_time:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    max_interval:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    max_lifetime:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    max_parallel_outgoing:
+        type: integer
+    multiplier:
+        description: Multiplier is the value multiplied by the backoff interval bounds
+        type: number
+    purge_older_than:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    randomization_factor:
+        description: RandomizationFactor is a random factor used to calculate next backoffs Randomized interval = RetryInterval * (1 ± RandomizationFactor)
+        type: number
+    retry_initial_interval:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    retry_max_elapsed_time:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    retry_max_interval:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    retry_shutdown_timeout:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    sending_queue:
+        properties:
+            batch:
+                properties:
+                    flush_timeout:
+                        description: Duration string (e.g., '1s', '5m', '1h')
+                        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                        type: string
+                    max_size:
+                        description: MaxSize defines the configuration for the maximum size of a batch.
+                        type: integer
+                    min_size:
+                        description: MinSize defines the configuration for the minimum size of a batch.
+                        type: integer
+                    sizer:
+                        description: Sizer determines the type of size measurement used by the batch. If not configured, use the same configuration as the queue. It accepts "requests", "items", or "bytes".
+                        type: object
+                type: object
+            block_on_overflow:
+                description: BlockOnOverflow determines the behavior when the component's TotalSize limit is reached. If true, the component will wait for space; otherwise, operations will immediately return a retryable error.
+                type: boolean
+            enabled:
+                description: Enabled indicates whether to not enqueue and batch before exporting.
+                type: boolean
+            num_consumers:
+                description: NumConsumers is the maximum number of concurrent consumers from the queue. This applies across all different optional configurations from above (e.g. wait_for_result, block_on_overflow, storage, etc.).
+                type: integer
+            queue_size:
+                description: QueueSize represents the maximum data size allowed for concurrent storage and processing.
+                type: integer
+            sizer:
+                description: Sizer determines the type of size measurement used by this component. It accepts "requests", "items", or "bytes".
+                type: object
+            storage:
+                description: 'StorageID if not empty, enables the persistent storage and uses the component specified as a storage extension for the persistent queue. TODO: This will be changed to Optional when available. See https://github.com/open-telemetry/opentelemetry-collector/issues/13822'
+                type: object
+            wait_for_result:
+                description: WaitForResult determines if incoming requests are blocked until the request is processed or not. Currently, this option is not available when persistent queue is configured using the storage configuration.
+                type: boolean
+        type: object
+    server_host:
+        type: string
+    timeout:
+        properties:
+            timeout:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+        type: object
+    use_hostname:
+        type: boolean
+type: object

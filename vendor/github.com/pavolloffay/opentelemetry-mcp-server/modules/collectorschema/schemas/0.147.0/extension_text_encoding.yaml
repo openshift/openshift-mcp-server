@@ -1,0 +1,11 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: text_encoding extension configuration
+type: object
+properties:
+    encoding:
+        type: string
+    marshaling_separator:
+        type: string
+    unmarshaling_separator:
+        type: string
+additionalProperties: false

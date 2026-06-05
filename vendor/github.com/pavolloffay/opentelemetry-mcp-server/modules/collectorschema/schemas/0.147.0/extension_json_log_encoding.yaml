@@ -1,0 +1,10 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: json_log_encoding extension configuration
+type: object
+properties:
+    array_mode:
+        type: boolean
+    mode:
+        description: Export raw log string instead of log wrapper
+        type: string
+additionalProperties: false

@@ -1,0 +1,96 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+properties:
+    access_token:
+        description: AccessToken is the authentication token provided by SignalFx.
+        type: string
+    access_token_passthrough:
+        description: AccessTokenPassthrough indicates whether to associate datapoints with an organization access token received in request.
+        type: boolean
+    compression:
+        description: Compression method to use (gzip or zstd). Ignored if DisableCompression=true. If unspecified defaults to gzip.
+        type: string
+    disable_compression:
+        description: Disable compression. If set to true then Compression field is ignored.
+        type: boolean
+    enabled:
+        description: Enabled indicates whether to not retry sending batches in case of export failure.
+        type: boolean
+    endpoint:
+        description: Endpoint is the destination to where traces will be sent to in SAPM format. It must be a full URL and include the scheme, port and path e.g, https://ingest.signalfx.com/v2/trace
+        type: string
+    initial_interval:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    log_detailed_response:
+        description: Log detailed response from trace ingest.
+        type: boolean
+    max_connections:
+        description: MaxConnections is used to set a limit to the maximum idle HTTP connection the exporter can keep open.
+        type: integer
+    max_elapsed_time:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    max_interval:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    multiplier:
+        description: Multiplier is the value multiplied by the backoff interval bounds
+        type: number
+    num_workers:
+        description: NumWorkers is the number of workers that should be used to export traces. Exporter can make as many requests in parallel as the number of workers. Defaults to 8.
+        type: integer
+    randomization_factor:
+        description: RandomizationFactor is a random factor used to calculate next backoffs Randomized interval = RetryInterval * (1 ± RandomizationFactor)
+        type: number
+    sending_queue:
+        properties:
+            batch:
+                properties:
+                    flush_timeout:
+                        description: Duration string (e.g., '1s', '5m', '1h')
+                        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                        type: string
+                    max_size:
+                        description: MaxSize defines the configuration for the maximum size of a batch.
+                        type: integer
+                    min_size:
+                        description: MinSize defines the configuration for the minimum size of a batch.
+                        type: integer
+                    sizer:
+                        description: Sizer determines the type of size measurement used by the batch. If not configured, use the same configuration as the queue. It accepts "requests", "items", or "bytes".
+                        type: object
+                type: object
+            block_on_overflow:
+                description: BlockOnOverflow determines the behavior when the component's TotalSize limit is reached. If true, the component will wait for space; otherwise, operations will immediately return a retryable error.
+                type: boolean
+            enabled:
+                description: Enabled indicates whether to not enqueue and batch before exporting.
+                type: boolean
+            num_consumers:
+                description: 'NumConsumers is the maximum number of concurrent consumers from the queue. This applies across all different optional configurations from above (e.g. wait_for_result, blockOnOverflow, persistent, etc.). TODO: This will also control the maximum number of shards, when supported: https://github.com/open-telemetry/opentelemetry-collector/issues/12473.'
+                type: integer
+            queue_size:
+                description: QueueSize represents the maximum data size allowed for concurrent storage and processing.
+                type: integer
+            sizer:
+                description: Sizer determines the type of size measurement used by this component. It accepts "requests", "items", or "bytes".
+                type: object
+            storage:
+                description: 'StorageID if not empty, enables the persistent storage and uses the component specified as a storage extension for the persistent queue. TODO: This will be changed to Optional when available.'
+                type: object
+            wait_for_result:
+                description: WaitForResult determines if incoming requests are blocked until the request is processed or not. Currently, this option is not available when persistent queue is configured using the storage configuration.
+                type: boolean
+        type: object
+    timeoutsettings:
+        description: squash ensures fields are correctly decoded in embedded struct.
+        properties:
+            timeout:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+        type: object
+type: object

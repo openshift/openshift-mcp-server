@@ -1,0 +1,10 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: deltatocumulative processor configuration
+type: object
+properties:
+    max_stale:
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    max_streams:
+        type: integer
+additionalProperties: false

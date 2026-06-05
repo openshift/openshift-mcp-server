@@ -1,0 +1,198 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: iis receiver configuration
+type: object
+properties:
+    collection_interval:
+        description: |-
+            CollectionInterval sets how frequently the scraper
+            should be called and used as the context timeout
+            to ensure that scrapers don't exceed the interval.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    initial_delay:
+        description: |-
+            InitialDelay sets the initial start delay for the scraper,
+            any non positive value is assumed to be immediately.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    metrics:
+        type: object
+        properties:
+            iis.application_pool.state:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            iis.application_pool.uptime:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            iis.connection.active:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            iis.connection.anonymous:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            iis.connection.attempt.count:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            iis.network.blocked:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            iis.network.file.count:
+                type: object
+                properties:
+                    aggregation_strategy:
+                        type: string
+                    attributes:
+                        type: array
+                        items:
+                            type: object
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            iis.network.io:
+                type: object
+                properties:
+                    aggregation_strategy:
+                        type: string
+                    attributes:
+                        type: array
+                        items:
+                            type: object
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            iis.request.count:
+                type: object
+                properties:
+                    aggregation_strategy:
+                        type: string
+                    attributes:
+                        type: array
+                        items:
+                            type: object
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            iis.request.queue.age.max:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            iis.request.queue.count:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            iis.request.rejected:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            iis.thread.active:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            iis.uptime:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+        additionalProperties: false
+    resource_attributes:
+        type: object
+        properties:
+            iis.application_pool:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            iis.site:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    timeout:
+        description: Timeout is an optional value used to set scraper's context deadline.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+additionalProperties: false

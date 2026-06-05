@@ -1,0 +1,79 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+properties:
+    inputconfig:
+        properties:
+            all:
+                type: boolean
+            attributes:
+                additionalProperties:
+                    type: string
+                type: object
+            convert_message_bytes:
+                type: boolean
+            directory:
+                type: string
+            dmesg:
+                type: boolean
+            files:
+                items:
+                    type: string
+                type: array
+            grep:
+                type: string
+            id:
+                type: string
+            identifiers:
+                items:
+                    type: string
+                type: array
+            matches:
+                items:
+                    additionalProperties: true
+                    type: object
+                type: array
+            namespace:
+                type: string
+            output:
+                items:
+                    type: string
+                type: array
+            priority:
+                type: string
+            resource:
+                additionalProperties:
+                    type: string
+                type: object
+            start_at:
+                type: string
+            type:
+                type: string
+            units:
+                items:
+                    type: string
+                type: array
+        type: object
+    operators:
+        items:
+            type: object
+        type: array
+    retry_on_failure:
+        properties:
+            enabled:
+                description: Enabled indicates whether to not retry sending logs in case of receiving a retryable error from a downstream consumer. Default is false.
+                type: boolean
+            initial_interval:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+            max_elapsed_time:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+            max_interval:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+        type: object
+    storage:
+        type: object
+type: object

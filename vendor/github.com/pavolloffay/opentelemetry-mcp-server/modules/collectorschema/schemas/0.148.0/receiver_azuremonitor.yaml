@@ -1,0 +1,111 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: azuremonitor receiver configuration
+type: object
+properties:
+    append_tags_as_attributes:
+        type: array
+        items:
+            type: string
+    auth:
+        description: |-
+            Authentication accepts the component azureauthextension,
+            and uses it to get an access token to make requests.
+            Using this, `credentials` and any related fields become
+            useless.
+        type: object
+        properties:
+            authenticator:
+                description: |-
+                    AuthenticatorID specifies the name of the azure extension to authenticate the
+                    requests to azure monitor.
+                type: string
+        additionalProperties: false
+    cache_resources:
+        type: number
+    cache_resources_definitions:
+        type: number
+    client_id:
+        type: string
+    client_secret:
+        type: string
+    cloud:
+        type: string
+    collection_interval:
+        description: |-
+            CollectionInterval sets how frequently the scraper
+            should be called and used as the context timeout
+            to ensure that scrapers don't exceed the interval.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    credentials:
+        description: 'Deprecated: Credentials is deprecated.'
+        type: string
+    dimensions:
+        type: object
+        properties:
+            enabled:
+                type: boolean
+            overrides:
+                type: object
+        additionalProperties: false
+    discover_subscriptions:
+        type: boolean
+    federated_token_file:
+        type: string
+    initial_delay:
+        description: |-
+            InitialDelay sets the initial start delay for the scraper,
+            any non positive value is assumed to be immediately.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    maximum_number_of_metrics_in_a_call:
+        type: integer
+    maximum_number_of_records_per_resource:
+        type: integer
+    maximum_resources_per_batch:
+        type: integer
+    metrics:
+        type: object
+    resource_attributes:
+        type: object
+        properties:
+            azuremonitor.subscription:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            azuremonitor.subscription_id:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            azuremonitor.tenant_id:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+        additionalProperties: false
+    resource_groups:
+        type: array
+        items:
+            type: string
+    services:
+        type: array
+        items:
+            type: string
+    subscription_ids:
+        type: array
+        items:
+            type: string
+    tenant_id:
+        type: string
+    timeout:
+        description: Timeout is an optional value used to set scraper's context deadline.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    use_batch_api:
+        type: boolean
+additionalProperties: false

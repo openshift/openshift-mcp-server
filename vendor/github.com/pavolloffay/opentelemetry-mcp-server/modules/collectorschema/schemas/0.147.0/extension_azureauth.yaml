@@ -1,0 +1,40 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: azureauth extension configuration
+type: object
+properties:
+    managed_identity:
+        type: object
+        properties:
+            client_id:
+                description: if left empty, then it is system managed
+                type: string
+        additionalProperties: false
+    scopes:
+        type: array
+        items:
+            type: string
+    service_principal:
+        type: object
+        properties:
+            client_certificate_path:
+                type: string
+            client_id:
+                type: string
+            client_secret:
+                type: string
+            tenant_id:
+                type: string
+        additionalProperties: false
+    use_default:
+        type: boolean
+    workload_identity:
+        type: object
+        properties:
+            client_id:
+                type: string
+            federated_token_file:
+                type: string
+            tenant_id:
+                type: string
+        additionalProperties: false
+additionalProperties: false

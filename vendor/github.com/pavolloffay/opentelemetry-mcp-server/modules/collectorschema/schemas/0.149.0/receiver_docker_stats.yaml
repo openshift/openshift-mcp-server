@@ -1,0 +1,930 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: docker_stats receiver configuration
+type: object
+properties:
+    api_version:
+        description: |-
+            Docker client API version. If empty, the client will auto-negotiate
+            the API version with the Docker daemon using version negotiation.
+        type: string
+    collection_interval:
+        description: |-
+            CollectionInterval sets how frequently the scraper
+            should be called and used as the context timeout
+            to ensure that scrapers don't exceed the interval.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    container_labels_to_metric_labels:
+        description: |-
+            A mapping of container label names to MetricDescriptor label keys.
+            The corresponding container label value will become the DataPoint label value
+            for the mapped name.  E.g. `io.kubernetes.container.name: container_spec_name`
+            would result in a MetricDescriptor label called `container_spec_name` whose
+            Metric DataPoints have the value of the `io.kubernetes.container.name` container label.
+        type: object
+        additionalProperties:
+            type: string
+    endpoint:
+        description: |-
+            The URL of the docker server. Default is "unix:///var/run/docker.sock"
+            on non-Windows and "npipe:////./pipe/docker_engine" on Windows
+        type: string
+    env_vars_to_metric_labels:
+        description: |-
+            A mapping of container environment variable names to MetricDescriptor label
+            keys.  The corresponding env var values become the DataPoint label value.
+            E.g. `APP_VERSION: version` would result MetricDescriptors having a label
+            key called `version` whose DataPoint label values are the value of the
+            `APP_VERSION` environment variable configured for that particular container, if
+            present.
+        type: object
+        additionalProperties:
+            type: string
+    excluded_images:
+        description: A list of filters whose matching images are to be excluded. Supports literals, globs, and regex.
+        type: array
+        items:
+            type: string
+    initial_delay:
+        description: |-
+            InitialDelay sets the initial start delay for the scraper,
+            any non positive value is assumed to be immediately.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    metrics:
+        type: object
+        properties:
+            container.blockio.io_merged_recursive:
+                type: object
+                properties:
+                    aggregation_strategy:
+                        type: string
+                    attributes:
+                        type: array
+                        items:
+                            type: object
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.blockio.io_queued_recursive:
+                type: object
+                properties:
+                    aggregation_strategy:
+                        type: string
+                    attributes:
+                        type: array
+                        items:
+                            type: object
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.blockio.io_service_bytes_recursive:
+                type: object
+                properties:
+                    aggregation_strategy:
+                        type: string
+                    attributes:
+                        type: array
+                        items:
+                            type: object
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.blockio.io_service_time_recursive:
+                type: object
+                properties:
+                    aggregation_strategy:
+                        type: string
+                    attributes:
+                        type: array
+                        items:
+                            type: object
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.blockio.io_serviced_recursive:
+                type: object
+                properties:
+                    aggregation_strategy:
+                        type: string
+                    attributes:
+                        type: array
+                        items:
+                            type: object
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.blockio.io_time_recursive:
+                type: object
+                properties:
+                    aggregation_strategy:
+                        type: string
+                    attributes:
+                        type: array
+                        items:
+                            type: object
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.blockio.io_wait_time_recursive:
+                type: object
+                properties:
+                    aggregation_strategy:
+                        type: string
+                    attributes:
+                        type: array
+                        items:
+                            type: object
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.blockio.sectors_recursive:
+                type: object
+                properties:
+                    aggregation_strategy:
+                        type: string
+                    attributes:
+                        type: array
+                        items:
+                            type: object
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.cpu.limit:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.cpu.logical.count:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.cpu.shares:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.cpu.throttling_data.periods:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.cpu.throttling_data.throttled_periods:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.cpu.throttling_data.throttled_time:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.cpu.usage.kernelmode:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.cpu.usage.percpu:
+                type: object
+                properties:
+                    aggregation_strategy:
+                        type: string
+                    attributes:
+                        type: array
+                        items:
+                            type: object
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.cpu.usage.system:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.cpu.usage.total:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.cpu.usage.usermode:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.cpu.utilization:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.active_anon:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.active_file:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.anon:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.cache:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.dirty:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.fails:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.file:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.hierarchical_memory_limit:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.hierarchical_memsw_limit:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.inactive_anon:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.inactive_file:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.mapped_file:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.percent:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.pgfault:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.pgmajfault:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.pgpgin:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.pgpgout:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.rss:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.rss_huge:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.total_active_anon:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.total_active_file:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.total_cache:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.total_dirty:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.total_inactive_anon:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.total_inactive_file:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.total_mapped_file:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.total_pgfault:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.total_pgmajfault:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.total_pgpgin:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.total_pgpgout:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.total_rss:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.total_rss_huge:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.total_unevictable:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.total_writeback:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.unevictable:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.usage.limit:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.usage.max:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.usage.total:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.writeback:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.network.io.usage.rx_bytes:
+                type: object
+                properties:
+                    aggregation_strategy:
+                        type: string
+                    attributes:
+                        type: array
+                        items:
+                            type: object
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.network.io.usage.rx_dropped:
+                type: object
+                properties:
+                    aggregation_strategy:
+                        type: string
+                    attributes:
+                        type: array
+                        items:
+                            type: object
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.network.io.usage.rx_errors:
+                type: object
+                properties:
+                    aggregation_strategy:
+                        type: string
+                    attributes:
+                        type: array
+                        items:
+                            type: object
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.network.io.usage.rx_packets:
+                type: object
+                properties:
+                    aggregation_strategy:
+                        type: string
+                    attributes:
+                        type: array
+                        items:
+                            type: object
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.network.io.usage.tx_bytes:
+                type: object
+                properties:
+                    aggregation_strategy:
+                        type: string
+                    attributes:
+                        type: array
+                        items:
+                            type: object
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.network.io.usage.tx_dropped:
+                type: object
+                properties:
+                    aggregation_strategy:
+                        type: string
+                    attributes:
+                        type: array
+                        items:
+                            type: object
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.network.io.usage.tx_errors:
+                type: object
+                properties:
+                    aggregation_strategy:
+                        type: string
+                    attributes:
+                        type: array
+                        items:
+                            type: object
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.network.io.usage.tx_packets:
+                type: object
+                properties:
+                    aggregation_strategy:
+                        type: string
+                    attributes:
+                        type: array
+                        items:
+                            type: object
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.pids.count:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.pids.limit:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.restarts:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.uptime:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+        additionalProperties: false
+    resource_attributes:
+        type: object
+        properties:
+            container.command_line:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            container.hostname:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            container.id:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            container.image.id:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            container.image.name:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            container.name:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            container.runtime:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    stream_stats:
+        description: |-
+            StreamStats enables a persistent streaming connection per container to collect stats.
+            When true, each container maintains an open Docker stats stream and the scraper reads
+            from the cached latest value, which reduces connection overhead.  When false (default),
+            a new connection is opened and closed on every scrape cycle, matching the original behavior.
+        type: boolean
+    timeout:
+        description: Timeout is an optional value used to set scraper's context deadline.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    tls:
+        description: |-
+            TLS holds optional TLS client configuration for connecting to the Docker daemon
+            over HTTPS. When nil (the default), the connection uses no custom TLS — suitable
+            for Unix sockets and plain HTTP endpoints.
+        type: object
+        properties:
+            ca_file:
+                description: |-
+                    Path to the CA cert. For a client this verifies the server certificate.
+                    For a server this verifies client certificates. If empty uses system root CA.
+                    (optional)
+                type: string
+            ca_pem:
+                description: In memory PEM encoded cert. (optional)
+                type: string
+            cert_file:
+                description: Path to the TLS cert to use for TLS required connections. (optional)
+                type: string
+            cert_pem:
+                description: In memory PEM encoded TLS cert to use for TLS required connections. (optional)
+                type: string
+            cipher_suites:
+                description: |-
+                    CipherSuites is a list of TLS cipher suites that the TLS transport can use.
+                    If left blank, a safe default list is used.
+                    See https://go.dev/src/crypto/tls/cipher_suites.go for a list of supported cipher suites.
+                type: array
+                items:
+                    type: string
+            curve_preferences:
+                description: |-
+                    contains the elliptic curves that will be used in
+                    an ECDHE handshake, in preference order
+                    Defaults to empty list and "crypto/tls" defaults are used, internally.
+                type: array
+                items:
+                    type: string
+            include_system_ca_certs_pool:
+                description: |-
+                    If true, load system CA certificates pool in addition to the certificates
+                    configured in this struct.
+                type: boolean
+            insecure:
+                description: |-
+                    In gRPC and HTTP when set to true, this is used to disable the client transport security.
+                    See https://godoc.org/google.golang.org/grpc#WithInsecure for gRPC.
+                    Please refer to https://godoc.org/crypto/tls#Config for more information.
+                    (optional, default false)
+                type: boolean
+            insecure_skip_verify:
+                description: InsecureSkipVerify will enable TLS but not verify the certificate.
+                type: boolean
+            key_file:
+                description: Path to the TLS key to use for TLS required connections. (optional)
+                type: string
+            key_pem:
+                description: In memory PEM encoded TLS key to use for TLS required connections. (optional)
+                type: string
+            max_version:
+                description: |-
+                    MaxVersion sets the maximum TLS version that is acceptable.
+                    If not set, refer to crypto/tls for defaults. (optional)
+                type: string
+            min_version:
+                description: |-
+                    MinVersion sets the minimum TLS version that is acceptable.
+                    If not set, TLS 1.2 will be used. (optional)
+                type: string
+            reload_interval:
+                description: |-
+                    ReloadInterval specifies the duration after which the certificate will be reloaded
+                    If not set, it will never be reloaded (optional)
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+            server_name_override:
+                description: |-
+                    ServerName requested by client for virtual hosting.
+                    This sets the ServerName in the TLSConfig. Please refer to
+                    https://godoc.org/crypto/tls#Config for more information. (optional)
+                type: string
+            tpm:
+                description: Trusted platform module configuration
+                type: object
+                properties:
+                    auth:
+                        type: string
+                    enabled:
+                        type: boolean
+                    owner_auth:
+                        type: string
+                    path:
+                        description: |-
+                            The path to the TPM device or Unix domain socket.
+                            For instance /dev/tpm0 or /dev/tpmrm0.
+                        type: string
+                additionalProperties: false
+        additionalProperties: false
+additionalProperties: false

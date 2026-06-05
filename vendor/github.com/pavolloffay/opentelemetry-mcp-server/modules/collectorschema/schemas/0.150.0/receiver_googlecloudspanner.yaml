@@ -1,0 +1,54 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: googlecloudspanner receiver configuration
+type: object
+properties:
+    backfill_enabled:
+        type: boolean
+    cardinality_total_limit:
+        type: integer
+    collection_interval:
+        description: |-
+            CollectionInterval sets how frequently the scraper
+            should be called and used as the context timeout
+            to ensure that scrapers don't exceed the interval.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    hide_topn_lockstats_rowrangestartkey:
+        type: boolean
+    initial_delay:
+        description: |-
+            InitialDelay sets the initial start delay for the scraper,
+            any non positive value is assumed to be immediately.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    projects:
+        type: array
+        items:
+            type: object
+            properties:
+                instances:
+                    type: array
+                    items:
+                        type: object
+                        properties:
+                            databases:
+                                type: array
+                                items:
+                                    type: string
+                            instance_id:
+                                type: string
+                        additionalProperties: false
+                project_id:
+                    type: string
+                service_account_key:
+                    type: string
+            additionalProperties: false
+    timeout:
+        description: Timeout is an optional value used to set scraper's context deadline.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    top_metrics_query_max_rows:
+        type: integer
+    truncate_text:
+        type: boolean
+additionalProperties: false

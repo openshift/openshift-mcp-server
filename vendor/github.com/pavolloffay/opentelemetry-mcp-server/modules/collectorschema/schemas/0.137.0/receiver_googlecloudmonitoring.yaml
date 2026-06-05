@@ -1,0 +1,27 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+properties:
+    collection_interval:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    initial_delay:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    metrics_list:
+        items:
+            properties:
+                metric_descriptor_filter:
+                    description: Filter for listing metric descriptors. Only support `project` and `metric.type` as filter objects. See https://cloud.google.com/monitoring/api/v3/filters#metric-descriptor-filter for more details.
+                    type: string
+                metric_name:
+                    type: string
+            type: object
+        type: array
+    project_id:
+        type: string
+    timeout:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+type: object
