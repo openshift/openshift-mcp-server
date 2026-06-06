@@ -1,18 +1,19 @@
-package openshift
+package nodes
 
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"k8s.io/utils/ptr"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
-	"github.com/containers/kubernetes-mcp-server/pkg/ocp"
+	"github.com/containers/kubernetes-mcp-server/pkg/cluster-diagnostics/nodesdebug"
 )
 
-func initNodes() []api.ServerTool {
+func InitNodes() []api.ServerTool {
 	return []api.ServerTool{
 		{
 			Tool: api.Tool{
@@ -86,20 +87,37 @@ func nodesDebugExec(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	if timeoutRaw, exists := params.GetArguments()["timeout_seconds"]; exists && timeoutRaw != nil {
 		switch v := timeoutRaw.(type) {
 		case float64:
+			if v < 1 || v != math.Trunc(v) {
+				return api.NewToolCallResult("", errors.New("timeout_seconds must be an integer >= 1")), nil
+			}
 			timeout = time.Duration(int64(v)) * time.Second
 		case int:
+			if v < 1 {
+				return api.NewToolCallResult("", errors.New("timeout_seconds must be >= 1")), nil
+			}
 			timeout = time.Duration(v) * time.Second
 		case int64:
+			if v < 1 {
+				return api.NewToolCallResult("", errors.New("timeout_seconds must be >= 1")), nil
+			}
 			timeout = time.Duration(v) * time.Second
 		default:
 			return api.NewToolCallResult("", errors.New("timeout_seconds must be a numeric value")), nil
 		}
 	}
 
-	client := ocp.NewNodeDebugClient(params.KubernetesClient)
-	output, execErr := ocp.NodesDebugExec(params.Context, client, namespace, nodeName, image, command, timeout)
-	if output == "" && execErr == nil {
-		output = fmt.Sprintf("Command executed successfully on node %s but produced no output.", nodeName)
+	client := nodesdebug.NewNodeDebug(params.KubernetesClient)
+	stdout, stderr, execErr := client.NodesDebugExec(params.Context, namespace, nodeName, image, command, "", "", timeout)
+	if stdout == "" && stderr == "" && execErr == nil {
+		stdout = fmt.Sprintf("Command executed successfully on node %s but produced no output.", nodeName)
+	}
+
+	// Prefer stdout, fallback to stderr, or if both are present, concatenate them with a separator.
+	output := stdout
+	if stdout == "" {
+		output = stderr
+	} else if stderr != "" {
+		output = fmt.Sprintf("-- stdout --\n%s\n-- stderr --\n%s", stdout, stderr)
 	}
 	return api.NewToolCallResult(output, execErr), nil
 }

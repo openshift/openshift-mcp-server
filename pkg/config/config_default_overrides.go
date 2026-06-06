@@ -5,7 +5,7 @@ func defaultOverrides() StaticConfig {
 		// IMPORTANT: this file is used to override default config values in downstream builds.
 		// For current release we want to just expose the settings below:
 		ReadOnly: true,
-		Toolsets: []string{"core", "config", "openshift"},
+		Toolsets: []string{"core", "config"},
 		ToolOverrides: map[string]ToolOverride{
 			"resources_create_or_update": {
 				Description: "Create or update a Kubernetes resource in the current cluster by providing a YAML or JSON representation of the resource.\n" +

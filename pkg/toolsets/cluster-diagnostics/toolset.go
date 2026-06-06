@@ -1,11 +1,11 @@
-package openshift
+package clusterdiagnostics
 
 import (
 	"slices"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
-	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/openshift/mustgather"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/cluster-diagnostics/nodes"
 )
 
 type Toolset struct{}
@@ -13,21 +13,21 @@ type Toolset struct{}
 var _ api.Toolset = (*Toolset)(nil)
 
 func (t *Toolset) GetName() string {
-	return "openshift"
+	return "cluster-diagnostics"
 }
 
 func (t *Toolset) GetDescription() string {
-	return "OpenShift-specific tools for cluster management and troubleshooting"
+	return "Tools for cluster diagnostics and troubleshooting"
 }
 
 func (t *Toolset) GetTools(o api.Openshift) []api.ServerTool {
-	return nil
+	return slices.Concat(
+		nodes.InitNodes(),
+	)
 }
 
 func (t *Toolset) GetPrompts() []api.ServerPrompt {
-	return slices.Concat(
-		mustgather.Prompts(),
-	)
+	return nil
 }
 
 func (t *Toolset) GetResources() []api.ServerResource {

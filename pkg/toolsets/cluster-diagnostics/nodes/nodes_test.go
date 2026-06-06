@@ -1,4 +1,4 @@
-package openshift
+package nodes
 
 import (
 	"testing"
