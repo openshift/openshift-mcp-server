@@ -1,23 +1,24 @@
-package openshift
+package nodes
 
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"k8s.io/utils/ptr"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
-	"github.com/containers/kubernetes-mcp-server/pkg/ocp"
+	"github.com/containers/kubernetes-mcp-server/pkg/cluster-diagnostics/nodesdebug"
 )
 
-func initNodes() []api.ServerTool {
+func InitNodes() []api.ServerTool {
 	return []api.ServerTool{
 		{
 			Tool: api.Tool{
 				Name:        "nodes_debug_exec",
-				Description: "Run commands on an OpenShift node using a privileged debug pod with comprehensive troubleshooting utilities. The debug pod uses the UBI9 toolbox image which includes: systemd tools (systemctl, journalctl), networking tools (ss, ip, ping, traceroute, nmap), process tools (ps, top, lsof, strace), file system tools (find, tar, rsync), and debugging tools (gdb). The host filesystem is mounted at /host, allowing commands to chroot /host if needed to access node-level resources. Output is truncated to the most recent 100 lines, so prefer filters like grep when expecting large logs.",
+				Description: "Run commands on an OpenShift node using a privileged debug pod with comprehensive troubleshooting utilities. The debug pod uses the UBI9 toolbox image which includes: systemd tools (systemctl, journalctl), networking tools (ss, ip, ping, traceroute, nmap), process tools (ps, top, lsof, strace), file system tools (find, tar, rsync), and debugging tools (gdb). The host filesystem is mounted at /host, allowing commands to chroot /host if needed to access node-level resources.",
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
@@ -60,46 +61,55 @@ func initNodes() []api.ServerTool {
 }
 
 func nodesDebugExec(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	nodeArg := params.GetArguments()["node"]
-	nodeName, ok := nodeArg.(string)
-	if nodeArg == nil || !ok || nodeName == "" {
-		return api.NewToolCallResult("", errors.New("missing required argument: node")), nil
+	p := api.WrapParams(params)
+	nodeName := p.RequiredString("node")
+	namespace := p.OptionalString("namespace", "")
+	image := p.OptionalString("image", "")
+	if err := p.Err(); err != nil {
+		return api.NewToolCallResult("", fmt.Errorf("failed to execute command on node: %w", err)), nil
 	}
 
 	commandArg := params.GetArguments()["command"]
 	command, err := toStringSlice(commandArg)
 	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("invalid command argument: %w", err)), nil
-	}
-
-	namespace := ""
-	if nsArg, ok := params.GetArguments()["namespace"].(string); ok {
-		namespace = nsArg
-	}
-
-	image := ""
-	if imageArg, ok := params.GetArguments()["image"].(string); ok {
-		image = imageArg
+		return api.NewToolCallResult("", fmt.Errorf("failed to execute command on node: invalid command argument: %w", err)), nil
 	}
 
 	var timeout time.Duration
 	if timeoutRaw, exists := params.GetArguments()["timeout_seconds"]; exists && timeoutRaw != nil {
 		switch v := timeoutRaw.(type) {
 		case float64:
+			if v < 1 || v != math.Trunc(v) {
+				return api.NewToolCallResult("", errors.New("failed to execute command on node: timeout_seconds must be an integer >= 1")), nil
+			}
 			timeout = time.Duration(int64(v)) * time.Second
 		case int:
+			if v < 1 {
+				return api.NewToolCallResult("", errors.New("failed to execute command on node: timeout_seconds must be >= 1")), nil
+			}
 			timeout = time.Duration(v) * time.Second
 		case int64:
+			if v < 1 {
+				return api.NewToolCallResult("", errors.New("failed to execute command on node: timeout_seconds must be >= 1")), nil
+			}
 			timeout = time.Duration(v) * time.Second
 		default:
-			return api.NewToolCallResult("", errors.New("timeout_seconds must be a numeric value")), nil
+			return api.NewToolCallResult("", errors.New("failed to execute command on node: timeout_seconds must be a numeric value")), nil
 		}
 	}
 
-	client := ocp.NewNodeDebugClient(params.KubernetesClient)
-	output, execErr := ocp.NodesDebugExec(params.Context, client, namespace, nodeName, image, command, timeout)
-	if output == "" && execErr == nil {
-		output = fmt.Sprintf("Command executed successfully on node %s but produced no output.", nodeName)
+	client := nodesdebug.NewNodeDebug(params.KubernetesClient)
+	stdout, stderr, execErr := client.NodesDebugExec(params.Context, namespace, nodeName, image, command, "", "", timeout)
+	if stdout == "" && stderr == "" && execErr == nil {
+		stdout = fmt.Sprintf("Command executed successfully on node %s but produced no output.", nodeName)
+	}
+
+	// Prefer stdout, fallback to stderr, or if both are present, concatenate them with a separator.
+	output := stdout
+	if stdout == "" {
+		output = stderr
+	} else if stderr != "" {
+		output = fmt.Sprintf("-- stdout --\n%s\n-- stderr --\n%s", stdout, stderr)
 	}
 	return api.NewToolCallResult(output, execErr), nil
 }

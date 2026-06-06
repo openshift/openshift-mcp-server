@@ -1,4 +1,4 @@
-package ocp
+package nodesdebug
 
 import (
 	"context"
@@ -30,8 +30,9 @@ func NewNodeDebugTestEnv(t *testing.T) *NodeDebugTestEnv {
 
 	podsClient := &FakePodInterface{}
 	fakeClient := &FakeNodeDebugClient{
-		pods:      podsClient,
-		namespace: "default",
+		pods:       podsClient,
+		namespace:  "default",
+		NodeExists: true,
 	}
 
 	return &NodeDebugTestEnv{
@@ -42,8 +43,10 @@ func NewNodeDebugTestEnv(t *testing.T) *NodeDebugTestEnv {
 
 // FakeNodeDebugClient implements the NodeDebugClient interface for testing.
 type FakeNodeDebugClient struct {
-	pods      *FakePodInterface
-	namespace string
+	pods            *FakePodInterface
+	NodeExists      bool
+	NodeExistsError error
+	namespace       string
 }
 
 func (f *FakeNodeDebugClient) NamespaceOrDefault(namespace string) string {
@@ -70,17 +73,31 @@ func (f *FakeNodeDebugClient) PodsLog(ctx context.Context, namespace, name, cont
 	return string(rawData), nil
 }
 
+func (f *FakeNodeDebugClient) PodsExec(ctx context.Context, namespace, name, container string, command []string) (string, string, error) {
+	return f.pods.PodsExec(ctx, namespace, name, container, command)
+}
+
+func (f *FakeNodeDebugClient) DoesNodeExist(_ context.Context, name string) (bool, error) {
+	if f.NodeExistsError != nil {
+		return false, f.NodeExistsError
+	}
+	if name == "" {
+		return false, nil
+	}
+	return f.NodeExists, nil
+}
+
 // FakePodInterface implements corev1client.PodInterface with deterministic behaviour for tests.
 type FakePodInterface struct {
 	corev1client.PodInterface
-	Created           *corev1.Pod
-	Deleted           bool
-	ExitCode          int32
-	TerminatedReason  string
-	TerminatedMessage string
-	WaitingReason     string
-	WaitingMessage    string
-	Logs              string
+	Created    *corev1.Pod
+	Running    bool
+	Deleted    bool
+	Logs       string
+	Command    []string
+	ExecStdout string
+	ExecStderr string
+	ExecError  error
 }
 
 func (f *FakePodInterface) Create(_ context.Context, pod *corev1.Pod, _ metav1.CreateOptions) (*corev1.Pod, error) {
@@ -98,33 +115,11 @@ func (f *FakePodInterface) Get(_ context.Context, _ string, _ metav1.GetOptions)
 	}
 	pod := f.Created.DeepCopy()
 
-	// If waiting state is set, return that instead of terminated
-	if f.WaitingReason != "" {
-		waiting := &corev1.ContainerStateWaiting{Reason: f.WaitingReason}
-		if f.WaitingMessage != "" {
-			waiting.Message = f.WaitingMessage
-		}
-		pod.Status.ContainerStatuses = []corev1.ContainerStatus{{
-			Name:  NodeDebugContainerName,
-			State: corev1.ContainerState{Waiting: waiting},
-		}}
+	if f.Running {
+		pod.Status.Phase = corev1.PodRunning
+	} else {
 		pod.Status.Phase = corev1.PodPending
-		return pod, nil
 	}
-
-	// Otherwise return terminated state
-	terminated := &corev1.ContainerStateTerminated{ExitCode: f.ExitCode}
-	if f.TerminatedReason != "" {
-		terminated.Reason = f.TerminatedReason
-	}
-	if f.TerminatedMessage != "" {
-		terminated.Message = f.TerminatedMessage
-	}
-	pod.Status.ContainerStatuses = []corev1.ContainerStatus{{
-		Name:  NodeDebugContainerName,
-		State: corev1.ContainerState{Terminated: terminated},
-	}}
-	pod.Status.Phase = corev1.PodSucceeded
 	return pod, nil
 }
 
@@ -144,6 +139,11 @@ func (f *FakePodInterface) GetLogs(name string, opts *corev1.PodLogOptions) *res
 		Negotiator:   runtime.NewClientNegotiator(schemek8s.Codecs.WithoutConversion(), schema.GroupVersion{Version: "v1"}),
 	}
 	return restclient.NewRequestWithClient(&url.URL{Scheme: "https", Host: "localhost"}, "", content, client).Verb("GET")
+}
+
+func (f *FakePodInterface) PodsExec(ctx context.Context, namespace, name, container string, command []string) (string, string, error) {
+	f.Command = command
+	return f.ExecStdout, f.ExecStderr, f.ExecError
 }
 
 type roundTripperFunc func(*http.Request) (*http.Response, error)

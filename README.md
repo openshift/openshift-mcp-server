@@ -264,20 +264,21 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 
 <!-- AVAILABLE-TOOLSETS-START -->
 
-| Toolset   | Description                                                                                                                                                                     | Default |
-|-----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| config    | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                         | ✓       |
-| core      | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                             | ✓       |
-| helm      | Tools for managing Helm charts and releases                                                                                                                                     |         |
-| kcp       | Manage kcp workspaces and multi-tenancy features                                                                                                                                |         |
-| kubevirt  | KubeVirt virtual machine management tools, check the [KubeVirt documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/kubevirt.md) for more details. |         |
-| metrics   | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                   |         |
-| oadp      | OADP (OpenShift API for Data Protection) tools for managing Velero backups, restores, and schedules                                                                             |         |
-| openshift | OpenShift-specific tools for cluster management and troubleshooting                                                                                                             | ✓       |
-| ossm      | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                 |         |
-| otelcol   | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                      |         |
-| tekton    | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns.                                                                                              |         |
-| traces    | Toolset for querying Tempo                                                                                                                                                      |         |
+| Toolset             | Description                                                                                                                                                                     | Default |
+|---------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| cluster-diagnostics | Tools for cluster diagnostics and troubleshooting                                                                                                                               |         |
+| config              | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                         | ✓       |
+| core                | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                             | ✓       |
+| helm                | Tools for managing Helm charts and releases                                                                                                                                     |         |
+| kcp                 | Manage kcp workspaces and multi-tenancy features                                                                                                                                |         |
+| kubevirt            | KubeVirt virtual machine management tools, check the [KubeVirt documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/kubevirt.md) for more details. |         |
+| metrics             | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                   |         |
+| oadp                | OADP (OpenShift API for Data Protection) tools for managing Velero backups, restores, and schedules                                                                             |         |
+| openshift           | OpenShift-specific tools for cluster management and troubleshooting                                                                                                             |         |
+| ossm                | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                 |         |
+| otelcol             | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                      |         |
+| tekton              | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns.                                                                                              |         |
+| traces              | Toolset for querying Tempo                                                                                                                                                      |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -286,6 +287,19 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 In case multi-cluster support is enabled (default) and you have access to multiple clusters, all applicable tools will include an additional `context` argument to specify the Kubernetes context (cluster) to use for that operation.
 
 <!-- AVAILABLE-TOOLSETS-TOOLS-START -->
+
+<details>
+
+<summary>cluster-diagnostics</summary>
+
+- **nodes_debug_exec** - Run commands on an OpenShift node using a privileged debug pod with comprehensive troubleshooting utilities. The debug pod uses the UBI9 toolbox image which includes: systemd tools (systemctl, journalctl), networking tools (ss, ip, ping, traceroute, nmap), process tools (ps, top, lsof, strace), file system tools (find, tar, rsync), and debugging tools (gdb). The host filesystem is mounted at /host, allowing commands to chroot /host if needed to access node-level resources.
+  - `command` (`array`) **(required)** - Command to execute on the node. All standard debugging utilities from the UBI9 toolbox are available. The host filesystem is mounted at /host - use 'chroot /host <command>' to access node-level resources, or run commands directly in the toolbox environment. Provide each argument as a separate array item (e.g. ['chroot', '/host', 'systemctl', 'status', 'kubelet'] or ['journalctl', '-u', 'kubelet', '--since', '1 hour ago']).
+  - `image` (`string`) - Container image to use for the debug pod (optional). Defaults to registry.access.redhat.com/ubi9/toolbox:latest which provides comprehensive debugging and troubleshooting utilities.
+  - `namespace` (`string`) - Namespace to create the temporary debug pod in (optional, defaults to the current namespace or 'default').
+  - `node` (`string`) **(required)** - Name of the node to debug (e.g. worker-0).
+  - `timeout_seconds` (`integer`) - Maximum time to wait for the command to complete before timing out (optional, defaults to 60 seconds).
+
+</details>
 
 <details>
 
@@ -640,13 +654,6 @@ Silences are used to temporarily mute alerts based on label matchers. This tool 
 <details>
 
 <summary>openshift</summary>
-
-- **nodes_debug_exec** - Run commands on an OpenShift node using a privileged debug pod with comprehensive troubleshooting utilities. The debug pod uses the UBI9 toolbox image which includes: systemd tools (systemctl, journalctl), networking tools (ss, ip, ping, traceroute, nmap), process tools (ps, top, lsof, strace), file system tools (find, tar, rsync), and debugging tools (gdb). The host filesystem is mounted at /host, allowing commands to chroot /host if needed to access node-level resources. Output is truncated to the most recent 100 lines, so prefer filters like grep when expecting large logs.
-  - `command` (`array`) **(required)** - Command to execute on the node. All standard debugging utilities from the UBI9 toolbox are available. The host filesystem is mounted at /host - use 'chroot /host <command>' to access node-level resources, or run commands directly in the toolbox environment. Provide each argument as a separate array item (e.g. ['chroot', '/host', 'systemctl', 'status', 'kubelet'] or ['journalctl', '-u', 'kubelet', '--since', '1 hour ago']).
-  - `image` (`string`) - Container image to use for the debug pod (optional). Defaults to registry.access.redhat.com/ubi9/toolbox:latest which provides comprehensive debugging and troubleshooting utilities.
-  - `namespace` (`string`) - Namespace to create the temporary debug pod in (optional, defaults to the current namespace or 'default').
-  - `node` (`string`) **(required)** - Name of the node to debug (e.g. worker-0).
-  - `timeout_seconds` (`integer`) - Maximum time to wait for the command to complete before timing out (optional, defaults to 60 seconds).
 
 </details>
 
