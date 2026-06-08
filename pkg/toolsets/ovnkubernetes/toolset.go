@@ -18,7 +18,7 @@ func (t *Toolset) GetDescription() string {
 }
 
 func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
-	return nil
+	return initOVNTools()
 }
 
 func (t *Toolset) GetPrompts() []api.ServerPrompt {
