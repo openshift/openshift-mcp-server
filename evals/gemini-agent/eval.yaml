@@ -1,6 +1,6 @@
 kind: Eval
 metadata:
-  name: "gemini-agent-netedge-eval"
+  name: "gemini-agent-toolsets-eval"
 config:
   agent:
     type: "file"
@@ -20,6 +20,16 @@ config:
     - glob: ../tasks/observability/*/*.yaml
       labelSelector:
         suite: observability
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            toolPattern: ".*"
+        minToolCalls: 1
+        maxToolCalls: 20
+    # Cluster diagnostics tasks
+    - glob: ../tasks/cluster-diagnostics/*/*.yaml
+      labelSelector:
+        suite: cluster-diagnostics
       assertions:
         toolsUsed:
           - server: kubernetes
