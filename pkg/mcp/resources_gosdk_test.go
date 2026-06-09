@@ -302,6 +302,8 @@ func (s *ResourceSuite) TestReloadRemovesResources() {
 		newConfig := config.Default()
 		newConfig.Toolsets = []string{"resource-test-empty"}
 		newConfig.KubeConfig = s.Cfg.KubeConfig
+		newConfig.ReadOnly = s.Cfg.ReadOnly
+		newConfig.ListOutput = s.Cfg.ListOutput
 
 		err := s.mcpServer.ReloadConfiguration(newConfig)
 		s.Require().NoError(err)
@@ -345,6 +347,8 @@ func (s *ResourceSuite) TestReloadNotifiesResourceListChanged() {
 	newConfig := config.Default()
 	newConfig.Toolsets = []string{"resource-test-empty"}
 	newConfig.KubeConfig = s.Cfg.KubeConfig
+	newConfig.ReadOnly = s.Cfg.ReadOnly
+	newConfig.ListOutput = s.Cfg.ListOutput
 
 	err := s.mcpServer.ReloadConfiguration(newConfig)
 	s.Require().NoError(err)
@@ -484,6 +488,8 @@ func (s *ResourceSuite) TestInvalidURITemplateReturnsError() {
 		newConfig := config.Default()
 		newConfig.Toolsets = []string{"resource-test-bad"}
 		newConfig.KubeConfig = s.Cfg.KubeConfig
+		newConfig.ReadOnly = s.Cfg.ReadOnly
+		newConfig.ListOutput = s.Cfg.ListOutput
 
 		s.NotPanics(func() {
 			err := s.mcpServer.ReloadConfiguration(newConfig)
@@ -513,6 +519,8 @@ func (s *ResourceSuite) TestInvalidURITemplateReturnsError() {
 		recoveryConfig := config.Default()
 		recoveryConfig.Toolsets = []string{"resource-test-good"}
 		recoveryConfig.KubeConfig = s.Cfg.KubeConfig
+		recoveryConfig.ReadOnly = s.Cfg.ReadOnly
+		recoveryConfig.ListOutput = s.Cfg.ListOutput
 
 		s.Require().NoError(s.mcpServer.ReloadConfiguration(recoveryConfig))
 
@@ -567,6 +575,8 @@ func (s *ResourceSuite) TestInvalidResourceURIReturnsError() {
 		newConfig := config.Default()
 		newConfig.Toolsets = []string{"resource-test-bad-uri"}
 		newConfig.KubeConfig = s.Cfg.KubeConfig
+		newConfig.ReadOnly = s.Cfg.ReadOnly
+		newConfig.ListOutput = s.Cfg.ListOutput
 
 		s.NotPanics(func() {
 			err := s.mcpServer.ReloadConfiguration(newConfig)
