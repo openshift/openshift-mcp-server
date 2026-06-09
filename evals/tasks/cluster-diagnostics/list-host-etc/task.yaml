@@ -1,0 +1,17 @@
+kind: Task
+metadata:
+  labels:
+    suite: cluster-diagnostics
+  name: list-host-etc
+  difficulty: medium
+steps:
+  prompt:
+    inline: "On the control-plane node, list the contents of /etc and report what you find."
+  verify:
+    contains: "hosts"
+  cleanup:
+    file: cleanup.sh
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "nodes_debug_exec"
