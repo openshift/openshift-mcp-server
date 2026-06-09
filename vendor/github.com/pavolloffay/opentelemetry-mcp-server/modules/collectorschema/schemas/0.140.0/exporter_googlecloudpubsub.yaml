@@ -1,0 +1,114 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+properties:
+    compression:
+        description: Compression of the payload (only gzip or is supported, no compression is the default)
+        type: string
+    enabled:
+        description: Enabled indicates whether to not retry sending batches in case of export failure.
+        type: boolean
+    endpoint:
+        description: Override of the Pubsub Endpoint, leave empty for the default endpoint
+        type: string
+    initial_interval:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    insecure:
+        description: Only has effect if Endpoint is not ""
+        type: boolean
+    max_elapsed_time:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    max_interval:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    multiplier:
+        description: Multiplier is the value multiplied by the backoff interval bounds
+        type: number
+    ordering:
+        description: Ordering configures the ordering keys
+        properties:
+            enabled:
+                description: Enabled indicates if ordering is enabled
+                type: boolean
+            from_resource_attribute:
+                description: FromResourceAttribute is a resource attribute that will be used as the ordering key.
+                type: string
+            remove_resource_attribute:
+                description: RemoveResourceAttribute indicates if the ordering key should be removed from the resource attributes.
+                type: boolean
+        type: object
+    project:
+        description: Google Cloud Project ID where the Pubsub client will connect to
+        type: string
+    randomization_factor:
+        description: RandomizationFactor is a random factor used to calculate next backoffs Randomized interval = RetryInterval * (1 ± RandomizationFactor)
+        type: number
+    sending_queue:
+        properties:
+            batch:
+                properties:
+                    flush_timeout:
+                        description: Duration string (e.g., '1s', '5m', '1h')
+                        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                        type: string
+                    max_size:
+                        description: MaxSize defines the configuration for the maximum size of a batch.
+                        type: integer
+                    min_size:
+                        description: MinSize defines the configuration for the minimum size of a batch.
+                        type: integer
+                    sizer:
+                        description: Sizer determines the type of size measurement used by the batch. If not configured, use the same configuration as the queue. It accepts "requests", "items", or "bytes".
+                        type: object
+                type: object
+            block_on_overflow:
+                description: BlockOnOverflow determines the behavior when the component's TotalSize limit is reached. If true, the component will wait for space; otherwise, operations will immediately return a retryable error.
+                type: boolean
+            enabled:
+                description: Enabled indicates whether to not enqueue and batch before exporting.
+                type: boolean
+            num_consumers:
+                description: NumConsumers is the maximum number of concurrent consumers from the queue. This applies across all different optional configurations from above (e.g. wait_for_result, block_on_overflow, storage, etc.).
+                type: integer
+            queue_size:
+                description: QueueSize represents the maximum data size allowed for concurrent storage and processing.
+                type: integer
+            sizer:
+                description: Sizer determines the type of size measurement used by this component. It accepts "requests", "items", or "bytes".
+                type: object
+            storage:
+                description: 'StorageID if not empty, enables the persistent storage and uses the component specified as a storage extension for the persistent queue. TODO: This will be changed to Optional when available. See https://github.com/open-telemetry/opentelemetry-collector/issues/13822'
+                type: object
+            wait_for_result:
+                description: WaitForResult determines if incoming requests are blocked until the request is processed or not. Currently, this option is not available when persistent queue is configured using the storage configuration.
+                type: boolean
+        type: object
+    timeoutsettings:
+        description: Timeout for all API calls. If not set, defaults to 12 seconds.
+        properties:
+            timeout:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+        type: object
+    topic:
+        description: The fully qualified resource name of the Pubsub topic
+        type: string
+    user_agent:
+        description: User agent that will be used by the Pubsub client to connect to the service
+        type: string
+    watermark:
+        description: Watermark defines the watermark (the ce-time attribute on the message) behavior
+        properties:
+            allowed_drift:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+            behavior:
+                description: Behavior of the watermark. Currently, only of the message (none, earliest and current, current being the default) will set the timestamp on pubsub based on timestamps of the events inside the message
+                type: string
+        type: object
+type: object

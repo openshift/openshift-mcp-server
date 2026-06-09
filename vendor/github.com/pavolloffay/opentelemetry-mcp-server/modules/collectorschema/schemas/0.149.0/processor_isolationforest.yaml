@@ -1,0 +1,101 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: isolationforest processor configuration
+type: object
+properties:
+    adaptive_window:
+        description: Adaptive window sizing configuration
+        type: object
+        properties:
+            adaptation_rate:
+                description: Adjustment speed (0.0-1.0)
+                type: number
+            enabled:
+                description: Core configuration
+                type: boolean
+            max_window_size:
+                description: Maximum samples (memory protection)
+                type: integer
+            memory_limit_mb:
+                description: Auto-shrink when exceeded
+                type: integer
+            min_window_size:
+                description: Minimum samples to keep
+                type: integer
+            stability_check_interval:
+                description: Check model accuracy interval
+                type: string
+            velocity_threshold:
+                description: Optional parameters with defaults
+                type: number
+        additionalProperties: false
+    classification_attribute:
+        type: string
+    contamination_rate:
+        type: number
+    features:
+        type: object
+        properties:
+            logs:
+                type: array
+                items:
+                    type: string
+            metrics:
+                type: array
+                items:
+                    type: string
+            traces:
+                type: array
+                items:
+                    type: string
+        additionalProperties: false
+    forest_size:
+        type: integer
+    min_samples:
+        type: integer
+    mode:
+        type: string
+    models:
+        type: array
+        items:
+            type: object
+            properties:
+                contamination_rate:
+                    type: number
+                features:
+                    type: array
+                    items:
+                        type: string
+                forest_size:
+                    type: integer
+                name:
+                    type: string
+                selector:
+                    type: object
+                    additionalProperties:
+                        type: string
+                subsample_size:
+                    type: integer
+                threshold:
+                    type: number
+            additionalProperties: false
+    performance:
+        type: object
+        properties:
+            batch_size:
+                type: integer
+            max_memory_mb:
+                type: integer
+            parallel_workers:
+                type: integer
+        additionalProperties: false
+    score_attribute:
+        type: string
+    subsample_size:
+        type: integer
+    threshold:
+        type: number
+    training_window:
+        type: string
+    update_frequency:
+        type: string
+additionalProperties: false

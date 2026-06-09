@@ -1,0 +1,79 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: sumologic processor configuration
+type: object
+properties:
+    add_cloud_namespace:
+        type: boolean
+    aggregate_attributes:
+        type: array
+        items:
+            type: object
+            properties:
+                attribute:
+                    type: string
+                prefixes:
+                    type: array
+                    items:
+                        type: string
+            additionalProperties: false
+    field_attributes:
+        type: object
+        properties:
+            severity_number:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    name:
+                        type: string
+                additionalProperties: false
+            severity_text:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    name:
+                        type: string
+                additionalProperties: false
+            span_id:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    name:
+                        type: string
+                additionalProperties: false
+            trace_id:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    name:
+                        type: string
+                additionalProperties: false
+        additionalProperties: false
+    nest_attributes:
+        type: object
+        properties:
+            enabled:
+                type: boolean
+            exclude:
+                type: array
+                items:
+                    type: string
+            include:
+                type: array
+                items:
+                    type: string
+            separator:
+                type: string
+            squash_single_values:
+                type: boolean
+        additionalProperties: false
+    translate_attributes:
+        type: boolean
+    translate_docker_metrics:
+        type: boolean
+    translate_telegraf_attributes:
+        type: boolean
+additionalProperties: false

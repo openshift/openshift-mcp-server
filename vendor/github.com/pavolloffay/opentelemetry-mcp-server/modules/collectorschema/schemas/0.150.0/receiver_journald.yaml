@@ -1,0 +1,92 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: journald receiver configuration
+type: object
+properties:
+    all:
+        type: boolean
+    attributes:
+        type: object
+        additionalProperties:
+            type: object
+    convert_message_bytes:
+        type: boolean
+    directory:
+        type: string
+    dmesg:
+        type: boolean
+    files:
+        type: array
+        items:
+            type: string
+    grep:
+        type: string
+    id:
+        type: string
+    identifiers:
+        type: array
+        items:
+            type: string
+    journalctl_path:
+        type: string
+    matches:
+        type: array
+        items:
+            type: object
+    merge:
+        type: boolean
+    namespace:
+        type: string
+    operators:
+        type: array
+        items:
+            type: object
+            additionalProperties: false
+    output:
+        type: array
+        items:
+            type: string
+    priority:
+        type: string
+    resource:
+        type: object
+        additionalProperties:
+            type: object
+    retry_on_failure:
+        type: object
+        properties:
+            enabled:
+                description: |-
+                    Enabled indicates whether to not retry sending logs in case of receiving a retryable error from a downstream
+                    consumer. Default is false.
+                type: boolean
+            initial_interval:
+                description: InitialInterval the time to wait after the first failure before retrying. Default value is 1 second.
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+            max_elapsed_time:
+                description: |-
+                    MaxElapsedTime is the maximum amount of time (including retries) spent trying to send a logs batch to
+                    a downstream consumer. Once this value is reached, the data is discarded. It never stops if MaxElapsedTime == 0.
+                    Default value is 5 minutes.
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+            max_interval:
+                description: |-
+                    MaxInterval is the upper bound on backoff interval. Once this value is reached the delay between
+                    consecutive retries will always be `MaxInterval`. Default value is 30 seconds.
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+        additionalProperties: false
+    root_path:
+        type: string
+    start_at:
+        type: string
+    storage:
+        type: string
+    type:
+        type: string
+    units:
+        type: array
+        items:
+            type: string
+additionalProperties: false

@@ -1,0 +1,21 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: sigv4auth extension configuration
+type: object
+properties:
+    assume_role:
+        type: object
+        properties:
+            arn:
+                type: string
+            session_name:
+                type: string
+            sts_region:
+                type: string
+            web_identity_token_file:
+                type: string
+        additionalProperties: false
+    region:
+        type: string
+    service:
+        type: string
+additionalProperties: false

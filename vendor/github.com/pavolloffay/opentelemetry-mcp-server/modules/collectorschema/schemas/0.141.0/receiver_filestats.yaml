@@ -1,0 +1,98 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+properties:
+    collection_interval:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    include:
+        type: string
+    initial_delay:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    metrics:
+        properties:
+            file.atime:
+                properties:
+                    enabled:
+                        type: boolean
+                type: object
+            file.count:
+                properties:
+                    enabled:
+                        type: boolean
+                type: object
+            file.ctime:
+                properties:
+                    enabled:
+                        type: boolean
+                type: object
+            file.mtime:
+                properties:
+                    enabled:
+                        type: boolean
+                type: object
+            file.size:
+                properties:
+                    enabled:
+                        type: boolean
+                type: object
+        type: object
+    resource_attributes:
+        properties:
+            file.name:
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: 'Experimental: MetricsExclude defines a list of filters for attribute values. If the list is not empty, metrics with matching resource attribute values will not be emitted. MetricsInclude has higher priority than MetricsExclude.'
+                        items:
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            type: object
+                        type: array
+                    metrics_include:
+                        description: 'Experimental: MetricsInclude defines a list of filters for attribute values. If the list is not empty, only metrics with matching resource attribute values will be emitted.'
+                        items:
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            type: object
+                        type: array
+                type: object
+            file.path:
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: 'Experimental: MetricsExclude defines a list of filters for attribute values. If the list is not empty, metrics with matching resource attribute values will not be emitted. MetricsInclude has higher priority than MetricsExclude.'
+                        items:
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            type: object
+                        type: array
+                    metrics_include:
+                        description: 'Experimental: MetricsInclude defines a list of filters for attribute values. If the list is not empty, only metrics with matching resource attribute values will be emitted.'
+                        items:
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            type: object
+                        type: array
+                type: object
+        type: object
+    timeout:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+type: object

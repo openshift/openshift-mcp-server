@@ -1,0 +1,44 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: macosunifiedlogging receiver configuration
+type: object
+properties:
+    archive_path:
+        description: |-
+            ArchivePath is a path or glob pattern to .logarchive directory(ies)
+            If empty, reads from the live system logs
+            Supports glob patterns (e.g., "*.logarchive", "**/logs/*.logarchive")
+        type: string
+    end_time:
+        description: |-
+            EndTime specifies when to stop reading logs
+            Only used with archive_path
+        type: string
+    format:
+        description: |-
+            Format specifies the output format from the log command
+            Options: "default" (system default), "ndjson", "json", "syslog", "compact"
+            Default: "default"
+        type: string
+    max_log_age:
+        description: |-
+            MaxLogAge specifies the maximum age of logs to read on startup
+            Only applies to live mode. Format: "24h", "1h30m", etc.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    max_poll_interval:
+        description: |-
+            MaxPollInterval specifies the maximum interval between polling for new logs (live mode only)
+            The actual poll interval uses exponential backoff based on whether logs are being actively written
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    predicate:
+        description: |-
+            Predicate is a filter predicate to pass to the log command
+            Example: "subsystem == 'com.apple.systempreferences'"
+        type: string
+    start_time:
+        description: |-
+            StartTime specifies when to start reading logs from
+            Format: "2006-01-02 15:04:05"
+        type: string
+additionalProperties: false

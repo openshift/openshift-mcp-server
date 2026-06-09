@@ -1,0 +1,45 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: azure_encoding extension configuration
+type: object
+properties:
+    logs:
+        type: object
+        properties:
+            exclude_categories:
+                type: array
+                items:
+                    type: string
+            include_categories:
+                type: array
+                items:
+                    type: string
+            time_formats:
+                description: TimeFormats is a list of time formats parsing layouts for Azure Resource Log Records
+                type: array
+                items:
+                    type: string
+        additionalProperties: false
+    metrics:
+        type: object
+        properties:
+            aggregations:
+                description: Aggregations is a list of metric aggregations to be exposed in OTEL result, default - all
+                type: array
+                items:
+                    type: object
+            time_formats:
+                description: TimeFormats is a list of time formats parsing layouts for Azure Metrics Records
+                type: array
+                items:
+                    type: string
+        additionalProperties: false
+    traces:
+        type: object
+        properties:
+            time_formats:
+                description: TimeFormats is a list of time formats parsing layouts for Azure Traces Records
+                type: array
+                items:
+                    type: string
+        additionalProperties: false
+additionalProperties: false

@@ -1,0 +1,7 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+properties:
+    collection_interval:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+type: object

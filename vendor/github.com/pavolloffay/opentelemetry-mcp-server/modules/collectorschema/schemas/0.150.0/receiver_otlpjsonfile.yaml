@@ -1,0 +1,125 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: otlpjsonfile receiver configuration
+type: object
+properties:
+    acquire_fs_lock:
+        type: boolean
+    compression:
+        type: string
+    delete_after_read:
+        type: boolean
+    encoding:
+        type: string
+    exclude:
+        type: array
+        items:
+            type: string
+    exclude_older_than:
+        description: |-
+            ExcludeOlderThan allows excluding files whose modification time is older
+            than the specified age.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    fingerprint_size:
+        type: integer
+    force_flush_period:
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    header:
+        type: object
+        properties:
+            metadata_operators:
+                type: array
+                items:
+                    type: object
+                    additionalProperties: false
+            pattern:
+                type: string
+        additionalProperties: false
+    include:
+        type: array
+        items:
+            type: string
+    include_file_name:
+        type: boolean
+    include_file_name_resolved:
+        type: boolean
+    include_file_owner_group_name:
+        type: boolean
+    include_file_owner_name:
+        type: boolean
+    include_file_path:
+        type: boolean
+    include_file_path_resolved:
+        type: boolean
+    include_file_permissions:
+        type: boolean
+    include_file_record_number:
+        type: boolean
+    include_file_record_offset:
+        type: boolean
+    initial_buffer_size:
+        type: integer
+    max_batches:
+        type: integer
+    max_concurrent_files:
+        type: integer
+    max_log_size:
+        type: integer
+    max_log_size_behavior:
+        type: string
+    multiline:
+        type: object
+        properties:
+            line_end_pattern:
+                type: string
+            line_start_pattern:
+                type: string
+            omit_pattern:
+                type: boolean
+        additionalProperties: false
+    on_truncate:
+        type: string
+    ordering_criteria:
+        type: object
+        properties:
+            group_by:
+                type: string
+            regex:
+                type: string
+            sort_by:
+                type: array
+                items:
+                    type: object
+                    properties:
+                        ascending:
+                            type: boolean
+                        layout:
+                            description: Timestamp only
+                            type: string
+                        location:
+                            type: string
+                        regex_key:
+                            type: string
+                        sort_type:
+                            type: string
+                    additionalProperties: false
+            top_n:
+                type: integer
+        additionalProperties: false
+    poll_interval:
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    polls_to_archive:
+        type: integer
+    preserve_leading_whitespaces:
+        type: boolean
+    preserve_trailing_whitespaces:
+        type: boolean
+    replay_file:
+        type: boolean
+    start_at:
+        type: string
+    storage:
+        type: string
+additionalProperties: false

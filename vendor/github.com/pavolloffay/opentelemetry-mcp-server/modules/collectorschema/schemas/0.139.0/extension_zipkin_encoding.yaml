@@ -1,0 +1,7 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+properties:
+    protocol:
+        type: string
+    version:
+        type: string
+type: object

@@ -1,0 +1,78 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: pulsar receiver configuration
+type: object
+properties:
+    auth:
+        type: object
+        properties:
+            athenz:
+                type: object
+                properties:
+                    key_id:
+                        type: string
+                    principal_header:
+                        type: string
+                    private_key:
+                        type: string
+                    provider_domain:
+                        type: string
+                    tenant_domain:
+                        type: string
+                    tenant_service:
+                        type: string
+                    zts_url:
+                        type: string
+                additionalProperties: false
+            oauth2:
+                type: object
+                properties:
+                    audience:
+                        type: string
+                    client_id:
+                        type: string
+                    issuer_url:
+                        type: string
+                    private_key:
+                        type: string
+                    scope:
+                        type: string
+                additionalProperties: false
+            tls:
+                type: object
+                properties:
+                    cert_file:
+                        type: string
+                    key_file:
+                        type: string
+                additionalProperties: false
+            token:
+                type: object
+                properties:
+                    token:
+                        type: string
+                additionalProperties: false
+        additionalProperties: false
+    consumer_name:
+        description: Name specifies the consumer name.
+        type: string
+    encoding:
+        description: Encoding of the messages (default "otlp_proto")
+        type: string
+    endpoint:
+        description: Configure the service URL for the Pulsar service.
+        type: string
+    subscription:
+        description: The Subscription that receiver will be consuming messages from (default "otlp_subscription")
+        type: string
+    tls_allow_insecure_connection:
+        description: 'Configure whether the Pulsar client accept untrusted TLS certificate from broker (default: false)'
+        type: boolean
+    tls_trust_certs_file_path:
+        description: Set the path to the trusted TLS certificate file
+        type: string
+    topic:
+        description: |-
+            The topic of pulsar to consume logs,metrics,traces. (default = "otlp_traces" for traces,
+            "otlp_metrics" for metrics, "otlp_logs" for logs)
+        type: string
+additionalProperties: false

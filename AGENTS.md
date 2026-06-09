@@ -439,6 +439,7 @@ The `docs/` directory contains user-facing documentation:
 - `docs/OTEL.md` – OpenTelemetry observability setup
 - `docs/metrics.md` – Metrics toolset (Prometheus / Alertmanager via obs-mcp)
 - `docs/tracing.md` – Tracing toolset (Grafana Tempo via obs-mcp)
+- `docs/otelcol.md` – OpenTelemetry Collector toolset (component discovery, schemas, and config validation via obs-mcp)
 - `docs/KIALI.md` – Kiali toolset configuration
 - `docs/getting-started-kubernetes.md` – Kubernetes ServiceAccount setup
 - `docs/getting-started-claude-code.md` – Claude Code CLI integration

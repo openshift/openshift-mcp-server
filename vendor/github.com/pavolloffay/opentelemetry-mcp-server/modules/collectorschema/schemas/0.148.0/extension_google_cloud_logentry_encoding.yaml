@@ -1,0 +1,11 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: google_cloud_logentry_encoding extension configuration
+type: object
+properties:
+    handle_json_payload_as:
+        description: Controls how the json payload of the [LogEntry]  is parsed into the body.
+        type: string
+    handle_proto_payload_as:
+        description: Controls how the proto payload of the [LogEntry]  is parsed into the body.
+        type: string
+additionalProperties: false

@@ -1,0 +1,24 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: logdedup processor configuration
+type: object
+properties:
+    conditions:
+        type: array
+        items:
+            type: string
+    exclude_fields:
+        type: array
+        items:
+            type: string
+    include_fields:
+        type: array
+        items:
+            type: string
+    interval:
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    log_count_attribute:
+        type: string
+    timezone:
+        type: string
+additionalProperties: false

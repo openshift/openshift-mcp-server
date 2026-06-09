@@ -1,0 +1,45 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: cisco_os receiver configuration
+type: object
+properties:
+    collection_interval:
+        description: |-
+            CollectionInterval sets how frequently the scraper
+            should be called and used as the context timeout
+            to ensure that scrapers don't exceed the interval.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    devices:
+        description: Devices is the list of Cisco devices to monitor.
+        type: array
+        items:
+            type: object
+            properties:
+                auth:
+                    type: object
+                    properties:
+                        key_file:
+                            type: string
+                        password:
+                            type: string
+                        username:
+                            type: string
+                    additionalProperties: false
+                host:
+                    type: string
+                name:
+                    type: string
+                port:
+                    type: integer
+            additionalProperties: false
+    initial_delay:
+        description: |-
+            InitialDelay sets the initial start delay for the scraper,
+            any non positive value is assumed to be immediately.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    timeout:
+        description: Timeout is an optional value used to set scraper's context deadline.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+additionalProperties: false

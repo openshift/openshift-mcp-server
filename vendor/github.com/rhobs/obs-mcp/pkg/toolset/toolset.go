@@ -6,6 +6,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
 
+	"github.com/rhobs/obs-mcp/pkg/otelcol"
 	"github.com/rhobs/obs-mcp/pkg/toolset/config"
 	toolset_tools "github.com/rhobs/obs-mcp/pkg/toolset/tools"
 	tempo "github.com/rhobs/obs-mcp/pkg/traces"
@@ -61,4 +62,5 @@ func (t *Toolset) GetResourceTemplates() []api.ServerResourceTemplate {
 func init() {
 	toolsets.Register(&Toolset{})
 	toolsets.Register(&tempo.Toolset{NewTempoLoader: toolset_tools.NewTempoLoader})
+	toolsets.Register(&otelcol.Toolset{})
 }
