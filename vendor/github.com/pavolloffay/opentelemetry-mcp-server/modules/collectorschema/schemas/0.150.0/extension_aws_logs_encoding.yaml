@@ -1,0 +1,47 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: aws_logs_encoding extension configuration
+type: object
+properties:
+    format:
+        description: |-
+            Format defines the AWS logs format.
+
+            Current valid values are:
+            - cloudwatch
+            - vpcflow
+            - s3access
+            - waf
+            - cloudtrail
+            - elbaccess
+            - networkfirewall
+        type: string
+    vpc_flow_log:
+        description: 'Deprecated: use VPCFlowLogConfig instead. It will be removed in v0.138.0'
+        type: object
+        properties:
+            file_format:
+                description: |-
+                    fileFormat - VPC flow logs can be sent in plain text or parquet files to S3.
+                    See https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs-s3-path.html.
+                type: string
+            format:
+                description: |-
+                    Format defines the custom field format of the VPC flow logs.
+                    When defined, this is used for parsing CloudWatch bound VPC flow logs.
+                type: string
+        additionalProperties: false
+    vpcflow:
+        type: object
+        properties:
+            file_format:
+                description: |-
+                    fileFormat - VPC flow logs can be sent in plain text or parquet files to S3.
+                    See https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs-s3-path.html.
+                type: string
+            format:
+                description: |-
+                    Format defines the custom field format of the VPC flow logs.
+                    When defined, this is used for parsing CloudWatch bound VPC flow logs.
+                type: string
+        additionalProperties: false
+additionalProperties: false

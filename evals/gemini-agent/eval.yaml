@@ -1,0 +1,28 @@
+kind: Eval
+metadata:
+  name: "gemini-agent-netedge-eval"
+config:
+  agent:
+    type: "file"
+    path: "agent.yaml"
+  mcpConfigFile: "../mcp-config.yaml"
+  llmJudge:
+    ref:
+      type: "builtin.llm-agent"
+      model: "openai:gemini-2.5-pro"
+  taskSets:
+    - glob: ../tasks/netedge/*/*.yaml
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            toolPattern: ".*"
+    # Observability tasks
+    - glob: ../tasks/observability/*/*.yaml
+      labelSelector:
+        suite: observability
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            toolPattern: ".*"
+        minToolCalls: 1
+        maxToolCalls: 20

@@ -52,10 +52,14 @@ diff-evals: mcpchecker ## Diff latest mcpchecker results against baseline
 .PHONY: run-server
 run-server: build ## Start MCP server in background and wait for health check
 	@echo "Starting MCP server on port $(MCP_PORT)..."
-	@if [ -n "$(TOOLSETS)" ]; then \
-		./$(BINARY_NAME) --port $(MCP_PORT) --toolsets $(TOOLSETS) --config-dir $(MCP_CONFIG_DIR) & echo $$! > .mcp-server.pid; \
+	@if [ -n "$(MCP_LOG_FILE)" ]; then \
+		echo "Redirecting server logs to $(MCP_LOG_FILE)"; \
+		REDIRECT="> $(MCP_LOG_FILE) 2>&1"; \
+	fi; \
+	if [ -n "$(TOOLSETS)" ]; then \
+		eval "./$(BINARY_NAME) --port $(MCP_PORT) --toolsets $(TOOLSETS) --config-dir $(MCP_CONFIG_DIR) $$REDIRECT &" echo $$! > .mcp-server.pid; \
 	else \
-		./$(BINARY_NAME) --port $(MCP_PORT) & echo $$! > .mcp-server.pid; \
+		eval "./$(BINARY_NAME) --port $(MCP_PORT) $$REDIRECT &" echo $$! > .mcp-server.pid; \
 	fi
 	@echo "MCP server started with PID $$(cat .mcp-server.pid)"
 	@echo "Waiting for MCP server to be ready..."

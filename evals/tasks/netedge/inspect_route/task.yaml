@@ -1,0 +1,15 @@
+kind: Task
+metadata:
+  name: inspect-route
+steps:
+  verify:
+    contains: "console"
+  prompt:
+    inline: Inspect the default OpenShift console route in the openshift-console namespace and report key fields like host, TLS termination type, and backend service.
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "inspect_route"
+        args:
+          namespace: "openshift-console"
+          route: "console"

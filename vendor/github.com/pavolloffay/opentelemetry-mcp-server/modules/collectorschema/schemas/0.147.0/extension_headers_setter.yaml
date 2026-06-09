@@ -1,0 +1,25 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: headers_setter extension configuration
+type: object
+properties:
+    additional_auth:
+        type: string
+    headers:
+        type: array
+        items:
+            type: object
+            properties:
+                action:
+                    type: string
+                default_value:
+                    type: string
+                from_attribute:
+                    type: string
+                from_context:
+                    type: string
+                key:
+                    type: string
+                value:
+                    type: string
+            additionalProperties: false
+additionalProperties: false

@@ -1,0 +1,221 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: syslog receiver configuration
+type: object
+properties:
+    allow_skip_pri_header:
+        type: boolean
+    attributes:
+        type: object
+        additionalProperties:
+            type: object
+    enable_octet_counting:
+        type: boolean
+    id:
+        type: string
+    location:
+        type: string
+    max_octets:
+        type: integer
+    non_transparent_framing_trailer:
+        type: string
+    on_error:
+        type: string
+    operators:
+        type: array
+        items:
+            type: object
+            additionalProperties: false
+    output:
+        type: array
+        items:
+            type: string
+    protocol:
+        type: string
+    resource:
+        type: object
+        additionalProperties:
+            type: object
+    retry_on_failure:
+        type: object
+        properties:
+            enabled:
+                description: |-
+                    Enabled indicates whether to not retry sending logs in case of receiving a retryable error from a downstream
+                    consumer. Default is false.
+                type: boolean
+            initial_interval:
+                description: InitialInterval the time to wait after the first failure before retrying. Default value is 1 second.
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+            max_elapsed_time:
+                description: |-
+                    MaxElapsedTime is the maximum amount of time (including retries) spent trying to send a logs batch to
+                    a downstream consumer. Once this value is reached, the data is discarded. It never stops if MaxElapsedTime == 0.
+                    Default value is 5 minutes.
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+            max_interval:
+                description: |-
+                    MaxInterval is the upper bound on backoff interval. Once this value is reached the delay between
+                    consecutive retries will always be `MaxInterval`. Default value is 30 seconds.
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+        additionalProperties: false
+    storage:
+        type: string
+    tcp:
+        type: object
+        properties:
+            add_attributes:
+                type: boolean
+            encoding:
+                type: string
+            listen_address:
+                type: string
+            max_log_size:
+                type: integer
+            multiline:
+                type: object
+                properties:
+                    line_end_pattern:
+                        type: string
+                    line_start_pattern:
+                        type: string
+                    omit_pattern:
+                        type: boolean
+                additionalProperties: false
+            one_log_per_packet:
+                type: boolean
+            preserve_leading_whitespaces:
+                type: boolean
+            preserve_trailing_whitespaces:
+                type: boolean
+            tls:
+                type: object
+                properties:
+                    ca_file:
+                        description: |-
+                            Path to the CA cert. For a client this verifies the server certificate.
+                            For a server this verifies client certificates. If empty uses system root CA.
+                            (optional)
+                        type: string
+                    ca_pem:
+                        description: In memory PEM encoded cert. (optional)
+                        type: string
+                    cert_file:
+                        description: Path to the TLS cert to use for TLS required connections. (optional)
+                        type: string
+                    cert_pem:
+                        description: In memory PEM encoded TLS cert to use for TLS required connections. (optional)
+                        type: string
+                    cipher_suites:
+                        description: |-
+                            CipherSuites is a list of TLS cipher suites that the TLS transport can use.
+                            If left blank, a safe default list is used.
+                            See https://go.dev/src/crypto/tls/cipher_suites.go for a list of supported cipher suites.
+                        type: array
+                        items:
+                            type: string
+                    client_ca_file:
+                        description: |-
+                            Path to the TLS cert to use by the server to verify a client certificate. (optional)
+                            This sets the ClientCAs and ClientAuth to RequireAndVerifyClientCert in the TLSConfig. Please refer to
+                            https://godoc.org/crypto/tls#Config for more information. (optional)
+                        type: string
+                    client_ca_file_reload:
+                        description: |-
+                            Reload the ClientCAs file when it is modified
+                            (optional, default false)
+                        type: boolean
+                    curve_preferences:
+                        description: |-
+                            contains the elliptic curves that will be used in
+                            an ECDHE handshake, in preference order
+                            Defaults to empty list and "crypto/tls" defaults are used, internally.
+                        type: array
+                        items:
+                            type: string
+                    include_system_ca_certs_pool:
+                        description: |-
+                            If true, load system CA certificates pool in addition to the certificates
+                            configured in this struct.
+                        type: boolean
+                    key_file:
+                        description: Path to the TLS key to use for TLS required connections. (optional)
+                        type: string
+                    key_pem:
+                        description: In memory PEM encoded TLS key to use for TLS required connections. (optional)
+                        type: string
+                    max_version:
+                        description: |-
+                            MaxVersion sets the maximum TLS version that is acceptable.
+                            If not set, refer to crypto/tls for defaults. (optional)
+                        type: string
+                    min_version:
+                        description: |-
+                            MinVersion sets the minimum TLS version that is acceptable.
+                            If not set, TLS 1.2 will be used. (optional)
+                        type: string
+                    reload_interval:
+                        description: |-
+                            ReloadInterval specifies the duration after which the certificate will be reloaded
+                            If not set, it will never be reloaded (optional)
+                        type: string
+                        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+                    tpm:
+                        description: Trusted platform module configuration
+                        type: object
+                        properties:
+                            auth:
+                                type: string
+                            enabled:
+                                type: boolean
+                            owner_auth:
+                                type: string
+                            path:
+                                description: |-
+                                    The path to the TPM device or Unix domain socket.
+                                    For instance /dev/tpm0 or /dev/tpmrm0.
+                                type: string
+                        additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    type:
+        type: string
+    udp:
+        type: object
+        properties:
+            add_attributes:
+                type: boolean
+            async:
+                type: object
+                properties:
+                    max_queue_length:
+                        type: integer
+                    processors:
+                        type: integer
+                    readers:
+                        type: integer
+                additionalProperties: false
+            encoding:
+                type: string
+            listen_address:
+                type: string
+            multiline:
+                type: object
+                properties:
+                    line_end_pattern:
+                        type: string
+                    line_start_pattern:
+                        type: string
+                    omit_pattern:
+                        type: boolean
+                additionalProperties: false
+            one_log_per_packet:
+                type: boolean
+            preserve_leading_whitespaces:
+                type: boolean
+            preserve_trailing_whitespaces:
+                type: boolean
+        additionalProperties: false
+additionalProperties: false

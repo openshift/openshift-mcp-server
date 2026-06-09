@@ -1,0 +1,154 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+properties:
+    inputconfig:
+        properties:
+            acquire_fs_lock:
+                type: boolean
+            attributes:
+                additionalProperties:
+                    type: string
+                type: object
+            compression:
+                type: string
+            delete_after_read:
+                type: boolean
+            encoding:
+                type: string
+            exclude:
+                items:
+                    type: string
+                type: array
+            exclude_older_than:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+            fingerprint_size:
+                type: integer
+            force_flush_period:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+            header:
+                properties:
+                    metadata_operators:
+                        items:
+                            type: object
+                        type: array
+                    pattern:
+                        type: string
+                type: object
+            id:
+                type: string
+            include:
+                items:
+                    type: string
+                type: array
+            include_file_name:
+                type: boolean
+            include_file_name_resolved:
+                type: boolean
+            include_file_owner_group_name:
+                type: boolean
+            include_file_owner_name:
+                type: boolean
+            include_file_path:
+                type: boolean
+            include_file_path_resolved:
+                type: boolean
+            include_file_record_number:
+                type: boolean
+            include_file_record_offset:
+                type: boolean
+            initial_buffer_size:
+                type: integer
+            max_batches:
+                type: integer
+            max_concurrent_files:
+                type: integer
+            max_log_size:
+                type: integer
+            multiline:
+                properties:
+                    line_end_pattern:
+                        type: string
+                    line_start_pattern:
+                        type: string
+                    omit_pattern:
+                        type: boolean
+                type: object
+            ordering_criteria:
+                properties:
+                    group_by:
+                        type: string
+                    regex:
+                        type: string
+                    sort_by:
+                        items:
+                            properties:
+                                ascending:
+                                    type: boolean
+                                layout:
+                                    description: Timestamp only
+                                    type: string
+                                location:
+                                    type: string
+                                regex_key:
+                                    type: string
+                                sort_type:
+                                    type: string
+                            type: object
+                        type: array
+                    top_n:
+                        type: integer
+                type: object
+            output:
+                items:
+                    type: string
+                type: array
+            poll_interval:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+            polls_to_archive:
+                type: integer
+            resource:
+                additionalProperties:
+                    type: string
+                type: object
+            start_at:
+                type: string
+            trimconfig:
+                properties:
+                    preserve_leading_whitespaces:
+                        type: boolean
+                    preserve_trailing_whitespaces:
+                        type: boolean
+                type: object
+            type:
+                type: string
+        type: object
+    operators:
+        items:
+            type: object
+        type: array
+    retry_on_failure:
+        properties:
+            enabled:
+                description: Enabled indicates whether to not retry sending logs in case of receiving a retryable error from a downstream consumer. Default is false.
+                type: boolean
+            initial_interval:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+            max_elapsed_time:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+            max_interval:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+        type: object
+    storage:
+        type: object
+type: object

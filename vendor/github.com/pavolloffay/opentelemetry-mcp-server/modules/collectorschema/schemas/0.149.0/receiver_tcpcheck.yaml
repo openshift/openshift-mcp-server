@@ -1,0 +1,69 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: tcpcheck receiver configuration
+type: object
+properties:
+    collection_interval:
+        description: |-
+            CollectionInterval sets how frequently the scraper
+            should be called and used as the context timeout
+            to ensure that scrapers don't exceed the interval.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    initial_delay:
+        description: |-
+            InitialDelay sets the initial start delay for the scraper,
+            any non positive value is assumed to be immediately.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    metrics:
+        type: object
+        properties:
+            tcpcheck.duration:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            tcpcheck.error:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            tcpcheck.status:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+        additionalProperties: false
+    targets:
+        type: array
+        items:
+            type: object
+            properties:
+                dialer:
+                    description: DialerConfig contains options for connecting to an address.
+                    type: object
+                    properties:
+                        timeout:
+                            description: |-
+                                Timeout is the maximum amount of time a dial will wait for
+                                a connect to complete. The default is no timeout.
+                            type: string
+                            pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+                    additionalProperties: false
+                endpoint:
+                    description: |-
+                        Endpoint configures the address for this network connection.
+                        For TCP and UDP networks, the address has the form "host:port". The host must be a literal IP address,
+                        or a host name that can be resolved to IP addresses. The port must be a literal port number or a service name.
+                        If the host is a literal IPv6 address it must be enclosed in square brackets, as in "[2001:db8::1]:80" or
+                        "[fe80::1%zone]:80". The zone specifies the scope of the literal IPv6 address as defined in RFC 4007.
+                    type: string
+            additionalProperties: false
+    timeout:
+        description: Timeout is an optional value used to set scraper's context deadline.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+additionalProperties: false

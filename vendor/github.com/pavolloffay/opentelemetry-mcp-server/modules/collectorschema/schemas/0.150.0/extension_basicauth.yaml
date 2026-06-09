@@ -1,0 +1,37 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: basicauth extension configuration
+type: object
+properties:
+    client_auth:
+        description: ClientAuth settings
+        type: object
+        properties:
+            password:
+                description: Password holds the password to use for client authentication.
+                type: string
+            password_file:
+                description: |-
+                    PasswordFile points to a file that contains the password.
+                    If set, takes precedence over Password. The file is watched for changes.
+                type: string
+            username:
+                description: Username holds the username to use for client authentication.
+                type: string
+            username_file:
+                description: |-
+                    UsernameFile points to a file that contains the username.
+                    If set, takes precedence over Username. The file is watched for changes.
+                type: string
+        additionalProperties: false
+    htpasswd:
+        description: Htpasswd settings.
+        type: object
+        properties:
+            file:
+                description: Path to the htpasswd file.
+                type: string
+            inline:
+                description: Inline contents of the htpasswd file.
+                type: string
+        additionalProperties: false
+additionalProperties: false

@@ -48,7 +48,7 @@ clean: ## Clean up all build artifacts
 	rm -rf $(CLEAN_TARGETS)
 
 .PHONY: build
-build: clean tidy format lint ## Build the project
+build: clean tidy format ## Build the project
 	go build $(COMMON_BUILD_ARGS) -o $(BINARY_NAME) ./cmd/kubernetes-mcp-server
 
 .PHONY: build-multiarch
@@ -67,6 +67,10 @@ build-all-platforms: clean tidy format lint ## Build the project for all platfor
 .PHONY: test
 test: ## Run the tests
 	go test -race -count=1 -v ./...
+
+.PHONY: test-observability-e2e
+test-observability-e2e: ## Run obs-mcp e2e tests against an OpenShift cluster
+	go test -tags observability_e2e -count=1 -v ./pkg/observability/tests/
 
 .PHONY: test-update-snapshots
 test-update-snapshots: ## Update test snapshots for toolset tests
@@ -167,6 +171,29 @@ local-env-setup-tekton: ## Setup complete local development environment with Kin
 	@echo "Tekton Pipelines is now available!"
 	@echo "Check status with: make tekton-status"
 
+.PHONY: local-env-setup-oadp
+local-env-setup-oadp: ## Setup complete local development environment with Kind cluster and OADP/Velero
+	@echo "========================================="
+	@echo "Kubernetes MCP Server - Local Setup"
+	@echo "          with OADP / Velero"
+	@echo "========================================="
+	$(MAKE) kind-create-cluster
+	$(MAKE) oadp-install
+	$(MAKE) build
+	@echo ""
+	@echo "========================================="
+	@echo "Local environment ready!"
+	@echo "========================================="
+	@echo ""
+	@echo "Run the MCP server with:"
+	@echo "  ./$(BINARY_NAME) --toolsets core,config,oadp"
+	@echo ""
+	@echo "Or run with MCP inspector:"
+	@echo "  npx @modelcontextprotocol/inspector@latest $$(pwd)/$(BINARY_NAME) --toolsets core,config,oadp"
+	@echo ""
+	@echo "OADP / Velero is now available!"
+	@echo "Check status with: make oadp-status"
+
 .PHONY: local-env-teardown
 local-env-teardown: ## Tear down the local Kind cluster
 	$(MAKE) kind-delete-cluster
@@ -177,3 +204,4 @@ print-git-tag-version: ## Print the GIT_TAG_VERSION
 
 # Include build configuration files
 -include build/*.mk
+-include build/openshift/*.mk

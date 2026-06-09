@@ -1,0 +1,156 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: docker_observer extension configuration
+type: object
+properties:
+    api_version:
+        description: |-
+            Docker client API version. If empty, the client will auto-negotiate
+            the API version with the Docker daemon using version negotiation.
+        type: string
+    cache_sync_interval:
+        description: |-
+            The time to wait before resyncing the list of containers the observer maintains
+            through the docker event listener example: cache_sync_interval: "20m"
+            Default: "60m"
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    endpoint:
+        description: |-
+            The URL of the docker server. Default is "unix:///var/run/docker.sock"
+            on non-Windows and "npipe:////./pipe/docker_engine" on Windows
+        type: string
+    excluded_images:
+        description: A list of filters whose matching images are to be excluded. Supports literals, globs, and regex.
+        type: array
+        items:
+            type: string
+    ignore_non_host_bindings:
+        description: |-
+            If true, the observer will ignore discovered container endpoints that are not bound
+            to host ports.  This is useful if containers exist that are not accessible
+            to an instance of the agent running outside of the docker network stack.
+        type: boolean
+    stream_stats:
+        description: |-
+            StreamStats enables a persistent streaming connection per container to collect stats.
+            When true, each container maintains an open Docker stats stream and the scraper reads
+            from the cached latest value, which reduces connection overhead.  When false (default),
+            a new connection is opened and closed on every scrape cycle, matching the original behavior.
+        type: boolean
+    timeout:
+        description: The maximum amount of time to wait for docker API responses. Default is 5s
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    tls:
+        description: |-
+            TLS holds optional TLS client configuration for connecting to the Docker daemon
+            over HTTPS. When nil (the default), the connection uses no custom TLS — suitable
+            for Unix sockets and plain HTTP endpoints.
+        type: object
+        properties:
+            ca_file:
+                description: |-
+                    Path to the CA cert. For a client this verifies the server certificate.
+                    For a server this verifies client certificates. If empty uses system root CA.
+                    (optional)
+                type: string
+            ca_pem:
+                description: In memory PEM encoded cert. (optional)
+                type: string
+            cert_file:
+                description: Path to the TLS cert to use for TLS required connections. (optional)
+                type: string
+            cert_pem:
+                description: In memory PEM encoded TLS cert to use for TLS required connections. (optional)
+                type: string
+            cipher_suites:
+                description: |-
+                    CipherSuites is a list of TLS cipher suites that the TLS transport can use.
+                    If left blank, a safe default list is used.
+                    See https://go.dev/src/crypto/tls/cipher_suites.go for a list of supported cipher suites.
+                type: array
+                items:
+                    type: string
+            curve_preferences:
+                description: |-
+                    contains the elliptic curves that will be used in
+                    an ECDHE handshake, in preference order
+                    Defaults to empty list and "crypto/tls" defaults are used, internally.
+                type: array
+                items:
+                    type: string
+            include_system_ca_certs_pool:
+                description: |-
+                    If true, load system CA certificates pool in addition to the certificates
+                    configured in this struct.
+                type: boolean
+            insecure:
+                description: |-
+                    In gRPC and HTTP when set to true, this is used to disable the client transport security.
+                    See https://godoc.org/google.golang.org/grpc#WithInsecure for gRPC.
+                    Please refer to https://godoc.org/crypto/tls#Config for more information.
+                    (optional, default false)
+                type: boolean
+            insecure_skip_verify:
+                description: InsecureSkipVerify will enable TLS but not verify the certificate.
+                type: boolean
+            key_file:
+                description: Path to the TLS key to use for TLS required connections. (optional)
+                type: string
+            key_pem:
+                description: In memory PEM encoded TLS key to use for TLS required connections. (optional)
+                type: string
+            max_version:
+                description: |-
+                    MaxVersion sets the maximum TLS version that is acceptable.
+                    If not set, refer to crypto/tls for defaults. (optional)
+                type: string
+            min_version:
+                description: |-
+                    MinVersion sets the minimum TLS version that is acceptable.
+                    If not set, TLS 1.2 will be used. (optional)
+                type: string
+            reload_interval:
+                description: |-
+                    ReloadInterval specifies the duration after which the certificate will be reloaded
+                    If not set, it will never be reloaded (optional)
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+            server_name_override:
+                description: |-
+                    ServerName requested by client for virtual hosting.
+                    This sets the ServerName in the TLSConfig. Please refer to
+                    https://godoc.org/crypto/tls#Config for more information. (optional)
+                type: string
+            tpm:
+                description: Trusted platform module configuration
+                type: object
+                properties:
+                    auth:
+                        type: string
+                    enabled:
+                        type: boolean
+                    owner_auth:
+                        type: string
+                    path:
+                        description: |-
+                            The path to the TPM device or Unix domain socket.
+                            For instance /dev/tpm0 or /dev/tpmrm0.
+                        type: string
+                additionalProperties: false
+        additionalProperties: false
+    use_host_bindings:
+        description: |-
+            If true, the observer will configure receivers for matching container endpoints
+            using the host bound ip and port.  This is useful if containers exist that are not
+            accessible to an instance of the agent running outside of the docker network stack.
+            If UseHostnameIfPresent and this config are both enabled, this setting will take precedence.
+        type: boolean
+    use_hostname_if_present:
+        description: |-
+            If true, the "Config.Hostname" field (if present) of the docker
+            container will be used as the discovered host that is used to configure
+            receivers.  If false or if no hostname is configured, the field
+            `NetworkSettings.IPAddress` is used instead.
+        type: boolean
+additionalProperties: false

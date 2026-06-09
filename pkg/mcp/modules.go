@@ -7,5 +7,9 @@ import (
 	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kcp"
 	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kiali"
 	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt"
+	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/netedge"
+	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/oadp"
+	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/openshift"
 	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/tekton"
+	_ "github.com/rhobs/obs-mcp/pkg/toolset"
 )

@@ -1,4 +1,5 @@
 _output/
+hack/kiali/bookinfo-hack/
 .idea/
 .vscode/
 .docusaurus/
@@ -27,8 +28,11 @@ kubernetes-mcp-server-linux-ppc64le
 kubernetes-mcp-server-windows-amd64.exe
 kubernetes-mcp-server-windows-arm64.exe
 
+.keycloak-config
+
 python/.venv/
 python/build/
 python/dist/
 python/kubernetes_mcp_server.egg-info/
 !python/kubernetes-mcp-server
+.notes/

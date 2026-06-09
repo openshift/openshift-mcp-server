@@ -1,0 +1,389 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+properties:
+    api:
+        description: API defines the Datadog API configuration.
+        properties:
+            fail_on_invalid_key:
+                description: FailOnInvalidKey states whether to exit at startup on invalid API key. The default value is false.
+                type: boolean
+            key:
+                description: 'Key is the Datadog API key to associate your Agent''s data with your organization. Create a new API key here: https://app.datadoghq.com/account/settings'
+                type: string
+            site:
+                description: Site is the site of the Datadog intake to send data to. The default value is "datadoghq.com".
+                type: string
+        type: object
+    auth:
+        properties:
+            authenticator:
+                description: AuthenticatorID specifies the name of the extension to use in order to authenticate the incoming data point.
+                type: object
+        type: object
+    compression:
+        description: The compression key for supported compression types within collector.
+        type: string
+    compression_params:
+        description: Advanced configuration options for the Compression
+        properties:
+            level:
+                type: integer
+        type: object
+    cookies:
+        description: Cookies configures the cookie management of the HTTP client.
+        properties:
+            enabled:
+                description: Enabled if true, cookies from HTTP responses will be reused in further HTTP requests with the same server.
+                type: boolean
+        type: object
+    disable_keep_alives:
+        description: 'DisableKeepAlives, if true, disables HTTP keep-alives and will only use the connection to the server for a single HTTP request. WARNING: enabling this option can result in significant overhead establishing a new HTTP(S) connection for every request. Before enabling this option please consider whether changes to idle connection settings can achieve your goal.'
+        type: boolean
+    enabled:
+        description: Enabled indicates whether to not retry sending batches in case of export failure.
+        type: boolean
+    endpoint:
+        description: 'The target URL to send data to (e.g.: http://some.url:9411/v1/traces).'
+        type: string
+    force_attempt_http2:
+        description: 'Enabling ForceAttemptHTTP2 forces the HTTP transport to use the HTTP/2 protocol. By default, this is set to true. NOTE: HTTP/2 does not support settings such as MaxConnsPerHost, MaxIdleConnsPerHost and MaxIdleConns.'
+        type: boolean
+    headers:
+        description: Additional headers attached to each HTTP request sent by the client. Existing header values are overwritten if collision happens. Header values are opaque since they may be sensitive.
+        items:
+            properties:
+                name:
+                    type: string
+                value:
+                    type: string
+            type: object
+        type: array
+    host_metadata:
+        description: HostMetadata defines the host metadata specific configuration
+        properties:
+            enabled:
+                description: Enabled enables the host metadata functionality.
+                type: boolean
+            hostname_source:
+                deprecated: true
+                description: 'HostnameSource is the source for the hostname of host metadata. This hostname is used for identifying the infrastructure list, host map and host tag information related to the host where the Datadog exporter is running. Changing this setting will not change the host used to tag your metrics, traces and logs in any way. For remote hosts, see https://docs.datadoghq.com/opentelemetry/schema_semantics/host_metadata/. Valid values are ''first_resource'' and ''config_or_system'': - ''first_resource'' picks the host metadata hostname from the resource attributes on the first OTLP payload that gets to the exporter. If the first payload lacks hostname-like attributes, it will fallback to ''config_or_system''. **Do not use this hostname source if receiving data from multiple hosts**. - ''config_or_system'' picks the host metadata hostname from the ''hostname'' setting, If this is empty it will use available system APIs and cloud provider endpoints. The default is ''config_or_system''.'
+                type: string
+            reporter_period:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+            tags:
+                description: Tags is a list of host tags. These tags will be attached to telemetry signals that have the host metadata hostname. To attach tags to telemetry signals regardless of the host, use a processor instead.
+                items:
+                    type: string
+                type: array
+        type: object
+    hostname:
+        description: Hostname is the fallback hostname used for payloads without hostname-identifying attributes. This option will NOT change the hostname applied to your metrics, traces and logs if they already have hostname-identifying attributes. If unset, the hostname will be determined automatically. See https://docs.datadoghq.com/opentelemetry/schema_semantics/hostname/?tab=datadogexporter#fallback-hostname-logic for details. Prefer using the `datadog.host.name` resource attribute over using this setting. See https://docs.datadoghq.com/opentelemetry/schema_semantics/hostname/?tab=datadogexporter#general-hostname-semantic-conventions for details.
+        type: string
+    hostname_detection_timeout:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    http2_ping_timeout:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    http2_read_idle_timeout:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    idle_conn_timeout:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    initial_interval:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    logs:
+        description: Logs defines the Logs exporter specific configuration
+        properties:
+            batch_wait:
+                description: 'BatchWait represents the maximum time the logs agent waits to fill each batch of logs before sending. Note: this config option does not apply when the `exporter.datadogexporter.UseLogsAgentExporter` feature flag is disabled.'
+                type: integer
+            compression_level:
+                description: 'CompressionLevel accepts values from 0 (no compression) to 9 (maximum compression but higher resource usage). Only takes effect if UseCompression is set to true. Note: this config option does not apply when the `exporter.datadogexporter.UseLogsAgentExporter` feature flag is disabled.'
+                type: integer
+            dialer:
+                description: DialerConfig contains options for connecting to an address.
+                properties:
+                    timeout:
+                        description: Duration string (e.g., '1s', '5m', '1h')
+                        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                        type: string
+                type: object
+            endpoint:
+                description: Endpoint configures the address for this network connection. The address has the form "host:port". The host must be a literal IP address, or a host name that can be resolved to IP addresses. The port must be a literal port number or a service name. If the host is a literal IPv6 address it must be enclosed in square brackets, as in "[2001:db8::1]:80" or "[fe80::1%zone]:80". The zone specifies the scope of the literal IPv6 address as defined in RFC 4007.
+                type: string
+            use_compression:
+                description: 'UseCompression enables the logs agent to compress logs before sending them. Note: this config option does not apply when the `exporter.datadogexporter.UseLogsAgentExporter` feature flag is disabled.'
+                type: boolean
+        type: object
+    max_conns_per_host:
+        description: MaxConnsPerHost limits the total number of connections per host, including connections in the dialing, active, and idle states. Default is 0 (unlimited).
+        type: integer
+    max_elapsed_time:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    max_idle_conns:
+        description: MaxIdleConns is used to set a limit to the maximum idle HTTP connections the client can keep open. By default, it is set to 100. Zero means no limit.
+        type: integer
+    max_idle_conns_per_host:
+        description: MaxIdleConnsPerHost is used to set a limit to the maximum idle HTTP connections the host can keep open. If zero, [net/http.DefaultMaxIdleConnsPerHost] is used.
+        type: integer
+    max_interval:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    metrics:
+        description: Metrics defines the Metrics exporter specific configuration
+        properties:
+            delta_ttl:
+                description: DeltaTTL defines the time that previous points of a cumulative monotonic metric are kept in memory to calculate deltas
+                type: integer
+            dialer:
+                description: DialerConfig contains options for connecting to an address.
+                properties:
+                    timeout:
+                        description: Duration string (e.g., '1s', '5m', '1h')
+                        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                        type: string
+                type: object
+            endpoint:
+                description: Endpoint configures the address for this network connection. The address has the form "host:port". The host must be a literal IP address, or a host name that can be resolved to IP addresses. The port must be a literal port number or a service name. If the host is a literal IPv6 address it must be enclosed in square brackets, as in "[2001:db8::1]:80" or "[fe80::1%zone]:80". The zone specifies the scope of the literal IPv6 address as defined in RFC 4007.
+                type: string
+            exporterconfig:
+                properties:
+                    instrumentation_scope_metadata_as_tags:
+                        description: InstrumentationScopeMetadataAsTags, if set to true, adds the name and version of the instrumentation scope that created a metric to the metric tags
+                        type: boolean
+                    resource_attributes_as_tags:
+                        description: ResourceAttributesAsTags, if set to true, will use the exporterhelper feature to transform all resource attributes into metric labels, which are then converted into tags
+                        type: boolean
+                type: object
+            histograms:
+                description: HistConfig defines the export of OTLP Histograms.
+                properties:
+                    mode:
+                        description: Mode for exporting histograms. Valid values are 'distributions', 'counters' or 'nobuckets'. - 'distributions' sends histograms as Datadog distributions (recommended). - 'counters' sends histograms as Datadog counts, one metric per bucket. - 'nobuckets' sends no bucket histogram metrics. Aggregation metrics will still be sent if `send_aggregation_metrics` is enabled. The current default is 'distributions'.
+                        type: string
+                    send_aggregation_metrics:
+                        description: SendAggregations states if the exporter should send .sum, .count, .min and .max metrics for histograms. The default is false.
+                        type: boolean
+                    send_count_sum_metrics:
+                        deprecated: true
+                        description: 'SendCountSum states if the export should send .sum and .count metrics for histograms. The default is false. Deprecated: [v0.75.0] Use `send_aggregation_metrics` (HistogramConfig.SendAggregations) instead.'
+                        type: boolean
+                type: object
+            summaries:
+                description: SummaryConfig defines the export for OTLP Summaries.
+                properties:
+                    mode:
+                        description: Mode is the mode for exporting OTLP Summaries. Valid values are 'noquantiles' or 'gauges'. - 'noquantiles' sends no `.quantile` metrics. `.sum` and `.count` metrics will still be sent. - 'gauges' sends `.quantile` metrics as gauges tagged by the quantile. The default is 'gauges'. See https://docs.datadoghq.com/metrics/otlp/?tab=summary#mapping for details and examples.
+                        type: string
+                type: object
+            sums:
+                description: SumConfig defines the export of OTLP Sums.
+                properties:
+                    cumulative_monotonic_mode:
+                        description: CumulativeMonotonicMode is the mode for exporting OTLP Cumulative Monotonic Sums. Valid values are 'to_delta' or 'raw_value'. - 'to_delta' calculates delta for cumulative monotonic sums and sends it as a Datadog count. - 'raw_value' sends the raw value of cumulative monotonic sums as Datadog gauges. The default is 'to_delta'. See https://docs.datadoghq.com/metrics/otlp/?tab=sum#mapping for details and examples.
+                        type: string
+                    initial_cumulative_monotonic_value:
+                        description: InitialCumulativeMonotonicMode defines the behavior of the exporter when receiving the first value of a cumulative monotonic sum.
+                        type: string
+                type: object
+        type: object
+    middlewares:
+        description: Middlewares are used to add custom functionality to the HTTP client. Middleware handlers are called in the order they appear in this list, with the first middleware becoming the outermost handler.
+        items:
+            properties:
+                id:
+                    description: ID specifies the name of the extension to use.
+                    type: object
+            type: object
+        type: array
+    multiplier:
+        description: Multiplier is the value multiplied by the backoff interval bounds
+        type: number
+    only_metadata:
+        description: OnlyMetadata defines whether to only send metadata This is useful for agent-collector setups, so that metadata about a host is sent to the backend even when telemetry data is reported via a different host. This flag is incompatible with disabling host metadata, `use_resource_metadata`, or `host_metadata::hostname_source != first_resource`
+        type: boolean
+    proxy_url:
+        description: ProxyURL setting for the collector
+        type: string
+    randomization_factor:
+        description: RandomizationFactor is a random factor used to calculate next backoffs Randomized interval = RetryInterval * (1 ± RandomizationFactor)
+        type: number
+    read_buffer_size:
+        description: ReadBufferSize for HTTP client. See http.Transport.ReadBufferSize. Default is 0.
+        type: integer
+    sending_queue:
+        properties:
+            batch:
+                properties:
+                    flush_timeout:
+                        description: Duration string (e.g., '1s', '5m', '1h')
+                        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                        type: string
+                    max_size:
+                        description: MaxSize defines the configuration for the maximum size of a batch.
+                        type: integer
+                    min_size:
+                        description: MinSize defines the configuration for the minimum size of a batch.
+                        type: integer
+                    sizer:
+                        description: Sizer determines the type of size measurement used by the batch. If not configured, use the same configuration as the queue. It accepts "requests", "items", or "bytes".
+                        type: object
+                type: object
+            block_on_overflow:
+                description: BlockOnOverflow determines the behavior when the component's TotalSize limit is reached. If true, the component will wait for space; otherwise, operations will immediately return a retryable error.
+                type: boolean
+            enabled:
+                description: Enabled indicates whether to not enqueue and batch before exporting.
+                type: boolean
+            num_consumers:
+                description: NumConsumers is the maximum number of concurrent consumers from the queue. This applies across all different optional configurations from above (e.g. wait_for_result, block_on_overflow, storage, etc.).
+                type: integer
+            queue_size:
+                description: QueueSize represents the maximum data size allowed for concurrent storage and processing.
+                type: integer
+            sizer:
+                description: Sizer determines the type of size measurement used by this component. It accepts "requests", "items", or "bytes".
+                type: object
+            storage:
+                description: 'StorageID if not empty, enables the persistent storage and uses the component specified as a storage extension for the persistent queue. TODO: This will be changed to Optional when available. See https://github.com/open-telemetry/opentelemetry-collector/issues/13822'
+                type: object
+            wait_for_result:
+                description: WaitForResult determines if incoming requests are blocked until the request is processed or not. Currently, this option is not available when persistent queue is configured using the storage configuration.
+                type: boolean
+        type: object
+    timeout:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    tls:
+        description: TLS struct exposes TLS client configuration.
+        properties:
+            ca_file:
+                description: Path to the CA cert. For a client this verifies the server certificate. For a server this verifies client certificates. If empty uses system root CA. (optional)
+                type: string
+            ca_pem:
+                description: In memory PEM encoded cert. (optional)
+                type: string
+            cert_file:
+                description: Path to the TLS cert to use for TLS required connections. (optional)
+                type: string
+            cert_pem:
+                description: In memory PEM encoded TLS cert to use for TLS required connections. (optional)
+                type: string
+            cipher_suites:
+                description: CipherSuites is a list of TLS cipher suites that the TLS transport can use. If left blank, a safe default list is used. See https://go.dev/src/crypto/tls/cipher_suites.go for a list of supported cipher suites.
+                items:
+                    type: string
+                type: array
+            curve_preferences:
+                description: contains the elliptic curves that will be used in an ECDHE handshake, in preference order Defaults to empty list and "crypto/tls" defaults are used, internally.
+                items:
+                    type: string
+                type: array
+            include_system_ca_certs_pool:
+                description: If true, load system CA certificates pool in addition to the certificates configured in this struct.
+                type: boolean
+            insecure:
+                description: In gRPC and HTTP when set to true, this is used to disable the client transport security. See https://godoc.org/google.golang.org/grpc#WithInsecure for gRPC. Please refer to https://godoc.org/crypto/tls#Config for more information. (optional, default false)
+                type: boolean
+            insecure_skip_verify:
+                description: InsecureSkipVerify will enable TLS but not verify the certificate.
+                type: boolean
+            key_file:
+                description: Path to the TLS key to use for TLS required connections. (optional)
+                type: string
+            key_pem:
+                description: In memory PEM encoded TLS key to use for TLS required connections. (optional)
+                type: string
+            max_version:
+                description: MaxVersion sets the maximum TLS version that is acceptable. If not set, refer to crypto/tls for defaults. (optional)
+                type: string
+            min_version:
+                description: MinVersion sets the minimum TLS version that is acceptable. If not set, TLS 1.2 will be used. (optional)
+                type: string
+            reload_interval:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+            server_name_override:
+                description: ServerName requested by client for virtual hosting. This sets the ServerName in the TLSConfig. Please refer to https://godoc.org/crypto/tls#Config for more information. (optional)
+                type: string
+            tpm:
+                description: Trusted platform module configuration
+                properties:
+                    auth:
+                        type: string
+                    enabled:
+                        type: boolean
+                    owner_auth:
+                        type: string
+                    path:
+                        description: The path to the TPM device or Unix domain socket. For instance /dev/tpm0 or /dev/tpmrm0.
+                        type: string
+                type: object
+        type: object
+    traces:
+        description: Traces defines the Traces exporter specific configuration
+        properties:
+            compute_stats_by_span_kind:
+                description: 'If set to true, enables an additional stats computation check on spans to see they have an eligible `span.kind` (server, consumer, client, producer). If enabled, a span with an eligible `span.kind` will have stats computed. If disabled, only top-level and measured spans will have stats computed. NOTE: For stats computed from OTel traces, only top-level spans are considered when this option is off. If you are sending OTel traces and want stats on non-top-level spans, this flag will need to be enabled. If you are sending OTel traces and do not want stats computed by span kind, you need to disable this flag and disable `compute_top_level_by_span_kind`.'
+                type: boolean
+            compute_top_level_by_span_kind:
+                description: If set to true, root spans and spans with a server or consumer `span.kind` will be marked as top-level. Additionally, spans with a client or producer `span.kind` will have stats computed. Enabling this config option may increase the number of spans that generate trace metrics, and may change which spans appear as top-level in Datadog. ComputeTopLevelBySpanKind needs to be enabled in both the Datadog connector and Datadog exporter configs if both components are being used. The default value is `false`.
+                type: boolean
+            dialer:
+                description: DialerConfig contains options for connecting to an address.
+                properties:
+                    timeout:
+                        description: Duration string (e.g., '1s', '5m', '1h')
+                        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                        type: string
+                type: object
+            endpoint:
+                description: Endpoint configures the address for this network connection. The address has the form "host:port". The host must be a literal IP address, or a host name that can be resolved to IP addresses. The port must be a literal port number or a service name. If the host is a literal IPv6 address it must be enclosed in square brackets, as in "[2001:db8::1]:80" or "[fe80::1%zone]:80". The zone specifies the scope of the literal IPv6 address as defined in RFC 4007.
+                type: string
+            ignore_resources:
+                description: 'ignored resources A blacklist of regular expressions can be provided to disable certain traces based on their resource name all entries must be surrounded by double quotes and separated by commas. ignore_resources: ["(GET|POST) /healthcheck"]'
+                items:
+                    type: string
+                type: array
+            peer_service_aggregation:
+                deprecated: true
+                description: 'If set to true, enables `peer.service` aggregation in the exporter. If disabled, aggregated trace stats will not include `peer.service` as a dimension. For the best experience with `peer.service`, it is recommended to also enable `compute_stats_by_span_kind`. If enabling both causes the datadog exporter to consume too many resources, try disabling `compute_stats_by_span_kind` first. If the overhead remains high, it will be due to a high cardinality of `peer.service` values from the traces. You may need to check your instrumentation. Deprecated: Please use PeerTagsAggregation instead'
+                type: boolean
+            peer_tags:
+                description: '[BETA] Optional list of supplementary peer tags that go beyond the defaults. The Datadog backend validates all tags and will drop ones that are unapproved. The default set of peer tags can be found at https://github.com/DataDog/datadog-agent/blob/505170c4ac8c3cbff1a61cf5f84b28d835c91058/pkg/trace/stats/concentrator.go#L55.'
+                items:
+                    type: string
+                type: array
+            peer_tags_aggregation:
+                description: If set to true, enables aggregation of peer related tags (e.g., `peer.service`, `db.instance`, etc.) in the datadog exporter. If disabled, aggregated trace stats will not include these tags as dimensions on trace metrics. For the best experience with peer tags, Datadog also recommends enabling `compute_stats_by_span_kind`. If you are using an OTel tracer, it's best to have both enabled because client/producer spans with relevant peer tags may not be marked by the datadog exporter as top-level spans. If enabling both causes the datadog exporter to consume too many resources, try disabling `compute_stats_by_span_kind` first. A high cardinality of peer tags or APM resources can also contribute to higher CPU and memory consumption. You can check for the cardinality of these fields by making trace search queries in the Datadog UI. The default list of peer tags can be found in https://github.com/DataDog/datadog-agent/blob/main/pkg/trace/stats/concentrator.go.
+                type: boolean
+            span_name_as_resource_name:
+                description: If set to true the OpenTelemetry span name will used in the Datadog resource name. If set to false the resource name will be filled with the instrumentation library name + span kind. The default value is `false`.
+                type: boolean
+            span_name_remappings:
+                additionalProperties:
+                    type: string
+                description: 'SpanNameRemappings is the map of datadog span names and preferred name to map to. This can be used to automatically map Datadog Span Operation Names to an updated value. All entries should be key/value pairs. span_name_remappings: io.opentelemetry.javaagent.spring.client: spring.client instrumentation:express.server: express go.opentelemetry.io_contrib_instrumentation_net_http_otelhttp.client: http.client'
+                type: object
+            trace_buffer:
+                description: TraceBuffer specifies the number of Datadog Agent TracerPayloads to buffer before dropping. The default value is 0, meaning the Datadog Agent TracerPayloads are unbuffered.
+                type: integer
+        type: object
+    write_buffer_size:
+        description: WriteBufferSize for HTTP client. See http.Transport.WriteBufferSize. Default is 0.
+        type: integer
+type: object

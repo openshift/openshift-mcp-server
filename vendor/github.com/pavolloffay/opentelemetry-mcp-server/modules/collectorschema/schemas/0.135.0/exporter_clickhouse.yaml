@@ -1,0 +1,156 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+properties:
+    async_insert:
+        description: AsyncInsert if true will enable async inserts. Default is `true`. Ignored if async inserts are configured in the `endpoint` or `connection_params`. Async inserts may still be overridden server-side.
+        type: boolean
+    cluster_name:
+        description: ClusterName if set will append `ON CLUSTER` with the provided name when creating tables.
+        type: string
+    compress:
+        description: 'Compress controls the compression algorithm. Valid options: `none` (disabled), `zstd`, `lz4` (default), `gzip`, `deflate`, `br`, `true` (lz4).'
+        type: string
+    connection_params:
+        additionalProperties:
+            type: string
+        description: ConnectionParams is the extra connection parameters with map format. for example compression/dial_timeout
+        type: object
+    create_schema:
+        description: CreateSchema if set to true will run the DDL for creating the database and tables. default is true.
+        type: boolean
+    database:
+        description: Database is the database name to export.
+        type: string
+    enabled:
+        description: Enabled indicates whether to not retry sending batches in case of export failure.
+        type: boolean
+    endpoint:
+        description: Endpoint is the clickhouse endpoint.
+        type: string
+    initial_interval:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    logs_table_name:
+        description: LogsTableName is the table name for logs. default is `otel_logs`.
+        type: string
+    max_elapsed_time:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    max_interval:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    metrics_table_name:
+        deprecated: true
+        description: 'MetricsTableName is the table name for metrics. default is `otel_metrics`. Deprecated: MetricsTableName exists for historical compatibility and should not be used. To set the metrics tables name, use the MetricsTables parameter instead.'
+        type: string
+    metrics_tables:
+        description: MetricsTables defines the table names for metric types.
+        properties:
+            exponential_histogram:
+                description: ExponentialHistogram is the table name for exponential histogram metric type. default is `otel_metrics_exponential_histogram`.
+                properties:
+                    name:
+                        type: string
+                type: object
+            gauge:
+                description: Gauge is the table name for gauge metric type. default is `otel_metrics_gauge`.
+                properties:
+                    name:
+                        type: string
+                type: object
+            histogram:
+                description: Histogram is the table name for histogram metric type. default is `otel_metrics_histogram`.
+                properties:
+                    name:
+                        type: string
+                type: object
+            sum:
+                description: Sum is the table name for sum metric type. default is `otel_metrics_sum`.
+                properties:
+                    name:
+                        type: string
+                type: object
+            summary:
+                description: Summary is the table name for summary metric type. default is `otel_metrics_summary`.
+                properties:
+                    name:
+                        type: string
+                type: object
+        type: object
+    multiplier:
+        description: Multiplier is the value multiplied by the backoff interval bounds
+        type: number
+    password:
+        description: Password is the authentication password.
+        type: string
+    randomization_factor:
+        description: RandomizationFactor is a random factor used to calculate next backoffs Randomized interval = RetryInterval * (1 ± RandomizationFactor)
+        type: number
+    sending_queue:
+        properties:
+            batch:
+                properties:
+                    flush_timeout:
+                        description: Duration string (e.g., '1s', '5m', '1h')
+                        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                        type: string
+                    max_size:
+                        description: MaxSize defines the configuration for the maximum size of a batch.
+                        type: integer
+                    min_size:
+                        description: MinSize defines the configuration for the minimum size of a batch.
+                        type: integer
+                    sizer:
+                        description: Sizer determines the type of size measurement used by the batch. If not configured, use the same configuration as the queue. It accepts "requests", "items", or "bytes".
+                        type: object
+                type: object
+            block_on_overflow:
+                description: BlockOnOverflow determines the behavior when the component's TotalSize limit is reached. If true, the component will wait for space; otherwise, operations will immediately return a retryable error.
+                type: boolean
+            enabled:
+                description: Enabled indicates whether to not enqueue and batch before exporting.
+                type: boolean
+            num_consumers:
+                description: 'NumConsumers is the maximum number of concurrent consumers from the queue. This applies across all different optional configurations from above (e.g. wait_for_result, blockOnOverflow, persistent, etc.). TODO: This will also control the maximum number of shards, when supported: https://github.com/open-telemetry/opentelemetry-collector/issues/12473.'
+                type: integer
+            queue_size:
+                description: QueueSize represents the maximum data size allowed for concurrent storage and processing.
+                type: integer
+            sizer:
+                description: Sizer determines the type of size measurement used by this component. It accepts "requests", "items", or "bytes".
+                type: object
+            storage:
+                description: 'StorageID if not empty, enables the persistent storage and uses the component specified as a storage extension for the persistent queue. TODO: This will be changed to Optional when available.'
+                type: object
+            wait_for_result:
+                description: WaitForResult determines if incoming requests are blocked until the request is processed or not. Currently, this option is not available when persistent queue is configured using the storage configuration.
+                type: boolean
+        type: object
+    table_engine:
+        description: TableEngine is the table engine to use. default is `MergeTree()`.
+        properties:
+            name:
+                type: string
+            params:
+                type: string
+        type: object
+    timeoutsettings:
+        properties:
+            timeout:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+        type: object
+    traces_table_name:
+        description: TracesTableName is the table name for traces. default is `otel_traces`.
+        type: string
+    ttl:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    username:
+        description: Username is the authentication username.
+        type: string
+type: object

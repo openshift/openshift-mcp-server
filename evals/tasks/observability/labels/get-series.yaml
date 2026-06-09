@@ -1,0 +1,26 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "get-series-cardinality"
+  difficulty: medium
+  parallel: true
+  runs: 1
+  labels:
+    category: labels
+    suite: observability
+    toolType: exploration
+  description: |
+    Tests if the agent can use the get_series tool to check cardinality for a metric.
+    The agent should first verify the metric exists via list_metrics, then use
+    get_series to retrieve matching time series and report the count.
+spec:
+  verify:
+    - llmJudge:
+        contains: "namespace"
+        reason: "Verify the agent retrieved actual series data containing label dimensions like namespace"
+    - llmJudge:
+        contains: "kube_pod_info"
+        reason: "Verify the agent queried the kube_pod_info metric and reported its cardinality"
+  prompt:
+    inline: |
+      How many time series exist for the kube_pod_info metric? Show the count and list the label names present.

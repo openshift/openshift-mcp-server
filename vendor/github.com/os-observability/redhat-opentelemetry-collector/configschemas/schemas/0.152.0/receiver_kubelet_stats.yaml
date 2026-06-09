@@ -1,0 +1,1114 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: kubelet_stats receiver configuration
+type: object
+properties:
+    auth_type:
+        description: |-
+            How to authenticate to the K8s API server.  This can be one of `none`
+            (for no auth), `serviceAccount` (to use the standard service account
+            token provided to the agent pod), or `kubeConfig` to use credentials
+            from `~/.kube/config`.
+        type: string
+    ca_file:
+        description: |-
+            Path to the CA cert. For a client this verifies the server certificate.
+            For a server this verifies client certificates. If empty uses system root CA.
+            (optional)
+        type: string
+    ca_pem:
+        description: In memory PEM encoded cert. (optional)
+        type: string
+    cert_file:
+        description: Path to the TLS cert to use for TLS required connections. (optional)
+        type: string
+    cert_pem:
+        description: In memory PEM encoded TLS cert to use for TLS required connections. (optional)
+        type: string
+    cipher_suites:
+        description: |-
+            CipherSuites is a list of TLS cipher suites that the TLS transport can use.
+            If left blank, a safe default list is used.
+            See https://go.dev/src/crypto/tls/cipher_suites.go for a list of supported cipher suites.
+        type: array
+        items:
+            type: string
+    collect_all_network_interfaces:
+        description: |-
+            NetworkCollectAllInterfaces allows to enable collecting metrics from all network interfaces instead of default one
+            Can be set separately for Pod and Node network metrics
+        type: object
+        properties:
+            node:
+                type: boolean
+            pod:
+                type: boolean
+        additionalProperties: false
+    collection_interval:
+        description: |-
+            CollectionInterval sets how frequently the scraper
+            should be called and used as the context timeout
+            to ensure that scrapers don't exceed the interval.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    context:
+        description: When using auth_type `kubeConfig`, override the current context.
+        type: string
+    curve_preferences:
+        description: |-
+            contains the elliptic curves that will be used in
+            an ECDHE handshake, in preference order
+            Defaults to empty list and "crypto/tls" defaults are used, internally.
+        type: array
+        items:
+            type: string
+    dialer:
+        description: DialerConfig contains options for connecting to an address.
+        type: object
+        properties:
+            timeout:
+                description: |-
+                    Timeout is the maximum amount of time a dial will wait for
+                    a connect to complete. The default is no timeout.
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+        additionalProperties: false
+    endpoint:
+        description: |-
+            Endpoint configures the address for this network connection.
+            The address has the form "host:port". The host must be a literal IP address, or a host name that can be
+            resolved to IP addresses. The port must be a literal port number or a service name.
+            If the host is a literal IPv6 address it must be enclosed in square brackets, as in "[2001:db8::1]:80" or
+            "[fe80::1%zone]:80". The zone specifies the scope of the literal IPv6 address as defined in RFC 4007.
+        type: string
+    extra_metadata_labels:
+        description: |-
+            ExtraMetadataLabels contains list of extra metadata that should be taken from /pods endpoint
+            and put as extra labels on metrics resource.
+            No additional metadata is fetched by default, so there are no extra calls to /pods endpoint.
+            Supported values include container.id and k8s.volume.type.
+        type: array
+        items:
+            type: object
+    include_system_ca_certs_pool:
+        description: |-
+            If true, load system CA certificates pool in addition to the certificates
+            configured in this struct.
+        type: boolean
+    initial_delay:
+        description: |-
+            InitialDelay sets the initial start delay for the scraper,
+            any non positive value is assumed to be immediately.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    insecure_skip_verify:
+        description: |-
+            InsecureSkipVerify controls whether the client verifies the server's
+            certificate chain and host name.
+        type: boolean
+    k8s_api_config:
+        description: Configuration of the Kubernetes API client.
+        type: object
+        properties:
+            auth_type:
+                description: |-
+                    How to authenticate to the K8s API server.  This can be one of `none`
+                    (for no auth), `serviceAccount` (to use the standard service account
+                    token provided to the agent pod), or `kubeConfig` to use credentials
+                    from `~/.kube/config`.
+                type: string
+            context:
+                description: When using auth_type `kubeConfig`, override the current context.
+                type: string
+            kube_api_burst:
+                description: |-
+                    KubeAPIBurst is the maximum burst of requests to the Kubernetes API.
+                    Uses client-go's default (10) if unset. Increase if you see client-side throttling warnings.
+                type: integer
+            kube_api_qps:
+                description: |-
+                    KubeAPIQPS is the maximum number of queries per second to the Kubernetes API.
+                    Uses client-go's default (5) if unset. Increase if you see client-side throttling warnings.
+                type: number
+        additionalProperties: false
+    key_file:
+        description: Path to the TLS key to use for TLS required connections. (optional)
+        type: string
+    key_pem:
+        description: In memory PEM encoded TLS key to use for TLS required connections. (optional)
+        type: string
+    kube_api_burst:
+        description: |-
+            KubeAPIBurst is the maximum burst of requests to the Kubernetes API.
+            Uses client-go's default (10) if unset. Increase if you see client-side throttling warnings.
+        type: integer
+    kube_api_qps:
+        description: |-
+            KubeAPIQPS is the maximum number of queries per second to the Kubernetes API.
+            Uses client-go's default (5) if unset. Increase if you see client-side throttling warnings.
+        type: number
+    max_version:
+        description: |-
+            MaxVersion sets the maximum TLS version that is acceptable.
+            If not set, refer to crypto/tls for defaults. (optional)
+        type: string
+    metric_groups:
+        description: |-
+            MetricGroupsToCollect provides a list of metrics groups to collect metrics from.
+            "container", "pod", "node" and "volume" are the only valid groups.
+        type: array
+        items:
+            type: object
+    metrics:
+        type: object
+        properties:
+            container.cpu.time:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.cpu.usage:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.filesystem.available:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.filesystem.capacity:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.filesystem.usage:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.available:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.major_page_faults:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.page_faults:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.rss:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.usage:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.memory.working_set:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            container.uptime:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.container.cpu.node.utilization:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.container.cpu_limit_utilization:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.container.cpu_request_utilization:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.container.memory.node.utilization:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.container.memory_limit_utilization:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.container.memory_request_utilization:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.node.cpu.time:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.node.cpu.usage:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.node.filesystem.available:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.node.filesystem.capacity:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.node.filesystem.usage:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.node.memory.available:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.node.memory.major_page_faults:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.node.memory.page_faults:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.node.memory.rss:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.node.memory.usage:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.node.memory.working_set:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.node.network.errors:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.node.network.io:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.node.system_container.cpu.time:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.node.system_container.cpu.usage:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.node.system_container.memory.usage:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.node.system_container.memory.working_set:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.node.uptime:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.pod.cpu.node.utilization:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.pod.cpu.time:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.pod.cpu.usage:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.pod.cpu_limit_utilization:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.pod.cpu_request_utilization:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.pod.filesystem.available:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.pod.filesystem.capacity:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.pod.filesystem.usage:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.pod.memory.available:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.pod.memory.major_page_faults:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.pod.memory.node.utilization:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.pod.memory.page_faults:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.pod.memory.rss:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.pod.memory.usage:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.pod.memory.working_set:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.pod.memory_limit_utilization:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.pod.memory_request_utilization:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.pod.network.errors:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.pod.network.io:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.pod.uptime:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.pod.volume.usage:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.volume.available:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.volume.capacity:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.volume.inodes:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.volume.inodes.free:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            k8s.volume.inodes.used:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+        additionalProperties: false
+    min_version:
+        description: |-
+            MinVersion sets the minimum TLS version that is acceptable.
+            If not set, TLS 1.2 will be used. (optional)
+        type: string
+    node:
+        description: |-
+            NodeName is the node name to limit the discovery of nodes.
+            For example, node name can be set using the downward API inside the collector
+            pod spec as follows:
+
+            env:
+              - name: K8S_NODE_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: spec.nodeName
+
+            Then set this value to ${env:K8S_NODE_NAME} in the configuration.
+        type: string
+    reload_interval:
+        description: |-
+            ReloadInterval specifies the duration after which the certificate will be reloaded
+            If not set, it will never be reloaded (optional)
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    resource_attributes:
+        type: object
+        properties:
+            aws.volume.id:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            container.id:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            fs.type:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            gce.pd.name:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            glusterfs.endpoints.name:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            glusterfs.path:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            k8s.container.name:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            k8s.namespace.name:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            k8s.node.name:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            k8s.node.system_container.name:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            k8s.persistentvolumeclaim.name:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            k8s.pod.name:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            k8s.pod.uid:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            k8s.volume.name:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            k8s.volume.type:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            partition:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                    metrics_exclude:
+                        description: |-
+                            Experimental: MetricsExclude defines a list of filters for attribute values.
+                            If the list is not empty, metrics with matching resource attribute values will not be emitted.
+                            MetricsInclude has higher priority than MetricsExclude.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                    metrics_include:
+                        description: |-
+                            Experimental: MetricsInclude defines a list of filters for attribute values.
+                            If the list is not empty, only metrics with matching resource attribute values will be emitted.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                regexp:
+                                    type: string
+                                strict:
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    timeout:
+        description: Timeout is an optional value used to set scraper's context deadline.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    tpm:
+        description: Trusted platform module configuration
+        type: object
+        properties:
+            auth:
+                type: string
+            enabled:
+                type: boolean
+            owner_auth:
+                type: string
+            path:
+                description: |-
+                    The path to the TPM device or Unix domain socket.
+                    For instance /dev/tpm0 or /dev/tpmrm0.
+                type: string
+        additionalProperties: false
+additionalProperties: false

@@ -1,0 +1,78 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: chrony receiver configuration
+type: object
+properties:
+    collection_interval:
+        description: |-
+            CollectionInterval sets how frequently the scraper
+            should be called and used as the context timeout
+            to ensure that scrapers don't exceed the interval.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    endpoint:
+        description: |-
+            Endpoint is the published address or unix socket
+            that allows clients to connect to:
+            The allowed format is:
+              unix:///path/to/chronyd/unix.sock
+              udp://localhost:323
+
+            The default value is unix:///var/run/chrony/chronyd.sock
+        type: string
+    initial_delay:
+        description: |-
+            InitialDelay sets the initial start delay for the scraper,
+            any non positive value is assumed to be immediately.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    metrics:
+        type: object
+        properties:
+            ntp.frequency.offset:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            ntp.skew:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            ntp.stratum:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            ntp.time.correction:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            ntp.time.last_offset:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            ntp.time.rms_offset:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+            ntp.time.root_delay:
+                type: object
+                properties:
+                    enabled:
+                        type: boolean
+                additionalProperties: false
+        additionalProperties: false
+    timeout:
+        description: Timeout is an optional value used to set scraper's context deadline.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+additionalProperties: false

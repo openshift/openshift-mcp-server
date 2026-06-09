@@ -1,0 +1,112 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: windowseventlog receiver configuration
+type: object
+properties:
+    attributes:
+        type: object
+        additionalProperties:
+            type: object
+    channel:
+        type: string
+    event_data_format:
+        type: string
+    exclude_providers:
+        type: array
+        items:
+            type: string
+    id:
+        type: string
+    ignore_channel_errors:
+        type: boolean
+    include_log_record_original:
+        type: boolean
+    max_events_per_poll:
+        type: integer
+    max_reads:
+        type: integer
+    operators:
+        type: array
+        items:
+            type: object
+            additionalProperties: false
+    output:
+        type: array
+        items:
+            type: string
+    poll_interval:
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    query:
+        type: string
+    raw:
+        type: boolean
+    remote:
+        type: object
+        properties:
+            domain:
+                type: string
+            password:
+                type: string
+            server:
+                type: string
+            username:
+                type: string
+        additionalProperties: false
+    resolve_sids:
+        description: ResolveSIDs contains configuration for SID-to-username resolution
+        type: object
+        properties:
+            cache_size:
+                description: |-
+                    CacheSize is the maximum number of SIDs to cache (LRU eviction)
+                    Default: 10000
+                type: integer
+            cache_ttl:
+                description: |-
+                    CacheTTL is how long cache entries remain valid
+                    Default: 15m
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+            enabled:
+                description: Enabled controls whether SID resolution is active
+                type: boolean
+        additionalProperties: false
+    resource:
+        type: object
+        additionalProperties:
+            type: object
+    retry_on_failure:
+        type: object
+        properties:
+            enabled:
+                description: |-
+                    Enabled indicates whether to not retry sending logs in case of receiving a retryable error from a downstream
+                    consumer. Default is false.
+                type: boolean
+            initial_interval:
+                description: InitialInterval the time to wait after the first failure before retrying. Default value is 1 second.
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+            max_elapsed_time:
+                description: |-
+                    MaxElapsedTime is the maximum amount of time (including retries) spent trying to send a logs batch to
+                    a downstream consumer. Once this value is reached, the data is discarded. It never stops if MaxElapsedTime == 0.
+                    Default value is 5 minutes.
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+            max_interval:
+                description: |-
+                    MaxInterval is the upper bound on backoff interval. Once this value is reached the delay between
+                    consecutive retries will always be `MaxInterval`. Default value is 30 seconds.
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+        additionalProperties: false
+    start_at:
+        type: string
+    storage:
+        type: string
+    suppress_rendering_info:
+        type: boolean
+    type:
+        type: string
+additionalProperties: false

@@ -1,0 +1,291 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+properties:
+    datapoints:
+        items:
+            properties:
+                attributes:
+                    items:
+                        properties:
+                            default_value:
+                                additionalProperties: true
+                                type: object
+                            key:
+                                type: string
+                            optional:
+                                type: boolean
+                        type: object
+                    type: array
+                conditions:
+                    description: Conditions are a set of OTTL conditions which are ORed. Data is processed into metrics only if the sequence evaluates to true.
+                    items:
+                        type: string
+                    type: array
+                description:
+                    type: string
+                exponential_histogram:
+                    properties:
+                        count:
+                            type: string
+                        max_size:
+                            type: integer
+                        value:
+                            type: string
+                    type: object
+                gauge:
+                    properties:
+                        value:
+                            type: string
+                    type: object
+                histogram:
+                    properties:
+                        buckets:
+                            items:
+                                type: number
+                            type: array
+                        count:
+                            type: string
+                        value:
+                            type: string
+                    type: object
+                include_resource_attributes:
+                    description: IncludeResourceAttributes is a list of resource attributes that needs to be included in the generated metric. If no resource attribute is included in the list then all attributes are included.
+                    items:
+                        properties:
+                            default_value:
+                                additionalProperties: true
+                                type: object
+                            key:
+                                type: string
+                            optional:
+                                type: boolean
+                        type: object
+                    type: array
+                name:
+                    type: string
+                sum:
+                    properties:
+                        value:
+                            type: string
+                    type: object
+                unit:
+                    description: 'Unit, if not-empty, will set the unit associated with the metric. See: https://github.com/open-telemetry/opentelemetry-collector/blob/b06236cc794982916cc956f20828b3e18eb33264/pdata/pmetric/generated_metric.go#L72-L81'
+                    type: string
+            type: object
+        type: array
+    logs:
+        items:
+            properties:
+                attributes:
+                    items:
+                        properties:
+                            default_value:
+                                additionalProperties: true
+                                type: object
+                            key:
+                                type: string
+                            optional:
+                                type: boolean
+                        type: object
+                    type: array
+                conditions:
+                    description: Conditions are a set of OTTL conditions which are ORed. Data is processed into metrics only if the sequence evaluates to true.
+                    items:
+                        type: string
+                    type: array
+                description:
+                    type: string
+                exponential_histogram:
+                    properties:
+                        count:
+                            type: string
+                        max_size:
+                            type: integer
+                        value:
+                            type: string
+                    type: object
+                gauge:
+                    properties:
+                        value:
+                            type: string
+                    type: object
+                histogram:
+                    properties:
+                        buckets:
+                            items:
+                                type: number
+                            type: array
+                        count:
+                            type: string
+                        value:
+                            type: string
+                    type: object
+                include_resource_attributes:
+                    description: IncludeResourceAttributes is a list of resource attributes that needs to be included in the generated metric. If no resource attribute is included in the list then all attributes are included.
+                    items:
+                        properties:
+                            default_value:
+                                additionalProperties: true
+                                type: object
+                            key:
+                                type: string
+                            optional:
+                                type: boolean
+                        type: object
+                    type: array
+                name:
+                    type: string
+                sum:
+                    properties:
+                        value:
+                            type: string
+                    type: object
+                unit:
+                    description: 'Unit, if not-empty, will set the unit associated with the metric. See: https://github.com/open-telemetry/opentelemetry-collector/blob/b06236cc794982916cc956f20828b3e18eb33264/pdata/pmetric/generated_metric.go#L72-L81'
+                    type: string
+            type: object
+        type: array
+    profiles:
+        items:
+            properties:
+                attributes:
+                    items:
+                        properties:
+                            default_value:
+                                additionalProperties: true
+                                type: object
+                            key:
+                                type: string
+                            optional:
+                                type: boolean
+                        type: object
+                    type: array
+                conditions:
+                    description: Conditions are a set of OTTL conditions which are ORed. Data is processed into metrics only if the sequence evaluates to true.
+                    items:
+                        type: string
+                    type: array
+                description:
+                    type: string
+                exponential_histogram:
+                    properties:
+                        count:
+                            type: string
+                        max_size:
+                            type: integer
+                        value:
+                            type: string
+                    type: object
+                gauge:
+                    properties:
+                        value:
+                            type: string
+                    type: object
+                histogram:
+                    properties:
+                        buckets:
+                            items:
+                                type: number
+                            type: array
+                        count:
+                            type: string
+                        value:
+                            type: string
+                    type: object
+                include_resource_attributes:
+                    description: IncludeResourceAttributes is a list of resource attributes that needs to be included in the generated metric. If no resource attribute is included in the list then all attributes are included.
+                    items:
+                        properties:
+                            default_value:
+                                additionalProperties: true
+                                type: object
+                            key:
+                                type: string
+                            optional:
+                                type: boolean
+                        type: object
+                    type: array
+                name:
+                    type: string
+                sum:
+                    properties:
+                        value:
+                            type: string
+                    type: object
+                unit:
+                    description: 'Unit, if not-empty, will set the unit associated with the metric. See: https://github.com/open-telemetry/opentelemetry-collector/blob/b06236cc794982916cc956f20828b3e18eb33264/pdata/pmetric/generated_metric.go#L72-L81'
+                    type: string
+            type: object
+        type: array
+    spans:
+        items:
+            properties:
+                attributes:
+                    items:
+                        properties:
+                            default_value:
+                                additionalProperties: true
+                                type: object
+                            key:
+                                type: string
+                            optional:
+                                type: boolean
+                        type: object
+                    type: array
+                conditions:
+                    description: Conditions are a set of OTTL conditions which are ORed. Data is processed into metrics only if the sequence evaluates to true.
+                    items:
+                        type: string
+                    type: array
+                description:
+                    type: string
+                exponential_histogram:
+                    properties:
+                        count:
+                            type: string
+                        max_size:
+                            type: integer
+                        value:
+                            type: string
+                    type: object
+                gauge:
+                    properties:
+                        value:
+                            type: string
+                    type: object
+                histogram:
+                    properties:
+                        buckets:
+                            items:
+                                type: number
+                            type: array
+                        count:
+                            type: string
+                        value:
+                            type: string
+                    type: object
+                include_resource_attributes:
+                    description: IncludeResourceAttributes is a list of resource attributes that needs to be included in the generated metric. If no resource attribute is included in the list then all attributes are included.
+                    items:
+                        properties:
+                            default_value:
+                                additionalProperties: true
+                                type: object
+                            key:
+                                type: string
+                            optional:
+                                type: boolean
+                        type: object
+                    type: array
+                name:
+                    type: string
+                sum:
+                    properties:
+                        value:
+                            type: string
+                    type: object
+                unit:
+                    description: 'Unit, if not-empty, will set the unit associated with the metric. See: https://github.com/open-telemetry/opentelemetry-collector/blob/b06236cc794982916cc956f20828b3e18eb33264/pdata/pmetric/generated_metric.go#L72-L81'
+                    type: string
+            type: object
+        type: array
+type: object

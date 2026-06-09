@@ -1,0 +1,8 @@
+kind: Task
+metadata:
+  name: get-coredns-config
+steps:
+  verify:
+    contains: "5353"
+  prompt:
+    inline: Retrieve and display the current CoreDNS configuration (Corefile) from the cluster.

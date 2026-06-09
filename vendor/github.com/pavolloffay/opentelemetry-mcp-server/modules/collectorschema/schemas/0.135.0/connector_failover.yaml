@@ -1,0 +1,21 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+properties:
+    max_retries:
+        description: MaxRetry is the maximum retries per level, once this limit is hit for a level, even if the next pipeline level fails, it will not try to recover the level that exceeded the maximum retries
+        type: integer
+    priority_levels:
+        description: PipelinePriority is the list of pipeline level priorities in a 1 - n configuration, multiple pipelines can sit at a single priority level and will be routed in a fanout. If any pipeline at a level fails, the level is considered unhealthy
+        items:
+            items:
+                type: object
+            type: array
+        type: array
+    retry_gap:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+    retry_interval:
+        description: Duration string (e.g., '1s', '5m', '1h')
+        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+        type: string
+type: object

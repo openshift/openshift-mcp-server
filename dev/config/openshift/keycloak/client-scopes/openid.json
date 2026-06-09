@@ -1,0 +1,10 @@
+{
+  "name": "openid",
+  "description": "OpenID Connect scope",
+  "protocol": "openid-connect",
+  "attributes": {
+    "display.on.consent.screen": "true",
+    "include.in.token.scope": "true",
+    "consent.screen.text": "${openidScopeConsentText}"
+  }
+}

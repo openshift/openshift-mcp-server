@@ -1,0 +1,12 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+properties:
+    format:
+        description: 'Format defines the AWS logs format. Current valid values are: - cloudwatch_logs_subscription_filter - vpc_flow_log - s3_access_log - waf_log - cloudtrail_log - elb_access_log'
+        type: string
+    vpc_flow_log:
+        properties:
+            file_format:
+                description: VPC flow logs sent to S3 have support for file format in plain text or parquet. Default is plain text. See https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs-s3-path.html.
+                type: string
+        type: object
+type: object

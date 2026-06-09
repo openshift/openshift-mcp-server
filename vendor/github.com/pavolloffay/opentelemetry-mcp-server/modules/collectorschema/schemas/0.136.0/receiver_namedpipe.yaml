@@ -1,0 +1,70 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+properties:
+    inputconfig:
+        properties:
+            attributes:
+                additionalProperties:
+                    type: string
+                type: object
+            encoding:
+                type: string
+            id:
+                type: string
+            max_log_size:
+                type: integer
+            mode:
+                type: integer
+            multiline:
+                properties:
+                    line_end_pattern:
+                        type: string
+                    line_start_pattern:
+                        type: string
+                    omit_pattern:
+                        type: boolean
+                type: object
+            output:
+                items:
+                    type: string
+                type: array
+            path:
+                type: string
+            resource:
+                additionalProperties:
+                    type: string
+                type: object
+            trimconfig:
+                properties:
+                    preserve_leading_whitespaces:
+                        type: boolean
+                    preserve_trailing_whitespaces:
+                        type: boolean
+                type: object
+            type:
+                type: string
+        type: object
+    operators:
+        items:
+            type: object
+        type: array
+    retry_on_failure:
+        properties:
+            enabled:
+                description: Enabled indicates whether to not retry sending logs in case of receiving a retryable error from a downstream consumer. Default is false.
+                type: boolean
+            initial_interval:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+            max_elapsed_time:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+            max_interval:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+        type: object
+    storage:
+        type: object
+type: object

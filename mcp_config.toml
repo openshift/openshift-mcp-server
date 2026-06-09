@@ -1,0 +1,17 @@
+log_level = 3
+port = "8080"
+read_only = false
+disable_destructive = false
+
+denied_resources = [
+    {group = "", version = "v1", kind = "ServiceAccount"},
+    {group = "", version = "v1", kind = "Secret"},
+    {group = "rbac.authorization.k8s.io", version = "v1"}
+]
+
+disabled_tools = [
+    "configuration_view",
+    "helm_install",
+    "helm_list",
+    "helm_uninstall",
+]

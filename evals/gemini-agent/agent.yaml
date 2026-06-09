@@ -1,0 +1,6 @@
+kind: Agent
+metadata:
+  name: "gemini-command-agent"
+acp:
+  cmd: "gemini"
+  args: ["--acp"]

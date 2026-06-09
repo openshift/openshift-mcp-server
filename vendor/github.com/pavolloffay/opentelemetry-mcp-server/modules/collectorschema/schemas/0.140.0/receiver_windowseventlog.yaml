@@ -1,0 +1,81 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+properties:
+    inputconfig:
+        properties:
+            attributes:
+                additionalProperties:
+                    type: string
+                type: object
+            channel:
+                type: string
+            exclude_providers:
+                items:
+                    type: string
+                type: array
+            id:
+                type: string
+            ignore_channel_errors:
+                type: boolean
+            include_log_record_original:
+                type: boolean
+            max_reads:
+                type: integer
+            output:
+                items:
+                    type: string
+                type: array
+            poll_interval:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+            query:
+                type: string
+            raw:
+                type: boolean
+            remote:
+                properties:
+                    domain:
+                        type: string
+                    password:
+                        type: string
+                    server:
+                        type: string
+                    username:
+                        type: string
+                type: object
+            resource:
+                additionalProperties:
+                    type: string
+                type: object
+            start_at:
+                type: string
+            suppress_rendering_info:
+                type: boolean
+            type:
+                type: string
+        type: object
+    operators:
+        items:
+            type: object
+        type: array
+    retry_on_failure:
+        properties:
+            enabled:
+                description: Enabled indicates whether to not retry sending logs in case of receiving a retryable error from a downstream consumer. Default is false.
+                type: boolean
+            initial_interval:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+            max_elapsed_time:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+            max_interval:
+                description: Duration string (e.g., '1s', '5m', '1h')
+                pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                type: string
+        type: object
+    storage:
+        type: object
+type: object
