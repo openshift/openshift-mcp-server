@@ -370,6 +370,10 @@ func (p *acmHubClusterProvider) Close() {
 	p.kubeConfigWatcher.Close()
 }
 
+func (p *acmHubClusterProvider) HasGVKs(_ []schema.GroupVersionKind) bool {
+	return true
+}
+
 // GetTokenExchangeConfig returns the token exchange configuration for the specified target.
 // Returns nil if no per-target exchange is configured
 func (p *acmHubClusterProvider) GetTokenExchangeConfig(target string) *tokenexchange.TargetTokenExchangeConfig {
