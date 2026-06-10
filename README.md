@@ -274,6 +274,7 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 | metrics  | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                   |         |
 | oadp     | OADP (OpenShift API for Data Protection) tools for managing Velero backups, restores, and schedules                                                                             |         |
 | ossm     | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                 |         |
+| otelcol  | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                      |         |
 | tekton   | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns.                                                                                              |         |
 | traces   | Toolset for querying Tempo                                                                                                                                                      |         |
 
@@ -631,6 +632,12 @@ Silences are used to temporarily mute alerts based on label matchers. This tool 
 
 <details>
 
+<summary>oadp</summary>
+
+</details>
+
+<details>
+
 <summary>ossm</summary>
 
 - **ossm_get_mesh_traffic_graph** - Returns service-to-service traffic topology, dependencies, and network metrics (throughput, response time, mTLS) for the specified namespaces. Use this to diagnose routing issues, latency, or find upstream/downstream dependencies.
@@ -708,6 +715,29 @@ Silences are used to temporarily mute alerts based on label matchers. This tool 
   - `resourceName` (`string`) **(required)** - Name of the resource to get metrics for
   - `resourceType` (`string`) **(required)** - Type of resource to get metrics
   - `step` (`string`) - Step between data points in seconds (e.g., '15'). Optional, defaults to 15 seconds
+
+</details>
+
+<details>
+
+<summary>otelcol</summary>
+
+- **otelcol_list_components** - List available OpenTelemetry Collector components (receivers, processors, exporters, extensions, connectors) for a given version.
+  - `version` (`string`) - Collector version (e.g., 'v0.100.0'). Defaults to latest available.
+
+- **otelcol_get_component_schema** - Get the JSON schema for an OpenTelemetry Collector component's configuration options.
+  - `component_name` (`string`) **(required)** - Component name from otelcol_list_components (e.g., 'otlp', 'batch', 'debug')
+  - `component_type` (`string`) **(required)** - Component type: receiver, processor, exporter, extension, connector
+  - `version` (`string`) - Collector version (e.g., 'v0.100.0'). Defaults to latest available.
+
+- **otelcol_validate_config** - Validate an OpenTelemetry Collector component configuration against its JSON schema.
+  - `component_name` (`string`) **(required)** - Component name from otelcol_list_components (e.g., 'otlp', 'batch', 'debug')
+  - `component_type` (`string`) **(required)** - Component type: receiver, processor, exporter, extension, connector
+  - `config` (`string`) **(required)** - Configuration to validate as YAML or JSON string
+  - `format` (`string`) - Config format: 'yaml' (default) or 'json'
+  - `version` (`string`) - Collector version (e.g., 'v0.100.0'). Defaults to latest available.
+
+- **otelcol_get_versions** - List available OpenTelemetry Collector versions and identify the latest.
 
 </details>
 

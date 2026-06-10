@@ -305,6 +305,7 @@ Toolsets group related tools together. Enable only the toolsets you need to redu
 | metrics  | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                   |         |
 | oadp     | OADP (OpenShift API for Data Protection) tools for managing Velero backups, restores, and schedules                                                                             |         |
 | ossm     | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                 |         |
+| otelcol  | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                      |         |
 | tekton   | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns.                                                                                              |         |
 | traces   | Toolset for querying Tempo                                                                                                                                                      |         |
 
