@@ -1,1 +1,283 @@
-[]
+[
+  {
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "OVN-Kubernetes: OVS Dump Conntrack"
+    },
+    "description": "Dump connection tracking entries from OVS datapath.\n\nRuns 'ovs-appctl dpctl/dump-conntrack' command and returns the conntrack entries.\n\nParameters:\n- namespace: Kubernetes namespace of the OVS pod\n- name: Name of the pod running OVS\n- filter (optional): Regex pattern to filter conntrack entries\n- additional_params (optional): Additional parameters (e.g., [\"zone=5\"])\n- head (optional): Return only first N lines\n- tail (optional): Return only last N lines",
+    "inputSchema": {
+      "properties": {
+        "additional_params": {
+          "description": "Additional parameters to pass to dpctl/dump-conntrack (e.g., [\"zone=5\"])",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "apply_tail_first": {
+          "description": "If both head and tail are set and apply_tail_first is true, apply tail before head. Default: false",
+          "type": "boolean"
+        },
+        "filter": {
+          "description": "Regex pattern to filter conntrack entries",
+          "type": "string"
+        },
+        "head": {
+          "description": "Return only first N lines. Default: 100 lines if tail is not specified",
+          "type": "integer"
+        },
+        "name": {
+          "description": "Name of the pod running OVS (e.g., \"ovnkube-node-xxxxx\")",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Kubernetes namespace of the OVS pod (e.g., \"openshift-ovn-kubernetes\")",
+          "type": "string"
+        },
+        "tail": {
+          "description": "Return only last N lines",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "namespace",
+        "name"
+      ],
+      "type": "object"
+    },
+    "name": "ovs_appctl_dump_conntrack",
+    "title": "OVN-Kubernetes: OVS Dump Conntrack"
+  },
+  {
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "OVN-Kubernetes: OVS Ofproto Trace"
+    },
+    "description": "Trace a packet through the OpenFlow pipeline.\n\nRuns 'ovs-appctl ofproto/trace' command to simulate packet processing through OpenFlow tables.\n\nParameters:\n- namespace: Kubernetes namespace of the OVS pod\n- name: Name of the pod running OVS\n- bridge: Name of the OVS bridge (e.g., \"br-int\")\n- flow: Flow specification (e.g., \"in_port=1,ip,nw_src=10.244.0.5,nw_dst=10.96.0.1\")\n- filter (optional): Regex pattern to filter trace output\n- head (optional): Return only first N lines\n- tail (optional): Return only last N lines",
+    "inputSchema": {
+      "properties": {
+        "apply_tail_first": {
+          "description": "If both head and tail are set and apply_tail_first is true, apply tail before head. Default: false",
+          "type": "boolean"
+        },
+        "bridge": {
+          "description": "Name of the OVS bridge (e.g., \"br-int\")",
+          "type": "string"
+        },
+        "filter": {
+          "description": "Regex pattern to filter trace output",
+          "type": "string"
+        },
+        "flow": {
+          "description": "Flow specification describing the packet to trace (e.g., \"in_port=1,ip,nw_src=10.244.0.5,nw_dst=10.96.0.1\")",
+          "type": "string"
+        },
+        "head": {
+          "description": "Return only first N lines. Default: 100 lines if tail is not specified",
+          "type": "integer"
+        },
+        "name": {
+          "description": "Name of the pod running OVS (e.g., \"ovnkube-node-xxxxx\")",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Kubernetes namespace of the OVS pod (e.g., \"openshift-ovn-kubernetes\")",
+          "type": "string"
+        },
+        "tail": {
+          "description": "Return only last N lines",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "namespace",
+        "name",
+        "bridge",
+        "flow"
+      ],
+      "type": "object"
+    },
+    "name": "ovs_appctl_ofproto_trace",
+    "title": "OVN-Kubernetes: OVS Ofproto Trace"
+  },
+  {
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "OVN-Kubernetes: OVS List Bridges"
+    },
+    "description": "List all OVS bridges on a specific pod.\n\nRuns 'ovs-vsctl list-br' command and returns the names of all configured bridges.\n\nParameters:\n- namespace: Kubernetes namespace of the OVS pod\n- name: Name of the pod running OVS",
+    "inputSchema": {
+      "properties": {
+        "name": {
+          "description": "Name of the pod running OVS (e.g., \"ovnkube-node-xxxxx\")",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Kubernetes namespace of the OVS pod (e.g., \"openshift-ovn-kubernetes\")",
+          "type": "string"
+        }
+      },
+      "required": [
+        "namespace",
+        "name"
+      ],
+      "type": "object"
+    },
+    "name": "ovs_list_br",
+    "title": "OVN-Kubernetes: OVS List Bridges"
+  },
+  {
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "OVN-Kubernetes: OVS List Interfaces"
+    },
+    "description": "List all interfaces on a specific OVS bridge.\n\nRuns 'ovs-vsctl list-ifaces' command and returns the names of all interfaces attached to the specified bridge.\n\nParameters:\n- namespace: Kubernetes namespace of the OVS pod\n- name: Name of the pod running OVS\n- bridge: Name of the OVS bridge (e.g., \"br-int\")",
+    "inputSchema": {
+      "properties": {
+        "bridge": {
+          "description": "Name of the OVS bridge (e.g., \"br-int\")",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name of the pod running OVS (e.g., \"ovnkube-node-xxxxx\")",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Kubernetes namespace of the OVS pod (e.g., \"openshift-ovn-kubernetes\")",
+          "type": "string"
+        }
+      },
+      "required": [
+        "namespace",
+        "name",
+        "bridge"
+      ],
+      "type": "object"
+    },
+    "name": "ovs_list_ifaces",
+    "title": "OVN-Kubernetes: OVS List Interfaces"
+  },
+  {
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "OVN-Kubernetes: OVS List Ports"
+    },
+    "description": "List all ports on a specific OVS bridge.\n\nRuns 'ovs-vsctl list-ports' command and returns the names of all ports attached to the specified bridge.\n\nParameters:\n- namespace: Kubernetes namespace of the OVS pod\n- name: Name of the pod running OVS\n- bridge: Name of the OVS bridge (e.g., \"br-int\")",
+    "inputSchema": {
+      "properties": {
+        "bridge": {
+          "description": "Name of the OVS bridge (e.g., \"br-int\")",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name of the pod running OVS (e.g., \"ovnkube-node-xxxxx\")",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Kubernetes namespace of the OVS pod (e.g., \"openshift-ovn-kubernetes\")",
+          "type": "string"
+        }
+      },
+      "required": [
+        "namespace",
+        "name",
+        "bridge"
+      ],
+      "type": "object"
+    },
+    "name": "ovs_list_ports",
+    "title": "OVN-Kubernetes: OVS List Ports"
+  },
+  {
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "OVN-Kubernetes: OVS Dump Flows"
+    },
+    "description": "Dump OpenFlow flows from a specific OVS bridge.\n\nRuns 'ovs-ofctl dump-flows' command on the specified bridge and returns the flow entries.\n\nParameters:\n- namespace: Kubernetes namespace of the OVS pod\n- name: Name of the pod running OVS\n- bridge: Name of the OVS bridge (e.g., \"br-int\")\n- filter (optional): Regex pattern to filter flows\n- head (optional): Return only first N lines\n- tail (optional): Return only last N lines",
+    "inputSchema": {
+      "properties": {
+        "apply_tail_first": {
+          "description": "If both head and tail are set and apply_tail_first is true, apply tail before head. Default: false",
+          "type": "boolean"
+        },
+        "bridge": {
+          "description": "Name of the OVS bridge (e.g., \"br-int\")",
+          "type": "string"
+        },
+        "filter": {
+          "description": "Regex pattern to filter flows",
+          "type": "string"
+        },
+        "head": {
+          "description": "Return only first N lines. Default: 100 lines if tail is not specified",
+          "type": "integer"
+        },
+        "name": {
+          "description": "Name of the pod running OVS (e.g., \"ovnkube-node-xxxxx\")",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Kubernetes namespace of the OVS pod (e.g., \"openshift-ovn-kubernetes\")",
+          "type": "string"
+        },
+        "tail": {
+          "description": "Return only last N lines",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "namespace",
+        "name",
+        "bridge"
+      ],
+      "type": "object"
+    },
+    "name": "ovs_ofctl_dump_flows",
+    "title": "OVN-Kubernetes: OVS Dump Flows"
+  },
+  {
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "OVN-Kubernetes: OVS Show"
+    },
+    "description": "Display a comprehensive overview of OVS configuration.\n\nRuns 'ovs-vsctl show' command and returns detailed information about bridges, ports, interfaces,\ncontrollers, and their configurations in a hierarchical format.\n\nParameters:\n- namespace: Kubernetes namespace of the OVS pod\n- name: Name of the pod running OVS\n- head (optional): Return only first N lines. Default: 100 lines if tail is not specified\n- tail (optional): Return only last N lines\n- apply_tail_first (optional): If both head and tail are set and apply_tail_first is true, apply tail before head",
+    "inputSchema": {
+      "properties": {
+        "apply_tail_first": {
+          "description": "If both head and tail are set and apply_tail_first is true, apply tail before head. Default: false",
+          "type": "boolean"
+        },
+        "head": {
+          "description": "Return only first N lines. Default: 100 lines if tail is not specified",
+          "type": "integer"
+        },
+        "name": {
+          "description": "Name of the pod running OVS (e.g., \"ovnkube-node-xxxxx\")",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Kubernetes namespace of the OVS pod (e.g., \"openshift-ovn-kubernetes\")",
+          "type": "string"
+        },
+        "tail": {
+          "description": "Return only last N lines",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "namespace",
+        "name"
+      ],
+      "type": "object"
+    },
+    "name": "ovs_vsctl_show",
+    "title": "OVN-Kubernetes: OVS Show"
+  }
+]

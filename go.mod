@@ -13,6 +13,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/miekg/dns v1.1.72
 	github.com/modelcontextprotocol/go-sdk v1.6.1
+	github.com/ovn-kubernetes/ovn-kubernetes-mcp v0.0.0-20260605095148-52ec23dbc6b1
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rhobs/obs-mcp v0.2.0
 	github.com/spf13/afero v1.15.0
@@ -82,7 +83,7 @@ require (
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
-	github.com/go-errors/errors v1.4.2 // indirect
+	github.com/go-errors/errors v1.5.1 // indirect
 	github.com/go-gorp/gorp/v3 v3.1.0 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/analysis v0.25.0 // indirect

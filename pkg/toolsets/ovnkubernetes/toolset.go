@@ -1,8 +1,11 @@
 package ovnkubernetes
 
 import (
+	"slices"
+
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/ovnkubernetes/ovs"
 )
 
 type Toolset struct{}
@@ -18,7 +21,7 @@ func (t *Toolset) GetDescription() string {
 }
 
 func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
-	return nil
+	return slices.Concat(ovs.Tools())
 }
 
 func (t *Toolset) GetPrompts() []api.ServerPrompt {

@@ -108,7 +108,7 @@ github.com/fsnotify/fsnotify/internal
 # github.com/fxamacker/cbor/v2 v2.9.0
 ## explicit; go 1.20
 github.com/fxamacker/cbor/v2
-# github.com/go-errors/errors v1.4.2
+# github.com/go-errors/errors v1.5.1
 ## explicit; go 1.14
 github.com/go-errors/errors
 # github.com/go-gorp/gorp/v3 v3.1.0
@@ -410,6 +410,14 @@ github.com/opencontainers/go-digest
 ## explicit; go 1.18
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
+# github.com/ovn-kubernetes/ovn-kubernetes-mcp v0.0.0-20260605095148-52ec23dbc6b1
+## explicit; go 1.25.0
+github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/kubernetes/types
+github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/ovs/mcp
+github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/ovs/types
+github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/utils
+github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/utils/headtail
+github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/utils/pattern
 # github.com/peterbourgon/diskv v2.0.1+incompatible
 ## explicit
 github.com/peterbourgon/diskv
