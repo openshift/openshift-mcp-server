@@ -1,1 +1,233 @@
-[]
+[
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "OVN: Get"
+    },
+    "description": "Query records from an OVN database table with flexible filtering.\n\nThis is a versatile command that can:\n1. List all records in a table (when no record specified)\n2. Get a specific record (when record specified)\n\nCommon Northbound tables: Logical_Switch, Logical_Router, Logical_Switch_Port, \nLogical_Router_Port, ACL, Address_Set, Port_Group, Load_Balancer, NAT\n\nCommon Southbound tables: Chassis, Port_Binding, Datapath_Binding, Logical_Flow,\nMAC_Binding, Multicast_Group, SB_Global\n\nReturns 100 lines by default; use head/tail to adjust.\n\nExample listing all records:\n{\n  \"database\": \"nbdb\",\n  \"table\": \"Port_Group\",\n  \"output\": \"_uuid: 1234-5678\\nname: \\\"pg_default\\\"\\nports: [...]\\n\\n_uuid: abcd-efgh\\n...\"\n}\n\nExample getting a specific record:\n{\n  \"database\": \"nbdb\",\n  \"table\": \"Logical_Router\",\n  \"record\": \"ovn_cluster_router\",\n  \"output\": \"_uuid: 4c4a0a35-348c-41cc-8417-53a618e0c383\\nname: ovn_cluster_router\\nports: [...]\"\n}\n\nExample getting specific columns:\n{\n  \"database\": \"nbdb\",\n  \"table\": \"Logical_Switch\",\n  \"columns\": \"name,ports\",\n  \"output\": \"name: ovn-worker\\nports: [uuid1, uuid2]\\n\\nname: join\\nports: [uuid3]\"\n}",
+    "inputSchema": {
+      "properties": {
+        "apply_tail_first": {
+          "description": "If both head and tail are set and apply_tail_first is true, apply tail before head. Default: false",
+          "type": "boolean"
+        },
+        "columns": {
+          "description": "Comma-separated list of columns to display (e.g., \"name,_uuid,ports\")",
+          "type": "string"
+        },
+        "database": {
+          "description": "OVN database to query - \"nbdb\" for Northbound or \"sbdb\" for Southbound",
+          "enum": [
+            "nbdb",
+            "sbdb"
+          ],
+          "type": "string"
+        },
+        "head": {
+          "description": "Return only first N lines. Default: 100 lines if tail is not specified",
+          "type": "integer"
+        },
+        "name": {
+          "description": "Name of the pod running OVN",
+          "type": "string"
+        },
+        "namespace": {
+          "default": "openshift-ovn-kubernetes",
+          "description": "Kubernetes namespace of the OVN pod",
+          "type": "string"
+        },
+        "pattern": {
+          "description": "Regex pattern to filter results. Only applies when listing all records.",
+          "type": "string"
+        },
+        "record": {
+          "description": "Record identifier (UUID or name). If not specified, lists all records",
+          "type": "string"
+        },
+        "table": {
+          "description": "Name of the table (e.g., \"Logical_Switch\", \"Port_Binding\")",
+          "type": "string"
+        },
+        "tail": {
+          "description": "Return only last N lines",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "database",
+        "table"
+      ],
+      "type": "object"
+    },
+    "name": "ovn_get",
+    "title": "OVN: Get"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "OVN: Logical Flow List"
+    },
+    "description": "List logical flows from the OVN Southbound database.\n\nRuns 'ovn-sbctl lflow-list' to retrieve logical flows which represent the compiled\nlogical network pipeline. This is essential for debugging packet forwarding.\nReturns 100 lines by default; use head/tail to adjust.\n\nExample output:\n{\n  \"datapath\": \"node1\",\n  \"flows\": [\n    \"table=0 (ls_in_port_sec_l2), priority=100, match=(inport == \\\"pod1\\\"), action=(next;)\",\n    \"table=1 (ls_in_port_sec_ip), priority=90, match=(ip4), action=(next;)\"\n  ]\n}",
+    "inputSchema": {
+      "properties": {
+        "apply_tail_first": {
+          "description": "If both head and tail are set and apply_tail_first is true, apply tail before head. Default: false",
+          "type": "boolean"
+        },
+        "datapath": {
+          "description": "Datapath name or UUID to filter flows for a specific logical switch/router",
+          "type": "string"
+        },
+        "head": {
+          "description": "Return only first N lines. Default: 100 lines if tail is not specified",
+          "type": "integer"
+        },
+        "name": {
+          "description": "Name of the pod running OVN",
+          "type": "string"
+        },
+        "namespace": {
+          "default": "openshift-ovn-kubernetes",
+          "description": "Kubernetes namespace of the OVN pod",
+          "type": "string"
+        },
+        "pattern": {
+          "description": "Regex pattern to filter flows",
+          "type": "string"
+        },
+        "tail": {
+          "description": "Return only last N lines",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "name": "ovn_lflow_list",
+    "title": "OVN: Logical Flow List"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "OVN: Show"
+    },
+    "description": "Display a comprehensive overview of OVN configuration from either the Northbound or Southbound database.\n\nFor Northbound (nbdb): Runs 'ovn-nbctl show' and displays logical switches, logical routers,\ntheir ports, and connections between them.\n\nFor Southbound (sbdb): Runs 'ovn-sbctl show' and displays chassis information, port bindings,\nand their relationships. Returns 100 lines by default; use head/tail to adjust.\n\nExample output for nbdb:\n{\n  \"database\": \"nbdb\",\n  \"output\": \"switch 1234-5678 (node1)\\n    port node1-k8s\\n        addresses: [\\\"00:00:00:00:00:01\\\"]\\n...\"\n}",
+    "inputSchema": {
+      "properties": {
+        "apply_tail_first": {
+          "description": "If both head and tail are set and apply_tail_first is true, apply tail before head. Default: false",
+          "type": "boolean"
+        },
+        "database": {
+          "description": "OVN database to query - \"nbdb\" for Northbound or \"sbdb\" for Southbound",
+          "enum": [
+            "nbdb",
+            "sbdb"
+          ],
+          "type": "string"
+        },
+        "head": {
+          "description": "Return only first N lines. Default: 100 lines if tail is not specified",
+          "type": "integer"
+        },
+        "name": {
+          "description": "Name of the pod running OVN (e.g., \"ovnkube-node-xxxxx\")",
+          "type": "string"
+        },
+        "namespace": {
+          "default": "openshift-ovn-kubernetes",
+          "description": "Kubernetes namespace of the OVN pod (e.g., \"openshift-ovn-kubernetes\")",
+          "type": "string"
+        },
+        "tail": {
+          "description": "Return only last N lines",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "database"
+      ],
+      "type": "object"
+    },
+    "name": "ovn_show",
+    "title": "OVN: Show"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "OVN: Trace"
+    },
+    "description": "Trace a packet through the OVN logical network.\n\nRuns 'ovn-trace' to simulate packet processing through the logical network pipeline.\nThis shows which logical flows match, what actions are taken, and the final disposition.\n\nThe trace is essential for debugging connectivity issues and understanding how traffic\nflows through the OVN logical network. Returns 100 lines by default; use head/tail to adjust.\n\nMicroflow specification examples:\n- inport==\"pod1\" \u0026\u0026 eth.src==00:00:00:00:00:01 \u0026\u0026 ip4.src==10.244.0.5 \u0026\u0026 ip4.dst==10.244.1.5\n- inport==\"pod1\" \u0026\u0026 eth.src==00:00:00:00:00:01 \u0026\u0026 icmp \u0026\u0026 ip4.src==10.244.0.5 \u0026\u0026 ip4.dst==8.8.8.8\n\nExample output:\n{\n  \"datapath\": \"node1\",\n  \"microflow\": \"inport==\\\"pod1\\\" \u0026\u0026 ...\",\n  \"output\": \"ingress(dp=\\\"node1\\\", inport=\\\"pod1\\\")\\n  0. ls_in_port_sec_l2: inport == \\\"pod1\\\", priority 50, uuid 1234\\n     next;\\n...\"\n}",
+    "inputSchema": {
+      "properties": {
+        "apply_tail_first": {
+          "description": "If both head and tail are set and apply_tail_first is true, apply tail before head. Default: false",
+          "type": "boolean"
+        },
+        "datapath": {
+          "description": "Name of the logical switch or router to start the trace",
+          "type": "string"
+        },
+        "head": {
+          "description": "Return only first N lines. Default: 100 lines if tail is not specified",
+          "type": "integer"
+        },
+        "microflow": {
+          "description": "Microflow specification describing the packet (e.g., \"inport==\\\"pod1\\\" \u0026\u0026 eth.src==00:00:00:00:00:01 \u0026\u0026 ip4.src==10.244.0.5 \u0026\u0026 ip4.dst==10.244.1.5\")",
+          "type": "string"
+        },
+        "mode": {
+          "default": "detailed",
+          "description": "Output verbosity mode - \"detailed\" (default), \"summary\", or \"minimal\"",
+          "enum": [
+            "detailed",
+            "summary",
+            "minimal"
+          ],
+          "type": "string"
+        },
+        "name": {
+          "description": "Name of the pod running OVN",
+          "type": "string"
+        },
+        "namespace": {
+          "default": "openshift-ovn-kubernetes",
+          "description": "Kubernetes namespace of the OVN pod",
+          "type": "string"
+        },
+        "pattern": {
+          "description": "Regex pattern to filter trace output",
+          "type": "string"
+        },
+        "tail": {
+          "description": "Return only last N lines",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "datapath",
+        "microflow"
+      ],
+      "type": "object"
+    },
+    "name": "ovn_trace",
+    "title": "OVN: Trace"
+  }
+]

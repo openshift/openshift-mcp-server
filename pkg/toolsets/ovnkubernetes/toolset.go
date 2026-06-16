@@ -3,6 +3,7 @@ package ovnkubernetes
 import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/ovnkubernetes/ovn"
 )
 
 type Toolset struct{}
@@ -17,8 +18,8 @@ func (t *Toolset) GetDescription() string {
 	return "OVN-Kubernetes CNI network troubleshooting tools"
 }
 
-func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
-	return nil
+func (t *Toolset) GetTools(_ api.FilteringProvider) []api.ServerTool {
+	return ovn.InitOVNTools()
 }
 
 func (t *Toolset) GetPrompts() []api.ServerPrompt {
