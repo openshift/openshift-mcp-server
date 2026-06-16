@@ -74,6 +74,9 @@ func NewAccessControlRoundTripper(ctx context.Context, cfg AccessControlRoundTri
 		rt.validators = append(rt.validators, &ConfirmationValidator{rulesProvider: cfg.ConfirmationRulesProvider})
 	}
 
+	// Always enable Windows EULA validator for windows-efi-installer PipelineRuns
+	rt.validators = append(rt.validators, &WindowsEULAValidator{})
+
 	return rt
 }
 
