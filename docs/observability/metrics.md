@@ -1,11 +1,12 @@
-# Metrics Toolset (`metrics`)
+# Metrics Toolset (`observability/metrics`)
 
 This toolset provides tools for querying Prometheus/Thanos metrics and Alertmanager alerts.
 It is implemented by the [`rhobs/obs-mcp`](https://github.com/rhobs/obs-mcp) package and registered
-into the openshift-mcp-server as the `metrics` toolset.
+into the openshift-mcp-server as the `observability/metrics` toolset.
 
-For Grafana Tempo and TraceQL (`traces` toolset), see the [tracing toolset guide](./tracing.md).
-For OpenTelemetry Collector configuration assistance (`otelcol` toolset), see the [otelcol toolset guide](./otelcol.md).
+For Grafana Loki and LogQL (`observability/logs` toolset), see the [logs toolset guide](./logs.md).
+For Grafana Tempo and TraceQL (`observability/traces` toolset), see the [tracing toolset guide](./tracing.md).
+For OpenTelemetry Collector configuration assistance (`observability/otelcol` toolset), see the [otelcol toolset guide](./otelcol.md).
 
 ## Tools
 
@@ -125,13 +126,13 @@ Query silences from Alertmanager. Requires `alertmanager_url` to be configured.
 ### Command line
 
 ```bash
-kubernetes-mcp-server --toolsets core,metrics
+kubernetes-mcp-server --toolsets core,observability/metrics
 ```
 
 ### Configuration file (TOML)
 
 ```toml
-toolsets = ["core", "metrics"]
+toolsets = ["core", "observability/metrics"]
 ```
 
 ### MCP client configuration
@@ -141,7 +142,7 @@ toolsets = ["core", "metrics"]
   "mcpServers": {
     "kubernetes": {
       "command": "npx",
-      "args": ["-y", "kubernetes-mcp-server@latest", "--toolsets", "core,metrics"]
+      "args": ["-y", "kubernetes-mcp-server@latest", "--toolsets", "core,observability/metrics"]
     }
   }
 }
@@ -151,10 +152,10 @@ toolsets = ["core", "metrics"]
 
 ## Configuration
 
-The toolset is configured via a `[metrics]` section in the TOML config file.
+The toolset is configured via a `[toolset_configs."observability/metrics"]` section in the TOML config file.
 
 ```toml
-[toolset_configs.metrics]
+[toolset_configs."observability/metrics"]
 # Where to read the bearer token from: "header" (default) or "kubeconfig".
 # Set to "kubeconfig" when running locally (STDIO mode) so the token is read
 # from your kubeconfig session (e.g. after `oc login`).
@@ -288,6 +289,6 @@ They are enabled by default (`guardrails = "all"`).
 To disable a specific guardrail while keeping others:
 
 ```toml
-[toolset_configs.metrics]
+[toolset_configs."observability/metrics"]
 guardrails = "disallow-explicit-name-label,require-label-matcher"  # omit disallow-blanket-regex
 ```
