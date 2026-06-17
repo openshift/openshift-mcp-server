@@ -295,21 +295,22 @@ Toolsets group related tools together. Enable only the toolsets you need to redu
 
 <!-- AVAILABLE-TOOLSETS-START -->
 
-| Toolset             | Description                                                                                                                                                                     | Default |
-|---------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| cluster-diagnostics | Tools for cluster diagnostics and troubleshooting                                                                                                                               |         |
-| config              | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                         | ✓       |
-| core                | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                             | ✓       |
-| helm                | Tools for managing Helm charts and releases                                                                                                                                     |         |
-| kcp                 | Manage kcp workspaces and multi-tenancy features                                                                                                                                |         |
-| kubevirt            | KubeVirt virtual machine management tools, check the [KubeVirt documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/kubevirt.md) for more details. |         |
-| metrics             | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                   |         |
-| oadp                | OADP (OpenShift API for Data Protection) tools for managing Velero backups, restores, and schedules                                                                             |         |
-| openshift           | OpenShift-specific tools for cluster management and troubleshooting                                                                                                             |         |
-| ossm                | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                 |         |
-| otelcol             | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                      |         |
-| tekton              | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns.                                                                                              |         |
-| traces              | Toolset for querying Tempo                                                                                                                                                      |         |
+| Toolset               | Description                                                                                                                                                                     | Default |
+|-----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| cluster-diagnostics   | Tools for cluster diagnostics and troubleshooting                                                                                                                               |         |
+| config                | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                         | ✓       |
+| core                  | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                             | ✓       |
+| helm                  | Tools for managing Helm charts and releases                                                                                                                                     |         |
+| kcp                   | Manage kcp workspaces and multi-tenancy features                                                                                                                                |         |
+| kubevirt              | KubeVirt virtual machine management tools, check the [KubeVirt documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/kubevirt.md) for more details. |         |
+| oadp                  | OADP (OpenShift API for Data Protection) tools for managing Velero backups, restores, and schedules                                                                             |         |
+| observability/logs    | Toolset for querying Loki logs                                                                                                                                                  |         |
+| observability/metrics | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                   |         |
+| observability/otelcol | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                      |         |
+| observability/traces  | Toolset for querying Tempo                                                                                                                                                      |         |
+| openshift             | OpenShift-specific tools for cluster management and troubleshooting                                                                                                             |         |
+| ossm                  | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                 |         |
+| tekton                | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns.                                                                                              |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 

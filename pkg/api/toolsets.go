@@ -38,7 +38,7 @@ func (s *ServerTool) IsTargetListProvider() bool {
 type Toolset interface {
 	// GetName returns the name of the toolset.
 	// Used to identify the toolset in configuration, logs, and command-line arguments.
-	// Examples: "core", "metrics", "helm"
+	// Examples: "core", "observability/metrics", "helm"
 	GetName() string
 	// GetDescription returns a human-readable description of the toolset.
 	// Will be used to generate documentation and help text.
