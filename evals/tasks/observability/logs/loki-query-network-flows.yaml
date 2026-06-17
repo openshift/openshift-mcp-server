@@ -1,0 +1,27 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: loki-query-network-flows
+  difficulty: medium
+  parallel: true
+  runs: 1
+  labels:
+    category: logs
+    suite: observability
+    toolType: query
+  description: |
+    Tests loki_query_range with NetObserv flow log labels (SrcK8S_Namespace /
+    DstK8S_Namespace) and tenant network—not kubernetes_namespace_name.
+spec:
+  prompt:
+    inline: |
+      Query NetObserv network flow logs from the last hour where the source or
+      destination namespace is obs-mcp-loki. Use LokiStack obs-mcp-loki in namespace
+      obs-mcp-loki with tenant network.
+  verify:
+    - llmJudge:
+        contains: "SrcK8S_Namespace"
+        reason: "Verify the agent used obs-mcp-loki indexed namespace labels in LogQL"
+    - llmJudge:
+        contains: "network"
+        reason: "Verify the agent used tenant network for the openshift-network LokiStack"
