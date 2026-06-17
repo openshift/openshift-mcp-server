@@ -160,6 +160,15 @@ func Serve(ctx context.Context, mcpServer *mcp.Server, cfgState *config.StaticCo
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
+	// Registering SIGHUP overrides Go's default disposition (terminate): os/signal
+	// then drops it via a non-blocking send to this unread channel. Without a
+	// config file cmd/root.go registers no reload handler, so this alone
+	// preserves the documented "SIGHUP is ignored" behavior; with one, that
+	// handler gets its own copy (Notify multicasts) and reloads.
+	sigHupChan := make(chan os.Signal, 1)
+	signal.Notify(sigHupChan, syscall.SIGHUP)
+	defer signal.Stop(sigHupChan)
+
 	serverErr := make(chan error, 1)
 	go func() {
 		var err error

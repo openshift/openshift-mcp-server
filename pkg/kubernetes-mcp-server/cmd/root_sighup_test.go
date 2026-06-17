@@ -403,7 +403,7 @@ type HTTPSIGHUPSuite struct {
 	httpClient      *http.Client
 	httpAddress     string
 	timeoutCancel   context.CancelFunc
-	stopServer      func()
+	stopServer      context.CancelFunc
 	waitForShutdown func() error
 }
 
@@ -421,7 +421,8 @@ func (s *HTTPSIGHUPSuite) TearDownTest() {
 	}
 	s.stopServer()
 	if s.waitForShutdown != nil {
-		_ = s.waitForShutdown()
+		// Non-fatal: let the rest of teardown run even if shutdown regressed.
+		s.NoError(s.waitForShutdown(), "HTTP server did not shut down gracefully")
 	}
 	if s.timeoutCancel != nil {
 		s.timeoutCancel()
@@ -480,24 +481,22 @@ func (s *HTTPSIGHUPSuite) TestSIGHUPReloadsConfigFromFile() {
 		},
 	}
 
-	// Start the server in a goroutine (going through root.go's Run path)
-	var timeoutCtx context.Context
+	// Run via root.go in a goroutine. A cancelable context (like http_test.go)
+	// stops the server instead of a process-wide SIGTERM; the 10s timeout context
+	// is the backstop so group.Wait can't hang if Serve does.
+	var timeoutCtx, cancelCtx context.Context
 	timeoutCtx, s.timeoutCancel = context.WithTimeout(s.T().Context(), 10*time.Second)
-	group, _ := errgroup.WithContext(timeoutCtx)
+	group, gc := errgroup.WithContext(timeoutCtx)
+	cancelCtx, s.stopServer = context.WithCancel(gc)
 
 	group.Go(func() error {
 		rootCmd := NewMCPServer(opts.IOStreams)
-		if err := opts.Complete(rootCmd); err != nil {
+		if err := opts.Complete(cancelCtx, rootCmd); err != nil {
 			return err
 		}
-		return opts.Run()
+		return opts.Run(cancelCtx)
 	})
 	s.waitForShutdown = group.Wait
-
-	// We can't cancel via context, so we'll use SIGTERM at the end
-	s.stopServer = func() {
-		_ = syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
-	}
 
 	// Wait for server to start
 	s.Require().NoError(test.WaitForServer(tcpAddr), "HTTP server did not start in time")
@@ -533,7 +532,11 @@ func (s *HTTPSIGHUPSuite) TestSIGHUPReloadsConfigFromFile() {
 			})
 		}, 3*time.Second, 200*time.Millisecond, "Helm tools should appear after SIGHUP and config reload")
 
-		s.True(len(toolsAfter) > len(toolsBefore), "Should have more tools after adding helm toolset")
+		// Reload must be additive: len(after) > len(before) would still pass if a
+		// core tool were dropped as helm was added, so require the full superset.
+		for _, tool := range toolsBefore {
+			s.Contains(toolsAfter, tool, "reload should not drop previously-available tool %q", tool)
+		}
 	})
 
 	s.Run("server continues to respond after SIGHUP", func() {
@@ -548,11 +551,64 @@ func (s *HTTPSIGHUPSuite) TestSIGHUPReloadsConfigFromFile() {
 	})
 
 	s.Run("no shutdown messages in logs", func() {
-		time.Sleep(100 * time.Millisecond)
-		logOutput := s.logBuffer.String()
-		s.False(strings.Contains(logOutput, "Received signal hangup"), "Should not receive signal shutdown message for SIGHUP")
-		s.False(strings.Contains(logOutput, "initiating graceful shutdown"), "Should not initiate shutdown")
-		s.False(strings.Contains(logOutput, "Shutting down HTTP server"), "Should not shut down HTTP server")
+		// Poll the negative over a window (not a fixed sleep + single sample):
+		// Never fails the moment a shutdown line appears.
+		s.Never(func() bool {
+			logOutput := s.logBuffer.String()
+			return strings.Contains(logOutput, "initiating graceful shutdown") ||
+				strings.Contains(logOutput, "Shutting down HTTP server")
+		}, 500*time.Millisecond, 50*time.Millisecond, "SIGHUP must not trigger shutdown of the HTTP server")
+	})
+}
+
+// TestSIGHUPIgnoredWithoutConfig drives the no-config HTTP path end-to-end:
+// with a port but no config file, root.go registers no reload handler, so
+// Serve's SIGHUP registration alone must keep the process alive. If that
+// regresses, this SIGHUP kills the test binary ("signal: hangup").
+func (s *HTTPSIGHUPSuite) TestSIGHUPIgnoredWithoutConfig() {
+	tcpAddr, err := test.RandomPortAddress()
+	s.Require().NoError(err)
+	s.httpAddress = fmt.Sprintf("127.0.0.1:%d", tcpAddr.Port)
+
+	// config.Default() mirrors NewMCPServerOptions; Complete keeps it as-is when
+	// no --config/--config-dir is set.
+	cfg := config.Default()
+	cfg.Port = fmt.Sprintf("%d", tcpAddr.Port)
+	cfg.KubeConfig = s.mockServer.KubeconfigFile(s.T())
+	opts := &MCPServerOptions{
+		StaticConfig: cfg,
+		IOStreams:    genericiooptions.IOStreams{Out: s.logBuffer, ErrOut: s.logBuffer},
+	}
+
+	var timeoutCtx, cancelCtx context.Context
+	timeoutCtx, s.timeoutCancel = context.WithTimeout(s.T().Context(), 10*time.Second)
+	group, gc := errgroup.WithContext(timeoutCtx)
+	cancelCtx, s.stopServer = context.WithCancel(gc)
+	group.Go(func() error {
+		rootCmd := NewMCPServer(opts.IOStreams)
+		if err := opts.Complete(cancelCtx, rootCmd); err != nil {
+			return err
+		}
+		return opts.Run(cancelCtx)
+	})
+	s.waitForShutdown = group.Wait
+
+	s.Require().NoError(test.WaitForServer(tcpAddr), "HTTP server did not start in time")
+	s.Require().NoError(test.WaitForHealthz(tcpAddr), "HTTP server /healthz endpoint did not respond in time")
+
+	s.Require().NoError(syscall.Kill(syscall.Getpid(), syscall.SIGHUP))
+
+	s.Run("no-config server keeps serving after SIGHUP", func() {
+		s.Never(func() bool {
+			logOutput := s.logBuffer.String()
+			return strings.Contains(logOutput, "initiating graceful shutdown") ||
+				strings.Contains(logOutput, "Shutting down HTTP server")
+		}, 500*time.Millisecond, 50*time.Millisecond, "SIGHUP must not shut down the no-config HTTP server")
+
+		resp, err := s.httpClient.Get(fmt.Sprintf("http://%s/healthz", s.httpAddress))
+		s.Require().NoError(err, "server should keep serving after SIGHUP")
+		defer func() { _ = resp.Body.Close() }()
+		s.Equal(http.StatusOK, resp.StatusCode)
 	})
 }
 
