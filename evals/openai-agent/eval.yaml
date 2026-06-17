@@ -92,3 +92,13 @@ config:
             toolPattern: ".*"
         minToolCalls: 1
         maxToolCalls: 15
+    # Must-gather archive analysis tasks (offline, no live cluster needed)
+    - glob: ../tasks/mustgather/*/*.yaml
+      labelSelector:
+        suite: mustgather
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            toolPattern: "mustgather_.*"
+        minToolCalls: 2
+        maxToolCalls: 10
