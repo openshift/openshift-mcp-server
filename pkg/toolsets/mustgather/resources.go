@@ -42,7 +42,7 @@ func initResources() []api.ServerTool {
 }
 
 func mustgatherResourcesList(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	p, err := GetProvider()
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}

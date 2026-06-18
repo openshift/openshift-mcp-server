@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/mustgather"
 	"github.com/google/jsonschema-go/jsonschema"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -60,9 +61,19 @@ func inspectRoute(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		Resource: "routes",
 	}
 
-	route, err := params.DynamicClient().Resource(gvr).Namespace(namespace).Get(params.Context, routeName, metav1.GetOptions{})
-	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to get route %s/%s: %w", namespace, routeName, err)), nil
+	var route *unstructured.Unstructured
+
+	if p, mgErr := mustgather.GetProvider(); mgErr == nil && p != nil {
+		gvk := schema.GroupVersionKind{Group: "route.openshift.io", Version: "v1", Kind: "Route"}
+		route = p.GetResource(gvk, routeName, namespace)
+		if route == nil {
+			return api.NewToolCallResult("", fmt.Errorf("route %s/%s not found in must-gather archive", namespace, routeName)), nil
+		}
+	} else {
+		route, err = params.DynamicClient().Resource(gvr).Namespace(namespace).Get(params.Context, routeName, metav1.GetOptions{})
+		if err != nil {
+			return api.NewToolCallResult("", fmt.Errorf("failed to get route %s/%s: %w", namespace, routeName, err)), nil
+		}
 	}
 
 	// Deep-copy the route so we can redact sensitive TLS fields without

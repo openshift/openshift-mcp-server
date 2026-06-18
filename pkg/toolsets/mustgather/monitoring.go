@@ -108,7 +108,7 @@ func initMonitoring() []api.ServerTool {
 }
 
 func mustgatherMonitoringPrometheusStatus(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	p, err := GetProvider()
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -154,7 +154,7 @@ func mustgatherMonitoringPrometheusStatus(params api.ToolHandlerParams) (*api.To
 }
 
 func mustgatherMonitoringPrometheusTargets(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	p, err := GetProvider()
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -211,7 +211,7 @@ func mustgatherMonitoringPrometheusTargets(params api.ToolHandlerParams) (*api.T
 }
 
 func mustgatherMonitoringPrometheusTSDB(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	p, err := GetProvider()
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -246,7 +246,7 @@ func mustgatherMonitoringPrometheusTSDB(params api.ToolHandlerParams) (*api.Tool
 }
 
 func mustgatherMonitoringPrometheusAlerts(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	p, err := GetProvider()
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -313,7 +313,7 @@ func mustgatherMonitoringPrometheusAlerts(params api.ToolHandlerParams) (*api.To
 }
 
 func mustgatherMonitoringPrometheusRules(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	p, err := GetProvider()
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
