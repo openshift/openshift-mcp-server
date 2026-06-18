@@ -20,8 +20,8 @@ func setProvider(p *mg.Provider) {
 	provider = p
 }
 
-// getProvider returns the loaded must-gather provider or an error
-func getProvider() (*mg.Provider, error) {
+// GetProvider returns the loaded must-gather provider or an error
+func GetProvider() (*mg.Provider, error) {
 	providerMu.RLock()
 	defer providerMu.RUnlock()
 	if provider == nil {

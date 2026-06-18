@@ -88,7 +88,7 @@ func initEvents() []api.ServerTool {
 }
 
 func mustgatherEventsList(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	p, err := GetProvider()
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -159,7 +159,7 @@ func mustgatherEventsList(params api.ToolHandlerParams) (*api.ToolCallResult, er
 }
 
 func mustgatherEventsByResource(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	p, err := GetProvider()
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -215,7 +215,7 @@ func mustgatherEventsByResource(params api.ToolHandlerParams) (*api.ToolCallResu
 }
 
 func mustgatherEventsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	p, err := GetProvider()
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}

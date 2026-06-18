@@ -79,7 +79,7 @@ func initNodes() []api.ServerTool {
 }
 
 func mustgatherNodeDiagnosticsGet(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	p, err := GetProvider()
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -146,7 +146,7 @@ func mustgatherNodeDiagnosticsGet(params api.ToolHandlerParams) (*api.ToolCallRe
 }
 
 func mustgatherNodeKubeletLogs(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	p, err := GetProvider()
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -183,7 +183,7 @@ func mustgatherNodeKubeletLogs(params api.ToolHandlerParams) (*api.ToolCallResul
 }
 
 func mustgatherNodeKubeletLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	p, err := GetProvider()
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
