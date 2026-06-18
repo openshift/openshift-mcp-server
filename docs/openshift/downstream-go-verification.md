@@ -62,7 +62,21 @@ The output should confirm the expected Go version, for example:
 go version go1.26.0 linux/amd64
 ```
 
-### 5. Apply the label
+### 5. Update the CI builder image tag
+
+If the Go version bump requires a new builder image, update the tag in
+`.ci-operator.yaml` at the root of the downstream repository:
+
+```yaml
+build_root_image:
+  name: builder
+  namespace: ocp
+  tag: rhel-9-golang-1.26-openshift-5.0
+```
+
+Change the `tag` value to match the verified image tag from the previous step.
+
+### 6. Apply the label
 
 Once verified, add the `downstream-go-verified` label to the upstream PR. The
 Go Version Check workflow will re-evaluate and pass.
