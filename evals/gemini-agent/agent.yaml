@@ -3,4 +3,4 @@ metadata:
   name: "gemini-command-agent"
 acp:
   cmd: "gemini"
-  args: ["--acp"]
+  args: ["--acp", "--yolo"]
