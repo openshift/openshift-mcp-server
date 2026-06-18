@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/mustgather"
 	"github.com/google/jsonschema-go/jsonschema"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -39,9 +40,20 @@ func getCoreDNSConfig(params api.ToolHandlerParams) (*api.ToolCallResult, error)
 		Resource: "configmaps",
 	}
 
-	cm, err := params.DynamicClient().Resource(gvr).Namespace("openshift-dns").Get(params.Context, "dns-default", metav1.GetOptions{})
-	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to get dns-default ConfigMap: %w", err)), nil
+	var cm *unstructured.Unstructured
+	var err error
+
+	if p, mgErr := mustgather.GetProvider(); mgErr == nil && p != nil {
+		gvk := schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ConfigMap"}
+		cm = p.GetResource(gvk, "dns-default", "openshift-dns")
+		if cm == nil {
+			return api.NewToolCallResult("", fmt.Errorf("ConfigMap openshift-dns/dns-default not found in must-gather archive")), nil
+		}
+	} else {
+		cm, err = params.DynamicClient().Resource(gvr).Namespace("openshift-dns").Get(params.Context, "dns-default", metav1.GetOptions{})
+		if err != nil {
+			return api.NewToolCallResult("", fmt.Errorf("failed to get dns-default ConfigMap: %w", err)), nil
+		}
 	}
 
 	data, found, err := unstructured.NestedStringMap(cm.Object, "data")

@@ -1,0 +1,16 @@
+kind: Task
+metadata:
+  name: get-coredns-config-offline
+  labels:
+    suite: kubernetes
+steps:
+  verify:
+    contains: "prometheus :9153"
+  prompt:
+    inline: First load the must-gather archive located at 'evals/testdata/must-gather' using the mustgather_use tool. Then use the get_coredns_config tool to retrieve the CoreDNS configuration from the offline result.
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "mustgather_use"
+      - server: kubernetes
+        toolPattern: "get_coredns_config"
