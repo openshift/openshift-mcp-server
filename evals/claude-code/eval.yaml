@@ -92,3 +92,13 @@ config:
             toolPattern: ".*"
         minToolCalls: 1
         maxToolCalls: 15
+    # Cluster diagnostics tasks
+    - glob: ../tasks/cluster-diagnostics/*/*.yaml
+      labelSelector:
+        suite: cluster-diagnostics
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            toolPattern: ".*"
+        minToolCalls: 1
+        maxToolCalls: 20

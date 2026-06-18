@@ -13,6 +13,7 @@ import (
 	configuration "github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
+	clusterDiagnosticsToolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/cluster-diagnostics"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/core"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/helm"
@@ -180,6 +181,7 @@ func (s *ToolsetsSuite) TestGranularToolsetsTools() {
 		&kiali.Toolset{},
 		&kubevirt.Toolset{},
 		&tekton.Toolset{},
+		&clusterDiagnosticsToolset.Toolset{},
 	}
 	for _, testCase := range testCases {
 		s.Run("Toolset "+testCase.GetName(), func() {
