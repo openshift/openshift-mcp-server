@@ -1,0 +1,19 @@
+kind: Task
+metadata:
+  name: inspect-route-offline
+  labels:
+    suite: kubernetes
+steps:
+  verify:
+    contains: "console"
+  prompt:
+    inline: First load the must-gather archive located at 'evals/testdata/must-gather' using the mustgather_use tool. Then inspect the default OpenShift console route in the openshift-console namespace and report key fields like host, TLS termination type, and backend service based entirely on the offline data.
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "mustgather_use"
+      - server: kubernetes
+        toolPattern: "inspect_route"
+        args:
+          namespace: "openshift-console"
+          route: "console"
