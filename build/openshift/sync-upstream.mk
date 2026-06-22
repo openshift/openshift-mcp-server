@@ -37,10 +37,11 @@ sync-upstream-pr: ## Create/update PR to sync with upstream (requires gh CLI)
 		exit 0; \
 	fi
 	@echo "📝 Creating sync branch..."
-	@CURRENT_BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
-	BEHIND_COUNT=$$(git rev-list --count $(ORIGIN_REMOTE)/main..$(UPSTREAM_REMOTE)/main); \
+	@BEHIND_COUNT=$$(git rev-list --count $(ORIGIN_REMOTE)/main..$(UPSTREAM_REMOTE)/main); \
 	echo "  Behind by $$BEHIND_COUNT commits"; \
-	git checkout -B $(SYNC_BRANCH_NAME) $(UPSTREAM_REMOTE)/main
+	git checkout -B $(SYNC_BRANCH_NAME) $(ORIGIN_REMOTE)/main
+	@echo "🔀 Merging upstream changes..."
+	@git merge --no-ff $(UPSTREAM_REMOTE)/main -m "chore: merge upstream changes"
 	@echo "🔧 Updating dependencies..."
 	@go mod tidy && go mod vendor
 	@if [ -n "$$(git status --porcelain go.mod go.sum vendor/)" ]; then \
