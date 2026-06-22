@@ -262,15 +262,14 @@ func (st *state) validate(instance reflect.Value, schema *Schema, callerAnns *an
 	}
 	if schema.AnyOf != nil {
 		// We must visit them all, to collect annotations.
-		var errs []error
+		ok := false
 		for _, ss := range schema.AnyOf {
-			if err := st.validate(instance, ss, &anns); err != nil {
-				errs = append(errs, err)
+			if valid(ss, &anns) {
+				ok = true
 			}
 		}
-		if len(errs) == len(schema.AnyOf) {
-			return fmt.Errorf("anyOf: did not validate against any of %v:\n%v",
-				schema.AnyOf, errors.Join(errs...))
+		if !ok {
+			return fmt.Errorf("anyOf: did not validate against any of %v", schema.AnyOf)
 		}
 	}
 	if schema.OneOf != nil {
