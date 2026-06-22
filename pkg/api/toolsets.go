@@ -47,6 +47,12 @@ type Toolset interface {
 	// GetPrompts returns the prompts provided by this toolset.
 	// Returns nil if the toolset doesn't provide any prompts.
 	GetPrompts() []ServerPrompt
+	// GetResources returns the resources provided by this toolset.
+	// Returns nil if the toolset doesn't provide any resources.
+	GetResources() []ServerResource
+	// GetResourceTemplates returns the resource templates provided by this toolset.
+	// Returns nil if the toolset doesn't provide any resource templates.
+	GetResourceTemplates() []ServerResourceTemplate
 }
 
 type ToolCallRequest interface {
@@ -101,6 +107,47 @@ func NewToolCallResultStructured(structured any, err error) *ToolCallResult {
 		}
 	}
 	return NewToolCallResultFull(content, structured, err)
+}
+
+// Resource represents the metadata of an MCP resource.
+type Resource struct {
+	URI         string
+	Name        string
+	Description string
+	MIMEType    string
+}
+
+// ResourceContent is the value returned by a resource handler.
+type ResourceContent struct {
+	MIMEType string
+	Text     string
+	Blob     []byte
+}
+
+// ResourceHandler is called when a client reads a resource.
+type ResourceHandler func(ctx context.Context) (*ResourceContent, error)
+
+// ServerResource represents a resource that can be registered with the MCP server.
+type ServerResource struct {
+	Resource Resource
+	Handler  ResourceHandler
+}
+
+// ResourceTemplate represents the metadata of an MCP resource template.
+type ResourceTemplate struct {
+	URITemplate string
+	Name        string
+	Description string
+	MIMEType    string
+}
+
+// ResourceTemplateHandler is called when a client reads a resource matching a template.
+type ResourceTemplateHandler func(ctx context.Context, uri string) (*ResourceContent, error)
+
+// ServerResourceTemplate represents a resource template that can be registered with the MCP server.
+type ServerResourceTemplate struct {
+	ResourceTemplate ResourceTemplate
+	Handler          ResourceTemplateHandler
 }
 
 type ToolHandlerParams struct {
