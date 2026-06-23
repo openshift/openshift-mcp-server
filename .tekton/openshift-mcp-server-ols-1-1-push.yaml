@@ -4,17 +4,16 @@ metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/openshift/openshift-mcp-server?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
-    build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
-    pipelinesascode.tekton.dev/cancel-in-progress: "true"
+    pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
-      == "main"
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
+      == "ols-1.1"
   labels:
-    appstudio.openshift.io/application: mcp-server-main
-    appstudio.openshift.io/component: openshift-mcp-server-main
+    appstudio.openshift.io/application: mcp-server-ols-1-1
+    appstudio.openshift.io/component: openshift-mcp-server-ols-1-1
     pipelines.appstudio.openshift.io/type: build
-  name: openshift-mcp-server-main-on-pull-request
+  name: openshift-mcp-server-ols-1-1-on-push
   namespace: ocp-mcp-server-tenant
 spec:
   params:
@@ -23,9 +22,7 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/ocp-mcp-server-tenant/openshift-mcp-server-main:on-pr-{{revision}}
-  - name: image-expires-after
-    value: 5d
+    value: quay.io/redhat-user-workloads/ocp-mcp-server-tenant/openshift-mcp-server-ols-1-1:{{revision}}
   - name: build-platforms
     value:
     - linux/x86_64
@@ -551,7 +548,7 @@ spec:
     - name: netrc
       optional: true
   taskRunTemplate:
-    serviceAccountName: build-pipeline-openshift-mcp-server-main
+    serviceAccountName: build-pipeline-openshift-mcp-server-ols-1-1
   workspaces:
   - name: git-auth
     secret:

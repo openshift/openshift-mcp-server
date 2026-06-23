@@ -31,10 +31,10 @@ LABEL io.k8s.description="Red Hat OpenShift MCP Server"
 LABEL io.k8s.display-name="Red Hat OpenShift MCP Server"
 LABEL io.openshift.tags="openshift,mcp"
 LABEL name=openshift-mcp-server
-LABEL release=0.0.1
+LABEL release=1.1.1
 LABEL url="https://github.com/openshift/openshift-mcp-server"
 LABEL vendor="Red Hat, Inc."
-LABEL version=0.0.1
+LABEL version=1.1.1
 LABEL summary="Red Hat OpenShift MCP Server"
 
 ENTRYPOINT ["/openshift-mcp-server", "--config", "/mcp_config.toml"]
