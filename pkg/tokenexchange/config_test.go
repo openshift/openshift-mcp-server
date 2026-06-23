@@ -1,11 +1,13 @@
 package tokenexchange
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"math/big"
 	"net"
@@ -28,7 +30,9 @@ func (s *TargetTokenExchangeConfigSuite) TestHTTPClientCAFile() {
 		client, err := (&TargetTokenExchangeConfig{}).HTTPClient()
 		s.Require().NoError(err)
 
-		transport, ok := client.Transport.(*http.Transport)
+		wrapper, ok := client.Transport.(*tlsEnforcingTransport)
+		s.Require().True(ok)
+		transport, ok := wrapper.Base.(*http.Transport)
 		s.Require().True(ok)
 		s.Require().NotNil(transport.TLSClientConfig)
 		s.Equal(uint16(tls.VersionTLS12), transport.TLSClientConfig.MinVersion)
@@ -106,6 +110,205 @@ func (s *TargetTokenExchangeConfigSuite) TestHTTPClientCAFile() {
 		_, err := (&TargetTokenExchangeConfig{CAFile: filepath.Join(s.T().TempDir(), "missing.pem")}).HTTPClient()
 		s.Require().Error(err)
 		s.Contains(err.Error(), "failed to read CA file")
+	})
+}
+
+func (s *TargetTokenExchangeConfigSuite) TestSetRequireTLS() {
+	s.Run("no enforcement when requireTLS is nil", func() {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"access_token": "test-token",
+				"token_type":   "Bearer",
+			})
+		}))
+		defer server.Close()
+
+		cfg := &TargetTokenExchangeConfig{
+			TokenURL: server.URL,
+		}
+		client, err := cfg.HTTPClient()
+		s.Require().NoError(err)
+
+		resp, err := client.Get(server.URL)
+		s.Require().NoError(err)
+		_ = resp.Body.Close()
+		s.Equal(http.StatusOK, resp.StatusCode)
+	})
+
+	s.Run("blocks HTTP when requireTLS returns true", func() {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
+
+		cfg := &TargetTokenExchangeConfig{}
+		cfg.SetRequireTLS(func() bool { return true })
+
+		client, err := cfg.HTTPClient()
+		s.Require().NoError(err)
+
+		_, err = client.Get(server.URL)
+		s.Require().Error(err)
+		s.Contains(err.Error(), "require_tls is enabled")
+	})
+
+	s.Run("allows HTTPS when requireTLS returns true", func() {
+		server := s.newTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
+
+		cfg := &TargetTokenExchangeConfig{
+			CAFile: s.writeCAFile(server.Certificate()),
+		}
+		cfg.SetRequireTLS(func() bool { return true })
+
+		client, err := cfg.HTTPClient()
+		s.Require().NoError(err)
+
+		resp, err := client.Get(server.URL)
+		s.Require().NoError(err)
+		_ = resp.Body.Close()
+		s.Equal(http.StatusOK, resp.StatusCode)
+	})
+
+	s.Run("allows HTTP when requireTLS returns false", func() {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
+
+		cfg := &TargetTokenExchangeConfig{}
+		cfg.SetRequireTLS(func() bool { return false })
+
+		client, err := cfg.HTTPClient()
+		s.Require().NoError(err)
+
+		resp, err := client.Get(server.URL)
+		s.Require().NoError(err)
+		_ = resp.Body.Close()
+		s.Equal(http.StatusOK, resp.StatusCode)
+	})
+
+	s.Run("evaluates requireTLS per request not at build time", func() {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
+
+		enforce := true
+		cfg := &TargetTokenExchangeConfig{}
+		cfg.SetRequireTLS(func() bool { return enforce })
+
+		client, err := cfg.HTTPClient()
+		s.Require().NoError(err)
+
+		_, err = client.Get(server.URL)
+		s.Require().Error(err)
+		s.Contains(err.Error(), "require_tls is enabled")
+
+		enforce = false
+		resp, err := client.Get(server.URL)
+		s.Require().NoError(err)
+		_ = resp.Body.Close()
+		s.Equal(http.StatusOK, resp.StatusCode)
+	})
+
+	s.Run("enforces when the enforcer is set after the client is built", func() {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
+
+		// Build (and memoize) the client with no enforcer installed.
+		cfg := &TargetTokenExchangeConfig{}
+		client, err := cfg.HTTPClient()
+		s.Require().NoError(err)
+
+		resp, err := client.Get(server.URL)
+		s.Require().NoError(err)
+		_ = resp.Body.Close()
+
+		// Always-wrapping means a later SetRequireTLS still takes effect on the
+		// same memoized client, with no rebuild (guards against an unwrapped
+		// client being cached before the enforcer is wired).
+		cfg.SetRequireTLS(func() bool { return true })
+		_, err = client.Get(server.URL)
+		s.Require().Error(err)
+		s.Contains(err.Error(), "require_tls is enabled")
+	})
+}
+
+func (s *TargetTokenExchangeConfigSuite) TestExchangeEnforcement() {
+	s.Run("rfc8693 exchanger is blocked with http URL and requireTLS", func() {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"access_token": "exchanged-token",
+				"token_type":   "Bearer",
+			})
+		}))
+		defer server.Close()
+
+		cfg := &TargetTokenExchangeConfig{
+			TokenURL:     server.URL,
+			ClientID:     "test-client",
+			ClientSecret: "test-secret",
+		}
+		cfg.SetRequireTLS(func() bool { return true })
+
+		exchanger := &rfc8693Exchanger{}
+		_, err := exchanger.Exchange(context.Background(), cfg, "incoming-token")
+		s.Require().Error(err)
+		s.Contains(err.Error(), "require_tls is enabled")
+	})
+
+	s.Run("keycloak-v1 exchanger is blocked with http URL and requireTLS", func() {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"access_token": "exchanged-token",
+				"token_type":   "Bearer",
+			})
+		}))
+		defer server.Close()
+
+		cfg := &TargetTokenExchangeConfig{
+			TokenURL:     server.URL,
+			ClientID:     "test-client",
+			ClientSecret: "test-secret",
+		}
+		cfg.SetRequireTLS(func() bool { return true })
+
+		exchanger := &keycloakV1Exchanger{}
+		_, err := exchanger.Exchange(context.Background(), cfg, "incoming-token")
+		s.Require().Error(err)
+		s.Contains(err.Error(), "require_tls is enabled")
+	})
+
+	s.Run("entra-obo exchanger is blocked with http URL and requireTLS", func() {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"access_token": "exchanged-token",
+				"token_type":   "Bearer",
+			})
+		}))
+		defer server.Close()
+
+		cfg := &TargetTokenExchangeConfig{
+			TokenURL:     server.URL,
+			ClientID:     "test-client",
+			ClientSecret: "test-secret",
+			Scopes:       []string{"api://target/.default"},
+		}
+		cfg.SetRequireTLS(func() bool { return true })
+
+		exchanger := &entraOBOExchanger{}
+		_, err := exchanger.Exchange(context.Background(), cfg, "incoming-token")
+		s.Require().Error(err)
+		s.Contains(err.Error(), "require_tls is enabled")
 	})
 }
 
