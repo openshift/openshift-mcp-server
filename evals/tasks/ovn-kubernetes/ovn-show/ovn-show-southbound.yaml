@@ -1,0 +1,30 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "ovn-show-southbound"
+  difficulty: easy
+  category: "OVN Configuration"
+  description: "Display OVN Southbound database configuration using ovn_show tool"
+  labels:
+    suite: ovn-kubernetes
+    requires: ovn-kubernetes
+spec:
+  limits:
+    timeout: "5m"
+  setup:
+    - script:
+        file: ./setup.sh
+  prompt:
+    inline: |
+      Show me the OVN Southbound database configuration from one of the ovnkube-node pods.
+  verify:
+    - llmJudge:
+        contains: "Shows Southbound database configuration from a node comprised of chassis information and port bindings"
+        reasoning: "Output should describe chassis information and port bindings"
+    - llmJudge:
+        contains: "Shows a overlay network using Geneve encapsulation with all nodes participating as chassis and connected ports"
+        reasoning: "Output should describe the Geneve overlay network with chassis and ports"
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "ovn_show"
