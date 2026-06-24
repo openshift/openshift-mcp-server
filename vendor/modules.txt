@@ -478,7 +478,7 @@ github.com/prometheus/prometheus/util/annotations
 github.com/prometheus/prometheus/util/features
 github.com/prometheus/prometheus/util/kahansum
 github.com/prometheus/prometheus/util/strutil
-# github.com/rhobs/obs-mcp v0.2.0
+# github.com/rhobs/obs-mcp v0.2.1
 ## explicit; go 1.25.7
 github.com/rhobs/obs-mcp/pkg/alertmanager
 github.com/rhobs/obs-mcp/pkg/prometheus
