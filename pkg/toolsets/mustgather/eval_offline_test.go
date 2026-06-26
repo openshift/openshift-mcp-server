@@ -21,7 +21,7 @@ func (r mockRequest) GetArguments() map[string]any {
 
 func TestEvalOffline(t *testing.T) {
 	// 1. Load the must-gather provider
-	archivePath := "/Users/btofel/workspace/openshift-mcp-server/evals/testdata/must-gather"
+	archivePath := "../../../evals/testdata/must-gather"
 	p, err := mg.NewProvider(archivePath)
 	if err != nil {
 		t.Fatalf("failed to create must-gather provider: %v", err)
