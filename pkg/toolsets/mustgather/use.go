@@ -48,7 +48,7 @@ func mustgatherUse(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		return api.NewToolCallResult("", fmt.Errorf("failed to load must-gather archive: %w", err)), nil
 	}
 
-	setProvider(p)
+	SetProvider(p)
 
 	metadata := p.GetMetadata()
 
