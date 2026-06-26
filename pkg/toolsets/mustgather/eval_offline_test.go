@@ -1,4 +1,4 @@
-package mustgather
+package mustgather_test
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/mustgather"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/netedge"
 )
 
@@ -25,7 +26,7 @@ func TestEvalOffline(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create must-gather provider: %v", err)
 	}
-	setProvider(p)
+	mustgather.SetProvider(p)
 	fmt.Println("Loaded must-gather archive successfully")
 
 	// 2. Get the "get_service_endpoints" tool from netedge toolset
