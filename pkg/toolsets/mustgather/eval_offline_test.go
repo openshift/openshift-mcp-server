@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
-	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/mustgather"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/netedge"
 )
@@ -20,14 +19,37 @@ func (r mockRequest) GetArguments() map[string]any {
 }
 
 func TestEvalOffline(t *testing.T) {
-	// 1. Load the must-gather provider
-	archivePath := "../../../evals/testdata/must-gather"
-	p, err := mg.NewProvider(archivePath)
-	if err != nil {
-		t.Fatalf("failed to create must-gather provider: %v", err)
+	// 1. Load the must-gather provider via mustgather_use tool
+	mustgatherToolset := &mustgather.Toolset{}
+	mustgatherTools := mustgatherToolset.GetTools(nil)
+	var useTool *api.ServerTool
+	for _, tool := range mustgatherTools {
+		if tool.Tool.Name == "mustgather_use" {
+			useTool = &tool
+			break
+		}
 	}
-	mustgather.SetProvider(p)
-	fmt.Println("Loaded must-gather archive successfully")
+	if useTool == nil {
+		t.Fatalf("mustgather_use tool not found")
+	}
+
+	useParams := api.ToolHandlerParams{
+		Context: context.Background(),
+		ToolCallRequest: mockRequest{
+			args: map[string]any{
+				"path": "../../../evals/testdata/must-gather",
+			},
+		},
+	}
+
+	useRes, err := useTool.Handler(useParams)
+	if err != nil {
+		t.Fatalf("mustgather_use returned error: %v", err)
+	}
+	if useRes.Error != nil {
+		t.Fatalf("mustgather_use execution error: %v", useRes.Error)
+	}
+	fmt.Println("Loaded must-gather archive successfully via tool")
 
 	// 2. Get the "get_service_endpoints" tool from netedge toolset
 	netedgeToolset := &netedge.Toolset{}

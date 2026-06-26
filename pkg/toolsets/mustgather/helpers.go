@@ -13,8 +13,8 @@ var (
 	provider   *mg.Provider
 )
 
-// SetProvider stores the loaded must-gather provider
-func SetProvider(p *mg.Provider) {
+// setProvider stores the loaded must-gather provider
+func setProvider(p *mg.Provider) {
 	providerMu.Lock()
 	defer providerMu.Unlock()
 	provider = p
