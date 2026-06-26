@@ -5,7 +5,7 @@ metadata:
     suite: kubernetes
 steps:
   verify:
-    contains: "console"
+    contains: "console-openshift-console.apps.example.com"
   prompt:
     inline: First load the must-gather archive located at 'evals/testdata/must-gather' using the mustgather_use tool. Then inspect the default OpenShift console route in the openshift-console namespace and report key fields like host, TLS termination type, and backend service based entirely on the offline data.
   assertions:
