@@ -1,0 +1,77 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  labels:
+    suite: kubevirt
+    requires: kubevirt
+  name: "update-vm-instancetype"
+  difficulty: hard
+spec:
+  requires:
+    - extension: kubernetes
+      as: k8s
+  setup:
+    - k8s.delete:
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: vm-test-instancetype-update
+        ignoreNotFound: true
+    - k8s.create:
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: vm-test-instancetype-update
+    - k8s.create:
+        apiVersion: kubevirt.io/v1
+        kind: VirtualMachine
+        metadata:
+          name: fedora-vm
+          namespace: vm-test-instancetype-update
+        spec:
+          runStrategy: Halted
+          instancetype:
+            name: u1.small
+            kind: VirtualMachineClusterInstancetype
+          template:
+            spec:
+              domain:
+                devices:
+                  disks:
+                  - name: containerdisk
+                    disk:
+                      bus: virtio
+              volumes:
+              - name: containerdisk
+                containerDisk:
+                  image: quay.io/containerdisks/fedora:latest
+  verify:
+    - script:
+        inline: |-
+          #!/usr/bin/env bash
+          source ../helpers/verify-vm.sh
+          NS="vm-test-instancetype-update"
+
+          verify_vm_exists "fedora-vm" "$NS" || exit 1
+          verify_instancetype "fedora-vm" "$NS" "u1.medium" || exit 1
+          verify_no_direct_resources "fedora-vm" "$NS"
+
+          echo "All validations passed"
+          exit 0
+  cleanup:
+    - k8s.delete:
+        apiVersion: kubevirt.io/v1
+        kind: VirtualMachine
+        metadata:
+          name: fedora-vm
+          namespace: vm-test-instancetype-update
+        ignoreNotFound: true
+    - k8s.delete:
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: vm-test-instancetype-update
+        ignoreNotFound: true
+  prompt:
+    inline: |
+      A Fedora VirtualMachine named fedora-vm exists in the vm-test-instancetype-update namespace using the u1.small instancetype. Double its memory by updating the instance type.
