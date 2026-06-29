@@ -49,6 +49,9 @@ func ValidateURLsRequireTLS(urls map[string]string) error {
 // when RequireTLS returns true. This provides Layer 2 (runtime) enforcement as
 // defense-in-depth, catching any URLs that might have been missed during config validation.
 // The RequireTLS function is called per-request, allowing dynamic config changes (e.g., SIGHUP).
+//
+// NOTE: pkg/tokenexchange/config.go duplicates this type and its helpers
+// (tlsEnforcingTransport, isSecureHTTPScheme) to avoid an import cycle.
 type TLSEnforcingTransport struct {
 	Base       http.RoundTripper
 	RequireTLS func() bool
@@ -56,7 +59,7 @@ type TLSEnforcingTransport struct {
 
 func (t *TLSEnforcingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if t.RequireTLS != nil && t.RequireTLS() && !isSecureHTTPScheme(req.URL.Scheme) {
-		klog.V(1).Infof("require_tls: blocked request to %s", req.URL.Host)
+		klog.FromContext(req.Context()).V(1).Info("require_tls: blocked request to host", "host", req.URL.Host)
 		return nil, fmt.Errorf("require_tls is enabled but request to %s uses %q scheme (secure scheme required)",
 			req.URL.Host, req.URL.Scheme)
 	}

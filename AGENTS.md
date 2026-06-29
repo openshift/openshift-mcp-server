@@ -33,6 +33,11 @@ Implement new functionality in the Go sources under `cmd/` and `pkg/`.
 The JavaScript (`npm/`) and Python (`python/`) directories only wrap the compiled binary for distribution (npm and PyPI).
 Most changes will not require touching them unless the version or packaging needs to be updated.
 
+### Logging
+
+When adding log lines, always use a contextual logger (`klog.FromContext(ctx)`). If necessary, add a `ctx` parameter to the function, and wire
+the context through to where you need a logger.
+
 ### Adding new MCP tools
 
 The project uses a toolset-based architecture for organizing MCP tools:
@@ -41,6 +46,8 @@ The project uses a toolset-based architecture for organizing MCP tools:
 - **Toolsets** group related tools together (e.g., config tools, core Kubernetes tools, Helm tools).
 - **Registration** happens in `pkg/toolsets/` where toolsets are registered at initialization.
 - Each toolset lives in its own subdirectory under `pkg/toolsets/` (e.g., `pkg/toolsets/config/`, `pkg/toolsets/core/`, `pkg/toolsets/helm/`).
+
+**Important:** When creating a new toolset, adding tools to an existing toolset, or modifying tool definitions, **always use the `/toolset-design` skill first**. This skill validates the design (naming, grouping, input schema, eval coverage) before implementation begins.
 
 When adding a new tool:
 1. Define the tool handler function that implements the tool's logic.

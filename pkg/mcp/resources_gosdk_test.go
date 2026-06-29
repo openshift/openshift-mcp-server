@@ -305,7 +305,7 @@ func (s *ResourceSuite) TestReloadRemovesResources() {
 		newConfig.ReadOnly = s.Cfg.ReadOnly
 		newConfig.ListOutput = s.Cfg.ListOutput
 
-		err := s.mcpServer.ReloadConfiguration(newConfig)
+		err := s.mcpServer.ReloadConfiguration(s.T().Context(), newConfig)
 		s.Require().NoError(err)
 
 		result, err := s.ListResources()
@@ -350,7 +350,7 @@ func (s *ResourceSuite) TestReloadNotifiesResourceListChanged() {
 	newConfig.ReadOnly = s.Cfg.ReadOnly
 	newConfig.ListOutput = s.Cfg.ListOutput
 
-	err := s.mcpServer.ReloadConfiguration(newConfig)
+	err := s.mcpServer.ReloadConfiguration(s.T().Context(), newConfig)
 	s.Require().NoError(err)
 
 	notification := capture.RequireNotification(s.T(), 2*time.Second, "notifications/resources/list_changed")
@@ -492,7 +492,7 @@ func (s *ResourceSuite) TestInvalidURITemplateReturnsError() {
 		newConfig.ListOutput = s.Cfg.ListOutput
 
 		s.NotPanics(func() {
-			err := s.mcpServer.ReloadConfiguration(newConfig)
+			err := s.mcpServer.ReloadConfiguration(s.T().Context(), newConfig)
 			s.Require().Error(err)
 			s.Contains(err.Error(), "{{invalid")
 		})
@@ -522,7 +522,7 @@ func (s *ResourceSuite) TestInvalidURITemplateReturnsError() {
 		recoveryConfig.ReadOnly = s.Cfg.ReadOnly
 		recoveryConfig.ListOutput = s.Cfg.ListOutput
 
-		s.Require().NoError(s.mcpServer.ReloadConfiguration(recoveryConfig))
+		s.Require().NoError(s.mcpServer.ReloadConfiguration(s.T().Context(), recoveryConfig))
 
 		result, err := s.ReadResource("test://example/good")
 		s.Require().NoError(err)
@@ -579,7 +579,7 @@ func (s *ResourceSuite) TestInvalidResourceURIReturnsError() {
 		newConfig.ListOutput = s.Cfg.ListOutput
 
 		s.NotPanics(func() {
-			err := s.mcpServer.ReloadConfiguration(newConfig)
+			err := s.mcpServer.ReloadConfiguration(s.T().Context(), newConfig)
 			s.Require().Error(err)
 			s.Contains(err.Error(), "%zz")
 		})

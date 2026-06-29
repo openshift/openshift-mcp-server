@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/discovery"
 	"k8s.io/klog/v2"
@@ -42,14 +43,16 @@ func (v *SchemaValidator) Validate(ctx context.Context, req *api.HTTPValidationR
 		return nil
 	}
 
+	logger := klog.FromContext(ctx)
+
 	// Only validate for create/update operations (exclude patch as partial bodies cause false positives)
 	if req.Verb != "create" && req.Verb != "update" {
 		return nil
 	}
 
-	validator, err := v.getValidator()
+	validator, err := v.getValidator(ctx)
 	if err != nil {
-		klog.V(4).Infof("Failed to get schema validator: %v", err)
+		klogutil.LogInfo(logger.V(4), "Failed to get schema validator", klogutil.Err(err))
 		return nil
 	}
 
@@ -63,7 +66,7 @@ func (v *SchemaValidator) Validate(ctx context.Context, req *api.HTTPValidationR
 		// In that case, skip validation rather than blocking the request
 		errMsg := err.Error()
 		if strings.Contains(errMsg, "yaml:") || strings.Contains(errMsg, "json:") {
-			klog.V(4).Infof("Schema validation skipped due to parsing error: %v", err)
+			klogutil.LogInfo(logger.V(4), "Schema validation skipped due to parsing error", klogutil.Err(err))
 			return nil
 		}
 		return convertKubectlValidationError(err)
@@ -81,7 +84,7 @@ func (a *openAPIResourcesAdapter) OpenAPISchema() (kubectlopenapi.Resources, err
 	return a.parser.Parse()
 }
 
-func (v *SchemaValidator) getValidator() (kubectlvalidation.Schema, error) {
+func (v *SchemaValidator) getValidator(ctx context.Context) (kubectlvalidation.Schema, error) {
 	v.validatorMu.Lock()
 	defer v.validatorMu.Unlock()
 
@@ -96,7 +99,7 @@ func (v *SchemaValidator) getValidator() (kubectlvalidation.Schema, error) {
 
 	openAPIClient, ok := discoveryClient.(discovery.OpenAPISchemaInterface)
 	if !ok {
-		klog.V(4).Infof("Discovery client does not support OpenAPI schema")
+		klog.FromContext(ctx).V(4).Info("Discovery client does not support OpenAPI schema")
 		return nil, nil
 	}
 

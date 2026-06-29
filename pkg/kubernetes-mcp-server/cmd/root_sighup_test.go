@@ -3,6 +3,9 @@
 package cmd
 
 import (
+	"context"
+	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
@@ -17,38 +20,60 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/logging"
 	"github.com/containers/kubernetes-mcp-server/pkg/mcp"
 	"github.com/containers/kubernetes-mcp-server/pkg/oauth"
+	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/suite"
+	"golang.org/x/sync/errgroup"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/textlogger"
 )
 
-// SIGHUPSuite tests the SIGHUP configuration reload behavior
+// baseSIGHUPSetup contains common setup for SIGHUP tests
+type baseSIGHUPSetup struct {
+	mockServer *test.MockServer
+	tempDir    string
+	logBuffer  *test.SyncBuffer
+	klogState  klog.State
+}
+
+// setupSIGHUPTest performs common SIGHUP test setup
+func setupSIGHUPTest(t *testing.T) *baseSIGHUPSetup {
+	s := &baseSIGHUPSetup{}
+	s.mockServer = test.NewMockServer()
+	s.mockServer.Handle(test.NewDiscoveryClientHandler())
+	s.tempDir = t.TempDir()
+
+	// Capture klog state
+	s.klogState = klog.CaptureState()
+
+	// Set up klog to write to buffer
+	s.logBuffer = &test.SyncBuffer{}
+	logger := textlogger.NewLogger(textlogger.NewConfig(textlogger.Verbosity(2), textlogger.Output(s.logBuffer)))
+	klog.SetLoggerWithOptions(logger)
+
+	return s
+}
+
+func (s *baseSIGHUPSetup) teardown() {
+	if s.mockServer != nil {
+		s.mockServer.Close()
+	}
+	s.klogState.Restore()
+}
+
+// SIGHUPSuite tests the SIGHUP configuration reload behavior for STDIO mode
 type SIGHUPSuite struct {
 	suite.Suite
-	mockServer      *test.MockServer
-	server          *mcp.Server
-	tempDir         string
+	*baseSIGHUPSetup
 	dropInConfigDir string
-	logBuffer       *test.SyncBuffer
-	klogState       klog.State
+	server          *mcp.Server
 	stopSIGHUP      func()
 }
 
 func (s *SIGHUPSuite) SetupTest() {
-	s.mockServer = test.NewMockServer()
-	s.mockServer.Handle(test.NewDiscoveryClientHandler())
-	s.tempDir = s.T().TempDir()
+	s.baseSIGHUPSetup = setupSIGHUPTest(s.T())
 	s.dropInConfigDir = filepath.Join(s.tempDir, "conf.d")
 	s.Require().NoError(os.Mkdir(s.dropInConfigDir, 0o755))
-
-	// Capture klog state so we can restore it after the test
-	s.klogState = klog.CaptureState()
-
-	// Set up klog to write to our buffer so we can verify log messages
-	s.logBuffer = &test.SyncBuffer{}
-	logger := textlogger.NewLogger(textlogger.NewConfig(textlogger.Verbosity(2), textlogger.Output(s.logBuffer)))
-	klog.SetLoggerWithOptions(logger)
 }
 
 func (s *SIGHUPSuite) TearDownTest() {
@@ -59,20 +84,17 @@ func (s *SIGHUPSuite) TearDownTest() {
 	if s.server != nil {
 		s.server.Close()
 	}
-	if s.mockServer != nil {
-		s.mockServer.Close()
-	}
-	s.klogState.Restore()
+	s.teardown()
 }
 
 func (s *SIGHUPSuite) InitServer(configPath, configDir string) *MCPServerOptions {
-	cfg, err := config.Read(configPath, configDir)
+	cfg, err := config.Read(s.T().Context(), configPath, configDir)
 	s.Require().NoError(err)
 	cfg.KubeConfig = s.mockServer.KubeconfigFile(s.T())
 
-	provider, err := kubernetes.NewProvider(cfg)
+	provider, err := kubernetes.NewProvider(s.T().Context(), cfg)
 	s.Require().NoError(err)
-	s.server, err = mcp.NewServer(mcp.Configuration{
+	s.server, err = mcp.NewServer(s.T().Context(), mcp.Configuration{
 		StaticConfig: cfg,
 	}, provider)
 	s.Require().NoError(err)
@@ -88,7 +110,7 @@ func (s *SIGHUPSuite) InitServer(configPath, configDir string) *MCPServerOptions
 	oauthState := oauth.NewState(&oauth.Snapshot{})
 
 	cfgState := config.NewStaticConfigState(cfg)
-	s.stopSIGHUP = opts.setupSIGHUPHandler(s.server, oauthState, cfgState)
+	s.stopSIGHUP = opts.setupSIGHUPHandler(s.T().Context(), s.server, oauthState, cfgState)
 	return opts
 }
 
@@ -295,7 +317,7 @@ func TestSIGHUPInvokesLogSinkReload(t *testing.T) {
 	mockServer.Handle(test.NewDiscoveryClientHandler())
 	t.Cleanup(mockServer.Close)
 
-	cfg, err := config.Read(configPath, "")
+	cfg, err := config.Read(t.Context(), configPath, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -312,11 +334,11 @@ func TestSIGHUPInvokesLogSinkReload(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = sink.Close() })
 
-	provider, err := kubernetes.NewProvider(cfg)
+	provider, err := kubernetes.NewProvider(t.Context(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mcpServer, err := mcp.NewServer(mcp.Configuration{StaticConfig: cfg, SDKLogger: sink.SDKLogger()}, provider)
+	mcpServer, err := mcp.NewServer(t.Context(), mcp.Configuration{StaticConfig: cfg, SDKLogger: sink.SDKLogger()}, provider)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -331,7 +353,7 @@ func TestSIGHUPInvokesLogSinkReload(t *testing.T) {
 		logSink: sink,
 	}
 	cfgState := config.NewStaticConfigState(cfg)
-	stop := opts.setupSIGHUPHandler(mcpServer, oauth.NewState(&oauth.Snapshot{}), cfgState)
+	stop := opts.setupSIGHUPHandler(t.Context(), mcpServer, oauth.NewState(&oauth.Snapshot{}), cfgState)
 	t.Cleanup(stop)
 
 	if err := os.WriteFile(configPath, []byte(
@@ -371,4 +393,225 @@ func TestSIGHUPInvokesLogSinkReload(t *testing.T) {
 
 func TestSIGHUP(t *testing.T) {
 	suite.Run(t, new(SIGHUPSuite))
+}
+
+// HTTPSIGHUPSuite tests the SIGHUP configuration reload behavior for the HTTP server
+type HTTPSIGHUPSuite struct {
+	suite.Suite
+	*baseSIGHUPSetup
+	configPath      string
+	httpClient      *http.Client
+	httpAddress     string
+	timeoutCancel   context.CancelFunc
+	stopServer      context.CancelFunc
+	waitForShutdown func() error
+}
+
+func (s *HTTPSIGHUPSuite) SetupTest() {
+	s.baseSIGHUPSetup = setupSIGHUPTest(s.T())
+	s.configPath = filepath.Join(s.tempDir, "config.toml")
+	s.httpClient = &http.Client{Timeout: 10 * time.Second}
+}
+
+func (s *HTTPSIGHUPSuite) TearDownTest() {
+	defer s.teardown()
+
+	if s.stopServer == nil {
+		return
+	}
+	s.stopServer()
+	if s.waitForShutdown != nil {
+		// Non-fatal: let the rest of teardown run even if shutdown regressed.
+		s.NoError(s.waitForShutdown(), "HTTP server did not shut down gracefully")
+	}
+	if s.timeoutCancel != nil {
+		s.timeoutCancel()
+		s.timeoutCancel = nil
+	}
+	s.stopServer = nil
+	s.waitForShutdown = nil
+}
+
+// getToolsList queries the MCP server via HTTP to get the list of available tools
+func (s *HTTPSIGHUPSuite) getToolsList() ([]string, error) {
+	client := sdk.NewClient(&sdk.Implementation{Name: "test", Version: "1.0.0"}, nil)
+	transport := &sdk.StreamableClientTransport{
+		Endpoint: fmt.Sprintf("http://%s/mcp", s.httpAddress),
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	session, err := client.Connect(ctx, transport, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect: %w", err)
+	}
+	defer func() { _ = session.Close() }()
+
+	tools, err := session.ListTools(ctx, &sdk.ListToolsParams{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list tools: %w", err)
+	}
+
+	toolNames := make([]string, len(tools.Tools))
+	for i, tool := range tools.Tools {
+		toolNames[i] = tool.Name
+	}
+	return toolNames, nil
+}
+
+func (s *HTTPSIGHUPSuite) TestSIGHUPReloadsConfigFromFile() {
+	// Create initial config file - start with only core toolset (no helm)
+	tcpAddr, err := test.RandomPortAddress()
+	s.Require().NoError(err)
+	s.httpAddress = fmt.Sprintf("127.0.0.1:%d", tcpAddr.Port)
+
+	s.Require().NoError(os.WriteFile(s.configPath, []byte(fmt.Sprintf(`
+		port = "%d"
+		kubeconfig = "%s"
+		toolsets = ["core", "config"]
+	`, tcpAddr.Port, s.mockServer.KubeconfigFile(s.T()))), 0o644))
+
+	// Create MCPServerOptions with config file set to trigger HTTP mode
+	opts := &MCPServerOptions{
+		ConfigPath: s.configPath,
+		IOStreams: genericiooptions.IOStreams{
+			Out:    s.logBuffer,
+			ErrOut: s.logBuffer,
+		},
+	}
+
+	// Run via root.go in a goroutine. A cancelable context (like http_test.go)
+	// stops the server instead of a process-wide SIGTERM; the 10s timeout context
+	// is the backstop so group.Wait can't hang if Serve does.
+	var timeoutCtx, cancelCtx context.Context
+	timeoutCtx, s.timeoutCancel = context.WithTimeout(s.T().Context(), 10*time.Second)
+	group, gc := errgroup.WithContext(timeoutCtx)
+	cancelCtx, s.stopServer = context.WithCancel(gc)
+
+	group.Go(func() error {
+		rootCmd := NewMCPServer(opts.IOStreams)
+		if err := opts.Complete(cancelCtx, rootCmd); err != nil {
+			return err
+		}
+		return opts.Run(cancelCtx)
+	})
+	s.waitForShutdown = group.Wait
+
+	// Wait for server to start
+	s.Require().NoError(test.WaitForServer(tcpAddr), "HTTP server did not start in time")
+	s.Require().NoError(test.WaitForHealthz(tcpAddr), "HTTP server /healthz endpoint did not respond in time")
+
+	// Get initial tools list - should NOT have helm tools
+	toolsBefore, err := s.getToolsList()
+	s.Require().NoError(err, "Should be able to query tools list")
+	s.False(slices.ContainsFunc(toolsBefore, func(t string) bool {
+		return strings.HasPrefix(t, "helm_")
+	}), "Should not have helm tools initially")
+
+	// Modify the config file to add helm toolset
+	s.Require().NoError(os.WriteFile(s.configPath, []byte(fmt.Sprintf(`
+		port = "%d"
+		kubeconfig = "%s"
+		toolsets = ["core", "config", "helm"]
+	`, tcpAddr.Port, s.mockServer.KubeconfigFile(s.T()))), 0o644))
+
+	// Send SIGHUP to current process
+	s.Require().NoError(syscall.Kill(syscall.Getpid(), syscall.SIGHUP))
+
+	s.Run("helm tools become available after SIGHUP", func() {
+		var toolsAfter []string
+		s.Require().Eventually(func() bool {
+			var err error
+			toolsAfter, err = s.getToolsList()
+			if err != nil {
+				return false
+			}
+			return slices.ContainsFunc(toolsAfter, func(t string) bool {
+				return strings.HasPrefix(t, "helm_")
+			})
+		}, 3*time.Second, 200*time.Millisecond, "Helm tools should appear after SIGHUP and config reload")
+
+		// Reload must be additive: len(after) > len(before) would still pass if a
+		// core tool were dropped as helm was added, so require the full superset.
+		for _, tool := range toolsBefore {
+			s.Contains(toolsAfter, tool, "reload should not drop previously-available tool %q", tool)
+		}
+	})
+
+	s.Run("server continues to respond after SIGHUP", func() {
+		s.Require().Eventually(func() bool {
+			resp, err := s.httpClient.Get(fmt.Sprintf("http://%s/healthz", s.httpAddress))
+			if err != nil {
+				return false
+			}
+			defer func() { _ = resp.Body.Close() }()
+			return resp.StatusCode == http.StatusOK
+		}, 2*time.Second, 50*time.Millisecond, "Server should continue responding after SIGHUP")
+	})
+
+	s.Run("no shutdown messages in logs", func() {
+		// Poll the negative over a window (not a fixed sleep + single sample):
+		// Never fails the moment a shutdown line appears.
+		s.Never(func() bool {
+			logOutput := s.logBuffer.String()
+			return strings.Contains(logOutput, "initiating graceful shutdown") ||
+				strings.Contains(logOutput, "Shutting down HTTP server")
+		}, 500*time.Millisecond, 50*time.Millisecond, "SIGHUP must not trigger shutdown of the HTTP server")
+	})
+}
+
+// TestSIGHUPIgnoredWithoutConfig drives the no-config HTTP path end-to-end:
+// with a port but no config file, root.go registers no reload handler, so
+// Serve's SIGHUP registration alone must keep the process alive. If that
+// regresses, this SIGHUP kills the test binary ("signal: hangup").
+func (s *HTTPSIGHUPSuite) TestSIGHUPIgnoredWithoutConfig() {
+	tcpAddr, err := test.RandomPortAddress()
+	s.Require().NoError(err)
+	s.httpAddress = fmt.Sprintf("127.0.0.1:%d", tcpAddr.Port)
+
+	// config.Default() mirrors NewMCPServerOptions; Complete keeps it as-is when
+	// no --config/--config-dir is set.
+	cfg := config.Default()
+	cfg.Port = fmt.Sprintf("%d", tcpAddr.Port)
+	cfg.KubeConfig = s.mockServer.KubeconfigFile(s.T())
+	opts := &MCPServerOptions{
+		StaticConfig: cfg,
+		IOStreams:    genericiooptions.IOStreams{Out: s.logBuffer, ErrOut: s.logBuffer},
+	}
+
+	var timeoutCtx, cancelCtx context.Context
+	timeoutCtx, s.timeoutCancel = context.WithTimeout(s.T().Context(), 10*time.Second)
+	group, gc := errgroup.WithContext(timeoutCtx)
+	cancelCtx, s.stopServer = context.WithCancel(gc)
+	group.Go(func() error {
+		rootCmd := NewMCPServer(opts.IOStreams)
+		if err := opts.Complete(cancelCtx, rootCmd); err != nil {
+			return err
+		}
+		return opts.Run(cancelCtx)
+	})
+	s.waitForShutdown = group.Wait
+
+	s.Require().NoError(test.WaitForServer(tcpAddr), "HTTP server did not start in time")
+	s.Require().NoError(test.WaitForHealthz(tcpAddr), "HTTP server /healthz endpoint did not respond in time")
+
+	s.Require().NoError(syscall.Kill(syscall.Getpid(), syscall.SIGHUP))
+
+	s.Run("no-config server keeps serving after SIGHUP", func() {
+		s.Never(func() bool {
+			logOutput := s.logBuffer.String()
+			return strings.Contains(logOutput, "initiating graceful shutdown") ||
+				strings.Contains(logOutput, "Shutting down HTTP server")
+		}, 500*time.Millisecond, 50*time.Millisecond, "SIGHUP must not shut down the no-config HTTP server")
+
+		resp, err := s.httpClient.Get(fmt.Sprintf("http://%s/healthz", s.httpAddress))
+		s.Require().NoError(err, "server should keep serving after SIGHUP")
+		defer func() { _ = resp.Body.Close() }()
+		s.Equal(http.StatusOK, resp.StatusCode)
+	})
+}
+
+func TestHTTPSIGHUP(t *testing.T) {
+	suite.Run(t, new(HTTPSIGHUPSuite))
 }
