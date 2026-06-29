@@ -23,6 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/klog/v2"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	"k8s.io/utils/ptr"
 )
 
@@ -159,13 +161,16 @@ func (n *NodeDebug) NodesDebugExec(
 		return "", "", err
 	}
 
+	// Capture logger before defer — ctx may be cancelled when the defer runs
+	logger := klog.FromContext(ctx)
+
 	// Ensure the pod is deleted regardless of completion state.
 	defer func() {
 		deleteCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		deleteErr := n.Pods(ns).Delete(deleteCtx, created.Name, metav1.DeleteOptions{})
 		if deleteErr != nil {
-			klog.Warningf("failed to delete debug pod %s: %v", created.Name, deleteErr)
+			klogutil.LogWarn(logger, "Failed to delete debug pod", klogutil.Field("pod", created.Name), klogutil.Err(deleteErr))
 		}
 	}()
 
@@ -180,7 +185,7 @@ func (n *NodeDebug) NodesDebugExec(
 		// Retrieve logs on exec errors — the pod may have produced partial output.
 		logs, logsErr := n.retrieveLogs(context.Background(), ns, created.Name)
 		if logsErr != nil {
-			klog.Warningf("failed to retrieve logs from debug pod %s in namespace %s: %v", created.Name, ns, logsErr)
+			klogutil.LogWarn(logger, "Failed to retrieve logs from debug pod", klogutil.Field("pod", created.Name), klogutil.Field("namespace", ns), klogutil.Err(logsErr))
 		} else if logs != "" {
 			return stdout, stderr, fmt.Errorf("failed to execute command in debug pod %s in namespace %s: %w\nlogs:\n%s", created.Name, ns, execErr, logs)
 		}

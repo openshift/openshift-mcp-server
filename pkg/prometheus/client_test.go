@@ -19,7 +19,7 @@ type PrometheusSuite struct {
 
 func (s *PrometheusSuite) TestNewClient() {
 	s.Run("creates client with defaults", func() {
-		client := NewClient("https://prometheus.example.com")
+		client := NewClient(context.Background(), "https://prometheus.example.com")
 
 		s.Equal("https://prometheus.example.com", client.baseURL)
 		s.Equal("", client.bearerToken)
@@ -28,7 +28,7 @@ func (s *PrometheusSuite) TestNewClient() {
 	})
 
 	s.Run("applies bearer token option", func() {
-		client := NewClient("https://prometheus.example.com",
+		client := NewClient(context.Background(), "https://prometheus.example.com",
 			WithBearerToken("test-token"),
 		)
 
@@ -36,7 +36,7 @@ func (s *PrometheusSuite) TestNewClient() {
 	})
 
 	s.Run("applies timeout option", func() {
-		client := NewClient("https://prometheus.example.com",
+		client := NewClient(context.Background(), "https://prometheus.example.com",
 			WithTimeout(60*time.Second),
 		)
 
@@ -44,7 +44,7 @@ func (s *PrometheusSuite) TestNewClient() {
 	})
 
 	s.Run("applies insecure option", func() {
-		client := NewClient("https://prometheus.example.com",
+		client := NewClient(context.Background(), "https://prometheus.example.com",
 			WithInsecure(true),
 		)
 
@@ -52,7 +52,7 @@ func (s *PrometheusSuite) TestNewClient() {
 	})
 
 	s.Run("trims whitespace from bearer token", func() {
-		client := NewClient("https://prometheus.example.com",
+		client := NewClient(context.Background(), "https://prometheus.example.com",
 			WithBearerToken("  test-token  "),
 		)
 
@@ -66,7 +66,7 @@ func (s *PrometheusSuite) TestWithBearerTokenFromRESTConfig() {
 			BearerToken: "direct-token",
 		}
 
-		client := NewClient("https://prometheus.example.com",
+		client := NewClient(context.Background(), "https://prometheus.example.com",
 			WithBearerTokenFromRESTConfig(config),
 		)
 
@@ -74,7 +74,7 @@ func (s *PrometheusSuite) TestWithBearerTokenFromRESTConfig() {
 	})
 
 	s.Run("handles nil config gracefully", func() {
-		client := NewClient("https://prometheus.example.com",
+		client := NewClient(context.Background(), "https://prometheus.example.com",
 			WithBearerTokenFromRESTConfig(nil),
 		)
 
@@ -84,7 +84,7 @@ func (s *PrometheusSuite) TestWithBearerTokenFromRESTConfig() {
 
 func (s *PrometheusSuite) TestWithTLSFromRESTConfig() {
 	s.Run("handles nil config gracefully", func() {
-		client := NewClient("https://prometheus.example.com",
+		client := NewClient(context.Background(), "https://prometheus.example.com",
 			WithTLSFromRESTConfig(nil),
 		)
 
@@ -110,7 +110,7 @@ cDq6b5fP0Z3e6Q1OvH5hEYnD6W8fXG5M8CxHjg==
 			},
 		}
 
-		client := NewClient("https://prometheus.example.com",
+		client := NewClient(context.Background(), "https://prometheus.example.com",
 			WithTLSFromRESTConfig(config),
 		)
 
@@ -140,7 +140,7 @@ func (s *PrometheusSuite) TestQuery() {
 		}))
 		defer server.Close()
 
-		client := NewClient(server.URL)
+		client := NewClient(context.Background(), server.URL)
 		result, err := client.Query(context.Background(), "up", "")
 
 		s.NoError(err)
@@ -158,7 +158,7 @@ func (s *PrometheusSuite) TestQuery() {
 		}))
 		defer server.Close()
 
-		client := NewClient(server.URL)
+		client := NewClient(context.Background(), server.URL)
 		_, err := client.Query(context.Background(), "up", "1234567890")
 
 		s.NoError(err)
@@ -173,7 +173,7 @@ func (s *PrometheusSuite) TestQuery() {
 		}))
 		defer server.Close()
 
-		client := NewClient(server.URL, WithBearerToken("test-token"))
+		client := NewClient(context.Background(), server.URL, WithBearerToken("test-token"))
 		_, err := client.Query(context.Background(), "up", "")
 
 		s.NoError(err)
@@ -185,7 +185,7 @@ func (s *PrometheusSuite) TestQuery() {
 		}))
 		defer server.Close()
 
-		client := NewClient(server.URL)
+		client := NewClient(context.Background(), server.URL)
 		_, err := client.Query(context.Background(), "up", "")
 
 		s.Error(err)
@@ -221,7 +221,7 @@ func (s *PrometheusSuite) TestQueryRange() {
 		}))
 		defer server.Close()
 
-		client := NewClient(server.URL)
+		client := NewClient(context.Background(), server.URL)
 		result, err := client.QueryRange(context.Background(),
 			"rate(http_requests_total[5m])",
 			"2024-01-01T00:00:00Z",
@@ -256,14 +256,14 @@ func (s *PrometheusSuite) TestTruncateString() {
 
 func (s *PrometheusSuite) TestCreateHTTPClient() {
 	s.Run("creates client with timeout", func() {
-		client := NewClient("https://example.com", WithTimeout(60*time.Second))
+		client := NewClient(context.Background(), "https://example.com", WithTimeout(60*time.Second))
 		httpClient := client.createHTTPClient()
 
 		s.Equal(60*time.Second, httpClient.Timeout)
 	})
 
 	s.Run("creates client with TLS config", func() {
-		client := NewClient("https://example.com", WithInsecure(true))
+		client := NewClient(context.Background(), "https://example.com", WithInsecure(true))
 		httpClient := client.createHTTPClient()
 
 		transport, ok := httpClient.Transport.(*http.Transport)

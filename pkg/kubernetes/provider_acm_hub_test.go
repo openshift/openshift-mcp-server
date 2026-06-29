@@ -38,7 +38,7 @@ func (s *ProviderACMHubTestSuite) SetupTest() {
 		cluster_proxy_addon_skip_tls_verify = true
 	`)))
 
-	provider, err := NewProvider(cfg)
+	provider, err := NewProvider(s.T().Context(), cfg)
 	s.Require().NoError(err, "Expected no error creating ACM provider")
 	s.provider = provider
 }
