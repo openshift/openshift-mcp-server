@@ -439,7 +439,7 @@ func (s *TroubleshootToolSuite) TestFetchDataVolumeStatus() {
 }
 
 func (s *TroubleshootToolSuite) TestExtractCloudInit() {
-	s.Run("extracts cloudInitNoCloud userData", func() {
+	s.Run("extracts cloudInitNoCloud userData with runcmd visible", func() {
 		testVM := &unstructured.Unstructured{}
 		testVM.SetUnstructuredContent(map[string]interface{}{
 			"apiVersion": "kubevirt.io/v1",
@@ -470,6 +470,40 @@ func (s *TroubleshootToolSuite) TestExtractCloudInit() {
 		s.Contains(result, "cloudinitdisk")
 		s.Contains(result, "cloudInitNoCloud")
 		s.Contains(result, "shutdown")
+	})
+
+	s.Run("redacts sensitive fields in userData", func() {
+		testVM := &unstructured.Unstructured{}
+		testVM.SetUnstructuredContent(map[string]interface{}{
+			"apiVersion": "kubevirt.io/v1",
+			"kind":       "VirtualMachine",
+			"metadata": map[string]interface{}{
+				"name":      "test-vm",
+				"namespace": "test-ns",
+			},
+			"spec": map[string]interface{}{
+				"template": map[string]interface{}{
+					"spec": map[string]interface{}{
+						"volumes": []interface{}{
+							map[string]interface{}{
+								"name": "cloudinitdisk",
+								"cloudInitNoCloud": map[string]interface{}{
+									"userData": "#cloud-config\npassword: supersecret123\nruncmd:\n  - echo hello\nssh_authorized_keys:\n  - ssh-rsa AAAA...",
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+		result := extractCloudInit(testVM, nil)
+
+		s.Contains(result, "password: <REDACTED>")
+		s.NotContains(result, "supersecret123")
+		s.Contains(result, "runcmd")
+		s.Contains(result, "echo hello")
+		s.Contains(result, "ssh_authorized_keys: <REDACTED>")
 	})
 
 	s.Run("returns no cloud-init message when none configured", func() {
@@ -521,7 +555,7 @@ func (s *TroubleshootToolSuite) TestExtractCloudInit() {
 					map[string]interface{}{
 						"name": "cloudinitdisk",
 						"cloudInitConfigDrive": map[string]interface{}{
-							"userData": "#cloud-config\npassword: test",
+							"userData": "#cloud-config\nruncmd:\n  - echo hello",
 						},
 					},
 				},
@@ -532,7 +566,7 @@ func (s *TroubleshootToolSuite) TestExtractCloudInit() {
 
 		s.Contains(result, "## Cloud-Init Configuration")
 		s.Contains(result, "cloudInitConfigDrive")
-		s.Contains(result, "password: test")
+		s.Contains(result, "echo hello")
 	})
 }
 

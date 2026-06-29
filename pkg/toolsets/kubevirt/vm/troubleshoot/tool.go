@@ -13,6 +13,7 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/utils/ptr"
 )
@@ -80,7 +81,7 @@ func troubleshoot(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	cloudInitYaml := extractCloudInit(vm, vmi)
 	podYaml, podNames := fetchVirtLauncherPod(ctx, dynamicClient, namespace, name)
 	podLogsText := fetchVirtLauncherPodLogs(ctx, params.KubernetesClient, namespace, podNames)
-	eventsYaml := fetchEvents(ctx, params.KubernetesClient, namespace, name)
+	eventsYaml := fetchEvents(ctx, params.KubernetesClient, namespace, name, podNames)
 
 	report := fmt.Sprintf(`# VirtualMachine Diagnostic Report: %s/%s
 
@@ -234,41 +235,21 @@ func fetchVirtLauncherPodLogs(ctx context.Context, client api.KubernetesClient, 
 	return result.String()
 }
 
-func fetchEvents(ctx context.Context, client api.KubernetesClient, namespace, vmName string) string {
+func fetchEvents(ctx context.Context, client api.KubernetesClient, namespace, vmName string, podNames []string) string {
 	core := kubernetes.NewCore(client)
 
-	vmEvents, err := core.EventsList(ctx, namespace, api.ListOptions{
-		ListOptions: metav1.ListOptions{FieldSelector: "involvedObject.name=" + vmName},
-	})
-	if err != nil {
-		return fmt.Sprintf("## Events\n\n*Error listing events: %v*", err)
-	}
+	objectNames := []string{vmName}
+	objectNames = append(objectNames, podNames...)
 
 	var relatedEvents []map[string]any
-	for _, event := range vmEvents {
-		involvedObj, ok := event["InvolvedObject"].(map[string]string)
-		if !ok {
+	for _, objName := range objectNames {
+		events, err := core.EventsList(ctx, namespace, api.ListOptions{
+			ListOptions: metav1.ListOptions{FieldSelector: "involvedObject.name=" + objName},
+		})
+		if err != nil {
 			continue
 		}
-		objKind := involvedObj["Kind"]
-		if objKind == "VirtualMachine" || objKind == "VirtualMachineInstance" {
-			relatedEvents = append(relatedEvents, event)
-		}
-	}
-
-	allEvents, err := core.EventsList(ctx, namespace, api.ListOptions{})
-	if err != nil {
-		return fmt.Sprintf("## Events\n\n*Error listing events: %v*", err)
-	}
-	for _, event := range allEvents {
-		involvedObj, ok := event["InvolvedObject"].(map[string]string)
-		if !ok {
-			continue
-		}
-		objName := involvedObj["Name"]
-		if strings.HasPrefix(objName, vmName+"-") || strings.HasPrefix(objName, "virt-launcher-"+vmName) {
-			relatedEvents = append(relatedEvents, event)
-		}
+		relatedEvents = append(relatedEvents, events...)
 	}
 
 	if len(relatedEvents) == 0 {
@@ -309,7 +290,11 @@ func fetchDataVolumeStatus(ctx context.Context, dynamicClient dynamic.Interface,
 
 		dv, err := dynamicClient.Resource(kubevirt.DataVolumeGVR).Namespace(namespace).Get(ctx, dvName, metav1.GetOptions{})
 		if err != nil {
-			fmt.Fprintf(&result, "### %s\n\n*DataVolume not found: %v*\n\n", dvName, err)
+			if !apierrors.IsNotFound(err) {
+				fmt.Fprintf(&result, "### %s\n\n*Error fetching DataVolume: %v*\n\n", dvName, err)
+				continue
+			}
+			fmt.Fprintf(&result, "### %s\n\n*DataVolume not found*\n\n", dvName)
 			pvc, pvcErr := dynamicClient.Resource(kubevirt.PersistentVolumeClaimGVR).Namespace(namespace).Get(ctx, dvName, metav1.GetOptions{})
 			if pvcErr != nil {
 				fmt.Fprintf(&result, "*PVC also not found: %v*\n\n", pvcErr)
@@ -390,11 +375,11 @@ func extractCloudInit(vm, vmi *unstructured.Unstructured) string {
 
 			userData, _ := ciData["userData"].(string)
 			if userData != "" {
-				fmt.Fprintf(&result, "```yaml\n%s\n```\n\n", userData)
+				fmt.Fprintf(&result, "```yaml\n%s\n```\n\n", redactCloudInitSensitiveFields(userData))
 			}
 			networkData, _ := ciData["networkData"].(string)
 			if networkData != "" {
-				fmt.Fprintf(&result, "**networkData:**\n```yaml\n%s\n```\n\n", networkData)
+				fmt.Fprintf(&result, "**networkData:** *present (%d bytes, redacted for security)*\n\n", len(networkData))
 			}
 			if userData == "" && networkData == "" {
 				secretRef, _ := ciData["userDataSecretRef"].(map[string]interface{})
@@ -409,4 +394,50 @@ func extractCloudInit(vm, vmi *unstructured.Unstructured) string {
 		return "## Cloud-Init Configuration\n\n*No cloud-init volumes configured*"
 	}
 	return result.String()
+}
+
+var sensitiveCloudInitKeys = []string{
+	"password:",
+	"passwd:",
+	"ssh_authorized_keys:",
+	"ssh-rsa ",
+	"ssh-ed25519 ",
+	"ecdsa-sha2-",
+	"ca-cert:",
+	"client-cert:",
+	"client-key:",
+	"token:",
+	"secret:",
+}
+
+func redactCloudInitSensitiveFields(userData string) string {
+	lines := strings.Split(userData, "\n")
+	var result []string
+	redacting := false
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		isSensitive := false
+		for _, key := range sensitiveCloudInitKeys {
+			if strings.Contains(strings.ToLower(trimmed), strings.ToLower(key)) {
+				isSensitive = true
+				break
+			}
+		}
+
+		if isSensitive {
+			indent := line[:len(line)-len(strings.TrimLeft(line, " "))]
+			keyPart := strings.SplitN(trimmed, ":", 2)[0]
+			result = append(result, indent+keyPart+": <REDACTED>")
+			redacting = strings.HasSuffix(trimmed, "|") || strings.HasSuffix(trimmed, ">")
+		} else if redacting {
+			if len(trimmed) > 0 && !strings.HasPrefix(trimmed, "-") && trimmed[0] != ' ' {
+				redacting = false
+				result = append(result, line)
+			}
+		} else {
+			result = append(result, line)
+		}
+	}
+	return strings.Join(result, "\n")
 }
