@@ -46,9 +46,13 @@ func (s *TroubleshootToolSuite) TestToolRegistration() {
 		s.ElementsMatch([]string{"namespace", "name"}, schema.Required)
 	})
 
-	s.Run("description mentions proactive invocation", func() {
+	s.Run("description mentions priority and scope", func() {
 		tools := Tools()
-		s.Contains(tools[0].Tool.Description, "proactively")
+		desc := tools[0].Tool.Description
+		s.Contains(desc, "FIRST")
+		s.Contains(desc, "root-cause")
+		s.Contains(desc, "StorageClasses")
+		s.Contains(desc, "cloud-init")
 	})
 }
 
@@ -312,6 +316,223 @@ func (s *TroubleshootToolSuite) TestFetchVirtLauncherPodLogs() {
 	s.Run("returns message when empty pod names", func() {
 		result := fetchVirtLauncherPodLogs(context.Background(), nil, "test-ns", []string{})
 		s.Contains(result, "No pod found")
+	})
+}
+
+func (s *TroubleshootToolSuite) TestFetchDataVolumeStatus() {
+	ctx := context.Background()
+	gvrToListKind := map[schema.GroupVersionResource]string{
+		kubevirt.DataVolumeGVR:            "DataVolumeList",
+		kubevirt.PersistentVolumeClaimGVR: "PersistentVolumeClaimList",
+	}
+
+	s.Run("returns DV status when DataVolume exists", func() {
+		testVM := &unstructured.Unstructured{}
+		testVM.SetUnstructuredContent(map[string]interface{}{
+			"apiVersion": "kubevirt.io/v1",
+			"kind":       "VirtualMachine",
+			"metadata": map[string]interface{}{
+				"name":      "test-vm",
+				"namespace": "test-ns",
+			},
+			"spec": map[string]interface{}{
+				"dataVolumeTemplates": []interface{}{
+					map[string]interface{}{
+						"metadata": map[string]interface{}{
+							"name": "test-vm-volume",
+						},
+						"spec": map[string]interface{}{
+							"storage": map[string]interface{}{
+								"storageClassName": "premium-storage",
+							},
+						},
+					},
+				},
+			},
+		})
+
+		testDV := &unstructured.Unstructured{}
+		testDV.SetUnstructuredContent(map[string]interface{}{
+			"apiVersion": "cdi.kubevirt.io/v1beta1",
+			"kind":       "DataVolume",
+			"metadata": map[string]interface{}{
+				"name":      "test-vm-volume",
+				"namespace": "test-ns",
+			},
+			"spec": map[string]interface{}{
+				"storage": map[string]interface{}{
+					"storageClassName": "premium-storage",
+				},
+			},
+			"status": map[string]interface{}{
+				"phase": "Succeeded",
+				"conditions": []interface{}{
+					map[string]interface{}{
+						"type":   "Ready",
+						"status": "True",
+					},
+				},
+			},
+		})
+
+		client := fake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), gvrToListKind, testDV)
+		result := fetchDataVolumeStatus(ctx, client, "test-ns", testVM)
+
+		s.Contains(result, "## DataVolume/PVC Status")
+		s.Contains(result, "test-vm-volume")
+		s.Contains(result, "premium-storage")
+		s.Contains(result, "Succeeded")
+	})
+
+	s.Run("returns not found when DataVolume missing", func() {
+		testVM := &unstructured.Unstructured{}
+		testVM.SetUnstructuredContent(map[string]interface{}{
+			"apiVersion": "kubevirt.io/v1",
+			"kind":       "VirtualMachine",
+			"metadata": map[string]interface{}{
+				"name":      "test-vm",
+				"namespace": "test-ns",
+			},
+			"spec": map[string]interface{}{
+				"dataVolumeTemplates": []interface{}{
+					map[string]interface{}{
+						"metadata": map[string]interface{}{
+							"name": "missing-volume",
+						},
+					},
+				},
+			},
+		})
+
+		client := fake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), gvrToListKind)
+		result := fetchDataVolumeStatus(ctx, client, "test-ns", testVM)
+
+		s.Contains(result, "## DataVolume/PVC Status")
+		s.Contains(result, "missing-volume")
+		s.Contains(result, "not found")
+	})
+
+	s.Run("returns message when VM is nil", func() {
+		client := fake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), gvrToListKind)
+		result := fetchDataVolumeStatus(ctx, client, "test-ns", nil)
+
+		s.Contains(result, "No VM available")
+	})
+
+	s.Run("returns message when no dataVolumeTemplates", func() {
+		testVM := &unstructured.Unstructured{}
+		testVM.SetUnstructuredContent(map[string]interface{}{
+			"apiVersion": "kubevirt.io/v1",
+			"kind":       "VirtualMachine",
+			"metadata": map[string]interface{}{
+				"name":      "test-vm",
+				"namespace": "test-ns",
+			},
+			"spec": map[string]interface{}{},
+		})
+
+		client := fake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), gvrToListKind)
+		result := fetchDataVolumeStatus(ctx, client, "test-ns", testVM)
+
+		s.Contains(result, "No dataVolumeTemplates")
+	})
+}
+
+func (s *TroubleshootToolSuite) TestExtractCloudInit() {
+	s.Run("extracts cloudInitNoCloud userData", func() {
+		testVM := &unstructured.Unstructured{}
+		testVM.SetUnstructuredContent(map[string]interface{}{
+			"apiVersion": "kubevirt.io/v1",
+			"kind":       "VirtualMachine",
+			"metadata": map[string]interface{}{
+				"name":      "test-vm",
+				"namespace": "test-ns",
+			},
+			"spec": map[string]interface{}{
+				"template": map[string]interface{}{
+					"spec": map[string]interface{}{
+						"volumes": []interface{}{
+							map[string]interface{}{
+								"name": "cloudinitdisk",
+								"cloudInitNoCloud": map[string]interface{}{
+									"userData": "#cloud-config\nruncmd:\n  - [\"shutdown\", \"-h\", \"now\"]",
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+		result := extractCloudInit(testVM, nil)
+
+		s.Contains(result, "## Cloud-Init Configuration")
+		s.Contains(result, "cloudinitdisk")
+		s.Contains(result, "cloudInitNoCloud")
+		s.Contains(result, "shutdown")
+	})
+
+	s.Run("returns no cloud-init message when none configured", func() {
+		testVM := &unstructured.Unstructured{}
+		testVM.SetUnstructuredContent(map[string]interface{}{
+			"apiVersion": "kubevirt.io/v1",
+			"kind":       "VirtualMachine",
+			"metadata": map[string]interface{}{
+				"name":      "test-vm",
+				"namespace": "test-ns",
+			},
+			"spec": map[string]interface{}{
+				"template": map[string]interface{}{
+					"spec": map[string]interface{}{
+						"volumes": []interface{}{
+							map[string]interface{}{
+								"name": "rootdisk",
+								"containerDisk": map[string]interface{}{
+									"image": "quay.io/containerdisks/fedora:latest",
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+		result := extractCloudInit(testVM, nil)
+
+		s.Contains(result, "No cloud-init volumes configured")
+	})
+
+	s.Run("returns no volumes message when both nil", func() {
+		result := extractCloudInit(nil, nil)
+		s.Contains(result, "No volumes found")
+	})
+
+	s.Run("extracts from VMI when VM has no volumes", func() {
+		testVMI := &unstructured.Unstructured{}
+		testVMI.SetUnstructuredContent(map[string]interface{}{
+			"apiVersion": "kubevirt.io/v1",
+			"kind":       "VirtualMachineInstance",
+			"metadata": map[string]interface{}{
+				"name":      "test-vm",
+				"namespace": "test-ns",
+			},
+			"spec": map[string]interface{}{
+				"volumes": []interface{}{
+					map[string]interface{}{
+						"name": "cloudinitdisk",
+						"cloudInitConfigDrive": map[string]interface{}{
+							"userData": "#cloud-config\npassword: test",
+						},
+					},
+				},
+			},
+		})
+
+		result := extractCloudInit(nil, testVMI)
+
+		s.Contains(result, "## Cloud-Init Configuration")
+		s.Contains(result, "cloudInitConfigDrive")
+		s.Contains(result, "password: test")
 	})
 }
 

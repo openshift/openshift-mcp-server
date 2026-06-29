@@ -242,7 +242,7 @@
       "readOnlyHint": true,
       "title": "Virtual Machine: Troubleshoot"
     },
-    "description": "Diagnose KubeVirt VirtualMachine issues by collecting VM status, VMI status, volumes, virt-launcher pod state, pod logs, and related events. Returns a structured diagnostic report. Use this tool whenever a user asks why a VM is not starting, crashing, failing to migrate, or exhibiting unexpected behavior. This tool should be invoked proactively in troubleshooting mode.",
+    "description": "Diagnose KubeVirt VirtualMachine issues by collecting VM status, VMI status, volumes, DataVolume/PVC state, cloud-init configuration, virt-launcher pod state, pod logs, and related events. Returns a structured diagnostic report with root-cause data that goes beyond what alerts provide. Use this tool FIRST whenever a user asks why a VM is not starting, stuck in Provisioning, crashlooping, failing to migrate, or exhibiting unexpected behavior. Identifies issues such as missing StorageClasses, invalid PVC specs, misconfigured cloud-init, and scheduling constraints.",
     "inputSchema": {
       "properties": {
         "name": {

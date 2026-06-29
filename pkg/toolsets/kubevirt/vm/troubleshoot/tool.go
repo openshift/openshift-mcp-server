@@ -23,9 +23,10 @@ func Tools() []api.ServerTool {
 			Tool: api.Tool{
 				Name: "vm_troubleshoot",
 				Description: fmt.Sprintf(
-					"Diagnose %s VirtualMachine issues by collecting VM status, VMI status, volumes, virt-launcher pod state, pod logs, and related events. "+
-						"Returns a structured diagnostic report. Use this tool whenever a user asks why a VM is not starting, crashing, failing to migrate, or exhibiting unexpected behavior. "+
-						"This tool should be invoked proactively in troubleshooting mode.",
+					"Diagnose %s VirtualMachine issues by collecting VM status, VMI status, volumes, DataVolume/PVC state, cloud-init configuration, virt-launcher pod state, pod logs, and related events. "+
+						"Returns a structured diagnostic report with root-cause data that goes beyond what alerts provide. "+
+						"Use this tool FIRST whenever a user asks why a VM is not starting, stuck in Provisioning, crashlooping, failing to migrate, or exhibiting unexpected behavior. "+
+						"Identifies issues such as missing StorageClasses, invalid PVC specs, misconfigured cloud-init, and scheduling constraints.",
 					defaults.ProductName()),
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
@@ -75,6 +76,8 @@ func troubleshoot(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	vmYaml, vm := fetchVMStatus(ctx, dynamicClient, namespace, name)
 	vmiYaml, vmi := fetchVMIStatus(ctx, dynamicClient, namespace, name)
 	volumesYaml := fetchVolumes(namespace, name, vm, vmi)
+	dataVolumeYaml := fetchDataVolumeStatus(ctx, dynamicClient, namespace, vm)
+	cloudInitYaml := extractCloudInit(vm, vmi)
 	podYaml, podNames := fetchVirtLauncherPod(ctx, dynamicClient, namespace, name)
 	podLogsText := fetchVirtLauncherPodLogs(ctx, params.KubernetesClient, namespace, podNames)
 	eventsYaml := fetchEvents(ctx, params.KubernetesClient, namespace, name)
@@ -92,7 +95,11 @@ func troubleshoot(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 %s
 
 %s
-`, namespace, name, vmYaml, vmiYaml, volumesYaml, podYaml, podLogsText, eventsYaml)
+
+%s
+
+%s
+`, namespace, name, vmYaml, vmiYaml, volumesYaml, dataVolumeYaml, cloudInitYaml, podYaml, podLogsText, eventsYaml)
 
 	return api.NewToolCallResult(report, nil), nil
 }
@@ -274,4 +281,132 @@ func fetchEvents(ctx context.Context, client api.KubernetesClient, namespace, vm
 	}
 
 	return fmt.Sprintf("## Events (related to %s)\n\n```yaml\n%s```", vmName, yamlStr)
+}
+
+func fetchDataVolumeStatus(ctx context.Context, dynamicClient dynamic.Interface, namespace string, vm *unstructured.Unstructured) string {
+	if vm == nil {
+		return "## DataVolume/PVC Status\n\n*No VM available to extract DataVolume references*"
+	}
+
+	dvTemplates, found, err := unstructured.NestedSlice(vm.Object, "spec", "dataVolumeTemplates")
+	if err != nil || !found || len(dvTemplates) == 0 {
+		return "## DataVolume/PVC Status\n\n*No dataVolumeTemplates defined in VM spec*"
+	}
+
+	var result strings.Builder
+	result.WriteString("## DataVolume/PVC Status\n\n")
+
+	for _, dvTemplate := range dvTemplates {
+		dvMap, ok := dvTemplate.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		metadata, _ := dvMap["metadata"].(map[string]interface{})
+		dvName, _ := metadata["name"].(string)
+		if dvName == "" {
+			continue
+		}
+
+		dv, err := dynamicClient.Resource(kubevirt.DataVolumeGVR).Namespace(namespace).Get(ctx, dvName, metav1.GetOptions{})
+		if err != nil {
+			fmt.Fprintf(&result, "### %s\n\n*DataVolume not found: %v*\n\n", dvName, err)
+			pvc, pvcErr := dynamicClient.Resource(kubevirt.PersistentVolumeClaimGVR).Namespace(namespace).Get(ctx, dvName, metav1.GetOptions{})
+			if pvcErr != nil {
+				fmt.Fprintf(&result, "*PVC also not found: %v*\n\n", pvcErr)
+			} else {
+				pvcStatus, _, _ := unstructured.NestedMap(pvc.Object, "status")
+				if pvcStatus != nil {
+					yamlStr, _ := output.MarshalYaml(pvcStatus)
+					fmt.Fprintf(&result, "PVC exists with status:\n```yaml\n%s```\n\n", yamlStr)
+				}
+			}
+			continue
+		}
+
+		dvStatus, found, _ := unstructured.NestedMap(dv.Object, "status")
+		if !found {
+			fmt.Fprintf(&result, "### %s\n\n*DataVolume exists but has no status*\n\n", dvName)
+			continue
+		}
+
+		yamlStr, err := output.MarshalYaml(dvStatus)
+		if err != nil {
+			fmt.Fprintf(&result, "### %s\n\n*Error marshaling DataVolume status: %v*\n\n", dvName, err)
+			continue
+		}
+
+		dvSpec, _, _ := unstructured.NestedMap(dv.Object, "spec")
+		storageClass := ""
+		if dvSpec != nil {
+			sc, _, _ := unstructured.NestedString(dvSpec, "storage", "storageClassName")
+			if sc != "" {
+				storageClass = sc
+			}
+		}
+
+		fmt.Fprintf(&result, "### %s", dvName)
+		if storageClass != "" {
+			fmt.Fprintf(&result, " (storageClass: %s)", storageClass)
+		}
+		fmt.Fprintf(&result, "\n\n```yaml\n%s```\n\n", yamlStr)
+	}
+
+	return result.String()
+}
+
+func extractCloudInit(vm, vmi *unstructured.Unstructured) string {
+	var volumes []interface{}
+	if vm != nil {
+		volumes, _, _ = unstructured.NestedSlice(vm.Object, "spec", "template", "spec", "volumes")
+	}
+	if len(volumes) == 0 && vmi != nil {
+		volumes, _, _ = unstructured.NestedSlice(vmi.Object, "spec", "volumes")
+	}
+	if len(volumes) == 0 {
+		return "## Cloud-Init Configuration\n\n*No volumes found*"
+	}
+
+	var result strings.Builder
+	found := false
+
+	for _, vol := range volumes {
+		volMap, ok := vol.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		for _, ciKey := range []string{"cloudInitNoCloud", "cloudInitConfigDrive"} {
+			ciData, exists := volMap[ciKey].(map[string]interface{})
+			if !exists {
+				continue
+			}
+			found = true
+			if result.Len() == 0 {
+				result.WriteString("## Cloud-Init Configuration\n\n")
+			}
+
+			volName, _ := volMap["name"].(string)
+			fmt.Fprintf(&result, "### %s (type: %s)\n\n", volName, ciKey)
+
+			userData, _ := ciData["userData"].(string)
+			if userData != "" {
+				fmt.Fprintf(&result, "```yaml\n%s\n```\n\n", userData)
+			}
+			networkData, _ := ciData["networkData"].(string)
+			if networkData != "" {
+				fmt.Fprintf(&result, "**networkData:**\n```yaml\n%s\n```\n\n", networkData)
+			}
+			if userData == "" && networkData == "" {
+				secretRef, _ := ciData["userDataSecretRef"].(map[string]interface{})
+				if secretRef != nil {
+					fmt.Fprintf(&result, "*userData from Secret: %v*\n\n", secretRef["name"])
+				}
+			}
+		}
+	}
+
+	if !found {
+		return "## Cloud-Init Configuration\n\n*No cloud-init volumes configured*"
+	}
+	return result.String()
 }
