@@ -80,6 +80,11 @@ func TestMain(m *testing.M) {
 			CRD("instancetype.kubevirt.io", "v1beta1", "virtualmachineinstancetypes", "VirtualMachineInstancetype", "virtualmachineinstancetype", true),
 			CRD("instancetype.kubevirt.io", "v1beta1", "virtualmachineclusterpreferences", "VirtualMachineClusterPreference", "virtualmachineclusterpreference", false),
 			CRD("instancetype.kubevirt.io", "v1beta1", "virtualmachinepreferences", "VirtualMachinePreference", "virtualmachinepreference", true),
+			// OADP / Velero
+			CRD("velero.io", "v1", "backups", "Backup", "backup", true),
+			CRD("velero.io", "v1", "restores", "Restore", "restore", true),
+			CRD("velero.io", "v1", "backupstoragelocations", "BackupStorageLocation", "backupstoragelocation", true),
+			CRD("oadp.openshift.io", "v1alpha1", "dataprotectionapplications", "DataProtectionApplication", "dataprotectionapplication", true),
 		},
 	}
 	// Configure API server for faster CRD establishment and test performance
