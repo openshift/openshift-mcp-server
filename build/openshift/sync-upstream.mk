@@ -1,4 +1,9 @@
 ##@ Upstream Sync
+# Limitation: -X theirs silently resolves textual conflicts in favor of upstream.
+# Downstream-specific patches to shared code (same lines as upstream) will be
+# dropped without warning. Only structural conflicts (delete/modify, rename)
+# trigger a hard failure. If downstream carries patches to files upstream also
+# edits, verify the merge result before approving the sync PR.
 
 UPSTREAM_REPO ?= containers/kubernetes-mcp-server
 UPSTREAM_REMOTE ?= upstream
@@ -41,11 +46,33 @@ sync-upstream-pr: ## Create/update PR to sync with upstream (requires gh CLI)
 	echo "  Behind by $$BEHIND_COUNT commits"; \
 	git checkout -B $(SYNC_BRANCH_NAME) $(ORIGIN_REMOTE)/main
 	@echo "🔀 Merging upstream changes..."
-	@git merge --no-ff $(UPSTREAM_REMOTE)/main -m "chore: merge upstream changes"
+	@if ! git merge --no-ff -X theirs $(UPSTREAM_REMOTE)/main -m "chore: merge upstream changes"; then \
+		echo "⚠️  Merge conflicts remain after -X theirs. Attempting to resolve generated files..."; \
+		CONFLICTED=$$(git diff --name-only --diff-filter=U); \
+		UNRESOLVABLE=""; \
+		for f in $$CONFLICTED; do \
+			case "$$f" in \
+				go.sum|go.mod|vendor/*) \
+					echo "  Accepting upstream for generated file: $$f"; \
+					git checkout --theirs "$$f"; \
+					git add "$$f"; \
+					;; \
+				*) \
+					UNRESOLVABLE="$$UNRESOLVABLE $$f"; \
+					;; \
+			esac; \
+		done; \
+		if [ -n "$$UNRESOLVABLE" ]; then \
+			echo "❌ Unresolvable conflicts in:$$UNRESOLVABLE"; \
+			git merge --abort; \
+			exit 1; \
+		fi; \
+		git commit --no-edit; \
+	fi
 	@echo "🔧 Updating dependencies..."
 	@go mod tidy && go mod vendor
 	@if [ -n "$$(git status --porcelain go.mod go.sum vendor/)" ]; then \
-		echo "📦 Changes detected. Committing and pushing..."; \
+		echo "📦 Changes detected in generated files. Committing..."; \
 		git add go.mod go.sum vendor/; \
 		git commit -m "chore: update dependencies and vendor"; \
 	fi
