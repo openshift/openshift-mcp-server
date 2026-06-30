@@ -89,11 +89,6 @@ type ClientRegistrationMetadata struct {
 	// SoftwareStatement is an OPTIONAL JWT that asserts client metadata values.
 	// Values in the software statement take precedence over other metadata values.
 	SoftwareStatement string `json:"software_statement,omitempty"`
-
-	// ApplicationType is an OPTIONAL string that indicates the type of application.
-	// Valid values are "native" and "web".
-	// If omitted, OIDC-compliant authorization servers default to "web".
-	ApplicationType string `json:"application_type,omitempty"`
 }
 
 // ClientRegistrationResponse represents the fields returned by the Authorization Server
@@ -209,7 +204,7 @@ func RegisterClient(ctx context.Context, registrationEndpoint string, clientMeta
 		return nil, fmt.Errorf("failed to read registration response body: %w", err)
 	}
 
-	if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusOK {
+	if resp.StatusCode == http.StatusCreated {
 		var regResponse ClientRegistrationResponse
 		if err := internaljson.Unmarshal(body, &regResponse); err != nil {
 			return nil, fmt.Errorf("failed to decode successful registration response: %w (%s)", err, string(body))
