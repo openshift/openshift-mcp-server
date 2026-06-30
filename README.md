@@ -713,7 +713,7 @@ Silences are used to temporarily mute alerts based on label matchers. This tool 
   - `timeRange` (`string`) - Time window used to compute CPU rate (Prometheus duration like '5m', '10m', '1h', '1d'). Defaults to '10m'.
   - `workloadName` (`string`) - Kubernetes Workload name (e.g. Deployment/StatefulSet/etc). Tool will look up the workload and pick one of its Pods. If not found, it will fall back to treating this value as a podName.
 
-- **ossm_get_logs** - Get the logs of a Kubernetes Pod (or workload name that will be resolved to a pod) in a namespace. Output is plain text, matching kubernetes-mcp-server pods_log.
+- **ossm_get_logs** - Get the logs of a Kubernetes Pod (or workload name that will be resolved to a pod) in a namespace. Output is plain text, matching kubernetes-mcp-server pods_log. The line_count field tells you the total number of log lines returned. Analyze ALL of them, but summarize the results unless the user explicitly asks for the raw output. Do not omit any error or warning lines.
   - `clusterName` (`string`) - Optional. Name of the cluster to get the logs from. If not provided, will use the default cluster name in the Kiali KubeConfig
   - `container` (`string`) - Optional. Name of the Pod container to get the logs from.
   - `format` (`string`) - Output formatting for chat. 'codeblock' wraps logs in ~~~ fences (recommended). 'plain' returns raw text like kubernetes-mcp-server pods_log.
@@ -731,7 +731,7 @@ Silences are used to temporarily mute alerts based on label matchers. This tool 
   - `namespace` (`string`) **(required)** - Namespace to get metrics from
   - `quantiles` (`string`) - Comma-separated list of quantiles for histogram metrics (e.g., '0.5,0.95,0.99'). Optional
   - `rateInterval` (`string`) - Rate interval for metrics (e.g., '1m', '5m'). Optional, defaults to '10m'
-  - `reporter` (`string`) - Metrics reporter. Optional, defaults to 'source'
+  - `reporter` (`string`) - Metrics reporter(s). Comma-separated list of: 'source', 'destination', 'waypoint', or the special value 'both' (no reporter filter). Optional, defaults to 'source'. Example: 'source,waypoint'
   - `requestProtocol` (`string`) - Filter by request protocol (e.g., 'http', 'grpc', 'tcp'). Optional
   - `resourceName` (`string`) **(required)** - Name of the resource to get metrics for
   - `resourceType` (`string`) **(required)** - Type of resource to get metrics
@@ -914,6 +914,12 @@ Use tempo_search_tags to discover available tag names.
   - `namespace` (`string`) **(required)** - The namespace of the VirtualMachine to troubleshoot
   - `name` (`string`) **(required)** - The name of the VirtualMachine to troubleshoot
 
+- **windows-golden-image** - Guides creation of a Windows golden image via the KubeVirt windows-efi-installer Tekton pipeline
+  - `winImageDownloadURL` (`string`) **(required)** - Microsoft Windows ISO download URL (must be https://)
+  - `namespace` (`string`) - Target namespace for the PipelineRun
+  - `windowsVersion` (`string`) - Windows version: 10, 11, 2k22 (default), or 2k25
+  - `pipelineVersion` (`string`) - Pipeline version (default: latest). Use specific version like 0.25.0 if needed
+
 </details>
 
 <details>
@@ -943,6 +949,46 @@ Use tempo_search_tags to discover available tag names.
   - `keep_resources` (`string`) - Keep pod resources after collection (true/false, default: false)
   - `all_component_images` (`string`) - Include must-gather images from all installed operators (true/false)
   - `images` (`string`) - Comma-separated list of custom must-gather container images
+
+</details>
+
+<details>
+
+<summary>ossm</summary>
+
+- **mesh-list-applications** - List applications in the mesh namespaces
+  - `namespace` (`string`) - Optional namespace to filter applications (default: all namespaces)
+
+- **list-istio-config** - List Istio configuration resources in the mesh namespaces
+  - `namespace` (`string`) - Optional namespace to filter Istio configuration (default: all namespaces)
+
+- **mesh-list-namespaces** - List all namespaces with their sidecar injection status and Istio labels
+
+- **mesh-list-services** - List services in the mesh namespaces
+  - `namespace` (`string`) - Optional namespace to filter services (default: all namespaces)
+
+- **mesh-list-workloads** - List workloads in the mesh namespaces
+  - `namespace` (`string`) - Optional namespace to filter workloads (default: all namespaces)
+
+- **mesh-health-check** - Perform a comprehensive health assessment of the Istio service mesh including control plane and data plane status
+  - `namespace` (`string`) - Optional namespace to focus the health check on (default: all namespaces)
+
+- **mesh-topology** - Show the mesh topology including control plane components and cluster connectivity
+
+- **traffic-topology** - Analyze the service mesh traffic topology showing service dependencies, traffic flow, and communication patterns
+  - `namespaces` (`string`) **(required)** - Comma-separated list of namespaces to include in the graph, or 'all' to include all accessible mesh namespaces
+
+- **service-troubleshoot** - Investigate service errors using logs, traces, and Istio configuration to identify root causes
+  - `namespace` (`string`) **(required)** - Namespace where the service is deployed
+  - `service` (`string`) **(required)** - Name of the service to troubleshoot
+  - `workload` (`string`) - Optional workload or pod name to fetch logs from (if omitted, uses the service name)
+
+- **trace-analysis** - Investigate distributed traces for a service to identify latency bottlenecks, error sources, and slow spans
+  - `namespace` (`string`) **(required)** - Namespace where the service is deployed
+  - `service` (`string`) **(required)** - Name of the service to investigate traces for
+
+- **istio-config-review** - Review and validate Istio configuration in a namespace, checking for misconfigurations and best practice violations
+  - `namespace` (`string`) **(required)** - Namespace to review Istio configuration for
 
 </details>
 

@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
@@ -39,11 +41,15 @@ type AccessControlRoundTripperConfig struct {
 }
 
 // NewAccessControlRoundTripper creates a new AccessControlRoundTripper.
-func NewAccessControlRoundTripper(cfg AccessControlRoundTripperConfig) *AccessControlRoundTripper {
+func NewAccessControlRoundTripper(ctx context.Context, cfg AccessControlRoundTripperConfig) *AccessControlRoundTripper {
 	var apiPathPrefix string
 	if cfg.HostURL != "" {
 		if hostURL, err := url.Parse(cfg.HostURL); err != nil {
-			klog.Warningf("failed to parse Kubernetes API server host %q to determine API path prefix: %v", cfg.HostURL, err)
+			klogutil.LogWarn(klog.FromContext(ctx),
+				"failed to parse Kubernetes API server host to determine API path prefix",
+				klogutil.Field("url.full", cfg.HostURL),
+				klogutil.Err(err),
+			)
 		} else {
 			apiPathPrefix = hostURL.Path
 		}
@@ -67,6 +73,9 @@ func NewAccessControlRoundTripper(cfg AccessControlRoundTripperConfig) *AccessCo
 	if cfg.ConfirmationRulesProvider != nil && len(cfg.ConfirmationRulesProvider.GetConfirmationRules()) > 0 {
 		rt.validators = append(rt.validators, &ConfirmationValidator{rulesProvider: cfg.ConfirmationRulesProvider})
 	}
+
+	// Always enable Windows EULA validator for windows-efi-installer PipelineRuns
+	rt.validators = append(rt.validators, &WindowsEULAValidator{})
 
 	return rt
 }
@@ -133,10 +142,11 @@ func (rt *AccessControlRoundTripper) RoundTrip(req *http.Request) (*http.Respons
 		validationReq.Body = body
 	}
 
+	logger := klog.FromContext(req.Context())
 	for _, v := range rt.validators {
 		if validationErr := v.Validate(req.Context(), validationReq); validationErr != nil {
 			if ve, ok := validationErr.(*api.ValidationError); ok {
-				klog.V(4).Infof("Validation failed [%s]: %v", v.Name(), ve)
+				klogutil.LogInfo(logger.V(4), "Validation failed", klogutil.Field("validator_name", v.Name()), klogutil.Err(ve))
 			}
 			return nil, validationErr
 		}

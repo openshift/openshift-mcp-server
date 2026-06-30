@@ -177,11 +177,10 @@ This repo takes an **opportunistic** stance:
 When in doubt, leave it off and add it later in a follow-up PR — declaring
 nothing is preferable to declaring something inaccurate.
 
-> **Wiring note:** `api.Tool` (see
-> [`pkg/api/toolsets.go`](../../pkg/api/toolsets.go)) carries `InputSchema` but
-> does not yet expose an `OutputSchema` field. Adding the field, surfacing it
-> through the MCP go-sdk transport, and generating it from typed structs is a
-> follow-up; until then this section is forward-looking guidance.
+A declared `outputSchema` is set on the tool definition and surfaced to clients
+through `tools/list`; it is **advertising, not enforcement**. The server does
+not validate a handler's `structuredContent` against the declared schema, so the
+tool author owns keeping the two aligned — see "Wire-contract discipline" below.
 
 ## Wire-contract discipline
 

@@ -7,8 +7,10 @@ import (
 	"reflect"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes/watcher"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/klog/v2"
 )
 
 // singleClusterProvider implements Provider for managing a single
@@ -33,19 +35,19 @@ func init() {
 // When used within a cluster or with an 'in-cluster' strategy, it uses an InClusterManager.
 // Otherwise, it uses a KubeconfigManager.
 func newSingleClusterProvider(strategy string) ProviderFactory {
-	return func(cfg api.BaseConfig) (Provider, error) {
+	return func(ctx context.Context, cfg api.BaseConfig) (Provider, error) {
 		ret := &singleClusterProvider{
 			config:   cfg,
 			strategy: strategy,
 		}
-		if err := ret.reset(); err != nil {
+		if err := ret.reset(ctx); err != nil {
 			return nil, err
 		}
 		return ret, nil
 	}
 }
 
-func (p *singleClusterProvider) reset() error {
+func (p *singleClusterProvider) reset(ctx context.Context) error {
 	if p.config != nil && p.config.GetKubeConfigPath() != "" && p.strategy == api.ClusterProviderInCluster {
 		return fmt.Errorf("kubeconfig file %s cannot be used with the in-cluster ClusterProviderStrategy",
 			p.config.GetKubeConfigPath())
@@ -56,9 +58,9 @@ func (p *singleClusterProvider) reset() error {
 	}
 	var err error
 	if p.strategy == api.ClusterProviderInCluster || IsInCluster(p.config) {
-		p.manager, err = NewInClusterManager(p.config)
+		p.manager, err = NewInClusterManager(ctx, p.config)
 	} else {
-		p.manager, err = NewKubeconfigManager(p.config, "")
+		p.manager, err = NewKubeconfigManager(ctx, p.config, "")
 	}
 	if err != nil {
 		if errors.Is(err, ErrorInClusterNotInCluster) {
@@ -69,8 +71,8 @@ func (p *singleClusterProvider) reset() error {
 	}
 
 	p.Close()
-	p.kubeconfigWatcher = watcher.NewKubeconfig(p.manager.kubernetes.clientCmdConfig)
-	p.clusterStateWatcher = watcher.NewClusterState(p.manager.kubernetes.DiscoveryClient())
+	p.kubeconfigWatcher = watcher.NewKubeconfig(ctx, p.manager.kubernetes.clientCmdConfig)
+	p.clusterStateWatcher = watcher.NewClusterState(ctx, p.manager.kubernetes.DiscoveryClient())
 	return nil
 }
 
@@ -102,16 +104,16 @@ func (p *singleClusterProvider) GetTargetParameterName() string {
 	return ""
 }
 
-func (p *singleClusterProvider) WatchTargets(reload McpReload) {
+func (p *singleClusterProvider) WatchTargets(ctx context.Context, reload McpReload) {
 	reloadWithReset := func() error {
-		if err := p.reset(); err != nil {
+		if err := p.reset(ctx); err != nil {
 			return err
 		}
-		p.WatchTargets(reload)
+		p.WatchTargets(ctx, reload)
 		return reload()
 	}
-	p.kubeconfigWatcher.Watch(reloadWithReset)
-	p.clusterStateWatcher.Watch(reload)
+	p.kubeconfigWatcher.Watch(ctx, reloadWithReset)
+	p.clusterStateWatcher.Watch(ctx, reload)
 }
 
 func (p *singleClusterProvider) Close() {
@@ -122,6 +124,20 @@ func (p *singleClusterProvider) Close() {
 	}
 }
 
-func (p *singleClusterProvider) HasGVKs(_ []schema.GroupVersionKind) bool {
+// HasGVKs uses the cluster's REST mapper to verify that every requested GVK is available.
+func (p *singleClusterProvider) HasGVKs(ctx context.Context, gvks []schema.GroupVersionKind) bool {
+	if len(gvks) == 0 {
+		return true
+	}
+	if p.manager == nil {
+		klogutil.LogWarn(klog.FromContext(ctx), "HasGVKs called with nil manager, assuming all GVKs are available")
+		return true
+	}
+	mapper := p.manager.kubernetes.RESTMapper()
+	for _, gvk := range gvks {
+		if _, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version); err != nil {
+			return false
+		}
+	}
 	return true
 }

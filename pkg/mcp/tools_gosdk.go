@@ -44,6 +44,21 @@ func ServerToolToGoSdkTool(s *Server, tool api.ServerTool) (*mcp.Tool, mcp.ToolH
 		},
 		InputSchema: inputSchema,
 	}
+	// A nil *jsonschema.Schema assigned to an "any" field (goSdkTool.OutputSchema)
+	// becomes a typed nil (non-nil interface), triggering a panic in AddTool.
+	// Therefore, only assign this field when non-nil.
+	//
+	// Unlike InputSchema above, Properties is intentionally left untouched: the
+	// Properties initialization there is an OpenAI-input-specific workaround
+	// (#717), whereas the output schema is advertised to MCP clients rather than
+	// sent as OpenAI function parameters, so it needs no equivalent.
+	outputSchema := tool.Tool.OutputSchema
+	if outputSchema != nil {
+		if outputSchema.Type != "object" {
+			return nil, nil, fmt.Errorf("tool %q: output schema must have type %q (got %q)", tool.Tool.Name, "object", outputSchema.Type)
+		}
+		goSdkTool.OutputSchema = outputSchema
+	}
 	goSdkHandler := func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		toolCallRequest, err := GoSdkToolCallRequestToToolCallRequest(request)
 		if err != nil {

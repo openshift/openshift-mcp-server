@@ -124,7 +124,7 @@ func handleDiagnosticTarget(params api.ToolHandlerParams, target string) (*api.T
 		opts = append(opts, prometheus.WithInsecure(true))
 	}
 
-	client := prometheus.NewClient(baseURL, opts...)
+	client := prometheus.NewClient(params.Context, baseURL, opts...)
 
 	results := make([]DiagnosticResult, 0, len(queries))
 	var wg sync.WaitGroup

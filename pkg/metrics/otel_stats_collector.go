@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	promclient "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel/attribute"
@@ -85,8 +86,10 @@ type CollectorConfig struct {
 //
 // When nil is returned, metrics will only be collected in-memory for the /stats endpoint.
 func createMetricsExporter(ctx context.Context, cfg *config.TelemetryConfig) (sdkmetric.Exporter, error) {
+	logger := klog.FromContext(ctx)
+
 	if strings.ToLower(os.Getenv("OTEL_METRICS_EXPORTER")) == "none" {
-		klog.V(2).Info("OTLP metrics export disabled via OTEL_METRICS_EXPORTER=none")
+		logger.V(2).Info("OTLP metrics export disabled via OTEL_METRICS_EXPORTER=none")
 		return nil, nil
 	}
 
@@ -106,19 +109,21 @@ func createMetricsExporter(ctx context.Context, cfg *config.TelemetryConfig) (sd
 
 	switch protocol {
 	case "http/protobuf", "http":
-		klog.V(2).Infof("Using HTTP/protobuf OTLP metrics exporter (protocol=%s)", protocol)
+		logger.V(2).Info("Using HTTP/protobuf OTLP metrics exporter", "telemetry.metrics.exporter.protocol", protocol)
 		return otlpmetrichttp.New(ctx, otlpmetrichttp.WithEndpointURL(endpoint))
 
 	case "grpc", "":
 		if protocol == "" {
-			klog.V(2).Info("Using gRPC OTLP metrics exporter (default)")
+			logger.V(2).Info("Using gRPC OTLP metrics exporter (default)")
 		} else {
-			klog.V(2).Info("Using gRPC OTLP metrics exporter")
+			logger.V(2).Info("Using gRPC OTLP metrics exporter")
 		}
 		return otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithEndpointURL(endpoint))
 
 	default:
-		klog.V(1).Infof("Unknown OTEL_EXPORTER_OTLP_PROTOCOL '%s' for metrics, defaulting to gRPC", protocol)
+		logger.V(1).Info("Unknown OTEL_EXPORTER_OTLP_PROTOCOL for metrics, defaulting to gRPC",
+			"telemetry.metrics.exporter.protocol", protocol,
+		)
 		return otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithEndpointURL(endpoint))
 	}
 }
@@ -126,7 +131,7 @@ func createMetricsExporter(ctx context.Context, cfg *config.TelemetryConfig) (sd
 // NewOtelStatsCollector creates a new OtelStatsCollector with ManualReader.
 // If OTEL_EXPORTER_OTLP_ENDPOINT is set, metrics will also be exported to OTLP.
 func NewOtelStatsCollector(meterName string) (*OtelStatsCollector, error) {
-	return NewOtelStatsCollectorWithConfig(CollectorConfig{
+	return NewOtelStatsCollectorWithConfig(context.Background(), CollectorConfig{
 		MeterName:      meterName,
 		ServiceName:    "kubernetes-mcp-server",
 		ServiceVersion: "unknown",
@@ -134,9 +139,8 @@ func NewOtelStatsCollector(meterName string) (*OtelStatsCollector, error) {
 }
 
 // NewOtelStatsCollectorWithConfig creates a new OtelStatsCollector with full configuration.
-func NewOtelStatsCollectorWithConfig(cfg CollectorConfig) (*OtelStatsCollector, error) {
-	ctx := context.Background()
-
+func NewOtelStatsCollectorWithConfig(ctx context.Context, cfg CollectorConfig) (*OtelStatsCollector, error) {
+	logger := klog.FromContext(ctx)
 	// Create an in-memory manual reader for stats collection (/stats endpoint)
 	reader := sdkmetric.NewManualReader()
 
@@ -166,9 +170,9 @@ func NewOtelStatsCollectorWithConfig(cfg CollectorConfig) (*OtelStatsCollector, 
 	if err != nil {
 		// Use Warning if telemetry was explicitly configured, V(1) otherwise
 		if cfg.Telemetry != nil && cfg.Telemetry.IsEnabled() {
-			klog.Warningf("Failed to create OTLP metrics exporter, OTLP export disabled: %v", err)
+			logger.Error(err, "Failed to create OTLP metrics exporter, OTLP export disabled")
 		} else {
-			klog.V(1).Infof("Failed to create OTLP metrics exporter, OTLP export disabled: %v", err)
+			klogutil.LogInfo(logger.V(1), "Failed to create OTLP metrics exporter, OTLP export disabled", klogutil.Err(err))
 		}
 	} else if exporter != nil {
 		attrs := []attribute.KeyValue{
@@ -182,7 +186,7 @@ func NewOtelStatsCollectorWithConfig(cfg CollectorConfig) (*OtelStatsCollector, 
 			resource.WithAttributes(attrs...),
 		)
 		if err != nil {
-			klog.V(1).Infof("Failed to create resource for metrics, using default: %v", err)
+			klogutil.LogInfo(logger.V(1), "Failed to create resource for metrics, using default", klogutil.Err(err))
 		} else {
 			opts = append(opts, sdkmetric.WithResource(res))
 		}
@@ -192,7 +196,7 @@ func NewOtelStatsCollectorWithConfig(cfg CollectorConfig) (*OtelStatsCollector, 
 			sdkmetric.WithInterval(30*time.Second),
 		)
 		opts = append(opts, sdkmetric.WithReader(periodicReader))
-		klog.V(1).Info("OTLP metrics export enabled")
+		logger.V(1).Info("OTLP metrics export enabled")
 	}
 
 	provider := sdkmetric.NewMeterProvider(opts...)
@@ -318,11 +322,11 @@ func (c *OtelStatsCollector) RecordHTTPRequest(ctx context.Context, method, path
 
 // GetStats returns a snapshot of current statistics by reading from OTel metrics.
 // Thread-safety is handled by the OTel SDK's ManualReader.
-func (c *OtelStatsCollector) GetStats() *Statistics {
+func (c *OtelStatsCollector) GetStats(ctx context.Context) *Statistics {
 	// Collect current metrics from the manual reader
 	var rm metricdata.ResourceMetrics
 	if err := c.reader.Collect(context.Background(), &rm); err != nil {
-		klog.V(1).Infof("Failed to collect metrics for stats endpoint: %v", err)
+		klogutil.LogInfo(klog.FromContext(ctx).V(1), "Failed to collect metrics for stats endpoint", klogutil.Err(err))
 		return &Statistics{
 			ToolCallsByName:      make(map[string]int64),
 			ToolErrorsByName:     make(map[string]int64),
