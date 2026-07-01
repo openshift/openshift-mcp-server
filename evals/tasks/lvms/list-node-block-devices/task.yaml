@@ -1,0 +1,43 @@
+kind: Task
+metadata:
+  labels:
+    suite: lvms
+    project: lvms
+    requires: lvms
+  annotations:
+    project-name: "LVMS"
+    project-url: "https://github.com/openshift/lvm-operator"
+  name: "list-node-block-devices"
+  difficulty: medium
+  description: "List block devices on a node to see what's available for LVMS"
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      # Get a node name for testing
+      NODE=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+      if [ -z "$NODE" ]; then
+          echo "No nodes found"
+          exit 1
+      fi
+      echo "Test node: $NODE"
+  verify:
+    inline: |-
+      #!/usr/bin/env bash
+      echo "=== Verification ==="
+      echo "The agent should have:"
+      echo "  1. Run 'lsblk' command on the node"
+      echo "  2. Shown disk devices, partitions, sizes"
+      echo "  3. This CANNOT be done with Kubernetes API - requires node access"
+      echo ""
+      echo "If the agent only queried Kubernetes resources, it FAILED."
+      exit 0
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      exit 0
+  prompt:
+    inline: |-
+      We want to add more storage capacity to LVMS. What unused disks or
+      partitions are available on the cluster nodes that could potentially
+      be added to the volume groups?

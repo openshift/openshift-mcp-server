@@ -1,0 +1,81 @@
+kind: Task
+metadata:
+  labels:
+    suite: lvms
+    project: lvms
+    requires: lvms
+  annotations:
+    project-name: "LVMS"
+    project-url: "https://github.com/openshift/lvm-operator"
+  name: "check-lvms-cluster-status"
+  difficulty: easy
+  description: "Check the status of the LVMCluster and verify it is healthy"
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="openshift-lvm-storage"
+
+      # Verify LVMS is installed
+      if ! kubectl get crd lvmclusters.lvm.topolvm.io > /dev/null 2>&1; then
+          echo "LVMS CRD not found - LVMS must be installed"
+          exit 1
+      fi
+
+      # Check if an LVMCluster exists
+      if [ -z "$(kubectl get lvmclusters -n "$NS" -o name 2>/dev/null)" ]; then
+          echo "No LVMCluster found in $NS - creating test cluster"
+          cat > /tmp/lvmcluster.yaml << 'EOF'
+      apiVersion: lvm.topolvm.io/v1alpha1
+      kind: LVMCluster
+      metadata:
+        name: eval-lvmcluster
+        namespace: openshift-lvm-storage
+      spec:
+        storage:
+          deviceClasses:
+            - name: vg1
+              default: true
+              fstype: xfs
+              thinPoolConfig:
+                name: thin-pool-1
+                sizePercent: 90
+                overprovisionRatio: 10
+      EOF
+          kubectl apply -f /tmp/lvmcluster.yaml
+          rm -f /tmp/lvmcluster.yaml
+          echo "Created eval-lvmcluster - waiting for reconciliation"
+          sleep 30
+      fi
+  verify:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="openshift-lvm-storage"
+
+      echo "=== Verification: Checking agent findings ==="
+
+      # The agent should have used list_lvmclusters or describe_lvmcluster
+      # and reported the cluster status
+
+      CLUSTER=$(kubectl get lvmclusters -n "$NS" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+      if [ -n "$CLUSTER" ]; then
+          STATE=$(kubectl get lvmcluster "$CLUSTER" -n "$NS" -o jsonpath='{.status.state}' 2>/dev/null || echo "Unknown")
+          READY=$(kubectl get lvmcluster "$CLUSTER" -n "$NS" -o jsonpath='{.status.ready}' 2>/dev/null || echo "Unknown")
+          echo "LVMCluster '$CLUSTER' state: $STATE, ready: $READY"
+      fi
+
+      echo ""
+      echo "=== Eval Complete ==="
+      echo "The agent should have:"
+      echo "  1. Queried the LVMCluster resource"
+      echo "  2. Reported the cluster name, state, and ready status"
+      echo "  3. Listed any device classes configured"
+
+      exit 0
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      # Only clean up the eval cluster if we created it
+      kubectl delete lvmcluster eval-lvmcluster -n openshift-lvm-storage --ignore-not-found
+  prompt:
+    inline: Is LVMS storage configured and working properly on this cluster? What storage options are available?

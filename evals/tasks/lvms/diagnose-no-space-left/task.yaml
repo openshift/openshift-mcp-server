@@ -1,0 +1,46 @@
+kind: Task
+metadata:
+  labels:
+    suite: lvms
+    project: lvms
+    requires: lvms
+  annotations:
+    project-name: "LVMS"
+    project-url: "https://github.com/openshift/lvm-operator"
+  name: "diagnose-no-space-left"
+  difficulty: hard
+  description: "Diagnose why a workload is getting 'no space left on device' errors"
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="openshift-lvm-storage"
+
+      if ! kubectl get crd lvmclusters.lvm.topolvm.io > /dev/null 2>&1; then
+          echo "LVMS CRD not found - LVMS must be installed"
+          exit 1
+      fi
+
+      echo "LVMS installed. This is a hard diagnostic task."
+  verify:
+    inline: |-
+      #!/usr/bin/env bash
+      echo "=== Verification ==="
+      echo "The agent should have:"
+      echo "  1. Checked thin pool utilization (requires lvs on node)"
+      echo "  2. Checked VG free space (requires vgs on node)"
+      echo "  3. Correlated with PVC/LV sizes"
+      echo "  4. Identified if thin pool is exhausted"
+      echo ""
+      echo "This task REQUIRES node-level LVM commands to diagnose properly."
+      exit 0
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      exit 0
+  prompt:
+    inline: |-
+      A workload using LVMS storage is reporting "no space left on device" errors,
+      but the PVC shows it still has capacity. This might be a thin pool exhaustion
+      issue. Can you check the actual thin pool and volume group utilization to
+      diagnose what's happening?

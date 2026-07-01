@@ -1,0 +1,43 @@
+kind: Task
+metadata:
+  labels:
+    suite: lvms
+    project: lvms
+    requires: lvms
+  annotations:
+    project-name: "LVMS"
+    project-url: "https://github.com/openshift/lvm-operator"
+  name: "show-lvm-physical-volumes"
+  difficulty: medium
+  description: "Show LVM physical volumes on nodes using pvs command"
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="openshift-lvm-storage"
+
+      # Verify LVMS is installed
+      if ! kubectl get crd lvmclusters.lvm.topolvm.io > /dev/null 2>&1; then
+          echo "LVMS CRD not found - LVMS must be installed"
+          exit 1
+      fi
+
+      echo "LVMS installed. This task requires running pvs on nodes."
+  verify:
+    inline: |-
+      #!/usr/bin/env bash
+      echo "=== Verification ==="
+      echo "The agent should have:"
+      echo "  1. Run 'pvs' command on the node(s)"
+      echo "  2. Shown PV name, VG name, size, free space"
+      echo "  3. This requires node debug access - not available via K8s API"
+      exit 0
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      exit 0
+  prompt:
+    inline: |-
+      I'm trying to understand how our LVMS storage is set up. Which physical
+      devices are being used for LVM storage, and how much space does each
+      device contribute to the volume groups?

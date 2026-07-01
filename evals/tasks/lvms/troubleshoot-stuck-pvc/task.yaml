@@ -1,0 +1,78 @@
+kind: Task
+metadata:
+  labels:
+    suite: lvms
+    project: lvms
+    requires: lvms
+  annotations:
+    project-name: "LVMS"
+    project-url: "https://github.com/openshift/lvm-operator"
+  name: "troubleshoot-lvms-stuck-pvc"
+  difficulty: hard
+  description: "Diagnose why a PVC using LVMS storage is stuck in Pending state"
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="lvms-eval-app"
+
+      # Verify LVMS is installed
+      if ! kubectl get crd lvmclusters.lvm.topolvm.io > /dev/null 2>&1; then
+          echo "LVMS CRD not found - LVMS must be installed"
+          exit 1
+      fi
+
+      # Create test namespace
+      kubectl create namespace "$NS" --dry-run=client -o yaml | kubectl apply -f -
+
+      # Create a PVC that will be stuck (requesting impossibly large storage)
+      cat > /tmp/stuck-pvc.yaml << 'EOF'
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: stuck-pvc
+        namespace: lvms-eval-app
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 500Ti
+        storageClassName: lvms-vg1
+      EOF
+      kubectl apply -f /tmp/stuck-pvc.yaml
+      rm -f /tmp/stuck-pvc.yaml
+
+      echo "Created PVC requesting 500Ti - this should be stuck pending"
+      sleep 10
+  verify:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="lvms-eval-app"
+
+      echo "=== Verification: Checking if agent diagnosed the issue ==="
+
+      # Check PVC status
+      PHASE=$(kubectl get pvc stuck-pvc -n "$NS" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+      echo "PVC phase: $PHASE"
+
+      echo ""
+      echo "=== Troubleshooting Eval Complete ==="
+      echo "The agent should have:"
+      echo "  1. Investigated the PVC and its storage class"
+      echo "  2. Checked LVMS cluster status and node capacity"
+      echo "  3. Identified insufficient capacity as the root cause (500Ti requested)"
+      echo "  4. Recommended action (reduce PVC size or add storage capacity)"
+      echo ""
+
+      exit 0
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      kubectl delete pvc stuck-pvc -n lvms-eval-app --ignore-not-found
+      kubectl delete namespace lvms-eval-app --ignore-not-found
+  prompt:
+    inline: |-
+      A PVC named "stuck-pvc" in the lvms-eval-app namespace has been stuck in Pending state for over an hour.
+      The application team is blocked waiting for storage. Investigate why this PVC cannot bind and tell me
+      what needs to be fixed.

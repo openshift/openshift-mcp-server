@@ -1,0 +1,89 @@
+kind: Task
+metadata:
+  labels:
+    suite: lvms
+    project: lvms
+    requires: lvms
+  annotations:
+    project-name: "LVMS"
+    project-url: "https://github.com/openshift/lvm-operator"
+  name: "lvms-forced-cleanup"
+  difficulty: hard
+  description: "Perform LVMS forced cleanup in correct order with finalizer handling"
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="openshift-lvm-storage"
+
+      # Verify LVMS is installed
+      if ! kubectl get crd lvmclusters.lvm.topolvm.io > /dev/null 2>&1; then
+          echo "LVMS CRD not found - LVMS must be installed"
+          exit 1
+      fi
+
+      # Create test resources that simulate stuck LVMS state
+      # These will have finalizers that block deletion
+
+      # Create a LogicalVolume with a finalizer (cluster-scoped resource, no namespace)
+      cat > /tmp/logicalvolume.yaml << 'EOF'
+      apiVersion: topolvm.io/v1
+      kind: LogicalVolume
+      metadata:
+        name: stuck-lv-test
+        finalizers:
+          - topolvm.io/logicalvolume
+      spec:
+        name: stuck-lv-test
+        nodeName: test-node
+        size: 1Gi
+        deviceClass: vg1
+      EOF
+      kubectl apply -f /tmp/logicalvolume.yaml
+      rm -f /tmp/logicalvolume.yaml
+
+      echo "Created stuck LogicalVolume with finalizer"
+      echo "Agent must remove finalizer before deletion"
+      sleep 2
+  verify:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="openshift-lvm-storage"
+
+      echo "=== Verification: Checking forced cleanup was performed correctly ==="
+
+      # Check if the LogicalVolume was removed (cluster-scoped, no namespace)
+      if kubectl get logicalvolume stuck-lv-test > /dev/null 2>&1; then
+          echo "FAIL: LogicalVolume stuck-lv-test still exists"
+          echo "Agent should have:"
+          echo "  1. Patched to remove finalizer: kubectl patch logicalvolume stuck-lv-test -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge"
+          echo "  2. Deleted the resource: kubectl delete logicalvolume stuck-lv-test"
+          exit 1
+      fi
+
+      echo "SUCCESS: LogicalVolume stuck-lv-test was properly cleaned up"
+      echo ""
+      echo "The agent correctly:"
+      echo "  1. Identified the resource had a finalizer blocking deletion"
+      echo "  2. Removed the finalizer before attempting delete"
+      echo "  3. Deleted the resource"
+      exit 0
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      # Force remove in case test failed (cluster-scoped, no namespace)
+      kubectl patch logicalvolume stuck-lv-test -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null || true
+      kubectl delete logicalvolume stuck-lv-test --ignore-not-found 2>/dev/null || true
+  prompt:
+    inline: |-
+      There is a stuck LogicalVolume named "stuck-lv-test" (cluster-scoped resource, no namespace)
+      that cannot be deleted normally because it has a finalizer.
+
+      First, call the lvms-troubleshoot prompt to get the LVMS forced cleanup procedure.
+      Then use the MCP tools (resources_create_or_update to remove finalizers, resources_delete to delete)
+      to perform the cleanup:
+      1. Remove the finalizer that is blocking deletion
+      2. Delete the resource
+
+      Do NOT use bash/kubectl commands - use the MCP tools only.
+      Report what you did and confirm the resource was successfully removed.

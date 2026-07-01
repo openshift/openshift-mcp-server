@@ -84,3 +84,14 @@ config:
             toolPattern: "netobserv_.*"
         minToolCalls: 1
         maxToolCalls: 10
+    # LVMS tasks - requires LVMS operator on cluster
+    # LVMS is a prompts-only toolset; uses core tools for K8s queries
+    - glob: ../tasks/lvms/*/*.yaml
+      labelSelector:
+        suite: lvms
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            toolPattern: ".*"
+        minToolCalls: 1
+        maxToolCalls: 20

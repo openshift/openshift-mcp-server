@@ -20,6 +20,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kcp"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kiali"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/lvms"
 	mgToolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/mustgather"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/openshift"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/tekton"
@@ -201,6 +202,7 @@ func (s *ToolsetsSuite) TestGranularToolsetsTools() {
 		&helm.Toolset{},
 		&kiali.Toolset{},
 		&kubevirt.Toolset{},
+		&lvms.Toolset{},
 		&tekton.Toolset{},
 		&clusterDiagnosticsToolset.Toolset{},
 	}
