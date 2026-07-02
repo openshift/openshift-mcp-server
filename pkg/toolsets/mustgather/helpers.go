@@ -1,33 +1,89 @@
 package mustgather
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
 
 	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/mcplog"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"golang.org/x/sync/singleflight"
 )
 
-var (
-	providerMu sync.RWMutex
-	provider   *mg.Provider
-)
-
-// setProvider stores the loaded must-gather provider
-func setProvider(p *mg.Provider) {
-	providerMu.Lock()
-	defer providerMu.Unlock()
-	provider = p
+type providerRegistry struct {
+	mu        sync.RWMutex
+	providers map[string]*mg.Provider // path -> loaded provider
+	lastUsed  map[string]string       // sessionID -> last used path
+	flight    singleflight.Group
 }
 
-// getProvider returns the loaded must-gather provider or an error
-func getProvider() (*mg.Provider, error) {
-	providerMu.RLock()
-	defer providerMu.RUnlock()
-	if provider == nil {
-		return nil, fmt.Errorf("no must-gather archive loaded. Call mustgather_use first with a path to a must-gather archive")
+var registry = &providerRegistry{
+	providers: make(map[string]*mg.Provider),
+	lastUsed:  make(map[string]string),
+}
+
+func sessionID(ctx context.Context) string {
+	session, ok := ctx.Value(mcplog.MCPSessionContextKey).(*mcp.ServerSession)
+	if !ok || session == nil {
+		return ""
 	}
-	return provider, nil
+	return session.ID()
+}
+
+// getOrInitProvider returns a provider for the given path, lazily initializing
+// it if needed. If path is empty, it falls back to the session's last-used path.
+func getOrInitProvider(ctx context.Context, path string) (*mg.Provider, error) {
+	sid := sessionID(ctx)
+
+	if path == "" {
+		registry.mu.RLock()
+		path = registry.lastUsed[sid]
+		registry.mu.RUnlock()
+		if path == "" {
+			return nil, fmt.Errorf("no must-gather archive loaded. Provide a 'path' argument or call mustgather_use first with a path to a must-gather archive")
+		}
+	}
+
+	registry.mu.RLock()
+	if p, ok := registry.providers[path]; ok {
+		registry.mu.RUnlock()
+		registry.mu.Lock()
+		registry.lastUsed[sid] = path
+		registry.mu.Unlock()
+		return p, nil
+	}
+	registry.mu.RUnlock()
+
+	result, err, _ := registry.flight.Do(path, func() (interface{}, error) {
+		p, err := mg.NewProvider(path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load must-gather archive: %w", err)
+		}
+		registry.mu.Lock()
+		registry.providers[path] = p
+		registry.mu.Unlock()
+		return p, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	p := result.(*mg.Provider)
+
+	registry.mu.Lock()
+	registry.lastUsed[sid] = path
+	registry.mu.Unlock()
+
+	return p, nil
+}
+
+// getProviderForResource returns the provider for the current session's
+// last-used path. Used by MCP resource handlers that cannot accept tool arguments.
+func getProviderForResource(ctx context.Context) (*mg.Provider, error) {
+	return getOrInitProvider(ctx, "")
 }
 
 // getString extracts a string argument with a default

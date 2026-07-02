@@ -23,6 +23,7 @@ func initMonitoring() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
+						"path":    {Type: "string", Description: "Path to the must-gather archive directory (optional if mustgather_use was called earlier)"},
 						"replica": {Type: "string", Description: "Prometheus replica (0, 1, or all). Default: all"},
 					},
 				},
@@ -41,6 +42,7 @@ func initMonitoring() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
+						"path":    {Type: "string", Description: "Path to the must-gather archive directory (optional if mustgather_use was called earlier)"},
 						"replica": {Type: "string", Description: "Prometheus replica (0, 1, or all). Default: 0"},
 						"health":  {Type: "string", Description: "Filter by health status: up, down, unknown (default: all)"},
 					},
@@ -60,6 +62,7 @@ func initMonitoring() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
+						"path":    {Type: "string", Description: "Path to the must-gather archive directory (optional if mustgather_use was called earlier)"},
 						"replica": {Type: "string", Description: "Prometheus replica (0, 1, or all). Default: 0"},
 						"limit":   {Type: "integer", Description: "Number of top entries to show per category (default: 10)"},
 					},
@@ -79,6 +82,7 @@ func initMonitoring() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
+						"path":  {Type: "string", Description: "Path to the must-gather archive directory (optional if mustgather_use was called earlier)"},
 						"state": {Type: "string", Description: "Filter by alert state: firing, pending (default: all)"},
 					},
 				},
@@ -97,6 +101,7 @@ func initMonitoring() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
+						"path": {Type: "string", Description: "Path to the must-gather archive directory (optional if mustgather_use was called earlier)"},
 						"type": {Type: "string", Description: "Filter by rule type: alerting, recording (default: all)"},
 					},
 				},
@@ -108,12 +113,14 @@ func initMonitoring() []api.ServerTool {
 }
 
 func mustgatherMonitoringPrometheusStatus(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	args := params.GetArguments()
+	path := getString(args, "path", "")
+	p, err := getOrInitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
 
-	replica := getString(params.GetArguments(), "replica", "all")
+	replica := getString(args, "replica", "all")
 	replicas := mg.GetReplicaNumbers(replica)
 
 	output := "## Prometheus Status\n\n"
@@ -154,12 +161,13 @@ func mustgatherMonitoringPrometheusStatus(params api.ToolHandlerParams) (*api.To
 }
 
 func mustgatherMonitoringPrometheusTargets(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	args := params.GetArguments()
+	path := getString(args, "path", "")
+	p, err := getOrInitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
 
-	args := params.GetArguments()
 	replica := getString(args, "replica", "0")
 	healthFilter := getString(args, "health", "")
 
@@ -211,12 +219,13 @@ func mustgatherMonitoringPrometheusTargets(params api.ToolHandlerParams) (*api.T
 }
 
 func mustgatherMonitoringPrometheusTSDB(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	args := params.GetArguments()
+	path := getString(args, "path", "")
+	p, err := getOrInitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
 
-	args := params.GetArguments()
 	replica := getString(args, "replica", "0")
 	limit := getInt(args, "limit", 10)
 
@@ -246,12 +255,14 @@ func mustgatherMonitoringPrometheusTSDB(params api.ToolHandlerParams) (*api.Tool
 }
 
 func mustgatherMonitoringPrometheusAlerts(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	args := params.GetArguments()
+	path := getString(args, "path", "")
+	p, err := getOrInitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
 
-	stateFilter := getString(params.GetArguments(), "state", "")
+	stateFilter := getString(args, "state", "")
 
 	rules, err := p.GetPrometheusRules()
 	if err != nil {
@@ -313,12 +324,14 @@ func mustgatherMonitoringPrometheusAlerts(params api.ToolHandlerParams) (*api.To
 }
 
 func mustgatherMonitoringPrometheusRules(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	args := params.GetArguments()
+	path := getString(args, "path", "")
+	p, err := getOrInitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
 
-	typeFilter := getString(params.GetArguments(), "type", "")
+	typeFilter := getString(args, "type", "")
 
 	rules, err := p.GetPrometheusRules()
 	if err != nil {
