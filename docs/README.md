@@ -29,6 +29,7 @@ Choose the guide that matches your needs:
 - **[OADP](OADP.md)** - Tools for OpenShift API for Data Protection (Velero backups, restores, schedules)
 - **[Kiali](KIALI.md)** - Tools for Kiali ServiceMesh with Istio
 - **[KubeVirt](kubevirt.md)** - KubeVirt virtual machine management tools
+- **[TNF](tnf.md)** - Two-Node Fencing diagnostics (pacemaker, STONITH, BMC health)
 
 ## Feature Specifications
 
