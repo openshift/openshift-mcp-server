@@ -50,7 +50,20 @@ sync-upstream-pr: ## Create/update PR to sync with upstream (requires gh CLI)
 		git commit -m "chore: update dependencies and vendor"; \
 	fi
 	@echo "📤 Pushing sync branch..."
-	@git push -f $(ORIGIN_REMOTE) $(SYNC_BRANCH_NAME)
+	@PUSHED_SHA=$$(git rev-parse $(SYNC_BRANCH_NAME)); \
+	git push -f $(ORIGIN_REMOTE) $(SYNC_BRANCH_NAME); \
+	echo "⏳ Waiting for GitHub to index pushed branch at $$PUSHED_SHA..."; \
+	OWNER_REPO=$$(gh repo view --json nameWithOwner -q .nameWithOwner); \
+	for i in $$(seq 1 12); do \
+		INDEXED=$$(gh api "repos/$$OWNER_REPO/git/refs/heads/$(SYNC_BRANCH_NAME)" \
+			--jq '.object.sha' 2>/dev/null || echo ""); \
+		if [ "$$INDEXED" = "$$PUSHED_SHA" ]; then \
+			echo "✅ Branch indexed."; \
+			break; \
+		fi; \
+		echo "  (attempt $$i/12: waiting for index, retrying in 5s...)"; \
+		sleep 5; \
+	done
 	@echo "🚀 Creating or updating PR..."
 	@CHANGELOG=$$(git log --pretty=format:"- %h %s (%an)" $(ORIGIN_REMOTE)/main..$(UPSTREAM_REMOTE)/main); \
 	BEHIND_COUNT=$$(git rev-list --count $(ORIGIN_REMOTE)/main..$(UPSTREAM_REMOTE)/main); \
