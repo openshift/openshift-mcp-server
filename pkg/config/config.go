@@ -193,6 +193,11 @@ type StaticConfig struct {
 	// ConfirmationRules define rules for prompting the user before dangerous actions.
 	ConfirmationRules []api.ConfirmationRule `toml:"confirmation_rules,omitempty"`
 
+	// MustGatherDirs is the list of directories scanned by the openshift/mustgather
+	// toolset for must-gather archives. Each entry may be a directory containing
+	// one or more archives, or a directory that is itself an archive.
+	MustGatherDirs []string `toml:"mustgather_dirs,omitempty"`
+
 	// Internal: parsed provider configs (not exposed to TOML package)
 	parsedClusterProviderConfigs map[string]api.ExtendedConfig
 	// Internal: parsed toolset configs (not exposed to TOML package)
@@ -527,6 +532,10 @@ func (c *StaticConfig) GetTLSCipherSuitesConfig() []string {
 
 func (c *StaticConfig) IsRequireOAuth() bool {
 	return c.RequireOAuth
+}
+
+func (c *StaticConfig) GetMustGatherDirs() []string {
+	return c.MustGatherDirs
 }
 
 // WithProviderStrategies sets the known cluster-provider strategies for

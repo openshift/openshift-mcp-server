@@ -111,6 +111,12 @@ type RequireOAuthProvider interface {
 	IsRequireOAuth() bool
 }
 
+// MustGatherDirsProvider provides access to the directories scanned by the
+// openshift/mustgather toolset for must-gather archives.
+type MustGatherDirsProvider interface {
+	GetMustGatherDirs() []string
+}
+
 type BaseConfig interface {
 	ClusterAuthProvider
 	ClusterProvider
@@ -124,4 +130,5 @@ type BaseConfig interface {
 	RequireTLSProvider
 	TLSConfigProvider
 	RequireOAuthProvider
+	MustGatherDirsProvider
 }

@@ -25,14 +25,15 @@ func initResources() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
-						"kind":          {Type: "string", Description: "Resource kind (e.g., Pod, Deployment, Service)"},
-						"namespace":     {Type: "string", Description: "Filter by namespace"},
-						"apiVersion":    {Type: "string", Description: "API version (default: v1)"},
-						"labelSelector": {Type: "string", Description: "Label selector (e.g., app=nginx,tier=frontend)"},
-						"fieldSelector": {Type: "string", Description: "Field selector (e.g., metadata.name=foo)"},
-						"limit":         {Type: "integer", Description: "Maximum number of resources to return (0 for all)"},
+						"must_gather_archive_id": archiveIDProperty(),
+						"kind":                   {Type: "string", Description: "Resource kind (e.g., Pod, Deployment, Service)"},
+						"namespace":              {Type: "string", Description: "Filter by namespace"},
+						"apiVersion":             {Type: "string", Description: "API version (default: v1)"},
+						"labelSelector":          {Type: "string", Description: "Label selector (e.g., app=nginx,tier=frontend)"},
+						"fieldSelector":          {Type: "string", Description: "Field selector (e.g., metadata.name=foo)"},
+						"limit":                  {Type: "integer", Description: "Maximum number of resources to return (0 for all)"},
 					},
-					Required: []string{"kind"},
+					Required: []string{"must_gather_archive_id", "kind"},
 				},
 			},
 			Handler:      mustgatherResourcesList,
@@ -42,12 +43,13 @@ func initResources() []api.ServerTool {
 }
 
 func mustgatherResourcesList(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	args := params.GetArguments()
+	id := getString(args, "must_gather_archive_id", "")
+	p, err := providerForArchive(params, id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
 
-	args := params.GetArguments()
 	kind := getString(args, "kind", "")
 	namespace := getString(args, "namespace", "")
 	apiVersion := getString(args, "apiVersion", "v1")

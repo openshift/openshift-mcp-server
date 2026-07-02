@@ -7,23 +7,35 @@ import (
 	"strings"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
 	"sigs.k8s.io/yaml"
 )
 
+// archiveURIPrefix is the fixed prefix of every must-gather resource URI. The
+// path segment immediately after it is the archive ID (mg-XXXX-YYYYYYYY).
+const archiveURIPrefix = "must-gather://local/"
+
+// initMCPResources returns no static resources: because every archive is
+// addressed by ID, all resources are exposed as templates (see
+// initMCPResourceTemplates).
 func initMCPResources() []api.ServerResource {
-	return []api.ServerResource{
+	return nil
+}
+
+func initMCPResourceTemplates() []api.ServerResourceTemplate {
+	return []api.ServerResourceTemplate{
 		{
-			Resource: api.Resource{
-				URI:         "must-gather://current",
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}",
 				Name:        "must-gather",
-				Description: "Loaded must-gather archive metadata",
+				Description: "Loaded must-gather archive metadata. Use the must_gather_archive_id from mustgather_list as {archive_id}.",
 				MIMEType:    "text/plain",
 			},
 			Handler: resourceCurrentArchive,
 		},
 		{
-			Resource: api.Resource{
-				URI:         "must-gather://current/namespaces",
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/namespaces",
 				Name:        "must-gather-namespaces",
 				Description: "List of all namespaces in the must-gather archive",
 				MIMEType:    "text/plain",
@@ -31,8 +43,8 @@ func initMCPResources() []api.ServerResource {
 			Handler: resourceNamespaces,
 		},
 		{
-			Resource: api.Resource{
-				URI:         "must-gather://current/etcd/members",
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/etcd/members",
 				Name:        "must-gather-etcd-members",
 				Description: "ETCD cluster member list from the must-gather archive",
 				MIMEType:    "application/json",
@@ -40,8 +52,8 @@ func initMCPResources() []api.ServerResource {
 			Handler: resourceETCDMembers,
 		},
 		{
-			Resource: api.Resource{
-				URI:         "must-gather://current/etcd/endpoint-status",
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/etcd/endpoint-status",
 				Name:        "must-gather-etcd-endpoint-status",
 				Description: "ETCD endpoint status from the must-gather archive",
 				MIMEType:    "application/json",
@@ -49,8 +61,8 @@ func initMCPResources() []api.ServerResource {
 			Handler: resourceETCDEndpointStatus,
 		},
 		{
-			Resource: api.Resource{
-				URI:         "must-gather://current/prometheus/config",
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/prometheus/config",
 				Name:        "must-gather-prometheus-config",
 				Description: "Prometheus configuration summary from the must-gather archive",
 				MIMEType:    "text/plain",
@@ -58,22 +70,17 @@ func initMCPResources() []api.ServerResource {
 			Handler: resourcePrometheusConfig,
 		},
 		{
-			Resource: api.Resource{
-				URI:         "must-gather://current/alertmanager/status",
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/alertmanager/status",
 				Name:        "must-gather-alertmanager-status",
 				Description: "AlertManager status from the must-gather archive",
 				MIMEType:    "text/plain",
 			},
 			Handler: resourceAlertManagerStatus,
 		},
-	}
-}
-
-func initMCPResourceTemplates() []api.ServerResourceTemplate {
-	return []api.ServerResourceTemplate{
 		{
 			ResourceTemplate: api.ResourceTemplate{
-				URITemplate: "must-gather://current/resources/{group}/{version}/{kind}/{namespace}/{name}",
+				URITemplate: "must-gather://local/{archive_id}/resources/{group}/{version}/{kind}/{namespace}/{name}",
 				Name:        "must-gather-resource",
 				Description: "A specific Kubernetes resource from the must-gather archive as YAML. Use '-' for empty group (core API) or cluster-scoped namespace.",
 				MIMEType:    "text/yaml",
@@ -83,8 +90,34 @@ func initMCPResourceTemplates() []api.ServerResourceTemplate {
 	}
 }
 
-func resourceCurrentArchive(_ context.Context) (*api.ResourceContent, error) {
-	p, err := getProvider()
+// archiveIDFromURI extracts the archive ID (the first path segment after the
+// must-gather://local/ prefix) from a resource URI.
+func archiveIDFromURI(uri string) (string, error) {
+	if !strings.HasPrefix(uri, archiveURIPrefix) {
+		return "", fmt.Errorf("invalid must-gather resource URI: %s", uri)
+	}
+	rest := strings.TrimPrefix(uri, archiveURIPrefix)
+	id := rest
+	if i := strings.Index(rest, "/"); i >= 0 {
+		id = rest[:i]
+	}
+	if id == "" {
+		return "", fmt.Errorf("must-gather resource URI missing archive ID: %s", uri)
+	}
+	return id, nil
+}
+
+// providerForURI resolves the provider for the archive addressed by uri.
+func providerForURI(cfg api.MustGatherDirsProvider, uri string) (*mg.Provider, error) {
+	id, err := archiveIDFromURI(uri)
+	if err != nil {
+		return nil, err
+	}
+	return providerForArchive(cfg, id)
+}
+
+func resourceCurrentArchive(_ context.Context, cfg api.BaseConfig, uri string) (*api.ResourceContent, error) {
+	p, err := providerForURI(cfg, uri)
 	if err != nil {
 		return nil, err
 	}
@@ -95,8 +128,8 @@ func resourceCurrentArchive(_ context.Context) (*api.ResourceContent, error) {
 	return &api.ResourceContent{Text: content}, nil
 }
 
-func resourceNamespaces(_ context.Context) (*api.ResourceContent, error) {
-	p, err := getProvider()
+func resourceNamespaces(_ context.Context, cfg api.BaseConfig, uri string) (*api.ResourceContent, error) {
+	p, err := providerForURI(cfg, uri)
 	if err != nil {
 		return nil, err
 	}
@@ -107,8 +140,8 @@ func resourceNamespaces(_ context.Context) (*api.ResourceContent, error) {
 	return &api.ResourceContent{Text: output}, nil
 }
 
-func resourceETCDMembers(_ context.Context) (*api.ResourceContent, error) {
-	p, err := getProvider()
+func resourceETCDMembers(_ context.Context, cfg api.BaseConfig, uri string) (*api.ResourceContent, error) {
+	p, err := providerForURI(cfg, uri)
 	if err != nil {
 		return nil, err
 	}
@@ -119,8 +152,8 @@ func resourceETCDMembers(_ context.Context) (*api.ResourceContent, error) {
 	return &api.ResourceContent{Text: string(data)}, nil
 }
 
-func resourceETCDEndpointStatus(_ context.Context) (*api.ResourceContent, error) {
-	p, err := getProvider()
+func resourceETCDEndpointStatus(_ context.Context, cfg api.BaseConfig, uri string) (*api.ResourceContent, error) {
+	p, err := providerForURI(cfg, uri)
 	if err != nil {
 		return nil, err
 	}
@@ -131,8 +164,8 @@ func resourceETCDEndpointStatus(_ context.Context) (*api.ResourceContent, error)
 	return &api.ResourceContent{Text: string(data)}, nil
 }
 
-func resourcePrometheusConfig(_ context.Context) (*api.ResourceContent, error) {
-	p, err := getProvider()
+func resourcePrometheusConfig(_ context.Context, cfg api.BaseConfig, uri string) (*api.ResourceContent, error) {
+	p, err := providerForURI(cfg, uri)
 	if err != nil {
 		return nil, err
 	}
@@ -178,8 +211,8 @@ func resourcePrometheusConfig(_ context.Context) (*api.ResourceContent, error) {
 	return &api.ResourceContent{Text: output}, nil
 }
 
-func resourceAlertManagerStatus(_ context.Context) (*api.ResourceContent, error) {
-	p, err := getProvider()
+func resourceAlertManagerStatus(_ context.Context, cfg api.BaseConfig, uri string) (*api.ResourceContent, error) {
+	p, err := providerForURI(cfg, uri)
 	if err != nil {
 		return nil, err
 	}
@@ -211,20 +244,24 @@ func resourceAlertManagerStatus(_ context.Context) (*api.ResourceContent, error)
 	return &api.ResourceContent{Text: output}, nil
 }
 
-func resourceGet(_ context.Context, uri string) (*api.ResourceContent, error) {
-	p, err := getProvider()
+func resourceGet(_ context.Context, cfg api.BaseConfig, uri string) (*api.ResourceContent, error) {
+	id, err := archiveIDFromURI(uri)
+	if err != nil {
+		return nil, err
+	}
+	p, err := providerForArchive(cfg, id)
 	if err != nil {
 		return nil, err
 	}
 
-	// Parse URI: must-gather://current/resources/{group}/{version}/{kind}/{namespace}/{name}
-	const prefix = "must-gather://current/resources/"
+	// Parse URI: must-gather://local/{archive_id}/resources/{group}/{version}/{kind}/{namespace}/{name}
+	prefix := archiveURIPrefix + id + "/resources/"
 	if !strings.HasPrefix(uri, prefix) {
 		return nil, fmt.Errorf("invalid resource URI: %s", uri)
 	}
 	parts := strings.SplitN(strings.TrimPrefix(uri, prefix), "/", 5)
 	if len(parts) != 5 {
-		return nil, fmt.Errorf("resource URI must have format: must-gather://current/resources/{group}/{version}/{kind}/{namespace}/{name}")
+		return nil, fmt.Errorf("resource URI must have format: must-gather://local/{archive_id}/resources/{group}/{version}/{kind}/{namespace}/{name}")
 	}
 	group, version, kind, namespace, name := parts[0], parts[1], parts[2], parts[3], parts[4]
 

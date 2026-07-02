@@ -5,29 +5,62 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
+
+	"golang.org/x/sync/singleflight"
 )
 
-var (
-	providerMu sync.RWMutex
-	provider   *mg.Provider
-)
-
-// setProvider stores the loaded must-gather provider
-func setProvider(p *mg.Provider) {
-	providerMu.Lock()
-	defer providerMu.Unlock()
-	provider = p
+type providerRegistry struct {
+	mu        sync.RWMutex
+	providers map[string]*mg.Provider // path -> loaded provider
+	flight    singleflight.Group
 }
 
-// getProvider returns the loaded must-gather provider or an error
-func getProvider() (*mg.Provider, error) {
-	providerMu.RLock()
-	defer providerMu.RUnlock()
-	if provider == nil {
-		return nil, fmt.Errorf("no must-gather archive loaded. Call mustgather_use first with a path to a must-gather archive")
+var registry = &providerRegistry{
+	providers: make(map[string]*mg.Provider),
+}
+
+// loadProvider returns a provider for the given absolute path, lazily
+// initializing and caching it. The cache is a pure performance optimization
+// keyed by path (no session state); concurrent loads of the same path are
+// coalesced via singleflight.
+func loadProvider(path string) (*mg.Provider, error) {
+	registry.mu.RLock()
+	if p, ok := registry.providers[path]; ok {
+		registry.mu.RUnlock()
+		return p, nil
 	}
-	return provider, nil
+	registry.mu.RUnlock()
+
+	result, err, _ := registry.flight.Do(path, func() (interface{}, error) {
+		p, err := mg.NewProvider(path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load must-gather archive: %w", err)
+		}
+		registry.mu.Lock()
+		registry.providers[path] = p
+		registry.mu.Unlock()
+		return p, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result.(*mg.Provider), nil
+}
+
+// providerForArchive resolves a must-gather archive ID to its provider using the
+// directories configured via --mustgather-dirs. It is the stateless entry point
+// shared by all mustgather_* tool handlers.
+func providerForArchive(cfg api.MustGatherDirsProvider, id string) (*mg.Provider, error) {
+	if id == "" {
+		return nil, fmt.Errorf("must_gather_archive_id is required; call mustgather_list to discover available archives")
+	}
+	path, err := resolveArchivePath(cfg.GetMustGatherDirs(), id)
+	if err != nil {
+		return nil, err
+	}
+	return loadProvider(path)
 }
 
 // getString extracts a string argument with a default

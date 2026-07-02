@@ -74,6 +74,27 @@ func FindContainerDir(basePath string) (string, error) {
 	return "", fmt.Errorf("container directory not found in %s", basePath)
 }
 
+// ReadArchiveMetadata cheaply reads the version and timestamp of the archive at
+// path without indexing its resources. It returns ("", "") when the archive's
+// container directory or metadata files cannot be located. Used by discovery to
+// list archives without paying the full load cost.
+func ReadArchiveMetadata(path string) (version, timestamp string) {
+	containerDir, err := FindContainerDir(path)
+	if err != nil {
+		containerDir = path
+	}
+	var metadata MustGatherMetadata
+	loadMetadata(containerDir, &metadata)
+	return metadata.Version, metadata.Timestamp
+}
+
+// IsArchive reports whether path looks like a must-gather archive, i.e. it
+// contains a recognizable container directory.
+func IsArchive(path string) bool {
+	_, err := FindContainerDir(path)
+	return err == nil
+}
+
 func loadMetadata(containerDir string, metadata *MustGatherMetadata) {
 	if data, err := os.ReadFile(filepath.Join(containerDir, "version")); err == nil {
 		metadata.Version = strings.TrimSpace(string(data))
