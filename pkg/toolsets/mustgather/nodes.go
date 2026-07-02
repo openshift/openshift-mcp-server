@@ -84,7 +84,7 @@ func initNodes() []api.ServerTool {
 func mustgatherNodeDiagnosticsGet(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	path := getString(args, "path", "")
-	p, err := getOrInitProvider(params.Context, path)
+	p, err := InitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -152,7 +152,7 @@ func mustgatherNodeDiagnosticsGet(params api.ToolHandlerParams) (*api.ToolCallRe
 func mustgatherNodeKubeletLogs(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	path := getString(args, "path", "")
-	p, err := getOrInitProvider(params.Context, path)
+	p, err := InitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -190,7 +190,7 @@ func mustgatherNodeKubeletLogs(params api.ToolHandlerParams) (*api.ToolCallResul
 func mustgatherNodeKubeletLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	path := getString(args, "path", "")
-	p, err := getOrInitProvider(params.Context, path)
+	p, err := InitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}

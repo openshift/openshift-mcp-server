@@ -84,7 +84,7 @@ func initMCPResourceTemplates() []api.ServerResourceTemplate {
 }
 
 func resourceCurrentArchive(ctx context.Context) (*api.ResourceContent, error) {
-	p, err := getProviderForResource(ctx)
+	p, err := GetProviderForResource(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func resourceCurrentArchive(ctx context.Context) (*api.ResourceContent, error) {
 }
 
 func resourceNamespaces(ctx context.Context) (*api.ResourceContent, error) {
-	p, err := getProviderForResource(ctx)
+	p, err := GetProviderForResource(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,7 @@ func resourceNamespaces(ctx context.Context) (*api.ResourceContent, error) {
 }
 
 func resourceETCDMembers(ctx context.Context) (*api.ResourceContent, error) {
-	p, err := getProviderForResource(ctx)
+	p, err := GetProviderForResource(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,7 @@ func resourceETCDMembers(ctx context.Context) (*api.ResourceContent, error) {
 }
 
 func resourceETCDEndpointStatus(ctx context.Context) (*api.ResourceContent, error) {
-	p, err := getProviderForResource(ctx)
+	p, err := GetProviderForResource(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +132,7 @@ func resourceETCDEndpointStatus(ctx context.Context) (*api.ResourceContent, erro
 }
 
 func resourcePrometheusConfig(ctx context.Context) (*api.ResourceContent, error) {
-	p, err := getProviderForResource(ctx)
+	p, err := GetProviderForResource(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func resourcePrometheusConfig(ctx context.Context) (*api.ResourceContent, error)
 }
 
 func resourceAlertManagerStatus(ctx context.Context) (*api.ResourceContent, error) {
-	p, err := getProviderForResource(ctx)
+	p, err := GetProviderForResource(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +212,7 @@ func resourceAlertManagerStatus(ctx context.Context) (*api.ResourceContent, erro
 }
 
 func resourceGet(ctx context.Context, uri string) (*api.ResourceContent, error) {
-	p, err := getProviderForResource(ctx)
+	p, err := GetProviderForResource(ctx)
 	if err != nil {
 		return nil, err
 	}

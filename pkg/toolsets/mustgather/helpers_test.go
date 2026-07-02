@@ -35,7 +35,7 @@ func (s *RegistrySuite) TearDownTest() {
 
 func (s *RegistrySuite) TestLazyInit() {
 	s.Run("loads provider on first call", func() {
-		p, err := getOrInitProvider(context.Background(), s.archiveDir)
+		p, err := InitProvider(context.Background(), s.archiveDir)
 		s.NoError(err)
 		s.NotNil(p)
 		s.Equal(s.archiveDir, p.GetMetadata().Path)
@@ -44,10 +44,10 @@ func (s *RegistrySuite) TestLazyInit() {
 
 func (s *RegistrySuite) TestCaching() {
 	s.Run("returns same provider on repeated calls", func() {
-		p1, err := getOrInitProvider(context.Background(), s.archiveDir)
+		p1, err := InitProvider(context.Background(), s.archiveDir)
 		s.Require().NoError(err)
 
-		p2, err := getOrInitProvider(context.Background(), s.archiveDir)
+		p2, err := InitProvider(context.Background(), s.archiveDir)
 		s.Require().NoError(err)
 
 		s.Same(p1, p2)
@@ -56,10 +56,10 @@ func (s *RegistrySuite) TestCaching() {
 
 func (s *RegistrySuite) TestLastUsedFallback() {
 	s.Run("uses last-used path when path is empty", func() {
-		_, err := getOrInitProvider(context.Background(), s.archiveDir)
+		_, err := InitProvider(context.Background(), s.archiveDir)
 		s.Require().NoError(err)
 
-		p, err := getOrInitProvider(context.Background(), "")
+		p, err := InitProvider(context.Background(), "")
 		s.NoError(err)
 		s.Equal(s.archiveDir, p.GetMetadata().Path)
 	})
@@ -67,7 +67,7 @@ func (s *RegistrySuite) TestLastUsedFallback() {
 
 func (s *RegistrySuite) TestNoPathNoLastUsed() {
 	s.Run("returns error when no path and no last-used", func() {
-		_, err := getOrInitProvider(context.Background(), "")
+		_, err := InitProvider(context.Background(), "")
 		s.Error(err)
 		s.Contains(err.Error(), "no must-gather archive loaded")
 	})
@@ -75,10 +75,10 @@ func (s *RegistrySuite) TestNoPathNoLastUsed() {
 
 func (s *RegistrySuite) TestGetProviderForResource() {
 	s.Run("uses session last-used path", func() {
-		_, err := getOrInitProvider(context.Background(), s.archiveDir)
+		_, err := InitProvider(context.Background(), s.archiveDir)
 		s.Require().NoError(err)
 
-		p, err := getProviderForResource(context.Background())
+		p, err := GetProviderForResource(context.Background())
 		s.NoError(err)
 		s.Equal(s.archiveDir, p.GetMetadata().Path)
 	})
@@ -89,7 +89,7 @@ func (s *RegistrySuite) TestGetProviderForResource() {
 		registry.lastUsed = make(map[string]string)
 		registry.mu.Unlock()
 
-		_, err := getProviderForResource(context.Background())
+		_, err := GetProviderForResource(context.Background())
 		s.Error(err)
 	})
 }
@@ -100,10 +100,10 @@ func (s *RegistrySuite) TestMultipleArchives() {
 		s.Require().NoError(err)
 		defer os.RemoveAll(dir2)
 
-		p1, err := getOrInitProvider(context.Background(), s.archiveDir)
+		p1, err := InitProvider(context.Background(), s.archiveDir)
 		s.Require().NoError(err)
 
-		p2, err := getOrInitProvider(context.Background(), dir2)
+		p2, err := InitProvider(context.Background(), dir2)
 		s.Require().NoError(err)
 
 		s.NotSame(p1, p2)
@@ -118,14 +118,14 @@ func (s *RegistrySuite) TestLastUsedUpdatedOnSwitch() {
 		s.Require().NoError(err)
 		defer os.RemoveAll(dir2)
 
-		_, err = getOrInitProvider(context.Background(), s.archiveDir)
+		_, err = InitProvider(context.Background(), s.archiveDir)
 		s.Require().NoError(err)
 
-		_, err = getOrInitProvider(context.Background(), dir2)
+		_, err = InitProvider(context.Background(), dir2)
 		s.Require().NoError(err)
 
 		// Last-used should now point to dir2
-		p, err := getOrInitProvider(context.Background(), "")
+		p, err := InitProvider(context.Background(), "")
 		s.Require().NoError(err)
 		s.Equal(dir2, p.GetMetadata().Path)
 	})
@@ -141,7 +141,7 @@ func (s *RegistrySuite) TestConcurrentSamePath() {
 			wg.Add(1)
 			go func(idx int) {
 				defer wg.Done()
-				p, err := getOrInitProvider(context.Background(), s.archiveDir)
+				p, err := InitProvider(context.Background(), s.archiveDir)
 				if err == nil {
 					results[idx] = p
 					atomic.AddInt32(&count, 1)
@@ -159,7 +159,7 @@ func (s *RegistrySuite) TestConcurrentSamePath() {
 
 func (s *RegistrySuite) TestEmptyArchive() {
 	s.Run("loads provider with zero resources for empty directory", func() {
-		p, err := getOrInitProvider(context.Background(), s.archiveDir)
+		p, err := InitProvider(context.Background(), s.archiveDir)
 		s.NoError(err)
 		s.NotNil(p)
 		s.Equal(0, p.GetMetadata().ResourceCount)

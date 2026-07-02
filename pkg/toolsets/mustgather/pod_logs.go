@@ -100,7 +100,7 @@ func initPodLogs() []api.ServerTool {
 func mustgatherPodLogsGet(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	path := getString(args, "path", "")
-	p, err := getOrInitProvider(params.Context, path)
+	p, err := InitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -202,7 +202,7 @@ func mustgatherPodLogsGet(params api.ToolHandlerParams) (*api.ToolCallResult, er
 func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	path := getString(args, "path", "")
-	p, err := getOrInitProvider(params.Context, path)
+	p, err := InitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -312,7 +312,7 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 func mustgatherPodLogsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	path := getString(args, "path", "")
-	p, err := getOrInitProvider(params.Context, path)
+	p, err := InitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}

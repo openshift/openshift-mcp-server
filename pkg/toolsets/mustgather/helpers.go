@@ -33,9 +33,9 @@ func sessionID(ctx context.Context) string {
 	return session.ID()
 }
 
-// getOrInitProvider returns a provider for the given path, lazily initializing
+// InitProvider returns a provider for the given path, lazily initializing
 // it if needed. If path is empty, it falls back to the session's last-used path.
-func getOrInitProvider(ctx context.Context, path string) (*mg.Provider, error) {
+func InitProvider(ctx context.Context, path string) (*mg.Provider, error) {
 	sid := sessionID(ctx)
 
 	if path == "" {
@@ -80,10 +80,10 @@ func getOrInitProvider(ctx context.Context, path string) (*mg.Provider, error) {
 	return p, nil
 }
 
-// getProviderForResource returns the provider for the current session's
+// GetProviderForResource returns the provider for the current session's
 // last-used path. Used by MCP resource handlers that cannot accept tool arguments.
-func getProviderForResource(ctx context.Context) (*mg.Provider, error) {
-	return getOrInitProvider(ctx, "")
+func GetProviderForResource(ctx context.Context) (*mg.Provider, error) {
+	return InitProvider(ctx, "")
 }
 
 // getString extracts a string argument with a default

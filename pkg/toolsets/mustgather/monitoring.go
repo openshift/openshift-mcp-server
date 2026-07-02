@@ -115,7 +115,7 @@ func initMonitoring() []api.ServerTool {
 func mustgatherMonitoringPrometheusStatus(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	path := getString(args, "path", "")
-	p, err := getOrInitProvider(params.Context, path)
+	p, err := InitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -163,7 +163,7 @@ func mustgatherMonitoringPrometheusStatus(params api.ToolHandlerParams) (*api.To
 func mustgatherMonitoringPrometheusTargets(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	path := getString(args, "path", "")
-	p, err := getOrInitProvider(params.Context, path)
+	p, err := InitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -221,7 +221,7 @@ func mustgatherMonitoringPrometheusTargets(params api.ToolHandlerParams) (*api.T
 func mustgatherMonitoringPrometheusTSDB(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	path := getString(args, "path", "")
-	p, err := getOrInitProvider(params.Context, path)
+	p, err := InitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -257,7 +257,7 @@ func mustgatherMonitoringPrometheusTSDB(params api.ToolHandlerParams) (*api.Tool
 func mustgatherMonitoringPrometheusAlerts(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	path := getString(args, "path", "")
-	p, err := getOrInitProvider(params.Context, path)
+	p, err := InitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -326,7 +326,7 @@ func mustgatherMonitoringPrometheusAlerts(params api.ToolHandlerParams) (*api.To
 func mustgatherMonitoringPrometheusRules(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	path := getString(args, "path", "")
-	p, err := getOrInitProvider(params.Context, path)
+	p, err := InitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}

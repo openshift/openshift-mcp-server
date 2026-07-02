@@ -54,7 +54,7 @@ func initEtcd() []api.ServerTool {
 func mustgatherETCDHealth(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	path := getString(args, "path", "")
-	p, err := getOrInitProvider(params.Context, path)
+	p, err := InitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -91,7 +91,7 @@ func mustgatherETCDHealth(params api.ToolHandlerParams) (*api.ToolCallResult, er
 func mustgatherETCDObjectCount(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	path := getString(args, "path", "")
-	p, err := getOrInitProvider(params.Context, path)
+	p, err := InitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}

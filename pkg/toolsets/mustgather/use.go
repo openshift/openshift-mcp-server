@@ -42,7 +42,7 @@ func mustgatherUse(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		return api.NewToolCallResult("", fmt.Errorf("path is required")), nil
 	}
 
-	p, err := getOrInitProvider(params.Context, path)
+	p, err := InitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to load must-gather archive: %w", err)), nil
 	}
