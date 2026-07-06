@@ -80,17 +80,20 @@ sync-upstream-pr: ## Create/update PR to sync with upstream (requires gh CLI)
 	@PUSHED_SHA=$$(git rev-parse $(SYNC_BRANCH_NAME)); \
 	git push -f $(ORIGIN_REMOTE) $(SYNC_BRANCH_NAME); \
 	echo "⏳ Waiting for GitHub to index pushed branch at $$PUSHED_SHA..."; \
-	OWNER_REPO=$$(gh repo view --json nameWithOwner -q .nameWithOwner); \
-	for i in $$(seq 1 12); do \
-		INDEXED=$$(gh api "repos/$$OWNER_REPO/git/refs/heads/$(SYNC_BRANCH_NAME)" \
-			--jq '.object.sha' 2>/dev/null || echo ""); \
+	INDEXED=""; \
+	for i in $$(seq 1 30); do \
+		INDEXED=$$(git ls-remote --refs $(ORIGIN_REMOTE) "refs/heads/$(SYNC_BRANCH_NAME)" 2>/dev/null | awk '{print $$1}'); \
 		if [ "$$INDEXED" = "$$PUSHED_SHA" ]; then \
-			echo "✅ Branch indexed."; \
+			echo "✅ Branch indexed at $$PUSHED_SHA."; \
 			break; \
 		fi; \
-		echo "  (attempt $$i/12: waiting for index, retrying in 5s...)"; \
+		echo "  (attempt $$i/30: got='$$INDEXED' want='$$PUSHED_SHA', retrying in 5s...)"; \
 		sleep 5; \
-	done
+	done; \
+	if [ "$$INDEXED" != "$$PUSHED_SHA" ]; then \
+		echo "❌ Timed out waiting for GitHub to index branch after $$((30 * 5))s. Exiting."; \
+		exit 1; \
+	fi
 	@echo "🚀 Creating or updating PR..."
 	@CHANGELOG=$$(git log --pretty=format:"- %h %s (%an)" $(ORIGIN_REMOTE)/main..$(UPSTREAM_REMOTE)/main); \
 	BEHIND_COUNT=$$(git rev-list --count $(ORIGIN_REMOTE)/main..$(UPSTREAM_REMOTE)/main); \
