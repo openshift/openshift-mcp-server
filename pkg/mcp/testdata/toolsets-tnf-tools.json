@@ -1,0 +1,53 @@
+[
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": "TNF: Check Fencing Config"
+    },
+    "description": "Check fencing configuration and readiness for a Two-Node Fencing (TNF) cluster. Validates cluster topology, critical operator health (etcd, machine-api, baremetal), Machine/Node/BareMetalHost correlation, BMC addresses and credentials, FenceAgentsRemediation templates and active remediations, and NodeHealthCheck resources. Returns a diagnostic summary identifying configuration issues that could prevent fencing from functioning correctly.",
+    "inputSchema": {
+      "properties": {
+        "namespace": {
+          "description": "Namespace containing BareMetalHost resources (e.g. 'openshift-machine-api'). If omitted, searches all namespaces.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "tnf_check_fencing_config",
+    "title": "TNF: Check Fencing Config"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": "TNF: Check STONITH Status"
+    },
+    "description": "Check STONITH and pacemaker fencing status on a Two-Node Fencing (TNF) cluster. Creates a temporary privileged debug pod on a control-plane node to run pcs diagnostic commands. Returns pacemaker cluster state, STONITH device configuration, quorum status, and recent fencing history. The debug pod is automatically cleaned up after execution.",
+    "inputSchema": {
+      "properties": {
+        "namespace": {
+          "description": "Namespace to create the temporary debug pod in (optional, defaults to 'default').",
+          "type": "string"
+        },
+        "node": {
+          "description": "Name of the node to run diagnostics on. If omitted, auto-detects the first control-plane node.",
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "description": "Maximum time in seconds to wait for the diagnostic commands to complete (optional, defaults to 120).",
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "name": "tnf_check_stonith_status",
+    "title": "TNF: Check STONITH Status"
+  }
+]
