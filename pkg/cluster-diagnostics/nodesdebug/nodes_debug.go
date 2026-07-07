@@ -140,12 +140,22 @@ func (n *NodeDebug) NodesDebugExec(
 	if debugImage == "" {
 		debugImage = DefaultNodeDebugImage
 	}
-	if timeout <= 0 {
-		timeout = DefaultNodeDebugTimeout
-	}
 
-	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	// If timeout is not set and ctx has a timeout, use that, else use the default timeout.
+	// If timeout is set, then use it.
+	var timeoutCtx context.Context
+	var cancel context.CancelFunc
+	if timeout <= 0 {
+		if _, ok := ctx.Deadline(); ok {
+			timeoutCtx = ctx
+		} else {
+			timeoutCtx, cancel = context.WithTimeout(ctx, DefaultNodeDebugTimeout)
+			defer cancel()
+		}
+	} else {
+		timeoutCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 
 	exists, err := n.DoesNodeExist(timeoutCtx, nodeName)
 	if err != nil {
