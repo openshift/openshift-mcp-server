@@ -83,3 +83,33 @@ config:
             toolPattern: "netobserv_.*"
         minToolCalls: 1
         maxToolCalls: 10
+    # OADP tasks - uses core toolset, requires OADP/Velero on cluster
+    - glob: ../tasks/oadp/*/*.yaml
+      labelSelector:
+        suite: oadp
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            toolPattern: ".*"
+        minToolCalls: 1
+        maxToolCalls: 15
+    # Cluster diagnostics tasks
+    - glob: ../tasks/cluster-diagnostics/*/*.yaml
+      labelSelector:
+        suite: cluster-diagnostics
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            toolPattern: ".*"
+        minToolCalls: 1
+        maxToolCalls: 20
+    # TNF (Two-Node Fencing) tasks - requires 2-node bare metal cluster
+    - glob: ../tasks/tnf/*/*.yaml
+      labelSelector:
+        suite: tnf
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            toolPattern: "tnf_.*"
+        minToolCalls: 1
+        maxToolCalls: 10

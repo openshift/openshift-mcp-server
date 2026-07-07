@@ -25,6 +25,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/openshift"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/ovnkubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/tekton"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/tnf"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/suite"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -228,6 +229,7 @@ func (s *ToolsetsSuite) TestGranularToolsetsTools() {
 		&tekton.Toolset{},
 		&clusterDiagnosticsToolset.Toolset{},
 		&cniDiagnosticsToolset.Toolset{},
+		&tnf.Toolset{},
 	}
 	for _, testCase := range testCases {
 		s.Run("Toolset "+testCase.GetName(), func() {
