@@ -9,12 +9,12 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
       == "main"
+    pipelinesascode.tekton.dev/target-namespace: "ocp-mcp-server-tenant"
   labels:
     appstudio.openshift.io/application: mcp-server-main
     appstudio.openshift.io/component: openshift-mcp-server-main
     pipelines.appstudio.openshift.io/type: build
   name: openshift-mcp-server-main-on-push
-  namespace: ocp-mcp-server-tenant
 spec:
   params:
   - name: git-url
