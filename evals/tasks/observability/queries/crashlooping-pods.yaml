@@ -10,13 +10,14 @@ metadata:
     suite: observability
     toolType: range-query
   description: |
-    Tests if the agent can identify crashlooping pods by discovering and querying
-    the kube_pod_container_status_restarts_total metric over a time range.
+    Tests if the agent can identify crashlooping pods using Prometheus metrics.
+    Valid approaches include querying kube_pod_container_status_restarts_total
+    (high restart counts) or kube_pod_container_status_waiting_reason with
+    reason=CrashLoopBackOff. The agent must name a metric and provide a PromQL query.
 spec:
   verify:
     - llmJudge:
-        contains: "kube_pod_container_status_restarts_total"
-        reason: "Verify the agent used the correct metric for container restart counts"
+        contains: "the agent identifies crashlooping pods using a relevant Prometheus metric such as kube_pod_container_status_restarts_total or kube_pod_container_status_waiting_reason with CrashLoopBackOff, and includes a PromQL query"
   prompt:
     inline: |
       Which pods were crashlooping in the last 5 minutes?

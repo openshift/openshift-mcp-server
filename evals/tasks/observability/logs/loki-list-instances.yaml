@@ -18,4 +18,3 @@ spec:
   verify:
     - llmJudge:
         contains: "obs-mcp-loki"
-        reason: "Verify the agent reported LokiStack instance details"

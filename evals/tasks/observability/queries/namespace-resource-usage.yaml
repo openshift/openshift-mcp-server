@@ -18,10 +18,8 @@ spec:
   verify:
     - llmJudge:
         contains: "container_cpu_usage_seconds_total"
-        reason: "Verify the agent discovered and used the correct CPU metric"
     - llmJudge:
         contains: "container_memory"
-        reason: "Verify the agent discovered and used a container memory metric (working_set_bytes or usage_bytes)"
   prompt:
     inline: |
       Which namespace is consuming the most CPU and memory?

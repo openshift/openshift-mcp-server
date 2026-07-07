@@ -15,7 +15,6 @@ spec:
   verify:
     - llmJudge:
         contains: "Additional property does_not_exist is not allowed"
-        reason: "Verify the response indicates invalid configuration"
   prompt:
     inline: |
       Validate this OpenTelemetry Collector batch processor configuration:

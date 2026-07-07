@@ -15,19 +15,14 @@ spec:
   verify:
     - llmJudge:
         contains: "metadata_cardinality_limit"
-        reason: "Verify the schema includes the metadata_cardinality_limit"
     - llmJudge:
         contains: "timeout"
-        reason: "Verify the schema includes the timeout"
     - llmJudge:
         contains: "metadata_keys"
-        reason: "Verify the schema includes the metadata_keys"
     - llmJudge:
         contains: "send_batch_max_size"
-        reason: "Verify the schema includes the send_batch_max_size"
     - llmJudge:
         contains: "send_batch_size"
-        reason: "Verify the schema includes the send_batch_size"
   prompt:
     inline: |
       What is the configuration schema for the OpenTelemetry Collector batch processor for version 0.144.0?

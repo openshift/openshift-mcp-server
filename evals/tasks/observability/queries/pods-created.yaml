@@ -10,13 +10,13 @@ metadata:
     suite: observability
     toolType: range-query
   description: |
-    Tests if the agent can use a range query to find recently created pods by
-    discovering the kube_pod_created metric and querying it over a 5-minute window.
+    Tests if the agent can find recently created pods using a time-based filter
+    on a pod timestamp metric (kube_pod_start_time or kube_pod_created) over a
+    5-minute window.
 spec:
   verify:
     - llmJudge:
-        contains: "kube_pod_created"
-        reason: "Verify the agent discovered and used the kube_pod_created metric"
+        contains: "a Kubernetes pod timestamp metric (such as kube_pod_start_time or kube_pod_created) used with a time filter to count pods created in the last 5 minutes"
   prompt:
     inline: |
       How many pods were created in the last 5 minutes?

@@ -21,7 +21,5 @@ spec:
   verify:
     - llmJudge:
         contains: "SrcK8S_Namespace"
-        reason: "Verify the agent used obs-mcp-loki indexed namespace labels in LogQL"
     - llmJudge:
         contains: "network"
-        reason: "Verify the agent used tenant network for the openshift-network LokiStack"

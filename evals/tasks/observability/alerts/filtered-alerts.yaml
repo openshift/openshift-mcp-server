@@ -18,7 +18,6 @@ spec:
   verify:
     - llmJudge:
         contains: "AlertmanagerReceiversNotConfigured"
-        reason: "Verify the agent filtered for warning-severity alerts and found AlertmanagerReceiversNotConfigured"
   prompt:
     inline: |
       Show me only the active alerts with severity=warning.

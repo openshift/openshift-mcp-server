@@ -16,7 +16,6 @@ spec:
   verify:
     - llmJudge:
         contains: "prometheus_tsdb_wal_storage_size_bytes"
-        reason: "Verify the agent used the correct WAL storage metric"
   prompt:
     inline: |
       What is the current storage size of the Prometheus WAL?

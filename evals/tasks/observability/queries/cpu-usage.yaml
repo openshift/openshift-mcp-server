@@ -16,10 +16,8 @@ spec:
   verify:
     - llmJudge:
         contains: "container_cpu_usage_seconds_total"
-        reason: "Verify the agent queried the correct CPU metric"
     - llmJudge:
         contains: "pod"
-        reason: "Verify the response identifies specific pods"
   prompt:
     inline: |
       Which pods are using the most CPU? Show me the top 5.

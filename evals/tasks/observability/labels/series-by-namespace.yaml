@@ -18,10 +18,8 @@ spec:
   verify:
     - llmJudge:
         contains: "pod"
-        reason: "Verify the agent retrieved actual series data containing label dimensions like pod"
     - llmJudge:
         contains: "container"
-        reason: "Verify the agent reported series with container label values from the namespace"
   prompt:
     inline: |
       How many time series exist for container_cpu_usage_seconds_total

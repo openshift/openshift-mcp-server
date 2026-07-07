@@ -16,7 +16,6 @@ spec:
   verify:
     - llmJudge:
         contains: "node_"
-        reason: "Verify the output lists specific node metrics discovered from Prometheus (e.g. node_cpu_seconds_total)"
   prompt:
     inline: |
       What node-related metrics are available in Prometheus?

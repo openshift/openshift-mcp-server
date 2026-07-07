@@ -20,4 +20,3 @@ spec:
   verify:
     - llmJudge:
         contains: "obs-mcp-loki"
-        reason: "Verify the agent discovered the obs-mcp-loki LokiStack from loki_list_instances"

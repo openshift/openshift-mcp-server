@@ -20,7 +20,5 @@ spec:
   verify:
     - llmJudge:
         contains: "SrcK8S_Namespace"
-        reason: "NetObserv flow logs expose SrcK8S_Namespace as an indexed Loki label"
     - llmJudge:
         contains: "DstK8S_Namespace"
-        reason: "NetObserv flow logs expose DstK8S_Namespace as an indexed Loki label"

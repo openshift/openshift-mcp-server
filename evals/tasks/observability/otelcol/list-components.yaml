@@ -15,10 +15,8 @@ spec:
   verify:
     - llmJudge:
         contains: "otlp"
-        reason: "Verify the response includes the OTLP component"
     - llmJudge:
         contains: "batch"
-        reason: "Verify the response includes the batch processor"
   prompt:
     inline: |
       What components are available in the OpenTelemetry Collector?

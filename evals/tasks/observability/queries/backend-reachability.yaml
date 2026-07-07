@@ -17,7 +17,6 @@ spec:
   verify:
     - llmJudge:
         contains: "prometheus-k8s"
-        reason: "Verify the agent queried the up metric and reported on the prometheus-k8s target"
   prompt:
     inline: |
       Is the metrics backend reachable? Query up{job="prometheus-k8s"} and report the status.

@@ -19,4 +19,3 @@ spec:
   verify:
     - llmJudge:
         contains: "SrcK8S_Namespace"
-        reason: "Verify the agent queried the SrcK8S_Namespace label"

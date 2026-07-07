@@ -10,14 +10,14 @@ metadata:
     suite: observability
     toolType: error-handling
   description: |
-    Tests agent behavior when a query is rejected by obs-mcp guardrails
-    due to high cardinality. The agent should explain the guardrail
-    rejection and suggest a scoped alternative rather than giving up.
+    Tests agent behavior when asked for an impractically large query
+    (all containers, 24h, 1s resolution). The agent should warn about
+    the data volume or impracticality and suggest a more scoped or
+    lower-resolution alternative rather than blindly executing the query.
 spec:
   verify:
     - llmJudge:
-        contains: "guardrail"
-        reason: "Verify the agent explains the query was rejected by a guardrail and suggests a scoped alternative"
+        contains: "the agent warns that the requested query would produce an impractically large amount of data, and suggests a scoped or lower-resolution alternative"
   prompt:
     inline: |
       Show me the CPU, memory, network, and disk usage for every single container

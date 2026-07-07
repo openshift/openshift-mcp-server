@@ -16,7 +16,6 @@ spec:
   verify:
     - llmJudge:
         contains: "prometheus_tsdb_head_series"
-        reason: "Verify the agent used the correct Prometheus TSDB metric"
   prompt:
     inline: |
       How many head series does Prometheus have?

@@ -15,7 +15,6 @@ spec:
   verify:
     - llmJudge:
         contains: "v0.144.0"
-        reason: "Verify the output contains the version 0.144.0"
   prompt:
     inline: |
       What versions of the OpenTelemetry Collector are available?
