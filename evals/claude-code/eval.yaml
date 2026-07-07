@@ -102,3 +102,13 @@ config:
             toolPattern: ".*"
         minToolCalls: 1
         maxToolCalls: 20
+    # TNF (Two-Node Fencing) tasks - requires 2-node bare metal cluster
+    - glob: ../tasks/tnf/*/*.yaml
+      labelSelector:
+        suite: tnf
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            toolPattern: "tnf_.*"
+        minToolCalls: 1
+        maxToolCalls: 10

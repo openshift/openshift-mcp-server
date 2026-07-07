@@ -1,0 +1,15 @@
+kind: Task
+metadata:
+  labels:
+    suite: tnf
+  name: check-stonith-status
+  difficulty: medium
+steps:
+  prompt:
+    inline: Check the pacemaker and STONITH status on this cluster. Report which STONITH devices are configured, whether they are started, and the current quorum status.
+  verify:
+    contains: "STONITH"
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "tnf_check_stonith_status"
