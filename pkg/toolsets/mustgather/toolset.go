@@ -18,7 +18,7 @@ func (t *Toolset) GetDescription() string {
 	return "Analyze OpenShift must-gather archives offline without a live cluster connection"
 }
 
-func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
+func (t *Toolset) GetTools(_ api.FilteringProvider) []api.ServerTool {
 	return slices.Concat(
 		initUse(),
 		initResources(),

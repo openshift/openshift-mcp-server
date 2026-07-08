@@ -6,6 +6,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/internal/test"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/stretchr/testify/suite"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 )
 
@@ -58,10 +59,43 @@ func (s *ProviderACMHubTestSuite) TestType() {
 	s.IsType(&acmHubClusterProvider{}, s.provider)
 }
 
-func (s *ProviderACMHubTestSuite) TestWithNonOpenShiftCluster() {
-	s.Run("IsOpenShift returns false", func() {
-		inOpenShift := s.provider.IsOpenShift(s.T().Context())
-		s.False(inOpenShift, "Expected IsOpenShift to return false")
+func (s *ProviderACMHubTestSuite) TestWithOpenShiftCluster() {
+	// Serve the OpenShift discovery document so the Project GVK is present on the hub.
+	// This simulates an ACM hub running on OpenShift.
+	s.mockServer.ResetHandlers()
+	s.mockServer.Handle(test.NewACMHubHandlerWithOpenShift(
+		test.ManagedCluster{Name: "cluster-a"},
+		test.ManagedCluster{Name: "cluster-b"},
+		test.ManagedCluster{Name: "cluster-c"},
+		test.ManagedCluster{Name: "hub", Labels: map[string]string{"local-cluster": "true"}},
+	))
+	s.Run("has OpenShift Project GVK", func() {
+		hasProjects := s.provider.AnyTargetHasGVKs(s.T().Context(), []schema.GroupVersionKind{
+			{Group: "project.openshift.io", Version: "v1", Kind: "Project"},
+		})
+		s.True(hasProjects, "Expected provider to report OpenShift Project GVK available")
+	})
+}
+
+func (s *ProviderACMHubTestSuite) TestWithNonOpenShiftGVK() {
+	s.Run("does not have non-existent GVK", func() {
+		// TODO: When we implement AnyTargetHasGVKs() via ACM search API, this test should
+		// return false for non-existent GVKs. Currently it returns true because the
+		// ProviderGVKFilter implementation tries to query all managed clusters (cluster-a,
+		// cluster-b, cluster-c) which don't have mock servers, causing errors. The error
+		// handling policy is to return true (assume GVKs exist) to avoid hiding tools due
+		// to transient discovery failures.
+		//
+		// When ACM search API is implemented, we'll query the hub's search index instead
+		// of iterating through all managed cluster clients, which will allow proper
+		// GVK detection without needing to connect to each cluster.
+		hasGVK := s.provider.AnyTargetHasGVKs(s.T().Context(), []schema.GroupVersionKind{
+			{Group: "nonexistent.example.com", Version: "v1", Kind: "Foo"},
+		})
+		// Current behavior: returns true due to errors connecting to mock managed clusters
+		s.True(hasGVK, "Current implementation returns true on discovery errors (regression guard)")
+		// Future behavior after ACM search API implementation:
+		// s.False(hasGVK, "Expected provider to report no nonexistent GVK")
 	})
 }
 

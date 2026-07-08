@@ -21,7 +21,6 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
-	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes/watcher"
 	"github.com/containers/kubernetes-mcp-server/pkg/tokenexchange"
 )
@@ -112,6 +111,7 @@ func parseAcmKubeConfigConfig(ctx context.Context, primitive toml.Primitive, md 
 }
 
 type acmHubClusterProvider struct {
+	*ProviderGVKFilter
 	hubManager         *Manager // for the main "hub" cluster
 	clusterProxyHost   string
 	skipTLSVerify      bool
@@ -140,6 +140,7 @@ type acmHubClusterProvider struct {
 }
 
 var _ Provider = &acmHubClusterProvider{}
+var _ ManagerProvider = &acmHubClusterProvider{}
 
 func init() {
 	RegisterProvider(ClusterProviderACM, newACMHubClusterProvider)
@@ -152,13 +153,12 @@ func init() {
 // IsACMHub checks if the current cluster is an ACM hub by looking for ACM CRDs
 // This is included here instead of in other files so that it doesn't create conflicts
 // with upstream changes
-func (m *Manager) IsACMHub(ctx context.Context) bool {
-	logger := klog.FromContext(ctx)
+func (m *Manager) IsACMHub() bool {
 	discoveryClient := m.kubernetes.DiscoveryClient()
 
 	_, apiLists, err := discoveryClient.ServerGroupsAndResources()
 	if err != nil {
-		klogutil.LogInfo(logger.V(3), "Failed to discover server resources for ACM detection", klogutil.Err(err))
+		klog.V(3).Infof("failed to discover server resources for ACM detection: %v", err)
 		return false
 	}
 
@@ -166,7 +166,7 @@ func (m *Manager) IsACMHub(ctx context.Context) bool {
 		if apiList.GroupVersion == "cluster.open-cluster-management.io/v1" {
 			for _, resource := range apiList.APIResources {
 				if resource.Kind == "ManagedCluster" {
-					logger.V(2).Info("Detected ACM hub cluster")
+					klog.V(2).Info("Detected ACM hub cluster")
 					return true
 				}
 			}
@@ -209,8 +209,8 @@ func newACMKubeConfigClusterProvider(ctx context.Context, cfg api.BaseConfig) (P
 	return newACMClusterProvider(ctx, baseManager, &acmKubeConfigProviderCfg.ACMProviderConfig, true)
 }
 
-func discoverClusterProxyHost(ctx context.Context, m *Manager, isClusterProviderACMKubeConfig bool) (string, error) {
-	logger := klog.FromContext(ctx)
+func discoverClusterProxyHost(m *Manager, isClusterProviderACMKubeConfig bool) (string, error) {
+	ctx := context.Background()
 
 	// With ClusterProviderACMKubeConfig we cannot use a vanilla service, since the mcp server is not in the cluster
 	if isClusterProviderACMKubeConfig {
@@ -225,7 +225,7 @@ func discoverClusterProxyHost(ctx context.Context, m *Manager, isClusterProvider
 		if err == nil {
 			host, found, err := unstructured.NestedString(route.Object, "spec", "host")
 			if err == nil && found && host != "" {
-				logger.V(2).Info("Auto-discovered cluster-proxy route", "host", host)
+				klog.V(2).Infof("Auto-discovered cluster-proxy route: %s", host)
 				return host, nil
 			}
 		}
@@ -242,7 +242,7 @@ func discoverClusterProxyHost(ctx context.Context, m *Manager, isClusterProvider
 			}
 		}
 		host := fmt.Sprintf("%s.%s.svc.cluster.local:%d", svc.Name, svc.Namespace, port)
-		logger.V(2).Info("Auto-discovered cluster-proxy service", "host", host)
+		klog.V(2).Infof("Auto-discovered cluster-proxy service: %s", host)
 		return host, nil
 	}
 
@@ -250,21 +250,19 @@ func discoverClusterProxyHost(ctx context.Context, m *Manager, isClusterProvider
 }
 
 func newACMClusterProvider(ctx context.Context, m *Manager, cfg *ACMProviderConfig, watchKubeConfig bool) (Provider, error) {
-	logger := klog.FromContext(ctx)
-
-	if !m.IsACMHub(ctx) {
+	if !m.IsACMHub() {
 		return nil, fmt.Errorf("not deployed in an ACM hub cluster")
 	}
 
 	// Auto-discover cluster-proxy host if is not provided
 	clusterProxyHost := cfg.ClusterProxyAddonHost
 	if clusterProxyHost == "" {
-		discoveredHost, err := discoverClusterProxyHost(ctx, m, watchKubeConfig)
+		discoveredHost, err := discoverClusterProxyHost(m, watchKubeConfig)
 		if err != nil {
 			return nil, fmt.Errorf("cluster_proxy_addon_host not provided and auto-discovery failed: %w", err)
 		}
 		clusterProxyHost = discoveredHost
-		logger.V(1).Info("Using auto-discovered cluster-proxy host", "host", clusterProxyHost)
+		klog.V(1).Infof("Using auto-discovered cluster-proxy host: %s", clusterProxyHost)
 	}
 
 	// Create cancellable context for the watch goroutine
@@ -285,18 +283,17 @@ func newACMClusterProvider(ctx context.Context, m *Manager, cfg *ACMProviderConf
 		clusterWatcher:     watcher.NewClusterState(ctx, m.kubernetes.DiscoveryClient()),
 	}
 
+	// Initialize the ProviderGVKFilter
+	provider.ProviderGVKFilter = NewProviderGVKFilter(provider)
+
 	resourceVersion, err := provider.refreshClusters(ctx)
 	if err != nil {
-		klogutil.LogWarn(logger, "Failed to discover managed clusters", klogutil.Err(err))
+		klog.Warningf("Failed to discover managed clusters: %v", err)
 	}
 	provider.initialResourceVersion = resourceVersion
 
-	logger.V(2).Info("ACM hub provider initialized", "managed_cluster.count", len(provider.clusterManagers))
+	klog.V(2).Infof("ACM hub provider initialized with %d managed clusters", len(provider.clusterManagers))
 	return provider, nil
-}
-
-func (p *acmHubClusterProvider) IsOpenShift(ctx context.Context) bool {
-	return p.hubManager.IsOpenShift(ctx)
 }
 
 func (p *acmHubClusterProvider) IsMultiTarget() bool {
@@ -310,7 +307,7 @@ func (p *acmHubClusterProvider) GetDerivedKubernetes(ctx context.Context, target
 		return p.hubManager.Derived(ctx)
 	}
 
-	manager, err := p.managerForCluster(ctx, target)
+	manager, err := p.managerForCluster(target)
 	if err != nil {
 		return nil, err
 	}
@@ -344,6 +341,29 @@ func (p *acmHubClusterProvider) GetTargetParameterName() string {
 	return ACMHubTargetParameterName
 }
 
+// GetTargetManagers returns managers for all targets.
+// Returns an error if managers for any target cannot be retrieved.
+// TODO: Cut over to ACM search API rather than using target managers for better performance.
+func (p *acmHubClusterProvider) GetTargetManagers(ctx context.Context) ([]*Manager, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	targets := make([]string, 0, len(p.clusterManagers))
+	for name := range p.clusterManagers {
+		targets = append(targets, name)
+	}
+
+	managers := make([]*Manager, 0, len(targets))
+	for _, target := range targets {
+		manager, err := p.managerForClusterUnsync(target)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get manager for target %s: %w", target, err)
+		}
+		managers = append(managers, manager)
+	}
+	return managers, nil
+}
+
 func (p *acmHubClusterProvider) WatchTargets(ctx context.Context, reload McpReload) {
 	if p.watchKubeConfig {
 		p.kubeConfigWatcher.Watch(ctx, reload)
@@ -371,10 +391,6 @@ func (p *acmHubClusterProvider) Close() {
 
 	p.clusterWatcher.Close()
 	p.kubeConfigWatcher.Close()
-}
-
-func (p *acmHubClusterProvider) HasGVKs(_ context.Context, _ []schema.GroupVersionKind) bool {
-	return true
 }
 
 // GetTokenExchangeConfig returns the token exchange configuration for the specified target.
@@ -427,8 +443,6 @@ func (p *acmHubClusterProvider) GetTokenExchangeStrategy() string {
 }
 
 func (p *acmHubClusterProvider) watchManagedClusters(resourceVersion string, onTargetsChanged func() error) {
-	logger := klog.FromContext(p.watchCtx)
-
 	gvr := schema.GroupVersionResource{
 		Group:    "cluster.open-cluster-management.io",
 		Version:  "v1",
@@ -446,7 +460,7 @@ func (p *acmHubClusterProvider) watchManagedClusters(resourceVersion string, onT
 	for {
 		select {
 		case <-p.watchCtx.Done():
-			logger.V(2).Info("Watch goroutine cancelled, exiting")
+			klog.V(2).Info("Watch goroutine cancelled, exiting")
 			return
 		default:
 		}
@@ -458,15 +472,15 @@ func (p *acmHubClusterProvider) watchManagedClusters(resourceVersion string, onT
 			},
 		)
 		if err != nil {
-			logger.Error(err, "Failed to start watch on managed clusters")
-			logger.V(2).Info("Waiting before retrying watch", "delay", delay)
+			klog.Errorf("Failed to start watch on managed clusters: %v", err)
+			klog.V(2).Infof("Waiting %v before retrying watch", delay)
 			time.Sleep(delay)
 			delay = min(time.Duration(float64(delay)*backoffRate), maxDelay)
 			continue
 		}
 
 		delay = initialDelay
-		logger.V(2).Info("Started watching managed clusters for changes")
+		klog.V(2).Info("Started watching managed clusters for changes")
 
 		for event := range watchInterface.ResultChan() {
 			obj, ok := event.Object.(*unstructured.Unstructured)
@@ -479,7 +493,7 @@ func (p *acmHubClusterProvider) watchManagedClusters(resourceVersion string, onT
 
 			switch event.Type {
 			case watch.Added:
-				logger.V(3).Info("Managed cluster added", "cluster", clusterName)
+				klog.V(3).Infof("Managed cluster added: %s", clusterName)
 				p.addCluster(clusterName)
 				// Check if this is the hub cluster
 				labels := obj.GetLabels()
@@ -487,21 +501,21 @@ func (p *acmHubClusterProvider) watchManagedClusters(resourceVersion string, onT
 					p.setHubClusterName(clusterName)
 				}
 				if err := onTargetsChanged(); err != nil {
-					klogutil.LogWarn(logger, "Error in onTargetsChanged callback", klogutil.Err(err))
+					klog.Warningf("Error in onTargetsChanged callback: %v", err)
 				}
 			case watch.Deleted:
-				logger.V(3).Info("Managed cluster deleted", "cluster", clusterName)
+				klog.V(3).Infof("Managed cluster deleted: %s", clusterName)
 				p.removeCluster(clusterName)
 				if err := onTargetsChanged(); err != nil {
-					klogutil.LogWarn(logger, "Error in onTargetsChanged callback", klogutil.Err(err))
+					klog.Warningf("Error in onTargetsChanged callback: %v", err)
 				}
 			case watch.Modified:
-				logger.V(3).Info("Managed cluster modified", "cluster", clusterName)
+				klog.V(3).Infof("Managed cluster modified: %s", clusterName)
 			}
 		}
 
 		watchInterface.Stop()
-		klogutil.LogWarn(logger, "Managed clusters watch closed, restarting")
+		klog.Warning("Managed clusters watch closed, restarting...")
 	}
 }
 
@@ -533,7 +547,7 @@ func (p *acmHubClusterProvider) refreshClusters(ctx context.Context) (string, er
 
 	resourceVersion := result.GetResourceVersion()
 	clusters, _ := p.GetTargets(ctx)
-	klog.FromContext(ctx).V(3).Info("Discovered managed clusters", "count", len(clusters), "clusters", clusters, "resource_version", resourceVersion)
+	klog.V(3).Infof("discovered %d managed clusters: %v (resourceVersion: %s)", len(clusters), clusters, resourceVersion)
 
 	return resourceVersion, nil
 }
@@ -561,10 +575,14 @@ func (p *acmHubClusterProvider) removeCluster(name string) {
 	delete(p.clusterManagers, name)
 }
 
-func (p *acmHubClusterProvider) managerForCluster(ctx context.Context, cluster string) (*Manager, error) {
-	p.mu.RLock()
+func (p *acmHubClusterProvider) managerForCluster(cluster string) (*Manager, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.managerForClusterUnsync(cluster)
+}
+
+func (p *acmHubClusterProvider) managerForClusterUnsync(cluster string) (*Manager, error) {
 	manager, exists := p.clusterManagers[cluster]
-	p.mu.RUnlock()
 
 	if exists && manager != nil {
 		return manager, nil
@@ -615,13 +633,10 @@ func (p *acmHubClusterProvider) managerForCluster(ctx context.Context, cluster s
 	}
 
 	proxyClientCmdConfig := clientcmd.NewDefaultClientConfig(*proxyRawConfig, nil)
-	newManager, err := NewManager(ctx, p.hubManager.config, proxyConfig, proxyClientCmdConfig)
+	newManager, err := NewManager(context.Background(), p.hubManager.config, proxyConfig, proxyClientCmdConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create manager for cluster %s: %w", cluster, err)
 	}
-
-	p.mu.Lock()
-	defer p.mu.Unlock()
 
 	if existingManager := p.clusterManagers[cluster]; existingManager != nil {
 		return existingManager, nil

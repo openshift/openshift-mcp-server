@@ -20,7 +20,7 @@ func (t *Toolset) GetDescription() string {
 	return "OpenShift-specific tools for cluster management and troubleshooting"
 }
 
-func (t *Toolset) GetTools(o api.Openshift) []api.ServerTool {
+func (t *Toolset) GetTools(_ api.FilteringProvider) []api.ServerTool {
 	return nil
 }
 

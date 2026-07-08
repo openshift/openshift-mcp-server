@@ -54,6 +54,59 @@ func NewACMHubHandler(clusters ...ManagedCluster) *ACMHubHandler {
 	}
 }
 
+// NewACMHubHandlerWithOpenShift creates an ACMHubHandler configured for ACM hub clusters
+// running on OpenShift. It includes both ACM-specific resources and OpenShift resources
+// (Project, Route) in the discovery API.
+func NewACMHubHandlerWithOpenShift(clusters ...ManagedCluster) *ACMHubHandler {
+	acmResources := []metav1.APIResourceList{
+		{
+			GroupVersion: "v1",
+			APIResources: []metav1.APIResource{
+				{Name: "services", Kind: "Service", Namespaced: true, Verbs: metav1.Verbs{"get", "list", "watch", "create", "update", "patch", "delete"}},
+			},
+		},
+		{
+			GroupVersion: "cluster.open-cluster-management.io/v1",
+			APIResources: []metav1.APIResource{
+				{
+					Name:         "managedclusters",
+					SingularName: "managedcluster",
+					Kind:         "ManagedCluster",
+					Namespaced:   false,
+					Verbs:        metav1.Verbs{"get", "list", "watch", "create", "update", "patch", "delete"},
+				},
+			},
+		},
+		{
+			GroupVersion: "project.openshift.io/v1",
+			APIResources: []metav1.APIResource{
+				{
+					Name:       "projects",
+					Kind:       "Project",
+					Namespaced: false,
+					ShortNames: []string{"pr"},
+					Verbs:      metav1.Verbs{"create", "delete", "get", "list", "patch", "update", "watch"},
+				},
+			},
+		},
+		{
+			GroupVersion: "route.openshift.io/v1",
+			APIResources: []metav1.APIResource{
+				{
+					Name:       "routes",
+					Kind:       "Route",
+					Namespaced: true,
+					Verbs:      metav1.Verbs{"create", "delete", "get", "list", "patch", "update", "watch"},
+				},
+			},
+		},
+	}
+	return &ACMHubHandler{
+		DiscoveryClientHandler: &DiscoveryClientHandler{APIResourceLists: acmResources},
+		ManagedClusters:        clusters,
+	}
+}
+
 func (h *ACMHubHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
