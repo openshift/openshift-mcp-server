@@ -27,6 +27,8 @@ func (s *WatchKubeConfigSuite) SetupTest() {
 	s.BaseMcpSuite.SetupTest()
 	s.T().Setenv("KUBECONFIG_DEBOUNCE_WINDOW_MS", "10")
 	s.mockServer = test.NewMockServer()
+	// Set up default discovery handler for non-OpenShift cluster
+	s.mockServer.Handle(test.NewDiscoveryClientHandler())
 	s.Require().NoError(toml.Unmarshal([]byte(`
 		[[prompts]]
 		name = "test-prompt"
@@ -110,7 +112,7 @@ func (s *WatchKubeConfigSuite) TestClearsNoLongerAvailableTools() {
 	s.mockServer.Handle(test.NewInOpenShiftHandler())
 	s.InitMcpClient()
 
-	s.Run("OpenShift tool is available", func() {
+	s.Run("OpenShift tool is available on OpenShift cluster", func() {
 		tools, err := s.ListTools()
 		s.Require().NoError(err, "call ListTools failed")
 		s.Require().NotNil(tools, "list tools failed")
@@ -124,11 +126,13 @@ func (s *WatchKubeConfigSuite) TestClearsNoLongerAvailableTools() {
 		s.Truef(found, "expected OpenShift tool to be available")
 	})
 
-	s.Run("OpenShift tool is removed after kubeconfig change", func() {
+	s.Run("OpenShift tool is removed after switching to non-OpenShift", func() {
 		capture := s.StartCapturingNotifications()
 
 		// Reload Config without OpenShift
 		s.mockServer.ResetHandlers()
+		// Add back non-OpenShift discovery handler
+		s.mockServer.Handle(test.NewDiscoveryClientHandler())
 		s.WriteKubeconfig()
 		capture.RequireNotification(s.T(), 5*time.Second, "notifications/tools/list_changed")
 		time.Sleep(serverSettleDelay)
@@ -137,7 +141,7 @@ func (s *WatchKubeConfigSuite) TestClearsNoLongerAvailableTools() {
 		s.Require().NoError(err, "call ListTools failed")
 		s.Require().NotNil(tools, "list tools failed")
 		for _, tool := range tools.Tools {
-			s.Require().Falsef(tool.Name == "projects_list", "expected OpenShift tool to be removed")
+			s.Require().Falsef(tool.Name == "projects_list", "expected OpenShift tool to be removed after cluster change")
 		}
 	})
 }

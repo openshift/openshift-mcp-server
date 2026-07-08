@@ -14,9 +14,18 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
 )
 
-func initResources(o api.Openshift) []api.ServerTool {
+func initResources(p api.FilteringProvider) []api.ServerTool {
+	// commonApiVersion lists example apiVersion/kind pairs that are appended to the
+	// resources_* tool descriptions as hints for the model. It is extended with
+	// target-specific kinds (e.g. OpenShift Route) when a target cluster exposes them,
+	// so the examples the model sees match the cluster it is talking to.
 	commonApiVersion := "v1 Pod, v1 Service, v1 Node, apps/v1 Deployment, networking.k8s.io/v1 Ingress"
-	if o.IsOpenShift(context.Background()) {
+	// TODO: A future config option could be used to decide whether to perform
+	// target compatibility checking/filtering, which may be expensive in
+	// environments where multiple endpoints would need to be consulted.
+	if p.AnyTargetHasGVKs(context.TODO(), []schema.GroupVersionKind{
+		{Group: "route.openshift.io", Version: "v1", Kind: "Route"},
+	}) {
 		commonApiVersion += ", route.openshift.io/v1 Route"
 	}
 	commonApiVersion = fmt.Sprintf("(common apiVersion and kind include: %s)", commonApiVersion)
@@ -93,13 +102,13 @@ func initResources(o api.Openshift) []api.ServerTool {
 		}, Handler: resourcesGet},
 		{Tool: api.Tool{
 			Name:        "resources_create_or_update",
-			Description: "Create or update a Kubernetes resource in the current cluster by providing a YAML or JSON representation of the resource\n" + commonApiVersion,
+			Description: "Create or update a Kubernetes resource via Server-Side Apply. The manifest is the complete desired state: any field this tool previously set and the new manifest omits is removed. To edit an existing resource, fetch it with resources_get, modify it, then re-apply the full resource.\n" + commonApiVersion,
 			InputSchema: &jsonschema.Schema{
 				Type: "object",
 				Properties: map[string]*jsonschema.Schema{
 					"resource": {
 						Type:        "string",
-						Description: "A JSON or YAML containing a representation of the Kubernetes resource. Should include top-level fields such as apiVersion,kind,metadata, and spec",
+						Description: "Complete YAML or JSON representation of the Kubernetes resource (full desired state, not a partial patch). Include apiVersion, kind, metadata, and the full spec.",
 					},
 				},
 				Required: []string{"resource"},

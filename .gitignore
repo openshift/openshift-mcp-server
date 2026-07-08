@@ -31,6 +31,8 @@ kubernetes-mcp-server-windows-arm64.exe
 .keycloak-config
 
 python/.venv/
+test/e2e/.venv/
+__pycache__/
 python/build/
 python/dist/
 python/kubernetes_mcp_server.egg-info/

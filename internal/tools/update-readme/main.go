@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
@@ -26,13 +28,13 @@ import (
 	_ "github.com/rhobs/obs-mcp/pkg/toolset"
 )
 
-type OpenShift struct{}
+type FilterProvider struct{}
 
-func (o *OpenShift) IsOpenShift(_ context.Context) bool {
+func (p *FilterProvider) AnyTargetHasGVKs(_ context.Context, _ []schema.GroupVersionKind) bool {
 	return true
 }
 
-var _ api.Openshift = (*OpenShift)(nil)
+var _ api.FilteringProvider = (*FilterProvider)(nil)
 
 func main() {
 	// Snyk reports false positive unless we flow the args through filepath.Clean and filepath.Localize in this specific order
@@ -89,7 +91,7 @@ func main() {
 	toolsetTools := strings.Builder{}
 	for _, toolset := range toolsetsList {
 		toolsetTools.WriteString("<details>\n\n<summary>" + toolset.GetName() + "</summary>\n\n")
-		tools := toolset.GetTools(&OpenShift{})
+		tools := toolset.GetTools(&FilterProvider{})
 		for _, tool := range tools {
 			fmt.Fprintf(&toolsetTools, "- **%s** - %s\n", tool.Tool.Name, tool.Tool.Description)
 			for _, propName := range slices.Sorted(maps.Keys(tool.Tool.InputSchema.Properties)) {
