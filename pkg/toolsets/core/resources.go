@@ -14,9 +14,18 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
 )
 
-func initResources(o api.Openshift) []api.ServerTool {
+func initResources(p api.FilteringProvider) []api.ServerTool {
+	// commonApiVersion lists example apiVersion/kind pairs that are appended to the
+	// resources_* tool descriptions as hints for the model. It is extended with
+	// target-specific kinds (e.g. OpenShift Route) when a target cluster exposes them,
+	// so the examples the model sees match the cluster it is talking to.
 	commonApiVersion := "v1 Pod, v1 Service, v1 Node, apps/v1 Deployment, networking.k8s.io/v1 Ingress"
-	if o.IsOpenShift(context.Background()) {
+	// TODO: A future config option could be used to decide whether to perform
+	// target compatibility checking/filtering, which may be expensive in
+	// environments where multiple endpoints would need to be consulted.
+	if p.AnyTargetHasGVKs(context.TODO(), []schema.GroupVersionKind{
+		{Group: "route.openshift.io", Version: "v1", Kind: "Route"},
+	}) {
 		commonApiVersion += ", route.openshift.io/v1 Route"
 	}
 	commonApiVersion = fmt.Sprintf("(common apiVersion and kind include: %s)", commonApiVersion)

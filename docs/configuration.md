@@ -10,9 +10,17 @@ This reference focuses on TOML file configuration. For CLI arguments, see the [C
 
 ## Table of Contents
 
+- [Table of Contents](#table-of-contents)
 - [Configuration Loading](#configuration-loading)
+  - [Usage](#usage)
 - [Drop-in Configuration](#drop-in-configuration)
+  - [How Drop-in Files Work](#how-drop-in-files-work)
+  - [Example Directory Structure](#example-directory-structure)
+  - [Example Drop-in Files](#example-drop-in-files)
 - [Dynamic Configuration Reload](#dynamic-configuration-reload)
+  - [How to Reload](#how-to-reload)
+  - [What Gets Reloaded](#what-gets-reloaded)
+  - [Limitations](#limitations)
 - [Configuration Reference](#configuration-reference-1)
   - [Server Settings](#server-settings)
   - [HTTP Server Security](#http-server-security)
@@ -30,9 +38,11 @@ This reference focuses on TOML file configuration. For CLI arguments, see the [C
   - [Validation](#validation)
   - [Confirmation Rules](#confirmation-rules)
   - [Toolset-Specific Configuration](#toolset-specific-configuration)
+    - [Helm Configuration](#helm-configuration)
   - [Cluster Provider Configuration](#cluster-provider-configuration)
 - [CLI Configuration Options](#cli-configuration-options)
 - [Complete Example](#complete-example)
+- [Related Documentation](#related-documentation)
 
 ## Configuration Loading
 
