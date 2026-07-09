@@ -9,6 +9,7 @@ UPSTREAM_REPO ?= containers/kubernetes-mcp-server
 UPSTREAM_REMOTE ?= upstream
 ORIGIN_REMOTE ?= origin
 SYNC_BRANCH_NAME ?= upstream-sync
+OWNER_REPO ?= $(shell git remote get-url $(ORIGIN_REMOTE) | sed 's|https://[^@]*@github\.com/||; s|https://github\.com/||; s|git@github\.com:||; s|\.git$$||')
 
 .PHONY: sync-upstream-check
 sync-upstream-check: ## Check if fork is behind upstream (dry-run)
@@ -95,14 +96,16 @@ sync-upstream-pr: ## Create/update PR to sync with upstream (requires gh CLI)
 		exit 1; \
 	fi
 	@echo "🚀 Creating or updating PR..."
-	@CHANGELOG=$$(git log --pretty=format:"- %h %s (%an)" $(ORIGIN_REMOTE)/main..$(UPSTREAM_REMOTE)/main); \
+	@echo "  OWNER_REPO='$(OWNER_REPO)'"; \
+	CHANGELOG=$$(git log --pretty=format:"- %h %s (%an)" $(ORIGIN_REMOTE)/main..$(UPSTREAM_REMOTE)/main); \
 	BEHIND_COUNT=$$(git rev-list --count $(ORIGIN_REMOTE)/main..$(UPSTREAM_REMOTE)/main); \
-	if gh pr list --head $(SYNC_BRANCH_NAME) --state open | grep -q "$(SYNC_BRANCH_NAME)"; then \
+	if gh pr list --repo "$(OWNER_REPO)" --head $(SYNC_BRANCH_NAME) --state open | grep -q "$(SYNC_BRANCH_NAME)"; then \
 		echo "  Updating existing PR..."; \
-		gh pr edit $(SYNC_BRANCH_NAME) --body "### 🔄 Upstream Sync"$$'\n'$$'\n'"**Update:** $$(date)"$$'\n'$$'\n'"New changes detected from upstream:"$$'\n'"$$CHANGELOG"; \
+		gh pr edit $(SYNC_BRANCH_NAME) --repo "$(OWNER_REPO)" --body "### 🔄 Upstream Sync"$$'\n'$$'\n'"**Update:** $$(date)"$$'\n'$$'\n'"New changes detected from upstream:"$$'\n'"$$CHANGELOG"; \
 	else \
 		echo "  Creating new PR..."; \
 		gh pr create \
+			--repo "$(OWNER_REPO)" \
 			--title "chore: sync with upstream $$(date +'%Y-%m-%d') - $$BEHIND_COUNT new commits" \
 			--body "### 🔄 Upstream Sync"$$'\n'$$'\n'"This PR syncs the fork with the latest upstream changes."$$'\n'$$'\n'"**Changes:**"$$'\n'"$$CHANGELOG" \
 			--base main \
