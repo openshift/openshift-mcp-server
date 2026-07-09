@@ -58,6 +58,11 @@ jobs:
   check-trigger:
     name: Check if evaluation should run
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      # Needed to comment on the PR when the TOCTOU check fails
+      pull-requests: write
     # Never run on forks: the evaluation needs model/judge secrets that forks
     # don't have, so it would only ever fail there.
     if: |
@@ -69,52 +74,122 @@ jobs:
         contains(github.event.comment.body, '/run-mcpchecker')))
     outputs:
       should-run: ${{ steps.check.outputs.should-run }}
-      toolsets: ${{ steps.check.outputs.toolsets }}
-      label-selector: ${{ steps.check.outputs.label-selector }}
+      toolsets: ${{ steps.suite.outputs.toolsets }}
+      label-selector: ${{ steps.suite.outputs.label-selector }}
       pr-number: ${{ steps.check.outputs.pr-number }}
       pr-sha: ${{ steps.check.outputs.pr-sha }}
       is-pr: ${{ steps.check.outputs.is-pr }}
     steps:
       - name: Check trigger conditions
         id: check
-        # All event-derived values are passed through `env` and referenced as shell
-        # variables. They are never interpolated directly into the `run` script, so
-        # untrusted input (e.g. a comment body) cannot alter the script that executes.
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+
+            if (context.eventName === 'issue_comment') {
+              const commenter = context.payload.comment.user.login;
+              const prNum = context.payload.issue.number;
+              const commentId = context.payload.comment.id;
+
+              // Only repository collaborators with admin/write access may trigger a run.
+              const { data: permData } = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner, repo, username: commenter,
+              });
+              if (permData.permission !== 'admin' && permData.permission !== 'write') {
+                core.setOutput('should-run', 'false');
+                core.setOutput('is-pr', 'true');
+                core.setOutput('pr-number', String(prNum));
+                core.setOutput('pr-sha', '');
+                core.info(`User ${commenter} does not have permission to trigger evaluations`);
+                return;
+              }
+
+              // TOCTOU guard: walk the PR timeline and extract the SHA of the
+              // last commit *before* the /run-mcpchecker comment.  This is the
+              // exact code the maintainer reviewed.  If any commits or force-pushes
+              // landed after the comment, the run is rejected.  Timeline ordering
+              // is controlled by GitHub's servers and cannot be spoofed.
+              const timeline = await github.paginate(
+                github.rest.issues.listEventsForTimeline,
+                { owner, repo, issue_number: prNum, per_page: 100 },
+              );
+
+              let seenComment = false;
+              let lastCommitSha = null;
+              for (const event of timeline) {
+                if (event.event === 'committed') {
+                  if (!seenComment) {
+                    lastCommitSha = event.sha;
+                  } else {
+                    core.setOutput('should-run', 'false');
+                    core.setOutput('is-pr', 'true');
+                    core.setOutput('pr-number', String(prNum));
+                    core.setOutput('pr-sha', '');
+                    core.info('TOCTOU: PR was updated after the /run-mcpchecker comment');
+                    await github.rest.issues.createComment({
+                      owner, repo, issue_number: prNum,
+                      body: '**Evaluation not started:** the PR was updated after this ' +
+                            '`/run-mcpchecker` comment was posted. Please re-review and ' +
+                            'comment `/run-mcpchecker` again.',
+                    });
+                    return;
+                  }
+                } else if (event.event === 'head_ref_force_pushed') {
+                  if (seenComment) {
+                    core.setOutput('should-run', 'false');
+                    core.setOutput('is-pr', 'true');
+                    core.setOutput('pr-number', String(prNum));
+                    core.setOutput('pr-sha', '');
+                    core.info('TOCTOU: PR was force-pushed after the /run-mcpchecker comment');
+                    await github.rest.issues.createComment({
+                      owner, repo, issue_number: prNum,
+                      body: '**Evaluation not started:** the PR was force-pushed after this ' +
+                            '`/run-mcpchecker` comment was posted. Please re-review and ' +
+                            'comment `/run-mcpchecker` again.',
+                    });
+                    return;
+                  }
+                  // After a force-push the old commit SHAs are invalid; reset
+                  // and let subsequent committed events repopulate.
+                  lastCommitSha = null;
+                } else if (event.event === 'commented' && event.id === commentId) {
+                  seenComment = true;
+                }
+              }
+
+              if (!seenComment) {
+                core.setOutput('should-run', 'false');
+                return
+              }
+
+              if (!lastCommitSha) {
+                core.setOutput('should-run', 'false');
+                core.setOutput('is-pr', 'true');
+                core.setOutput('pr-number', String(prNum));
+                core.setOutput('pr-sha', '');
+                core.warning('Could not determine the PR head SHA from the timeline');
+                return;
+              }
+
+              core.setOutput('should-run', 'true');
+              core.setOutput('is-pr', 'true');
+              core.setOutput('pr-number', String(prNum));
+              core.setOutput('pr-sha', lastCommitSha);
+              core.info(`Pinned to SHA: ${lastCommitSha}`);
+            } else {
+              core.setOutput('should-run', 'true');
+              core.setOutput('is-pr', 'false');
+              core.setOutput('pr-sha', context.sha);
+            }
+
+      - name: Select suite
+        id: suite
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EVENT_NAME: ${{ github.event_name }}
-          REPOSITORY: ${{ github.repository }}
-          COMMENTER: ${{ github.event.comment.user.login }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
           COMMENT_BODY: ${{ github.event.comment.body }}
-          HEAD_SHA: ${{ github.sha }}
           INPUT_SUITE: ${{ github.event.inputs.suite }}
         run: |
-          if [[ "$EVENT_NAME" == "issue_comment" ]]; then
-            # Only repository collaborators with admin/write access may trigger a run.
-            PERMISSION=$(gh api "repos/${REPOSITORY}/collaborators/${COMMENTER}/permission" --jq '.permission')
-
-            if [[ "$PERMISSION" != "admin" && "$PERMISSION" != "write" ]]; then
-              echo "should-run=false" >> "$GITHUB_OUTPUT"
-              echo "User ${COMMENTER} does not have permission to trigger evaluations"
-              exit 0
-            fi
-
-            echo "should-run=true" >> "$GITHUB_OUTPUT"
-            echo "is-pr=true" >> "$GITHUB_OUTPUT"
-            echo "pr-number=${ISSUE_NUMBER}" >> "$GITHUB_OUTPUT"
-
-            # Capture SHA at trigger time to prevent TOCTOU race condition
-            # This ensures we run the exact code the maintainer reviewed
-            PR_SHA=$(gh pr view "$ISSUE_NUMBER" --repo "$REPOSITORY" --json headRefOid --jq '.headRefOid')
-            echo "pr-sha=$PR_SHA" >> "$GITHUB_OUTPUT"
-            echo "Pinned to SHA: $PR_SHA"
-          else
-            echo "should-run=true" >> "$GITHUB_OUTPUT"
-            echo "is-pr=false" >> "$GITHUB_OUTPUT"
-            echo "pr-sha=${HEAD_SHA}" >> "$GITHUB_OUTPUT"
-          fi
-
           # Suite selection: defaults to 'core', can be overridden by workflow_dispatch input or PR comment
           SUITE="${INPUT_SUITE:-core}"
 
