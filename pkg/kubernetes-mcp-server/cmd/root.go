@@ -67,6 +67,7 @@ const (
 	flagConfig               = "config"
 	flagConfigDir            = "config-dir"
 	flagPort                 = "port"
+	flagBindAddress          = "bind-address"
 	flagSSEBaseUrl           = "sse-base-url"
 	flagKubeconfig           = "kubeconfig"
 	flagToolsets             = "toolsets"
@@ -92,6 +93,7 @@ type MCPServerOptions struct {
 	LogLevel             int
 	LogFile              string
 	Port                 string
+	BindAddress          string
 	SSEBaseUrl           string
 	Kubeconfig           string
 	Toolsets             []string
@@ -166,6 +168,7 @@ func NewMCPServer(streams genericiooptions.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.ConfigPath, flagConfig, o.ConfigPath, "Path of the config file.")
 	cmd.Flags().StringVar(&o.ConfigDir, flagConfigDir, o.ConfigDir, "Path to drop-in configuration directory (files loaded in lexical order). Defaults to "+config.DefaultDropInConfigDir+" relative to the config file if --config is set.")
 	cmd.Flags().StringVar(&o.Port, flagPort, o.Port, "Start a streamable HTTP and SSE HTTP server on the specified port (e.g. 8080)")
+	cmd.Flags().StringVar(&o.BindAddress, flagBindAddress, o.BindAddress, "Address to bind the HTTP server to (e.g. 127.0.0.1). Defaults to 0.0.0.0 (all interfaces)")
 	cmd.Flags().StringVar(&o.SSEBaseUrl, flagSSEBaseUrl, o.SSEBaseUrl, "SSE public base URL to use when sending the endpoint message (e.g. https://example.com)")
 	cmd.Flags().StringVar(&o.Kubeconfig, flagKubeconfig, o.Kubeconfig, "Path to the kubeconfig file to use for authentication")
 	cmd.Flags().StringSliceVar(&o.Toolsets, flagToolsets, o.Toolsets, "Comma-separated list of MCP toolsets to use (available toolsets: "+strings.Join(toolsets.ToolsetNames(), ", ")+"). Defaults to "+strings.Join(o.StaticConfig.Toolsets, ", ")+".")
@@ -247,6 +250,9 @@ func (m *MCPServerOptions) loadFlags(cmd *cobra.Command) {
 	}
 	if cmd.Flag(flagPort).Changed {
 		m.StaticConfig.Port = m.Port
+	}
+	if cmd.Flag(flagBindAddress).Changed {
+		m.StaticConfig.BindAddress = m.BindAddress
 	}
 	if cmd.Flag(flagSSEBaseUrl).Changed {
 		m.StaticConfig.SSEBaseURL = m.SSEBaseUrl

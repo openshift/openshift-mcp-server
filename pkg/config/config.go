@@ -35,12 +35,13 @@ type ToolOverride struct {
 type StaticConfig struct {
 	DeniedResources []api.GroupVersionKind `toml:"denied_resources"`
 
-	LogLevel   int    `toml:"log_level,omitzero"`
-	LogFile    string `toml:"log_file,omitempty"`
-	Port       string `toml:"port,omitempty"`
-	SSEBaseURL string `toml:"sse_base_url,omitempty"`
-	KubeConfig string `toml:"kubeconfig,omitempty"`
-	ListOutput string `toml:"list_output,omitempty"`
+	LogLevel    int    `toml:"log_level,omitzero"`
+	LogFile     string `toml:"log_file,omitempty"`
+	Port        string `toml:"port,omitempty"`
+	BindAddress string `toml:"bind_address,omitempty"`
+	SSEBaseURL  string `toml:"sse_base_url,omitempty"`
+	KubeConfig  string `toml:"kubeconfig,omitempty"`
+	ListOutput  string `toml:"list_output,omitempty"`
 	// Stateless configures the MCP server to operate in stateless mode.
 	// When true, the server will not send notifications to clients (e.g., tools/list_changed, prompts/list_changed).
 	// This is useful for container deployments, load balancing, and serverless environments where

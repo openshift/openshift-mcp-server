@@ -125,7 +125,7 @@ func Serve(ctx context.Context, mcpServer *mcp.Server, cfgState *config.StaticCo
 	// ReadHeaderTimeout provides Slowloris protection; other timeouts are left
 	// at Go defaults since MCP clients maintain persistent connections.
 	httpServer := &http.Server{
-		Addr:              ":" + staticConfig.Port,
+		Addr:              net.JoinHostPort(staticConfig.BindAddress, staticConfig.Port),
 		Handler:           instrumentedHandler,
 		ReadHeaderTimeout: staticConfig.HTTP.ReadHeaderTimeout.Duration(),
 		TLSConfig: &tls.Config{
@@ -170,18 +170,26 @@ func Serve(ctx context.Context, mcpServer *mcp.Server, cfgState *config.StaticCo
 	signal.Notify(sigHupChan, syscall.SIGHUP)
 	defer signal.Stop(sigHupChan)
 
+	if staticConfig.BindAddress == "0.0.0.0" && staticConfig.TLSCert == "" && !staticConfig.RequireOAuth {
+		klogutil.LogWarn(logger,
+			"HTTP server is listening on all interfaces without TLS or authentication, "+
+				"consider setting bind_address to 127.0.0.1, enabling TLS, or enabling OAuth",
+			klogutil.Field("bind_address", staticConfig.BindAddress),
+		)
+	}
+
 	serverErr := make(chan error, 1)
 	go func() {
 		var err error
 		if staticConfig.TLSCert != "" && staticConfig.TLSKey != "" {
 			logger.Info("HTTPS server starting",
-				"server.port", staticConfig.Port,
+				"server.addr", httpServer.Addr,
 				"endpoints", "/mcp, /sse, /message, /healthz, /stats, /metrics",
 			)
 			err = httpServer.ListenAndServeTLS(staticConfig.TLSCert, staticConfig.TLSKey)
 		} else {
 			logger.Info("HTTP server starting",
-				"server.port", staticConfig.Port,
+				"server.addr", httpServer.Addr,
 				"endpoints", "/mcp, /sse, /message, /healthz, /stats, /metrics",
 			)
 			err = httpServer.ListenAndServe()
