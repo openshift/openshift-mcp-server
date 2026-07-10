@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog/v2"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 )
 
 const (
@@ -112,7 +112,7 @@ type tlsEnforcingTransport struct {
 
 func (t *tlsEnforcingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if t.RequireTLS != nil && t.RequireTLS() && !isSecureHTTPScheme(req.URL.Scheme) {
-		klog.FromContext(req.Context()).V(1).Info("require_tls: blocked request to host", "host", req.URL.Host)
+		klogutil.FromContext(req.Context()).V(1).Info("require_tls: blocked request to host", "host", req.URL.Host)
 		return nil, fmt.Errorf("require_tls is enabled but request to %s uses %q scheme (secure scheme required)",
 			req.URL.Host, req.URL.Scheme)
 	}

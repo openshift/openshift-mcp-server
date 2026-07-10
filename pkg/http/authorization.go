@@ -11,7 +11,6 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
-	"k8s.io/klog/v2"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
@@ -58,7 +57,7 @@ func AuthorizationMiddleware(cfgState *config.StaticConfigState, oauthState *oau
 	var skipJWTWarningOnce sync.Once
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			logger := klog.FromContext(r.Context())
+			logger := klogutil.FromContext(r.Context())
 			// Skip auth for infrastructure endpoints (health, metrics) and well-known endpoints
 			// Use prefix matching per endpoint to handle sub-paths like /.well-known/oauth-protected-resource/sse
 			requestPath := r.URL.EscapedPath()

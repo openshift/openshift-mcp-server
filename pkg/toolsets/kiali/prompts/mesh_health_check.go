@@ -3,10 +3,9 @@ package prompts
 import (
 	"fmt"
 
-	"k8s.io/klog/v2"
-
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	kialiclient "github.com/containers/kubernetes-mcp-server/pkg/kiali"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kiali/tools"
 )
 
@@ -34,7 +33,7 @@ func meshHealthCheckHandler(params api.PromptHandlerParams) (*api.PromptCallResu
 	args := params.GetArguments()
 	namespace := args["namespace"]
 
-	klog.FromContext(params.Context).Info("Starting mesh health check prompt...")
+	klogutil.FromContext(params.Context).Info("Starting mesh health check prompt...")
 
 	kiali := kialiclient.NewKiali(params, params.RESTConfig())
 	statusContent, err := kiali.ExecuteRequest(params.Context, tools.KialiGetMeshStatusEndpoint, nil)

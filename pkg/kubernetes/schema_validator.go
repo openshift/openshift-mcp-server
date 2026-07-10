@@ -7,14 +7,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/api"
-	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/discovery"
-	"k8s.io/klog/v2"
 	openapierrors "k8s.io/kube-openapi/pkg/util/proto/validation"
 	kubectlopenapi "k8s.io/kubectl/pkg/util/openapi"
 	kubectlvalidation "k8s.io/kubectl/pkg/validation"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 )
 
 const schemaCacheTTL = 15 * time.Minute
@@ -43,7 +43,7 @@ func (v *SchemaValidator) Validate(ctx context.Context, req *api.HTTPValidationR
 		return nil
 	}
 
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 
 	// Only validate for create/update operations (exclude patch as partial bodies cause false positives)
 	if req.Verb != "create" && req.Verb != "update" {
@@ -99,7 +99,7 @@ func (v *SchemaValidator) getValidator(ctx context.Context) (kubectlvalidation.S
 
 	openAPIClient, ok := discoveryClient.(discovery.OpenAPISchemaInterface)
 	if !ok {
-		klog.FromContext(ctx).V(4).Info("Discovery client does not support OpenAPI schema")
+		klogutil.FromContext(ctx).V(4).Info("Discovery client does not support OpenAPI schema")
 		return nil, nil
 	}
 

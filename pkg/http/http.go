@@ -99,7 +99,7 @@ func statsHandler(mcpServer *mcp.Server) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(stats); err != nil {
-			klogutil.LogInfo(klog.FromContext(r.Context()).V(1), "Failed to encode stats response", klogutil.Err(err))
+			klogutil.LogInfo(klogutil.FromContext(r.Context()).V(1), "Failed to encode stats response", klogutil.Err(err))
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -107,7 +107,7 @@ func statsHandler(mcpServer *mcp.Server) http.HandlerFunc {
 }
 
 func Serve(ctx context.Context, mcpServer *mcp.Server, cfgState *config.StaticConfigState, oauthState *oauth.State) error {
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 	// Only fields read below are startup-only; middleware reloads via cfgState.
 	staticConfig := cfgState.Load()
 	mux := http.NewServeMux()
@@ -132,7 +132,7 @@ func Serve(ctx context.Context, mcpServer *mcp.Server, cfgState *config.StaticCo
 			MinVersion: tls.VersionTLS12,
 		},
 		// BaseContext propagates the server context (including the klog logger)
-		// to all incoming request contexts, so klog.FromContext(r.Context())
+		// to all incoming request contexts, so klogutil.FromContext(r.Context())
 		// returns the contextual logger rather than the global fallback.
 		BaseContext: func(_ net.Listener) context.Context { return ctx },
 	}

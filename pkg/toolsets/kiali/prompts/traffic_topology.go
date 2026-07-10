@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/klog/v2"
-
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	kialiclient "github.com/containers/kubernetes-mcp-server/pkg/kiali"
 	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
@@ -42,7 +40,7 @@ func trafficTopologyHandler(params api.PromptHandlerParams) (*api.PromptCallResu
 		return nil, fmt.Errorf("namespaces argument is required: provide a comma-separated list or 'all' for all accessible mesh namespaces")
 	}
 
-	klog.FromContext(params.Context).Info("Starting traffic topology analysis prompt...")
+	klogutil.FromContext(params.Context).Info("Starting traffic topology analysis prompt...")
 
 	kiali := kialiclient.NewKiali(params, params.RESTConfig())
 
@@ -118,7 +116,7 @@ func parseNamespacesFromResponse(ctx context.Context, content string) string {
 
 	var resp nsResponse
 	if err := json.Unmarshal([]byte(content), &resp); err != nil {
-		klogutil.LogWarn(klog.FromContext(ctx), "Failed to parse namespace list response", klogutil.Err(err))
+		klogutil.LogWarn(klogutil.FromContext(ctx), "Failed to parse namespace list response", klogutil.Err(err))
 		return ""
 	}
 

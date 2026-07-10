@@ -9,11 +9,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/klog/v2"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 )
 
 type Manager struct {
@@ -84,7 +85,7 @@ func resolveKubeconfigContext(ctx context.Context, loadingRules *clientcmd.Clien
 				"Configure a context with 'kubectl config set-context <name>' and 'kubectl config use-context <name>'")
 	case 1:
 		for name := range rawConfig.Contexts {
-			klog.FromContext(ctx).Info(
+			klogutil.FromContext(ctx).Info(
 				"current-context is not set in kubeconfig, auto-selecting the only available context",
 				"context_name", name,
 			)
@@ -167,7 +168,7 @@ func NewManager(ctx context.Context, config api.BaseConfig, restConfig *rest.Con
 func (m *Manager) Derived(ctx context.Context) (*Kubernetes, error) {
 	authorization, ok := ctx.Value(OAuthAuthorizationHeader).(string)
 	hasToken := ok && strings.HasPrefix(authorization, "Bearer ")
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 
 	// No token: fall back to kubeconfig credentials, unless require_oauth=true.
 	// In kubeconfig mode, the token exchange layer clears the auth header before we get here,

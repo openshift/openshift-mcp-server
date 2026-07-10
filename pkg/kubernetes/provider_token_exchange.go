@@ -5,12 +5,12 @@ import (
 	"strings"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	"github.com/containers/kubernetes-mcp-server/pkg/oauth"
 	"github.com/containers/kubernetes-mcp-server/pkg/tokenexchange"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/klog/v2"
 )
 
 type tokenExchangingProvider struct {
@@ -71,7 +71,7 @@ func (p *tokenExchangingProvider) baseConfig() api.BaseConfig {
 // getOrBuildStsConfig returns a cached STS config, rebuilding it when the
 // OIDC provider's token URL or STS/TLS config fields change.
 func (p *tokenExchangingProvider) getOrBuildStsConfig(ctx context.Context, snap *oauth.Snapshot, baseConfig api.BaseConfig) *tokenexchange.TargetTokenExchangeConfig {
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 
 	strategy := baseConfig.GetStsStrategy()
 	if strategy == "" {

@@ -8,14 +8,14 @@ import (
 	"sort"
 	"sync"
 
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes/watcher"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/klog/v2"
 )
 
 // kcpTargetParameterName is the parameter name used to specify
@@ -107,7 +107,7 @@ func (p *kcpClusterProvider) reset(ctx context.Context) error {
 	// Discover workspaces
 	workspaceList, err := p.discoverWorkspaces(baseManager)
 	if err != nil {
-		klogutil.LogWarn(klog.FromContext(ctx), "Failed to discover workspaces via API, falling back to kubeconfig", klogutil.Err(err))
+		klogutil.LogWarn(klogutil.FromContext(ctx), "Failed to discover workspaces via API, falling back to kubeconfig", klogutil.Err(err))
 		workspaceList, err = p.workspacesFromKubeconfig(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to discover workspaces: %w", err)
@@ -160,7 +160,7 @@ func (p *kcpClusterProvider) workspacesFromKubeconfig(ctx context.Context) ([]st
 		result = append(result, ws)
 	}
 
-	klog.FromContext(ctx).V(2).Info("Discovered workspaces from kubeconfig", "num_workspaces", len(result))
+	klogutil.FromContext(ctx).V(2).Info("Discovered workspaces from kubeconfig", "num_workspaces", len(result))
 	return result, nil
 }
 

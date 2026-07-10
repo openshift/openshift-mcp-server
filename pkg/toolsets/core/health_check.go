@@ -8,7 +8,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/klog/v2"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
@@ -51,7 +50,7 @@ func clusterHealthCheckHandler(params api.PromptHandlerParams) (*api.PromptCallR
 	namespace := args["namespace"]
 	checkEvents := args["check_events"] != "false" // default true
 
-	logger := klog.FromContext(params.Context)
+	logger := klogutil.FromContext(params.Context)
 	logger.Info("Starting cluster health check...")
 
 	// Check if namespace exists if specified
@@ -135,7 +134,7 @@ func gatherClusterDiagnostics(params api.PromptHandlerParams, namespace string, 
 		TargetNamespace: namespace,
 	}
 
-	logger := klog.FromContext(params.Context)
+	logger := klogutil.FromContext(params.Context)
 
 	// Gather node diagnostics using ResourcesList
 	logger.Info("Collecting node diagnostics...")

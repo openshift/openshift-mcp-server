@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/config"
-	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	promclient "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel/attribute"
@@ -22,7 +20,9 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
-	"k8s.io/klog/v2"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 )
 
 // Statistics represents the aggregated metrics data exposed by the stats endpoint.
@@ -86,7 +86,7 @@ type CollectorConfig struct {
 //
 // When nil is returned, metrics will only be collected in-memory for the /stats endpoint.
 func createMetricsExporter(ctx context.Context, cfg *config.TelemetryConfig) (sdkmetric.Exporter, error) {
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 
 	if strings.ToLower(os.Getenv("OTEL_METRICS_EXPORTER")) == "none" {
 		logger.V(2).Info("OTLP metrics export disabled via OTEL_METRICS_EXPORTER=none")
@@ -140,7 +140,7 @@ func NewOtelStatsCollector(meterName string) (*OtelStatsCollector, error) {
 
 // NewOtelStatsCollectorWithConfig creates a new OtelStatsCollector with full configuration.
 func NewOtelStatsCollectorWithConfig(ctx context.Context, cfg CollectorConfig) (*OtelStatsCollector, error) {
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 	// Create an in-memory manual reader for stats collection (/stats endpoint)
 	reader := sdkmetric.NewManualReader()
 
@@ -326,7 +326,7 @@ func (c *OtelStatsCollector) GetStats(ctx context.Context) *Statistics {
 	// Collect current metrics from the manual reader
 	var rm metricdata.ResourceMetrics
 	if err := c.reader.Collect(context.Background(), &rm); err != nil {
-		klogutil.LogInfo(klog.FromContext(ctx).V(1), "Failed to collect metrics for stats endpoint", klogutil.Err(err))
+		klogutil.LogInfo(klogutil.FromContext(ctx).V(1), "Failed to collect metrics for stats endpoint", klogutil.Err(err))
 		return &Statistics{
 			ToolCallsByName:      make(map[string]int64),
 			ToolErrorsByName:     make(map[string]int64),

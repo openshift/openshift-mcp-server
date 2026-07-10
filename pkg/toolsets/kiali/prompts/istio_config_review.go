@@ -3,10 +3,9 @@ package prompts
 import (
 	"fmt"
 
-	"k8s.io/klog/v2"
-
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	kialiclient "github.com/containers/kubernetes-mcp-server/pkg/kiali"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kiali/tools"
 )
 
@@ -38,7 +37,7 @@ func istioConfigReviewHandler(params api.PromptHandlerParams) (*api.PromptCallRe
 		return nil, fmt.Errorf("namespace argument is required")
 	}
 
-	klog.FromContext(params.Context).Info("Starting Istio config review...", "namespace", namespace)
+	klogutil.FromContext(params.Context).Info("Starting Istio config review...", "namespace", namespace)
 
 	kiali := kialiclient.NewKiali(params, params.RESTConfig())
 

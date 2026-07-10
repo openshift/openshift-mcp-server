@@ -8,14 +8,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/config"
-	"github.com/containers/kubernetes-mcp-server/pkg/telemetry"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
-	"k8s.io/klog/v2"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
+	"github.com/containers/kubernetes-mcp-server/pkg/telemetry"
 )
 
 // httpTracer is the tracer used for HTTP request spans
@@ -102,7 +103,7 @@ func RequestMiddleware(cfgState *config.StaticConfigState) func(http.Handler) ht
 				}
 				start := time.Now()
 				next.ServeHTTP(lrw, r)
-				klog.FromContext(r.Context()).V(5).Info("HTTP request completed",
+				klogutil.FromContext(r.Context()).V(5).Info("HTTP request completed",
 					"http.request.method", r.Method,
 					"url.path", r.URL.Path,
 					"http.response.status_code", lrw.statusCode,
@@ -180,7 +181,7 @@ func RequestMiddleware(cfgState *config.StaticConfigState) func(http.Handler) ht
 				span.SetStatus(codes.Ok, "")
 			}
 
-			klog.FromContext(r.Context()).V(5).Info("HTTP request completed",
+			klogutil.FromContext(r.Context()).V(5).Info("HTTP request completed",
 				"http.request.method", r.Method,
 				"url.path", r.URL.Path,
 				"http.response.status_code", lrw.statusCode,

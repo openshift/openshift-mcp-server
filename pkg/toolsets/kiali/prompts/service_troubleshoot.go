@@ -3,8 +3,6 @@ package prompts
 import (
 	"fmt"
 
-	"k8s.io/klog/v2"
-
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	kialiclient "github.com/containers/kubernetes-mcp-server/pkg/kiali"
 	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
@@ -59,7 +57,7 @@ func serviceTroubleshootHandler(params api.PromptHandlerParams) (*api.PromptCall
 		logTarget = workload
 	}
 
-	klog.FromContext(params.Context).Info("Starting service troubleshoot prompt...", "namespace", namespace, "service", service)
+	klogutil.FromContext(params.Context).Info("Starting service troubleshoot prompt...", "namespace", namespace, "service", service)
 
 	kiali := kialiclient.NewKiali(params, params.RESTConfig())
 
@@ -99,7 +97,7 @@ func serviceTroubleshootHandler(params api.PromptHandlerParams) (*api.PromptCall
 func fetchKialiData(kiali *kialiclient.Kiali, params api.PromptHandlerParams, endpoint string, args map[string]any) string {
 	content, err := kiali.ExecuteRequest(params.Context, endpoint, args)
 	if err != nil {
-		klogutil.LogWarn(klog.FromContext(params.Context), "Failed to fetch data from endpoint", klogutil.Field("endpoint", endpoint), klogutil.Err(err))
+		klogutil.LogWarn(klogutil.FromContext(params.Context), "Failed to fetch data from endpoint", klogutil.Field("endpoint", endpoint), klogutil.Err(err))
 		return fmt.Sprintf("(data unavailable: %v)", err)
 	}
 	return content

@@ -13,13 +13,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericiooptions"
-	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	internalhttp "github.com/containers/kubernetes-mcp-server/pkg/http"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/logging"
 	"github.com/containers/kubernetes-mcp-server/pkg/mcp"
@@ -141,10 +141,11 @@ func NewMCPServer(streams genericiooptions.IOStreams) *cobra.Command {
 			// Close the log sink whatever happens next: Validate may fail, Run
 			// may panic, the version short-circuit may exit early. The sink is
 			// the only thing that holds an open fd between Complete and now.
+			// Close also flushes the OTel log provider when configured.
 			defer func() {
 				if o.logSink != nil {
 					if err := o.logSink.Close(); err != nil {
-						klog.FromContext(ctx).Error(err, "failed to close log sink")
+						klogutil.FromContext(ctx).Error(err, "failed to close log sink")
 					}
 				}
 			}()
@@ -204,11 +205,30 @@ func (m *MCPServerOptions) Complete(ctx context.Context, cmd *cobra.Command) err
 
 	m.loadFlags(cmd)
 
-	sink, err := logging.New(m.StaticConfig, m.Out, m.ErrOut)
+	// Initialize the OTel log provider before wiring klog. This runs before
+	// klog is configured, so it does not use klog internally. If it fails or
+	// telemetry is disabled, otelLogProvider is nil and logging proceeds
+	// text-only.
+	otelLogProvider, otelLogErr := telemetry.NewLogProvider(
+		ctx, &m.StaticConfig.Telemetry, version.BinaryName, version.Version,
+	)
+
+	var sinkOpts []logging.Option
+	if otelLogProvider != nil {
+		otelSink := telemetry.NewLogSink(version.BinaryName, version.Version, otelLogProvider)
+		sinkOpts = append(sinkOpts, logging.WithOtelLogSink(otelSink, otelLogProvider))
+	}
+
+	sink, err := logging.New(m.StaticConfig, m.Out, m.ErrOut, sinkOpts...)
 	if err != nil {
 		return err
 	}
 	m.logSink = sink
+
+	// klog is now wired — log the deferred OTel provider error if one occurred.
+	if otelLogErr != nil {
+		klogutil.FromContext(ctx).Error(otelLogErr, "Failed to create OTel log provider, log export disabled")
+	}
 
 	if m.StaticConfig.RequireOAuth && m.StaticConfig.Port == "" {
 		// RequireOAuth is not relevant flow for STDIO transport
@@ -314,7 +334,7 @@ func (m *MCPServerOptions) Run(ctx context.Context) error {
 		strategy = "auto-detect (it is recommended to set this explicitly in your Config)"
 	}
 
-	klog.FromContext(ctx).V(1).Info("Starting kubernetes-mcp-server",
+	klogutil.FromContext(ctx).V(1).Info("Starting kubernetes-mcp-server",
 		"config.path", m.ConfigPath,
 		"config.toolsets", m.StaticConfig.Toolsets,
 		"config.list_output", m.StaticConfig.ListOutput,
@@ -360,7 +380,7 @@ func (m *MCPServerOptions) Run(ctx context.Context) error {
 		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		if err := mcpServer.Shutdown(shutdownCtx); err != nil {
-			klog.FromContext(ctx).Error(err, "MCP server shutdown error")
+			klogutil.FromContext(ctx).Error(err, "MCP server shutdown error")
 		}
 	}()
 
@@ -397,7 +417,7 @@ func (m *MCPServerOptions) setupSIGHUPHandler(
 	done := make(chan struct{})
 	signal.Notify(sigHupCh, syscall.SIGHUP)
 
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 
 	go func() {
 		defer close(done)

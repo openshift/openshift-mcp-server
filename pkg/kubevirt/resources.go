@@ -8,7 +8,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/klog/v2"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 )
@@ -74,7 +73,7 @@ func collectDataSources(ctx context.Context, dynamicClient dynamic.Interface) ma
 	for _, ns := range wellKnownNamespaces {
 		list, err := dynamicClient.Resource(DataSourceGVR).Namespace(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
-			klogutil.LogInfo(klog.FromContext(ctx).V(4), "failed to list DataSources in well-known namespace", klogutil.Field("kubernetes.namespace.name", ns), klogutil.Err(err))
+			klogutil.LogInfo(klogutil.FromContext(ctx).V(4), "failed to list DataSources in well-known namespace", klogutil.Field("kubernetes.namespace.name", ns), klogutil.Err(err))
 		} else {
 			items = append(items, list.Items...)
 		}
@@ -83,7 +82,7 @@ func collectDataSources(ctx context.Context, dynamicClient dynamic.Interface) ma
 	// List DataSources from all namespaces
 	list, err := dynamicClient.Resource(DataSourceGVR).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		klogutil.LogInfo(klog.FromContext(ctx).V(4), "failed to list DataSources cluster-wide", klogutil.Err(err))
+		klogutil.LogInfo(klogutil.FromContext(ctx).V(4), "failed to list DataSources cluster-wide", klogutil.Err(err))
 	} else {
 		items = append(items, list.Items...)
 	}
@@ -135,7 +134,7 @@ func SearchPreferences(ctx context.Context, dynamicClient dynamic.Interface, nam
 	var results []PreferenceInfo
 	clusterList, err := dynamicClient.Resource(VirtualMachineClusterPreferenceGVR).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		klogutil.LogInfo(klog.FromContext(ctx).V(4), "failed to list cluster-scoped VirtualMachineClusterPreferences", klogutil.Err(err))
+		klogutil.LogInfo(klogutil.FromContext(ctx).V(4), "failed to list cluster-scoped VirtualMachineClusterPreferences", klogutil.Err(err))
 	} else {
 		for _, item := range clusterList.Items {
 			results = append(results, PreferenceInfo{
@@ -148,7 +147,7 @@ func SearchPreferences(ctx context.Context, dynamicClient dynamic.Interface, nam
 	// Search for namespaced VirtualMachinePreferences
 	namespacedList, err := dynamicClient.Resource(VirtualMachinePreferenceGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		klogutil.LogInfo(klog.FromContext(ctx).V(4), "failed to list namespaced VirtualMachinePreferences", klogutil.Field("kubernetes.namespace.name", namespace), klogutil.Err(err))
+		klogutil.LogInfo(klogutil.FromContext(ctx).V(4), "failed to list namespaced VirtualMachinePreferences", klogutil.Field("kubernetes.namespace.name", namespace), klogutil.Err(err))
 	} else {
 		for _, item := range namespacedList.Items {
 			results = append(results, PreferenceInfo{
@@ -180,7 +179,7 @@ func SearchInstancetypes(ctx context.Context, dynamicClient dynamic.Interface, n
 	var results []InstancetypeInfo
 	clusterList, err := dynamicClient.Resource(VirtualMachineClusterInstancetypeGVR).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		klogutil.LogInfo(klog.FromContext(ctx).V(4), "failed to list cluster-scoped VirtualMachineClusterInstancetypes", klogutil.Err(err))
+		klogutil.LogInfo(klogutil.FromContext(ctx).V(4), "failed to list cluster-scoped VirtualMachineClusterInstancetypes", klogutil.Err(err))
 	} else {
 		for _, item := range clusterList.Items {
 			results = append(results, InstancetypeInfo{
@@ -194,7 +193,7 @@ func SearchInstancetypes(ctx context.Context, dynamicClient dynamic.Interface, n
 	// Search for namespaced VirtualMachineInstancetypes
 	namespacedList, err := dynamicClient.Resource(VirtualMachineInstancetypeGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		klogutil.LogInfo(klog.FromContext(ctx).V(4), "failed to list namespaced VirtualMachineInstancetypes", klogutil.Field("kubernetes.namespace.name", namespace), klogutil.Err(err))
+		klogutil.LogInfo(klogutil.FromContext(ctx).V(4), "failed to list namespaced VirtualMachineInstancetypes", klogutil.Field("kubernetes.namespace.name", namespace), klogutil.Err(err))
 	} else {
 		for _, item := range namespacedList.Items {
 			results = append(results, InstancetypeInfo{

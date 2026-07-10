@@ -13,12 +13,12 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
 	"github.com/containers/kubernetes-mcp-server/pkg/tokenexchange"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -192,7 +192,7 @@ func Read(ctx context.Context, configPath, dropInConfigDir string) (*StaticConfi
 	var configFiles []string
 	var configDir string
 
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 
 	// Main config file
 	if configPath != "" {
@@ -245,7 +245,7 @@ func Read(ctx context.Context, configPath, dropInConfigDir string) (*StaticConfi
 // Files are processed in lexical (alphabetical) order.
 // Only files with .toml extension are processed; dotfiles are ignored.
 func loadDropInConfigs(ctx context.Context, dropInConfigDir string) ([]string, error) {
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 	// Check if directory exists
 	info, err := os.Stat(dropInConfigDir)
 	if err != nil {
@@ -268,7 +268,7 @@ func loadDropInConfigs(ctx context.Context, dropInConfigDir string) ([]string, e
 // Dotfiles (starting with '.') and non-.toml files are ignored.
 // Files are sorted lexically (alphabetically) by filename.
 func getSortedConfigFiles(ctx context.Context, dir string) ([]string, error) {
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -311,7 +311,7 @@ func readAndMergeFiles(ctx context.Context, files []string) ([]byte, error) {
 	rawConfig := map[string]interface{}{}
 	// Merge each file in order using deep merge
 	for _, file := range files {
-		klog.FromContext(ctx).V(3).Info("Merging config", "file_name", filepath.Base(file))
+		klogutil.FromContext(ctx).V(3).Info("Merging config", "file_name", filepath.Base(file))
 		configData, err := os.ReadFile(file)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read config %s: %w", file, err)
@@ -518,7 +518,7 @@ func (c *StaticConfig) Validate(ctx context.Context) error {
 		}
 		if u.Scheme == "http" {
 			klogutil.LogWarn(
-				klog.FromContext(ctx),
+				klogutil.FromContext(ctx),
 				"authorization-url is using insecure scheme, this is not recommended production use",
 				klogutil.Field("url.scheme", "http"),
 			)
@@ -591,7 +591,7 @@ func (c *StaticConfig) validateSkipJWTVerification(ctx context.Context) error {
 		return nil
 	}
 	if c.SkipJWTVerification {
-		klogutil.LogWarn(klog.FromContext(ctx),
+		klogutil.LogWarn(klogutil.FromContext(ctx),
 			"skip_jwt_verification is enabled with no authorization_url: bearer tokens will be forwarded without any local validation. "+
 				"The cluster (or a trusted upstream) is the sole authority. Only use this when cluster_auth_mode=passthrough and the cluster validates tokens directly.")
 		return nil

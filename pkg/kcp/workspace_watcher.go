@@ -8,11 +8,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
-	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes/watcher"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/klog/v2"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
+	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes/watcher"
 )
 
 const (
@@ -48,7 +48,7 @@ func NewWorkspaceWatcher(ctx context.Context, dynamicClient dynamic.Interface, r
 	pollInterval := DefaultWorkspacePollInterval
 	debounceWindow := DefaultWorkspaceDebounceWindow
 
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 
 	// Allow override via environment variable for testing
 	if envInterval := os.Getenv("WORKSPACE_POLL_INTERVAL_MS"); envInterval != "" {
@@ -87,7 +87,7 @@ func (w *WorkspaceWatcher) Watch(ctx context.Context, onChange func() error) {
 	w.lastKnownState = w.captureState(ctx)
 	w.mu.Unlock()
 
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 
 	go func() {
 		defer close(w.stoppedCh)
@@ -175,7 +175,7 @@ func (w *WorkspaceWatcher) Close() {
 
 // captureState queries the current workspace list from the kcp tenancy API.
 func (w *WorkspaceWatcher) captureState(ctx context.Context) workspaceState {
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 	state := workspaceState{workspaces: []string{}}
 
 	list, err := w.dynamicClient.Resource(WorkspaceGVR).

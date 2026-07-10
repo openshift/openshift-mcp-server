@@ -13,7 +13,8 @@ import (
 	"time"
 
 	"golang.org/x/oauth2"
-	"k8s.io/klog/v2"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 )
 
 const (
@@ -79,7 +80,7 @@ func injectClientAuth(ctx context.Context, cfg *TargetTokenExchangeConfig, data 
 		if token == "" {
 			return fmt.Errorf("federated token file %q is empty: the external identity provider may not have written a token yet", cfg.FederatedTokenFile)
 		}
-		klog.FromContext(ctx).V(4).Info("Read federated token from file",
+		klogutil.FromContext(ctx).V(4).Info("Read federated token from file",
 			"token_exchange.federated_token_file", cfg.FederatedTokenFile,
 			"token_exchange.token.size", len(token),
 		)

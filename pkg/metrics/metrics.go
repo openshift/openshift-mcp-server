@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
-	"k8s.io/klog/v2"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 )
 
 // Config contains configuration for the metrics system.
@@ -47,7 +47,7 @@ func New(ctx context.Context, cfg Config) (*Metrics, error) {
 	}
 	m.stats = stats
 	m.collectors = append(m.collectors, m.stats)
-	klog.FromContext(ctx).V(1).Info("Stats collector enabled")
+	klogutil.FromContext(ctx).V(1).Info("Stats collector enabled")
 
 	return m, nil
 }

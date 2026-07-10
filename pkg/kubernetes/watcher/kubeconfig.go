@@ -9,7 +9,8 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog/v2"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 )
 
 const (
@@ -36,7 +37,7 @@ func NewKubeconfig(ctx context.Context, clientConfig clientcmd.ClientConfig) *Ku
 	if envDebounce := os.Getenv("KUBECONFIG_DEBOUNCE_WINDOW_MS"); envDebounce != "" {
 		if ms, err := strconv.Atoi(envDebounce); err == nil && ms > 0 {
 			debounceWindow = time.Duration(ms) * time.Millisecond
-			klog.FromContext(ctx).V(2).Info("Using custom kubeconfig debounce window", "debounce_window", debounceWindow)
+			klogutil.FromContext(ctx).V(2).Info("Using custom kubeconfig debounce window", "debounce_window", debounceWindow)
 		}
 	}
 
@@ -52,7 +53,7 @@ func NewKubeconfig(ctx context.Context, clientConfig clientcmd.ClientConfig) *Ku
 // and triggers a debounced reload when changes are detected.
 // It can only be called once per Kubeconfig instance.
 func (w *Kubeconfig) Watch(ctx context.Context, onChange func() error) {
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 
 	w.mu.Lock()
 	if w.started {
