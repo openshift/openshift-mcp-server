@@ -44,6 +44,9 @@
   "gomod": {
     "enabled": false
   },
+  "github-actions": {
+    "enabled": false
+  },
   "vulnerabilityAlerts": {
     "enabled": true
   }
