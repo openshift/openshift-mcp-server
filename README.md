@@ -264,22 +264,22 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 
 <!-- AVAILABLE-TOOLSETS-START -->
 
-| Toolset               | Description                                                                                                                                                                     | Default |
-|-----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| cluster-diagnostics   | Tools for cluster diagnostics and troubleshooting                                                                                                                               |         |
-| config                | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                         | ✓       |
-| core                  | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                             | ✓       |
-| helm                  | Tools for managing Helm charts and releases                                                                                                                                     |         |
-| kcp                   | Manage kcp workspaces and multi-tenancy features                                                                                                                                |         |
-| kubevirt              | KubeVirt virtual machine management tools, check the [KubeVirt documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/kubevirt.md) for more details. |         |
-| oadp                  | OADP (OpenShift API for Data Protection) tools for managing Velero backups, restores, and schedules                                                                             |         |
-| observability/logs    | Toolset for querying Loki logs                                                                                                                                                  |         |
-| observability/metrics | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                   |         |
-| observability/otelcol | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                      |         |
-| observability/traces  | Toolset for querying Tempo                                                                                                                                                      |         |
-| openshift             | OpenShift-specific tools for cluster management and troubleshooting                                                                                                             |         |
-| ossm                  | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                 |         |
-| tekton                | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns.                                                                                              |         |
+| Toolset               | Description                                                                                                                                                                                                      | Default |
+|-----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| cluster-diagnostics   | Tools for cluster diagnostics and troubleshooting                                                                                                                                                                |         |
+| config                | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                                                          | ✓       |
+| core                  | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                                                              | ✓       |
+| helm                  | Tools for managing Helm charts and releases                                                                                                                                                                      |         |
+| kcp                   | Manage kcp workspaces and multi-tenancy features                                                                                                                                                                 |         |
+| kubevirt              | OpenShift Virtualization tools for managing virtual machines, check the [OpenShift Virtualization documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/kubevirt.md) for more details. |         |
+| oadp                  | OADP (OpenShift API for Data Protection) tools for managing Velero backups, restores, and schedules                                                                                                              |         |
+| observability/logs    | Toolset for querying Loki logs                                                                                                                                                                                   |         |
+| observability/metrics | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                                                    |         |
+| observability/otelcol | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                                                       |         |
+| observability/traces  | Toolset for querying Tempo                                                                                                                                                                                       |         |
+| openshift             | OpenShift-specific tools for cluster management and troubleshooting                                                                                                                                              |         |
+| ossm                  | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                                                  |         |
+| tekton                | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns.                                                                                                                               |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -453,12 +453,12 @@ In case multi-cluster support is enabled (default) and you have access to multip
 
 <summary>kubevirt</summary>
 
-- **vm_clone** - Clone a KubeVirt VirtualMachine by creating a VirtualMachineClone resource. This creates a copy of the source VM with a new name using the KubeVirt Clone API
+- **vm_clone** - Clone a VirtualMachine on OpenShift Virtualization by creating a VirtualMachineClone resource. This creates a copy of the source VM with a new name using the OpenShift Virtualization Clone API
   - `name` (`string`) **(required)** - The name of the source virtual machine to clone
   - `namespace` (`string`) **(required)** - The namespace of the source virtual machine
   - `targetName` (`string`) **(required)** - The name for the new cloned virtual machine
 
-- **vm_create** - Create a KubeVirt VirtualMachine in the cluster with the specified configuration, automatically resolving instance types, preferences, and container disk images. VM will be created in Halted state by default; use autostart parameter to start it immediately.
+- **vm_create** - Create a VirtualMachine on OpenShift Virtualization with the specified configuration, automatically resolving instance types, preferences, and container disk images. VM will be created in Halted state by default; use autostart parameter to start it immediately.
   - `autostart` (`boolean`) - Optional flag to automatically start the VM after creation (sets runStrategy to Always instead of Halted). Defaults to false.
   - `instancetype` (`string`) - Optional instance type name for the VM (e.g., 'u1.small', 'u1.medium', 'u1.large')
   - `name` (`string`) **(required)** - The name of the virtual machine
@@ -475,7 +475,7 @@ In case multi-cluster support is enabled (default) and you have access to multip
   - `name` (`string`) **(required)** - The name of the virtual machine
   - `namespace` (`string`) **(required)** - The namespace of the virtual machine
 
-- **vm_lifecycle** - Manage KubeVirt VirtualMachine lifecycle: start, stop, or restart a VM
+- **vm_lifecycle** - Manage OpenShift Virtualization VirtualMachine lifecycle: start, stop, or restart a VM
   - `action` (`string`) **(required)** - The lifecycle action to perform: 'start' (changes runStrategy to Always), 'stop' (changes runStrategy to Halted), or 'restart' (stops then starts the VM)
   - `name` (`string`) **(required)** - The name of the virtual machine
   - `namespace` (`string`) **(required)** - The namespace of the virtual machine
@@ -954,11 +954,11 @@ Use tempo_search_tags to discover available tag names.
 
 <summary>kubevirt</summary>
 
-- **vm-troubleshoot** - Generate a step-by-step troubleshooting guide for diagnosing KubeVirt VirtualMachine issues
+- **vm-troubleshoot** - Generate a step-by-step troubleshooting guide for diagnosing OpenShift Virtualization VirtualMachine issues
   - `namespace` (`string`) **(required)** - The namespace of the VirtualMachine to troubleshoot
   - `name` (`string`) **(required)** - The name of the VirtualMachine to troubleshoot
 
-- **windows-golden-image** - Guides creation of a Windows golden image via the KubeVirt windows-efi-installer Tekton pipeline
+- **windows-golden-image** - Guides creation of a Windows golden image via the OpenShift Virtualization windows-efi-installer Tekton pipeline
   - `winImageDownloadURL` (`string`) **(required)** - Microsoft Windows ISO download URL (must be https://)
   - `namespace` (`string`) - Target namespace for the PipelineRun
   - `windowsVersion` (`string`) - Windows version: 10, 11, 2k22 (default), or 2k25

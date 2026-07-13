@@ -1,8 +1,8 @@
 package defaults
 
 const (
-	toolsetDescriptionOverride               = ""
-	productNameOverride                      = ""
+	toolsetDescriptionOverride               = "OpenShift Virtualization tools for managing virtual machines, check the [OpenShift Virtualization documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/kubevirt.md) for more details."
+	productNameOverride                      = "OpenShift Virtualization"
 	windowsEFIInstallerTektonCatalogOverride = ""
 )
 
