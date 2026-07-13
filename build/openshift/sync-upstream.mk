@@ -99,9 +99,15 @@ sync-upstream-pr: ## Create/update PR to sync with upstream (requires gh CLI)
 	@echo "  OWNER_REPO='$(OWNER_REPO)'"; \
 	CHANGELOG=$$(git log --pretty=format:"- %h %s (%an)" $(ORIGIN_REMOTE)/main..$(UPSTREAM_REMOTE)/main); \
 	BEHIND_COUNT=$$(git rev-list --count $(ORIGIN_REMOTE)/main..$(UPSTREAM_REMOTE)/main); \
-	if gh pr list --repo "$(OWNER_REPO)" --head $(SYNC_BRANCH_NAME) --state open | grep -q "$(SYNC_BRANCH_NAME)"; then \
-		echo "  Updating existing PR..."; \
-		gh pr edit $(SYNC_BRANCH_NAME) --repo "$(OWNER_REPO)" --body "### 🔄 Upstream Sync"$$'\n'$$'\n'"**Update:** $$(date)"$$'\n'$$'\n'"New changes detected from upstream:"$$'\n'"$$CHANGELOG"; \
+	if ! PR_NUMBER=$$(gh pr list --repo "$(OWNER_REPO)" --head $(SYNC_BRANCH_NAME) --state open --json number --jq '.[0].number'); then \
+		echo "❌ Failed to list PRs (possible rate-limit or auth error). Aborting to prevent duplicate PR creation."; \
+		exit 1; \
+	fi; \
+	if [ -n "$$PR_NUMBER" ] && [ "$$PR_NUMBER" != "null" ]; then \
+		echo "  Updating existing PR #$$PR_NUMBER..."; \
+		PR_BODY="### 🔄 Upstream Sync"$$'\n'$$'\n'"**Update:** $$(date)"$$'\n'$$'\n'"New changes detected from upstream:"$$'\n'"$$CHANGELOG"; \
+		gh api --method PATCH "repos/$(OWNER_REPO)/pulls/$$PR_NUMBER" \
+			--raw-field body="$$PR_BODY"; \
 	else \
 		echo "  Creating new PR..."; \
 		gh pr create \
