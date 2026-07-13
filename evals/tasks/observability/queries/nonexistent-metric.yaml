@@ -16,8 +16,7 @@ metadata:
 spec:
   verify:
     - llmJudge:
-        contains: "not found"
-        reason: "Verify the agent communicates that the metric does not exist or was not found"
+        contains: "the metric does not exist or was not found"
   prompt:
     inline: |
       What is the current value of the metric fake_nonexistent_metric_total?

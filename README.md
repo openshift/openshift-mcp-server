@@ -264,21 +264,22 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 
 <!-- AVAILABLE-TOOLSETS-START -->
 
-| Toolset             | Description                                                                                                                                                                     | Default |
-|---------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| cluster-diagnostics | Tools for cluster diagnostics and troubleshooting                                                                                                                               |         |
-| config              | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                         | ✓       |
-| core                | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                             | ✓       |
-| helm                | Tools for managing Helm charts and releases                                                                                                                                     |         |
-| kcp                 | Manage kcp workspaces and multi-tenancy features                                                                                                                                |         |
-| kubevirt            | KubeVirt virtual machine management tools, check the [KubeVirt documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/kubevirt.md) for more details. |         |
-| metrics             | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                   |         |
-| oadp                | OADP (OpenShift API for Data Protection) tools for managing Velero backups, restores, and schedules                                                                             |         |
-| openshift           | OpenShift-specific tools for cluster management and troubleshooting                                                                                                             |         |
-| ossm                | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                 |         |
-| otelcol             | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                      |         |
-| tekton              | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns.                                                                                              |         |
-| traces              | Toolset for querying Tempo                                                                                                                                                      |         |
+| Toolset               | Description                                                                                                                                                                     | Default |
+|-----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| cluster-diagnostics   | Tools for cluster diagnostics and troubleshooting                                                                                                                               |         |
+| config                | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                         | ✓       |
+| core                  | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                             | ✓       |
+| helm                  | Tools for managing Helm charts and releases                                                                                                                                     |         |
+| kcp                   | Manage kcp workspaces and multi-tenancy features                                                                                                                                |         |
+| kubevirt              | KubeVirt virtual machine management tools, check the [KubeVirt documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/kubevirt.md) for more details. |         |
+| oadp                  | OADP (OpenShift API for Data Protection) tools for managing Velero backups, restores, and schedules                                                                             |         |
+| observability/logs    | Toolset for querying Loki logs                                                                                                                                                  |         |
+| observability/metrics | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                   |         |
+| observability/otelcol | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                      |         |
+| observability/traces  | Toolset for querying Tempo                                                                                                                                                      |         |
+| openshift             | OpenShift-specific tools for cluster management and troubleshooting                                                                                                             |         |
+| ossm                  | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                 |         |
+| tekton                | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns.                                                                                              |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -483,7 +484,50 @@ In case multi-cluster support is enabled (default) and you have access to multip
 
 <details>
 
-<summary>metrics</summary>
+<summary>oadp</summary>
+
+</details>
+
+<details>
+
+<summary>observability/logs</summary>
+
+- **loki_list_instances** - List LokiStack instances available in the Kubernetes cluster.
+Call this first when using Loki Operator managed stacks so you can pass lokiNamespace and lokiName to other Loki tools.
+
+- **loki_label_names** - List available Loki label names for a time range. Use this before writing LogQL queries.
+  - `end` (`string`) - End time as RFC3339, Unix timestamp, NOW, or NOW-relative expression (optional).
+  - `lokiName` (`string`) - Name of the LokiStack. Use loki_list_instances to discover valid values.
+  - `lokiNamespace` (`string`) - Kubernetes namespace of the LokiStack. Use loki_list_instances to discover valid values.
+  - `start` (`string`) - Start time as RFC3339, Unix timestamp, NOW, or NOW-relative expression (optional).
+  - `tenant` (`string`) - Loki tenant ID (X-Scope-OrgID). For LokiStack gateway modes (e.g. openshift-network) this selects the `/api/logs/v1/<tenant>` path; use `network` for openshift-network.
+
+- **loki_label_values** - List possible values for a Loki label key. Use this to build precise label matchers in LogQL.
+  - `end` (`string`) - End time as RFC3339, Unix timestamp, NOW, or NOW-relative expression (optional).
+  - `label` (`string`) **(required)** - Label key to inspect (for example namespace, pod, container).
+  - `lokiName` (`string`) - Name of the LokiStack. Use loki_list_instances to discover valid values.
+  - `lokiNamespace` (`string`) - Kubernetes namespace of the LokiStack. Use loki_list_instances to discover valid values.
+  - `start` (`string`) - Start time as RFC3339, Unix timestamp, NOW, or NOW-relative expression (optional).
+  - `tenant` (`string`) - Loki tenant ID (X-Scope-OrgID). For LokiStack gateway modes (e.g. openshift-network) this selects the `/api/logs/v1/<tenant>` path; use `network` for openshift-network.
+
+- **loki_query_range** - Execute a Loki LogQL range query and return matching log streams and lines.
+
+Use precise label matchers and a short time window first.
+  - `direction` (`string`) - Search direction: backward (default) or forward.
+  - `duration` (`string`) - Lookback duration from now when start/end are omitted (for example 5m, 1h). Defaults to 15m.
+  - `end` (`string`) - End time as RFC3339, Unix timestamp, NOW, or NOW-relative expression (optional).
+  - `limit` (`number`) - Maximum number of log lines to return. Defaults to 100, max 1000.
+  - `lokiName` (`string`) - Name of the LokiStack. Use loki_list_instances to discover valid values.
+  - `lokiNamespace` (`string`) - Kubernetes namespace of the LokiStack. Use loki_list_instances to discover valid values.
+  - `query` (`string`) **(required)** - LogQL query string.
+  - `start` (`string`) - Start time as RFC3339, Unix timestamp, NOW, or NOW-relative expression (optional).
+  - `tenant` (`string`) - Loki tenant ID (X-Scope-OrgID). For LokiStack gateway modes (e.g. openshift-network) this selects the `/api/logs/v1/<tenant>` path; use `network` for openshift-network.
+
+</details>
+
+<details>
+
+<summary>observability/metrics</summary>
 
 - **list_metrics** - MANDATORY FIRST STEP: List all available metric names in Prometheus.
 
@@ -647,7 +691,128 @@ Silences are used to temporarily mute alerts based on label matchers. This tool 
 
 <details>
 
-<summary>oadp</summary>
+<summary>observability/otelcol</summary>
+
+- **otelcol_list_components** - List available OpenTelemetry Collector components (receivers, processors, exporters, extensions, connectors) for a given version.
+  - `version` (`string`) - Collector version (e.g., 'v0.100.0'). Defaults to latest available.
+
+- **otelcol_get_component_schema** - Get the JSON schema for an OpenTelemetry Collector component's configuration options.
+  - `component_name` (`string`) **(required)** - Component name from otelcol_list_components (e.g., 'otlp', 'batch', 'debug')
+  - `component_type` (`string`) **(required)** - Component type: receiver, processor, exporter, extension, connector
+  - `version` (`string`) - Collector version (e.g., 'v0.100.0'). Defaults to latest available.
+
+- **otelcol_validate_config** - Validate an OpenTelemetry Collector component configuration against its JSON schema.
+  - `component_name` (`string`) **(required)** - Component name from otelcol_list_components (e.g., 'otlp', 'batch', 'debug')
+  - `component_type` (`string`) **(required)** - Component type: receiver, processor, exporter, extension, connector
+  - `config` (`string`) **(required)** - Configuration to validate as YAML or JSON string
+  - `format` (`string`) - Config format: 'yaml' (default) or 'json'
+  - `version` (`string`) - Collector version (e.g., 'v0.100.0'). Defaults to latest available.
+
+- **otelcol_get_versions** - List available OpenTelemetry Collector versions and identify the latest.
+
+</details>
+
+<details>
+
+<summary>observability/traces</summary>
+
+- **tempo_list_instances** - List all Tempo instances available in the Kubernetes cluster.
+Call this tool first to discover available Tempo instances before using other Tempo tools,
+as the returned namespace, name, and tenant values are required parameters for all other Tempo tools.
+Always print the output of this tool in a table.
+
+- **tempo_get_trace_by_id** - Retrieve a single distributed trace by its trace ID from Tempo.
+Returns the full trace with all its spans, including service names, operation names, durations, and attributes.
+Use this tool when you already have a specific trace ID, e.g. from search results or logs.
+  - `end` (`string`) - Optional end of the time range in RFC 3339 format, e.g. "2025-01-02T00:00:00Z".
+Narrows the time range to improve query performance.
+  - `start` (`string`) - Optional start of the time range in RFC 3339 format, e.g. "2025-01-01T00:00:00Z".
+Narrows the time range to improve query performance.
+  - `tempoName` (`string`) **(required)** - The name of the Tempo instance to query. Use tempo_list_instances to discover available instance names.
+  - `tempoNamespace` (`string`) **(required)** - The Kubernetes namespace where the Tempo instance is deployed. Use tempo_list_instances to discover available namespaces.
+  - `tenant` (`string`) - The tenant to query. This parameter is required for multi-tenant instances. Use tempo_list_instances to discover available tenants for each instance.
+  - `traceid` (`string`) **(required)** - The trace ID to retrieve, e.g. "26dad4a0e2b0dd9a440dd5ff203a24a4".
+
+- **tempo_search_traces** - Search for distributed traces in Tempo using TraceQL.
+Use this tool to find traces matching specific criteria such as service name, HTTP status code, duration, or other span or resource attributes.
+
+IMPORTANT — "slow" or "long" trace requests: Do NOT guess a duration threshold.
+First call this tool WITHOUT a duration filter to establish a latency baseline, then use that baseline to set a sensible threshold.
+Both steps are required — do NOT skip the second search with the duration filter.
+Skip this two-step process only when the user provides an explicit duration (e.g. "find traces slower than 2s").
+
+  - `end` (`string`) - End of the time range in RFC 3339 format, e.g. "2025-01-01T00:00:00Z".
+Use "NOW" for current time.
+Both start and end should be provided to search the full time range; if omitted, only a small window of recent data is searched.
+  - `limit` (`number`) - Maximum number of traces to return. Defaults to the server-side limit if not specified.
+  - `query` (`string`) **(required)** - A TraceQL query expression. Format:
+query: "{ <filters joined by &&> }"
+
+Filters:
+- service name:     resource.service.name="<value>" (string, use quotes)
+- HTTP status code: span.http.response.status_code=<code> (number, no quotes)
+- duration:         duration><value like 100ms, 2s, 5m> (no quotes)
+- error status:     status=error (keyword, NO quotes — do NOT write status="error")
+
+IMPORTANT: status values (error, ok, unset) are keywords, NOT strings. Write status=error, NEVER status="error".
+
+Operators: =, !=, >, <, >=, <=
+
+Common attributes:
+- resource.service.name (service name)
+- span.http.response.status_code (HTTP response code)
+- span.http.request.method (HTTP method like GET, POST)
+- span.url.full (request URL)
+- duration (trace duration, e.g. 100ms, 2s)
+- status (trace status: ok, error, unset)
+
+IMPORTANT: Always wrap filters in curly braces { }.
+Do NOT use SQL, PromQL, or Lucene syntax.
+Do NOT omit the "resource." or "span." prefix from attribute names
+
+If unsure which attributes to filter on, start with {} to return all traces, then use tempo_search_tags to discover available attributes.
+
+  - `spss` (`number`) - Maximum number of matching spans to return per trace.
+  - `start` (`string`) - Start of the time range in RFC 3339 format, e.g. "2025-01-01T00:00:00Z".
+Use "NOW" for current time.
+Both start and end should be provided to search the full time range; if omitted, only a small window of recent data is searched.
+  - `tempoName` (`string`) **(required)** - The name of the Tempo instance to query. Use tempo_list_instances to discover available instance names.
+  - `tempoNamespace` (`string`) **(required)** - The Kubernetes namespace where the Tempo instance is deployed. Use tempo_list_instances to discover available namespaces.
+  - `tenant` (`string`) - The tenant to query. This parameter is required for multi-tenant instances. Use tempo_list_instances to discover available tenants for each instance.
+
+- **tempo_search_tags** - List available tag names (attribute keys) in Tempo, grouped by scope.
+Use this tool to discover which attributes are available for building TraceQL queries with tempo_search_traces.
+For example, this tool may reveal tag names like "service.name" (in the "resource" scope) or "http.response.status_code" (in the "span" scope).
+To use these in TraceQL queries, prefix them with their scope, e.g. "resource.service.name" or "span.http.response.status_code".
+  - `end` (`string`) - Optional end of the time range (in RFC 3339 format, e.g. "2025-01-01T00:00:00Z") to filter which traces are considered when listing tags.
+  - `limit` (`number`) - Maximum number of tag names to return per scope.
+  - `maxStaleValues` (`number`) - Maximum number of consecutive blocks without new tag names before the search stops early. Higher values are more thorough but slower.
+  - `query` (`string`) - Optional TraceQL query to filter which traces are considered when listing tags,
+e.g. '{ resource.service.name="payment-service" }' to only show tags present in traces from the 'payment-service' service.
+  - `scope` (`string`) - Filter tags to a specific scope. One of:
+"resource" (service-level attributes like service.name),
+"span" (individual span attributes like http.response.status_code),
+"intrinsic" (built-in fields like duration, status, name).
+If omitted, tags from all scopes are returned.
+  - `start` (`string`) - Optional start of the time range (in RFC 3339 format, e.g. "2025-01-01T00:00:00Z") to filter which traces are considered when listing tags.
+  - `tempoName` (`string`) **(required)** - The name of the Tempo instance to query. Use tempo_list_instances to discover available instance names.
+  - `tempoNamespace` (`string`) **(required)** - The Kubernetes namespace where the Tempo instance is deployed. Use tempo_list_instances to discover available namespaces.
+  - `tenant` (`string`) - The tenant to query. This parameter is required for multi-tenant instances. Use tempo_list_instances to discover available tenants for each instance.
+
+- **tempo_search_tag_values** - List the known values for a specific tag (attribute key) in Tempo.
+Use this tool to discover what values exist for a given tag, e.g. to find all service names (values of "resource.service.name") or all HTTP methods (values of "span.http.request.method").
+This is useful for building accurate TraceQL queries with tempo_search_traces.
+  - `end` (`string`) - Optional end of the time range (in RFC 3339 format, e.g. "2025-01-01T00:00:00Z") to filter which traces are considered when listing values.
+  - `limit` (`number`) - Maximum number of tag values to return.
+  - `maxStaleValues` (`number`) - Maximum number of consecutive blocks without new values before the search stops early. Higher values are more thorough but slower.
+  - `query` (`string`) - Optional TraceQL query to filter which traces are considered when listing values,
+e.g. '{ resource.service.name="payment-service" }' to only show tag values from the 'payment-service' service.
+  - `start` (`string`) - Optional start of the time range (in RFC 3339 format, e.g. "2025-01-01T00:00:00Z") to filter which traces are considered when listing values.
+  - `tag` (`string`) **(required)** - The fully qualified tag name to get values for, including its scope prefix, e.g. "resource.service.name" or "span.http.response.status_code".
+Use tempo_search_tags to discover available tag names.
+  - `tempoName` (`string`) **(required)** - The name of the Tempo instance to query. Use tempo_list_instances to discover available instance names.
+  - `tempoNamespace` (`string`) **(required)** - The Kubernetes namespace where the Tempo instance is deployed. Use tempo_list_instances to discover available namespaces.
+  - `tenant` (`string`) - The tenant to query. This parameter is required for multi-tenant instances. Use tempo_list_instances to discover available tenants for each instance.
 
 </details>
 
@@ -741,29 +906,6 @@ Silences are used to temporarily mute alerts based on label matchers. This tool 
 
 <details>
 
-<summary>otelcol</summary>
-
-- **otelcol_list_components** - List available OpenTelemetry Collector components (receivers, processors, exporters, extensions, connectors) for a given version.
-  - `version` (`string`) - Collector version (e.g., 'v0.100.0'). Defaults to latest available.
-
-- **otelcol_get_component_schema** - Get the JSON schema for an OpenTelemetry Collector component's configuration options.
-  - `component_name` (`string`) **(required)** - Component name from otelcol_list_components (e.g., 'otlp', 'batch', 'debug')
-  - `component_type` (`string`) **(required)** - Component type: receiver, processor, exporter, extension, connector
-  - `version` (`string`) - Collector version (e.g., 'v0.100.0'). Defaults to latest available.
-
-- **otelcol_validate_config** - Validate an OpenTelemetry Collector component configuration against its JSON schema.
-  - `component_name` (`string`) **(required)** - Component name from otelcol_list_components (e.g., 'otlp', 'batch', 'debug')
-  - `component_type` (`string`) **(required)** - Component type: receiver, processor, exporter, extension, connector
-  - `config` (`string`) **(required)** - Configuration to validate as YAML or JSON string
-  - `format` (`string`) - Config format: 'yaml' (default) or 'json'
-  - `version` (`string`) - Collector version (e.g., 'v0.100.0'). Defaults to latest available.
-
-- **otelcol_get_versions** - List available OpenTelemetry Collector versions and identify the latest.
-
-</details>
-
-<details>
-
 <summary>tekton</summary>
 
 - **tekton_pipeline_start** - Start a Tekton Pipeline by creating a PipelineRun that references it
@@ -788,104 +930,6 @@ Silences are used to temporarily mute alerts based on label matchers. This tool 
   - `name` (`string`) **(required)** - Name of the TaskRun to get logs from
   - `namespace` (`string`) - Namespace of the TaskRun
   - `tail` (`integer`) - Number of lines to retrieve from the end of the logs (Optional, default: 100)
-
-</details>
-
-<details>
-
-<summary>traces</summary>
-
-- **tempo_list_instances** - List all Tempo instances available in the Kubernetes cluster.
-Call this tool first to discover available Tempo instances before using other Tempo tools,
-as the returned namespace, name, and tenant values are required parameters for all other Tempo tools.
-Always print the output of this tool in a table.
-
-- **tempo_get_trace_by_id** - Retrieve a single distributed trace by its trace ID from Tempo.
-Returns the full trace with all its spans, including service names, operation names, durations, and attributes.
-Use this tool when you already have a specific trace ID, e.g. from search results or logs.
-  - `end` (`string`) - Optional end of the time range in RFC 3339 format, e.g. "2025-01-02T00:00:00Z".
-Narrows the time range to improve query performance.
-  - `start` (`string`) - Optional start of the time range in RFC 3339 format, e.g. "2025-01-01T00:00:00Z".
-Narrows the time range to improve query performance.
-  - `tempoName` (`string`) **(required)** - The name of the Tempo instance to query. Use tempo_list_instances to discover available instance names.
-  - `tempoNamespace` (`string`) **(required)** - The Kubernetes namespace where the Tempo instance is deployed. Use tempo_list_instances to discover available namespaces.
-  - `tenant` (`string`) - The tenant to query. This parameter is required for multi-tenant instances. Use tempo_list_instances to discover available tenants for each instance.
-  - `traceid` (`string`) **(required)** - The trace ID to retrieve, e.g. "26dad4a0e2b0dd9a440dd5ff203a24a4".
-
-- **tempo_search_traces** - Search for distributed traces in Tempo using TraceQL.
-Use this tool to find traces matching specific criteria such as service name, HTTP status code, duration, or other span or resource attributes.
-  - `end` (`string`) - End of the time range in RFC 3339 format, e.g. "2025-01-01T00:00:00Z".
-Use "NOW" for current time.
-Both start and end should be provided to search the full time range; if omitted, only a small window of recent data is searched.
-  - `limit` (`number`) - Maximum number of traces to return. Defaults to the server-side limit if not specified.
-  - `query` (`string`) **(required)** - A TraceQL query expression. Format:
-query: "{ <filters joined by &&> }"
-
-Filters:
-- service name:     resource.service.name="<value>" (string, use quotes)
-- HTTP status code: span.http.response.status_code=<code> (number, no quotes)
-- duration:         duration><value like 100ms, 2s, 5m> (no quotes)
-- error status:     status=error (keyword, NO quotes — do NOT write status="error")
-
-IMPORTANT: status values (error, ok, unset) are keywords, NOT strings. Write status=error, NEVER status="error".
-
-Operators: =, !=, >, <, >=, <=
-
-Common attributes:
-- resource.service.name (service name)
-- span.http.response.status_code (HTTP response code)
-- span.http.request.method (HTTP method like GET, POST)
-- span.url.full (request URL)
-- duration (trace duration, e.g. 100ms, 2s)
-- status (trace status: ok, error, unset)
-
-IMPORTANT: Always wrap filters in curly braces { }.
-Do NOT use SQL, PromQL, or Lucene syntax.
-Do NOT omit the "resource." or "span." prefix from attribute names
-
-If unsure which attributes to filter on, start with {} to return all traces, then use tempo_search_tags to discover available attributes.
-
-  - `spss` (`number`) - Maximum number of matching spans to return per trace.
-  - `start` (`string`) - Start of the time range in RFC 3339 format, e.g. "2025-01-01T00:00:00Z".
-Use "NOW" for current time.
-Both start and end should be provided to search the full time range; if omitted, only a small window of recent data is searched.
-  - `tempoName` (`string`) **(required)** - The name of the Tempo instance to query. Use tempo_list_instances to discover available instance names.
-  - `tempoNamespace` (`string`) **(required)** - The Kubernetes namespace where the Tempo instance is deployed. Use tempo_list_instances to discover available namespaces.
-  - `tenant` (`string`) - The tenant to query. This parameter is required for multi-tenant instances. Use tempo_list_instances to discover available tenants for each instance.
-
-- **tempo_search_tags** - List available tag names (attribute keys) in Tempo, grouped by scope.
-Use this tool to discover which attributes are available for building TraceQL queries with tempo_search_traces.
-For example, this tool may reveal tag names like "service.name" (in the "resource" scope) or "http.response.status_code" (in the "span" scope).
-To use these in TraceQL queries, prefix them with their scope, e.g. "resource.service.name" or "span.http.response.status_code".
-  - `end` (`string`) - Optional end of the time range (in RFC 3339 format, e.g. "2025-01-01T00:00:00Z") to filter which traces are considered when listing tags.
-  - `limit` (`number`) - Maximum number of tag names to return per scope.
-  - `maxStaleValues` (`number`) - Maximum number of consecutive blocks without new tag names before the search stops early. Higher values are more thorough but slower.
-  - `query` (`string`) - Optional TraceQL query to filter which traces are considered when listing tags,
-e.g. '{ resource.service.name="payment-service" }' to only show tags present in traces from the 'payment-service' service.
-  - `scope` (`string`) - Filter tags to a specific scope. One of:
-"resource" (service-level attributes like service.name),
-"span" (individual span attributes like http.response.status_code),
-"intrinsic" (built-in fields like duration, status, name).
-If omitted, tags from all scopes are returned.
-  - `start` (`string`) - Optional start of the time range (in RFC 3339 format, e.g. "2025-01-01T00:00:00Z") to filter which traces are considered when listing tags.
-  - `tempoName` (`string`) **(required)** - The name of the Tempo instance to query. Use tempo_list_instances to discover available instance names.
-  - `tempoNamespace` (`string`) **(required)** - The Kubernetes namespace where the Tempo instance is deployed. Use tempo_list_instances to discover available namespaces.
-  - `tenant` (`string`) - The tenant to query. This parameter is required for multi-tenant instances. Use tempo_list_instances to discover available tenants for each instance.
-
-- **tempo_search_tag_values** - List the known values for a specific tag (attribute key) in Tempo.
-Use this tool to discover what values exist for a given tag, e.g. to find all service names (values of "resource.service.name") or all HTTP methods (values of "span.http.request.method").
-This is useful for building accurate TraceQL queries with tempo_search_traces.
-  - `end` (`string`) - Optional end of the time range (in RFC 3339 format, e.g. "2025-01-01T00:00:00Z") to filter which traces are considered when listing values.
-  - `limit` (`number`) - Maximum number of tag values to return.
-  - `maxStaleValues` (`number`) - Maximum number of consecutive blocks without new values before the search stops early. Higher values are more thorough but slower.
-  - `query` (`string`) - Optional TraceQL query to filter which traces are considered when listing values,
-e.g. '{ resource.service.name="payment-service" }' to only show tag values from the 'payment-service' service.
-  - `start` (`string`) - Optional start of the time range (in RFC 3339 format, e.g. "2025-01-01T00:00:00Z") to filter which traces are considered when listing values.
-  - `tag` (`string`) **(required)** - The fully qualified tag name to get values for, including its scope prefix, e.g. "resource.service.name" or "span.http.response.status_code".
-Use tempo_search_tags to discover available tag names.
-  - `tempoName` (`string`) **(required)** - The name of the Tempo instance to query. Use tempo_list_instances to discover available instance names.
-  - `tempoNamespace` (`string`) **(required)** - The Kubernetes namespace where the Tempo instance is deployed. Use tempo_list_instances to discover available namespaces.
-  - `tenant` (`string`) - The tenant to query. This parameter is required for multi-tenant instances. Use tempo_list_instances to discover available tenants for each instance.
 
 </details>
 

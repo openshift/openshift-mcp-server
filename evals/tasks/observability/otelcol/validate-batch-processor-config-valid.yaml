@@ -15,10 +15,9 @@ spec:
   verify:
     - llmJudge:
         contains: "is valid"
-        reason: "Verify the response indicates the configuration is valid"
   prompt:
     inline: |
-      Validate this OpenTelemetry Collector batch processor configuration:
+      Validate this OpenTelemetry Collector batch processor configuration for version 0.144.0:
 
       ```yaml
       send_batch_size: 8192

@@ -176,8 +176,8 @@ func (s *MetricsE2ESuite) discoverRoutes() map[string]string {
 
 func (s *MetricsE2ESuite) buildConfig() *config.StaticConfig {
 	tomlCfg := fmt.Sprintf(`
-		toolsets = ["metrics"]
-		[toolset_configs.metrics]
+		toolsets = ["observability/metrics"]
+		[toolset_configs."observability/metrics"]
 		prometheus_url = "%s"
 		alertmanager_url = "%s"
 		insecure = true

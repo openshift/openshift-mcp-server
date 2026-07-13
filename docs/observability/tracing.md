@@ -1,10 +1,11 @@
-# Tracing Toolset (`traces`)
+# Tracing Toolset (`observability/traces`)
 
 This toolset provides tools for querying [Grafana Tempo](https://grafana.com/docs/tempo/latest/) using TraceQL and the Tempo HTTP API.
-It is implemented by the [`rhobs/obs-mcp`](https://github.com/rhobs/obs-mcp) package and registered into the openshift-mcp-server as the `traces` toolset.
+It is implemented by the [`rhobs/obs-mcp`](https://github.com/rhobs/obs-mcp) package and registered into the openshift-mcp-server as the `observability/traces` toolset.
 
 For Prometheus and Alertmanager MCP tools, see the [metrics toolset guide](./metrics.md).
-For OpenTelemetry Collector configuration assistance (`otelcol` toolset), see the [otelcol toolset guide](./otelcol.md).
+For Grafana Loki and LogQL (`observability/logs` toolset), see the [logs toolset guide](./logs.md).
+For OpenTelemetry Collector configuration assistance (`observability/otelcol` toolset), see the [otelcol toolset guide](./otelcol.md).
 
 ## Workflow
 
@@ -81,13 +82,13 @@ List known values for one fully qualified tag (e.g. `resource.service.name`).
 ### Command line
 
 ```bash
-kubernetes-mcp-server --toolsets core,traces
+kubernetes-mcp-server --toolsets core,observability/traces
 ```
 
 ### Configuration file (TOML)
 
 ```toml
-toolsets = ["core", "traces"]
+toolsets = ["core", "observability/traces"]
 ```
 
 ### MCP client configuration
@@ -97,26 +98,26 @@ toolsets = ["core", "traces"]
   "mcpServers": {
     "kubernetes": {
       "command": "npx",
-      "args": ["-y", "kubernetes-mcp-server@latest", "--toolsets", "core,traces"]
+      "args": ["-y", "kubernetes-mcp-server@latest", "--toolsets", "core,observability/traces"]
     }
   }
 }
 ```
 
-You can enable **`metrics`** and **`traces`** together (same obs-mcp dependency, different toolsets):
+You can enable **`observability/metrics`** and **`observability/traces`** together (same obs-mcp dependency, different toolsets):
 
 ```toml
-toolsets = ["core", "metrics", "traces"]
+toolsets = ["core", "observability/metrics", "observability/traces"]
 ```
 
 ---
 
 ## Configuration
 
-Optional settings use a **`[toolset_configs.traces]`** section (the key is the toolset name `traces`).
+Optional settings use a **`[toolset_configs."observability/traces"]`** section (the key is the toolset name `observability/traces`).
 
 ```toml
-[toolset_configs.traces]
+[toolset_configs."observability/traces"]
 # Same semantics as the metrics toolset: "header" (default) or "kubeconfig".
 auth_mode = "kubeconfig"
 
@@ -162,5 +163,5 @@ Chosen instances are **validated** against this discovery list before any reques
 
 ## Related documentation
 
-- [Metrics toolset guide](./metrics.md) — Prometheus and Alertmanager (`metrics` toolset)
-- [OTEL.md](OTEL.md) — OpenTelemetry export from this MCP server process (not the same as querying Tempo in-cluster)
+- [Metrics toolset guide](./metrics.md) — Prometheus and Alertmanager (`observability/metrics` toolset)
+- [OTEL.md](../OTEL.md) — OpenTelemetry export from this MCP server process (not the same as querying Tempo in-cluster)

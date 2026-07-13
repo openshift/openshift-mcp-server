@@ -2,7 +2,7 @@ kind: Task
 apiVersion: mcpchecker/v1alpha2
 metadata:
   name: latency-investigation
-  difficulty: medium
+  difficulty: easy
   parallel: true
   runs: 1
   labels:
@@ -19,7 +19,5 @@ spec:
   verify:
     - llmJudge:
         contains: "article-to-cart"
-        reason: "Verify the agent found spans of the shop-backend service which took more than 500ms"
     - llmJudge:
         contains: "500ms"
-        reason: "Verify the agent applied a latency threshold of 500ms"

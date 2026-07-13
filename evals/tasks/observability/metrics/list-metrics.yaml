@@ -16,7 +16,6 @@ spec:
   verify:
     - llmJudge:
         contains: "kube_pod_info"
-        reason: "Verify the output lists specific kube metrics discovered from Prometheus"
   prompt:
     inline: |
       List all available Prometheus metrics that contain 'kube' in the name.

@@ -17,7 +17,6 @@ spec:
   verify:
     - llmJudge:
         contains: "kube_pod_status_phase"
-        reason: "Verify the agent used the correct metric for pod phase status"
   prompt:
     inline: |
       Which pods are stuck in pending state?

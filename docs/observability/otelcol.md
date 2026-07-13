@@ -1,14 +1,15 @@
-# OpenTelemetry Collector Toolset (`otelcol`)
+# OpenTelemetry Collector Toolset (`observability/otelcol`)
 
 This toolset provides tools for OpenTelemetry Collector configuration assistance: listing
 components, fetching JSON schemas, validating component configs, and listing supported versions.
 It is implemented by the [`rhobs/obs-mcp`](https://github.com/rhobs/obs-mcp) package and
-registered into the openshift-mcp-server as the `otelcol` toolset.
+registered into the openshift-mcp-server as the `observability/otelcol` toolset.
 
 Component schemas are embedded in the binary (via `redhat-opentelemetry-collector`); no
 running Collector instance or cluster endpoint is required.
 
 For Prometheus and Alertmanager MCP tools, see the [metrics toolset guide](./metrics.md).
+For Grafana Loki and LogQL (`observability/logs` toolset), see the [logs toolset guide](./logs.md).
 For Grafana Tempo and TraceQL, see the [tracing toolset guide](./tracing.md).
 
 ## Workflow
@@ -77,13 +78,13 @@ Validate a component configuration against its JSON schema.
 ### Command line
 
 ```bash
-kubernetes-mcp-server --toolsets core,otelcol
+kubernetes-mcp-server --toolsets core,observability/otelcol
 ```
 
 ### Configuration file (TOML)
 
 ```toml
-toolsets = ["core", "otelcol"]
+toolsets = ["core", "observability/otelcol"]
 ```
 
 ### MCP client configuration
@@ -93,16 +94,16 @@ toolsets = ["core", "otelcol"]
   "mcpServers": {
     "kubernetes": {
       "command": "npx",
-      "args": ["-y", "kubernetes-mcp-server@latest", "--toolsets", "core,otelcol"]
+      "args": ["-y", "kubernetes-mcp-server@latest", "--toolsets", "core,observability/otelcol"]
     }
   }
 }
 ```
 
-You can enable **`metrics`**, **`traces`**, and **`otelcol`** together (same obs-mcp dependency, different toolsets):
+You can enable **`observability/metrics`**, **`observability/traces`**, and **`observability/otelcol`** together (same obs-mcp dependency, different toolsets):
 
 ```toml
-toolsets = ["core", "metrics", "traces", "otelcol"]
+toolsets = ["core", "observability/metrics", "observability/traces", "observability/otelcol"]
 ```
 
 ---
@@ -110,7 +111,7 @@ toolsets = ["core", "metrics", "traces", "otelcol"]
 ## Configuration
 
 The toolset works out of the box with embedded schemas. Advanced deployments may use a
-**`[toolset_configs.otelcol]`** section; the only configurable field is `SchemaFS`, which is
+**`[toolset_configs."observability/otelcol"]`** section; the only configurable field is `SchemaFS`, which is
 normally set programmatically and not required for standard use.
 
 No Prometheus, Tempo, or Collector endpoint URLs are needed.
@@ -120,12 +121,13 @@ No Prometheus, Tempo, or Collector endpoint URLs are needed.
 ## Prerequisites
 
 - **None for schema tools** — schemas ship inside the MCP server binary.
-- **No cluster RBAC** — unlike `metrics` and `traces`, this toolset does not call the Kubernetes API.
+- **No cluster RBAC** — unlike `observability/metrics` and `observability/traces`, this toolset does not call the Kubernetes API.
 
 ---
 
 ## Related documentation
 
-- [Metrics toolset guide](./metrics.md) — Prometheus and Alertmanager (`metrics` toolset)
-- [Tracing toolset guide](./tracing.md) — Grafana Tempo and TraceQL (`traces` toolset)
-- [OTEL.md](OTEL.md) — OpenTelemetry export from this MCP server process (not the same as Collector config assistance)
+- [Metrics toolset guide](./metrics.md) — Prometheus and Alertmanager (`observability/metrics` toolset)
+- [Logs toolset guide](./logs.md) — Grafana Loki and LogQL (`observability/logs` toolset)
+- [Tracing toolset guide](./tracing.md) — Grafana Tempo and TraceQL (`observability/traces` toolset)
+- [OTEL.md](../OTEL.md) — OpenTelemetry export from this MCP server process (not the same as Collector config assistance)

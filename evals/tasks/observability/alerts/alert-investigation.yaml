@@ -17,10 +17,8 @@ spec:
   verify:
     - llmJudge:
         contains: "AlertmanagerReceiversNotConfigured"
-        reason: "Verify the agent retrieved firing alerts and identified AlertmanagerReceiversNotConfigured"
     - llmJudge:
         contains: "alertmanager"
-        reason: "Verify the agent investigated Alertmanager-related metrics for the alert"
   prompt:
     inline: |
       Check if there are any firing alerts. If there are, investigate

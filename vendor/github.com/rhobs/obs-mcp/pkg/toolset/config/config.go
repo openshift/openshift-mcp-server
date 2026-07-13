@@ -8,23 +8,11 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	serverconfig "github.com/containers/kubernetes-mcp-server/pkg/config"
 
+	"github.com/rhobs/obs-mcp/pkg/auth"
 	"github.com/rhobs/obs-mcp/pkg/prometheus"
 )
 
-const MetricsToolSetName = "metrics"
-
-// AuthMode defines where the bearer token is obtained for authenticating
-// against Prometheus and Alertmanager endpoints.
-type AuthMode string
-
-const (
-	// AuthModeHeader reads the bearer token from the request context (authorization header).
-	// This is the default.
-	AuthModeHeader AuthMode = "header"
-
-	// AuthModeKubeConfig reads the bearer token from the kubeconfig/REST config only.
-	AuthModeKubeConfig AuthMode = "kubeconfig"
-)
+const MetricsToolSetName = "observability/metrics"
 
 // Config holds obs-mcp toolset configuration
 type Config struct {
@@ -32,7 +20,7 @@ type Config struct {
 	// against Prometheus and Alertmanager endpoints.
 	// Valid values: "header" (default) - read from the request context authorization header,
 	//              "kubeconfig" - read from the kubeconfig/REST config.
-	AuthMode AuthMode `toml:"auth_mode,omitempty"`
+	AuthMode auth.AuthMode `toml:"auth_mode,omitempty"`
 	// PrometheusURL is the URL of the Prometheus/Thanos Querier endpoint.
 	// This field is required. Example: "https://thanos-querier-openshift-monitoring.apps.example.com"
 	PrometheusURL string `toml:"prometheus_url,omitempty"`
@@ -72,8 +60,8 @@ var _ api.ExtendedConfig = (*Config)(nil)
 
 // Validate checks that the configuration values are valid.
 func (c *Config) Validate() error {
-	if c.AuthMode != "" && c.AuthMode != AuthModeHeader && c.AuthMode != AuthModeKubeConfig {
-		return fmt.Errorf("invalid auth_mode: %q (valid options: %q, %q)", c.AuthMode, AuthModeHeader, AuthModeKubeConfig)
+	if c.AuthMode != "" && c.AuthMode != auth.AuthModeHeader && c.AuthMode != auth.AuthModeKubeConfig {
+		return fmt.Errorf("invalid auth_mode: %q (valid options: %q, %q)", c.AuthMode, auth.AuthModeHeader, auth.AuthModeKubeConfig)
 	}
 
 	if _, err := c.GetGuardrails(); err != nil {
@@ -84,9 +72,9 @@ func (c *Config) Validate() error {
 }
 
 // GetAuthMode returns the configured token source, defaulting to TokenSourceHeader.
-func (c *Config) GetAuthMode() AuthMode {
+func (c *Config) GetAuthMode() auth.AuthMode {
 	if c.AuthMode == "" {
-		return AuthModeHeader
+		return auth.AuthModeHeader
 	}
 	return c.AuthMode
 }

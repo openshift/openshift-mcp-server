@@ -17,10 +17,8 @@ spec:
   verify:
     - llmJudge:
         contains: "namespace"
-        reason: "Verify the agent retrieved actual series data containing label dimensions like namespace"
     - llmJudge:
         contains: "kube_pod_info"
-        reason: "Verify the agent queried the kube_pod_info metric and reported its cardinality"
   prompt:
     inline: |
       How many time series exist for the kube_pod_info metric? Show the count and list the label names present.

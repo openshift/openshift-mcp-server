@@ -22,13 +22,13 @@ Choose the guide that matches your needs:
 
 ## Toolset Guides
 
-- **[Metrics](./metrics.md)** - Prometheus and Alertmanager tools (`metrics` toolset, via [obs-mcp](https://github.com/rhobs/obs-mcp))
-- **[Tracing](./tracing.md)** - Grafana Tempo and TraceQL (`traces` toolset, via [obs-mcp](https://github.com/rhobs/obs-mcp))
-- **[OpenTelemetry Collector](./otelcol.md)** - Component discovery, schemas, and config validation (`otelcol` toolset, via [obs-mcp](https://github.com/rhobs/obs-mcp))
+- **[Metrics](./observability/metrics.md)** - Prometheus and Alertmanager tools (`observability/metrics` toolset, via [obs-mcp](https://github.com/rhobs/obs-mcp))
+- **[Tracing](./observability/tracing.md)** - Grafana Tempo and TraceQL (`observability/traces` toolset, via [obs-mcp](https://github.com/rhobs/obs-mcp))
+- **[Logs](./observability/logs.md)** - Grafana Loki and LogQL (`observability/logs` toolset, via [obs-mcp](https://github.com/rhobs/obs-mcp))
+- **[OpenTelemetry Collector](./observability/otelcol.md)** - Component discovery, schemas, and config validation (`observability/otelcol` toolset, via [obs-mcp](https://github.com/rhobs/obs-mcp))
 - **[OADP](OADP.md)** - Tools for OpenShift API for Data Protection (Velero backups, restores, schedules)
 - **[Kiali](KIALI.md)** - Tools for Kiali ServiceMesh with Istio
 - **[KubeVirt](kubevirt.md)** - KubeVirt virtual machine management tools
-- **[Observability](OBSERVABILITY.md)** - Tools for Prometheus metrics and Alertmanager alerts
 
 ## Feature Specifications
 

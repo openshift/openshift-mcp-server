@@ -16,10 +16,8 @@ spec:
   verify:
     - llmJudge:
         contains: "container_memory"
-        reason: "Verify the agent queried a container memory metric (working_set_bytes or usage_bytes)"
     - llmJudge:
         contains: "pod"
-        reason: "Verify the response identifies specific pods"
   prompt:
     inline: |
       Which pods are using the most memory? Show me the top 5.
