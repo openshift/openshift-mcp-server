@@ -1,0 +1,15 @@
+kind: Task
+metadata:
+  labels:
+    suite: tnf
+  name: diagnose-fencing-health
+  difficulty: hard
+steps:
+  prompt:
+    inline: Perform a full fencing health assessment for this Two-Node Fencing cluster. Check the fencing configuration, STONITH status, and analyze whether there is any split-brain risk. Provide a summary with an overall health status and any recommended actions.
+  verify:
+    contains: "fencing"
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "tnf_.*"
