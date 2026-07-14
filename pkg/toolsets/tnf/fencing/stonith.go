@@ -32,7 +32,7 @@ var stonithDiagnosticScript = strings.Join([]string{
 	"echo '===PCS_QUORUM_STATUS==='",
 	"corosync-quorumtool 2>&1",
 	"echo '===PCS_PROPERTY==='",
-	"pcs property list 2>&1",
+	"{ pcs property config 2>&1 || pcs property list 2>&1; }",
 	"echo '===END==='",
 }, "; ")
 

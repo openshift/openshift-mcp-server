@@ -82,14 +82,19 @@ func tnfTroubleshootHandler(params api.PromptHandlerParams) (*api.PromptCallResu
 	dynamicClient := params.DynamicClient()
 	coreClient := params.CoreV1()
 
-	topologyData := fetchClusterTopology(ctx, dynamicClient, coreClient)
+	topologyData, isTNF := fetchClusterTopology(ctx, dynamicClient, coreClient)
 	nodeHealthData := fetchNodeHealth(ctx, coreClient)
 	operatorData := fetchOperatorHealth(ctx, dynamicClient)
 	bmhData := fetchBMHStatus(ctx, dynamicClient, coreClient, namespace)
 
 	stonithData := fetchSTONITHData(ctx, params.KubernetesClient, coreClient, nodeName)
 
-	remediationData := fetchRemediationStatus(ctx, dynamicClient)
+	var remediationData string
+	if isTNF {
+		remediationData = "TNF clusters use Pacemaker/STONITH for fencing — see STONITH data above.\n"
+	} else {
+		remediationData = fetchRemediationStatus(ctx, dynamicClient)
+	}
 
 	guideText := fmt.Sprintf(`# TNF Fencing Troubleshooting Guide
 
@@ -156,12 +161,6 @@ debug pod. Key things to check:
 
 ## Step 6: Remediation Operators
 
-Optional operators that automate fencing response:
-- **FenceAgentsRemediation (FAR)**: Operator-driven fencing using fence agents
-- **NodeHealthCheck (NHC)**: Monitors node conditions and triggers remediation
-
-These are complementary to pacemaker STONITH — not all clusters use them.
-
 %s
 
 ---
@@ -225,7 +224,7 @@ After analysis, report:
 	), nil
 }
 
-func fetchClusterTopology(ctx context.Context, dynamicClient dynamic.Interface, coreClient corev1client.CoreV1Interface) string {
+func fetchClusterTopology(ctx context.Context, dynamicClient dynamic.Interface, coreClient corev1client.CoreV1Interface) (string, bool) {
 	var result strings.Builder
 	result.WriteString("### Cluster Topology\n\n")
 
@@ -233,7 +232,7 @@ func fetchClusterTopology(ctx context.Context, dynamicClient dynamic.Interface, 
 	if err != nil {
 		slog.Debug("could not get Infrastructure CR", "error", err)
 		result.WriteString("*Infrastructure CR not available*\n")
-		return result.String()
+		return result.String(), false
 	}
 
 	platform, _, _ := unstructured.NestedString(infra.Object, "status", "platform")
@@ -247,7 +246,7 @@ func fetchClusterTopology(ctx context.Context, dynamicClient dynamic.Interface, 
 	nodes, err := coreClient.Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		slog.Debug("could not list nodes", "error", err)
-		return result.String()
+		return result.String(), false
 	}
 
 	cpCount := 0
@@ -268,7 +267,7 @@ func fetchClusterTopology(ctx context.Context, dynamicClient dynamic.Interface, 
 		result.WriteString("- **TNF Profile:** No\n")
 	}
 
-	return result.String()
+	return result.String(), isTNF
 }
 
 func fetchNodeHealth(ctx context.Context, coreClient corev1client.CoreV1Interface) string {

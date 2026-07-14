@@ -143,18 +143,20 @@ func (s *TNFTroubleshootSuite) TestFetchClusterTopology() {
 		dynamicClient := fake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), gvrToListKind, infra)
 		coreClient := newFakeCoreV1(node1, node2)
 
-		result := fetchClusterTopology(ctx, dynamicClient, coreClient)
+		result, isTNF := fetchClusterTopology(ctx, dynamicClient, coreClient)
 		s.Contains(result, "BareMetal")
 		s.Contains(result, "TNF Profile:** Yes")
 		s.Contains(result, "Total Nodes:** 2")
+		s.True(isTNF)
 	})
 
 	s.Run("handles missing infrastructure CR", func() {
 		dynamicClient := fake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), gvrToListKind)
 		coreClient := newFakeCoreV1()
 
-		result := fetchClusterTopology(ctx, dynamicClient, coreClient)
+		result, isTNF := fetchClusterTopology(ctx, dynamicClient, coreClient)
 		s.Contains(result, "not available")
+		s.False(isTNF)
 	})
 }
 
