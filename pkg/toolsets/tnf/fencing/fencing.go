@@ -55,7 +55,7 @@ func InitFencing() []api.ServerTool {
 				Description: "Check fencing configuration and readiness for a Two-Node Fencing (TNF) cluster. " +
 					"Validates cluster topology, critical operator health (etcd, machine-api, baremetal), " +
 					"Machine/Node/BareMetalHost correlation, BMC addresses and credentials, " +
-					"FenceAgentsRemediation templates and active remediations, and NodeHealthCheck resources. " +
+					"pacemaker/STONITH fencing status via Kubernetes resources. " +
 					"Returns a diagnostic summary identifying configuration issues that could " +
 					"prevent fencing from functioning correctly.",
 				InputSchema: &jsonschema.Schema{
@@ -99,7 +99,7 @@ func checkFencingHealth(params api.ToolHandlerParams) (*api.ToolCallResult, erro
 
 	report.WriteString("# TNF Fencing Health Check\n\n")
 
-	topoIssues := checkInfrastructureTopology(params.Context, dynamicClient, coreClient, &report)
+	isTNF, topoIssues := checkInfrastructureTopology(params.Context, dynamicClient, coreClient, &report)
 	issues = append(issues, topoIssues...)
 
 	coIssues := checkClusterOperatorHealth(params.Context, dynamicClient, &report)
@@ -128,11 +128,13 @@ func checkFencingHealth(params api.ToolHandlerParams) (*api.ToolCallResult, erro
 		}
 	}
 
-	farIssues := checkFenceAgentsRemediation(params.Context, dynamicClient, &report)
-	issues = append(issues, farIssues...)
+	if !isTNF {
+		farIssues := checkFenceAgentsRemediation(params.Context, dynamicClient, &report)
+		issues = append(issues, farIssues...)
 
-	nhcIssues := checkNodeHealthChecks(params.Context, dynamicClient, &report)
-	issues = append(issues, nhcIssues...)
+		nhcIssues := checkNodeHealthChecks(params.Context, dynamicClient, &report)
+		issues = append(issues, nhcIssues...)
+	}
 
 	report.WriteString("## Summary\n\n")
 	if len(issues) == 0 {
@@ -147,8 +149,9 @@ func checkFencingHealth(params api.ToolHandlerParams) (*api.ToolCallResult, erro
 	return api.NewToolCallResult(report.String(), nil), nil
 }
 
-func checkInfrastructureTopology(ctx context.Context, client dynamic.Interface, coreClient corev1.CoreV1Interface, report *strings.Builder) []string {
+func checkInfrastructureTopology(ctx context.Context, client dynamic.Interface, coreClient corev1.CoreV1Interface, report *strings.Builder) (bool, []string) {
 	var issues []string
+	isTNF := false
 	report.WriteString("## Cluster Topology\n\n")
 
 	infra, err := client.Resource(InfrastructureGVR).Get(ctx, "cluster", metav1.GetOptions{})
@@ -160,7 +163,7 @@ func checkInfrastructureTopology(ctx context.Context, client dynamic.Interface, 
 			fmt.Fprintf(report, "- Infrastructure CR: **error** — %v\n\n", err)
 			issues = append(issues, fmt.Sprintf("failed to get Infrastructure CR: %v", err))
 		}
-		return issues
+		return isTNF, issues
 	}
 
 	platform, _, err := unstructured.NestedString(infra.Object, "status", "platform")
@@ -195,7 +198,7 @@ func checkInfrastructureTopology(ctx context.Context, client dynamic.Interface, 
 		fmt.Fprintf(report, "- Total nodes: %d\n", len(nodes.Items))
 		fmt.Fprintf(report, "- Control-plane nodes: %d\n", cpCount)
 
-		isTNF := strings.EqualFold(platform, "BareMetal") && cpCount == 2
+		isTNF = strings.EqualFold(platform, "BareMetal") && cpCount == 2
 		if isTNF {
 			report.WriteString("- TNF Profile: **Yes** (2-node bare metal)\n")
 		} else {
@@ -210,7 +213,7 @@ func checkInfrastructureTopology(ctx context.Context, client dynamic.Interface, 
 	}
 
 	report.WriteString("\n")
-	return issues
+	return isTNF, issues
 }
 
 func checkClusterOperatorHealth(ctx context.Context, client dynamic.Interface, report *strings.Builder) []string {
