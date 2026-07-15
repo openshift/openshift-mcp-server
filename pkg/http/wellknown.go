@@ -16,7 +16,6 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	"github.com/containers/kubernetes-mcp-server/pkg/oauth"
-	"k8s.io/klog/v2"
 )
 
 const maxWellKnownResponseSize = 1 << 20 // 1 MB
@@ -149,7 +148,7 @@ func (w *WellKnown) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		return
 	}
 
-	logger := klog.FromContext(request.Context())
+	logger := klogutil.FromContext(request.Context())
 
 	// Try direct proxy first (works for Keycloak and other providers that support all endpoints)
 	resourceMetadata, respHeaders, err := w.fetchWellKnownEndpoint(request, upstreamURL)

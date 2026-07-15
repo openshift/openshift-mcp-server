@@ -7,8 +7,22 @@ MCP_CONFIG_DIR ?= dev/config/mcp-configs
 
 MCPCHECKER = $(shell pwd)/_output/tools/bin/mcpchecker
 MCPCHECKER_VERSION ?= latest
-EVAL_CONFIG ?= evals/openai-agent/eval.yaml
-EVAL_LABEL_SELECTOR ?= suite=kubernetes
+CLAUDE_AGENT_ACP = $(shell pwd)/_output/tools/node_modules/.bin/claude-agent-acp
+CLAUDE_AGENT_ACP_VERSION ?= latest
+
+# High-level knobs for local single-suite runs, e.g.:
+#   make run-evals SUITE=kubevirt AGENT=claude-code MODEL=sonnet
+# AGENT selects the eval config, SUITE selects the task suite label, and MODEL
+# sets ANTHROPIC_MODEL for the claude-agent-acp adapter (the openai-agent ignores it).
+AGENT ?= openai-agent
+SUITE ?= core
+MODEL ?=
+
+# Prefer a per-suite eval config when one exists: those carry no llmJudge, so a
+# local run needs no OpenAI key. Otherwise fall back to the agent's top-level
+# config (the one CI uses; its llmJudge requires an OpenAI key).
+EVAL_CONFIG ?= $(or $(wildcard evals/tasks/$(SUITE)/$(AGENT)/eval.yaml),evals/$(AGENT)/eval.yaml)
+EVAL_LABEL_SELECTOR ?= suite=$(SUITE)
 EVAL_TASK_FILTER ?=
 EVAL_VERBOSE ?= false
 
@@ -24,9 +38,20 @@ mcpchecker:
 
 ##@ Evals
 
+# Install the claude-agent-acp adapter locally under _output/tools, required by
+# the claude-code eval agent (evals/claude-code/agent.yaml runs `claude-agent-acp`).
+.PHONY: claude-agent-acp
+claude-agent-acp: ## Install the claude-agent-acp adapter for the claude-code eval agent
+	@[ -f $(CLAUDE_AGENT_ACP) ] || { \
+		set -e ;\
+		echo "Installing claude-agent-acp@$(CLAUDE_AGENT_ACP_VERSION) to $(CLAUDE_AGENT_ACP)..." ;\
+		npm install --prefix $(shell pwd)/_output/tools @agentclientprotocol/claude-agent-acp@$(CLAUDE_AGENT_ACP_VERSION) ;\
+		echo "✅ claude-agent-acp installed" ;\
+	}
+
 .PHONY: run-evals
-run-evals: mcpchecker ## Run mcpchecker evaluations against the MCP server
-	$(MCPCHECKER) check $(EVAL_CONFIG) \
+run-evals: mcpchecker $(if $(filter claude-code,$(AGENT)),claude-agent-acp) ## Run mcpchecker evals (knobs: SUITE, AGENT, MODEL; see evals/README.md)
+	$(if $(MODEL),ANTHROPIC_MODEL=$(MODEL) )PATH="$(shell pwd)/_output/tools/node_modules/.bin:$(PATH)" $(MCPCHECKER) check $(EVAL_CONFIG) \
 		$(if $(EVAL_LABEL_SELECTOR),--label-selector $(EVAL_LABEL_SELECTOR),) \
 		$(if $(EVAL_TASK_FILTER),--run "$(EVAL_TASK_FILTER)",) \
 		$(if $(filter true,$(EVAL_VERBOSE)),--verbose,) \
@@ -65,7 +90,7 @@ run-server: build ## Start MCP server in background and wait for health check
 	@echo "Waiting for MCP server to be ready..."
 	@elapsed=0; \
 	while [ $$elapsed -lt $(MCP_HEALTH_TIMEOUT) ]; do \
-		if curl -s http://localhost:$(MCP_PORT)/health > /dev/null 2>&1; then \
+		if curl -fsS http://localhost:$(MCP_PORT)/healthz > /dev/null 2>&1; then \
 			echo "MCP server is ready"; \
 			exit 0; \
 		fi; \

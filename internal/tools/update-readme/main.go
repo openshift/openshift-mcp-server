@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 
+	"sigs.k8s.io/yaml"
+
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
@@ -20,19 +22,37 @@ import (
 	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kcp"
 	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kiali"
 	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt"
-	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/oadp"
-	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/openshift"
+	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/netobserv"
 	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/tekton"
-	_ "github.com/rhobs/obs-mcp/pkg/toolset"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-type OpenShift struct{}
+type FilterProvider struct{}
 
-func (o *OpenShift) IsOpenShift(_ context.Context) bool {
+func (p *FilterProvider) AnyTargetHasGVKs(_ context.Context, _ []schema.GroupVersionKind) bool {
 	return true
 }
 
-var _ api.Openshift = (*OpenShift)(nil)
+func (p *FilterProvider) IsTargetCompatibilityToolFiltersEnabled() bool {
+	return false
+}
+
+var _ api.FilteringProvider = (*FilterProvider)(nil)
+
+type evalTask struct {
+	Kind     string `json:"kind"`
+	Metadata struct {
+		Labels      map[string]string `json:"labels"`
+		Annotations map[string]string `json:"annotations"`
+	} `json:"metadata"`
+}
+
+type projectInfo struct {
+	Name     string
+	URL      string
+	Toolsets map[string]bool
+	Count    int
+}
 
 func main() {
 	// Snyk reports false positive unless we flow the args through filepath.Clean and filepath.Localize in this specific order
@@ -46,6 +66,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	// Validated Projects
+	updated := generateValidatedProjects(string(readme))
+
 	// Available Toolsets
 	toolsetsList := toolsets.Toolsets()
 
@@ -78,8 +102,8 @@ func main() {
 		}
 		fmt.Fprintf(&availableToolsets, "| %-*s | %-*s | %-*s |\n", maxNameLen, toolset.GetName(), maxDescLen, toolset.GetDescription(), defaultHeaderLen, defaultIndicator)
 	}
-	updated := replaceBetweenMarkers(
-		string(readme),
+	updated = replaceBetweenMarkers(
+		updated,
 		"<!-- AVAILABLE-TOOLSETS-START -->",
 		"<!-- AVAILABLE-TOOLSETS-END -->",
 		availableToolsets.String(),
@@ -89,7 +113,7 @@ func main() {
 	toolsetTools := strings.Builder{}
 	for _, toolset := range toolsetsList {
 		toolsetTools.WriteString("<details>\n\n<summary>" + toolset.GetName() + "</summary>\n\n")
-		tools := toolset.GetTools(&OpenShift{})
+		tools := toolset.GetTools(&FilterProvider{})
 		for _, tool := range tools {
 			fmt.Fprintf(&toolsetTools, "- **%s** - %s\n", tool.Tool.Name, tool.Tool.Description)
 			for _, propName := range slices.Sorted(maps.Keys(tool.Tool.InputSchema.Properties)) {
@@ -198,4 +222,118 @@ func replaceBetweenMarkers(content, startMarker, endMarker, replacement string) 
 		return content
 	}
 	return content[:startIdx+len(startMarker)] + "\n\n" + replacement + "\n" + content[endIdx:]
+}
+
+func generateValidatedProjects(content string) string {
+	evalsDir := "evals/tasks"
+	projects := make(map[string]*projectInfo)
+	displayNameToKey := make(map[string]string)
+
+	err := filepath.Walk(evalsDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if filepath.Ext(path) != ".yaml" {
+			return nil
+		}
+		if strings.Contains(path, "/artifacts/") {
+			return nil
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		var task evalTask
+		if err := yaml.Unmarshal(data, &task); err != nil {
+			panic(fmt.Sprintf("failed to parse %q: %v", path, err))
+		}
+
+		if task.Kind != "Task" && task.Kind != "Prompt" {
+			return nil
+		}
+
+		projectKey := task.Metadata.Labels["project"]
+		if projectKey == "" {
+			return nil
+		}
+
+		projectName := task.Metadata.Annotations["project-name"]
+		projectURL := task.Metadata.Annotations["project-url"]
+
+		if projectName == "" || projectURL == "" {
+			panic(fmt.Sprintf("task %q has project label %q but is missing project-name or project-url annotations", path, projectKey))
+		}
+
+		if existingKey, ok := displayNameToKey[projectName]; ok && existingKey != projectKey {
+			panic(fmt.Sprintf("display name %q is used by both project keys %q and %q", projectName, existingKey, projectKey))
+		}
+		displayNameToKey[projectName] = projectKey
+
+		p, exists := projects[projectKey]
+		if !exists {
+			p = &projectInfo{
+				Name:     projectName,
+				URL:      projectURL,
+				Toolsets: map[string]bool{},
+			}
+			projects[projectKey] = p
+		} else {
+			if p.Name != projectName {
+				panic(fmt.Sprintf("project %q has conflicting names: %q vs %q", projectKey, p.Name, projectName))
+			}
+			if p.URL != projectURL {
+				panic(fmt.Sprintf("project %q has conflicting URLs: %q vs %q", projectKey, p.URL, projectURL))
+			}
+		}
+
+		p.Count++
+
+		if requires := task.Metadata.Labels["requires"]; requires != "" {
+			for _, ts := range strings.Split(requires, ",") {
+				if ts = strings.TrimSpace(ts); ts != "" {
+					p.Toolsets[ts] = true
+				}
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	type row struct {
+		name     string
+		url      string
+		toolsets string
+		count    int
+	}
+	var rows []row
+	for _, p := range projects {
+		extras := slices.Sorted(maps.Keys(p.Toolsets))
+		var toolsetsStr string
+		if len(extras) == 0 {
+			toolsetsStr = "-"
+		} else {
+			toolsetsStr = "`" + strings.Join(extras, "`, `") + "`"
+		}
+		rows = append(rows, row{name: p.Name, url: p.URL, toolsets: toolsetsStr, count: p.Count})
+	}
+	slices.SortFunc(rows, func(a, b row) int {
+		return strings.Compare(strings.ToLower(a.name), strings.ToLower(b.name))
+	})
+
+	table := strings.Builder{}
+	table.WriteString("| Project | Optional toolset(s) | Eval scenarios |\n")
+	table.WriteString("|---------|---------------------|----------------|\n")
+	for _, r := range rows {
+		fmt.Fprintf(&table, "| [%s](%s) | %s | %d |\n", r.name, r.url, r.toolsets, r.count)
+	}
+
+	return replaceBetweenMarkers(content, "<!-- VALIDATED-PROJECTS-START -->", "<!-- VALIDATED-PROJECTS-END -->", table.String())
 }

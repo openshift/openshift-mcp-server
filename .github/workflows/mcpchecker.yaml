@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: 'Which task suite to run (core, helm, kubevirt, kiali, tekton, or all)'
+        description: 'Which task suite to run (core, helm, kubevirt, kiali, tekton, netobserv, or all)'
         required: false
         default: 'core'
         type: choice
@@ -23,6 +23,7 @@ on:
           - kubevirt
           - kiali
           - tekton
+          - netobserv
           - all
       task-filter:
         description: 'Regular expression to filter tasks (optional)'
@@ -58,60 +59,147 @@ jobs:
   check-trigger:
     name: Check if evaluation should run
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      # Needed to comment on the PR when the TOCTOU check fails
+      pull-requests: write
+    # Never run on forks: the evaluation needs model/judge secrets that forks
+    # don't have, so it would only ever fail there.
     if: |
-      github.event_name == 'schedule' ||
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'issue_comment' &&
-       github.event.issue.pull_request &&
-       contains(github.event.comment.body, '/run-mcpchecker'))
+      github.repository == 'containers/kubernetes-mcp-server' &&
+      (github.event_name == 'schedule' ||
+       github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request &&
+        contains(github.event.comment.body, '/run-mcpchecker')))
     outputs:
       should-run: ${{ steps.check.outputs.should-run }}
-      toolsets: ${{ steps.check.outputs.toolsets }}
-      label-selector: ${{ steps.check.outputs.label-selector }}
+      toolsets: ${{ steps.suite.outputs.toolsets }}
+      label-selector: ${{ steps.suite.outputs.label-selector }}
       pr-number: ${{ steps.check.outputs.pr-number }}
       pr-sha: ${{ steps.check.outputs.pr-sha }}
       is-pr: ${{ steps.check.outputs.is-pr }}
     steps:
       - name: Check trigger conditions
         id: check
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+
+            if (context.eventName === 'issue_comment') {
+              const commenter = context.payload.comment.user.login;
+              const prNum = context.payload.issue.number;
+              const commentId = context.payload.comment.id;
+
+              // Only repository collaborators with admin/write access may trigger a run.
+              const { data: permData } = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner, repo, username: commenter,
+              });
+              if (permData.permission !== 'admin' && permData.permission !== 'write') {
+                core.setOutput('should-run', 'false');
+                core.setOutput('is-pr', 'true');
+                core.setOutput('pr-number', String(prNum));
+                core.setOutput('pr-sha', '');
+                core.info(`User ${commenter} does not have permission to trigger evaluations`);
+                return;
+              }
+
+              // TOCTOU guard: walk the PR timeline and extract the SHA of the
+              // last commit *before* the /run-mcpchecker comment.  This is the
+              // exact code the maintainer reviewed.  If any commits or force-pushes
+              // landed after the comment, the run is rejected.  Timeline ordering
+              // is controlled by GitHub's servers and cannot be spoofed.
+              const timeline = await github.paginate(
+                github.rest.issues.listEventsForTimeline,
+                { owner, repo, issue_number: prNum, per_page: 100 },
+              );
+
+              let seenComment = false;
+              let lastCommitSha = null;
+              for (const event of timeline) {
+                if (event.event === 'committed') {
+                  if (!seenComment) {
+                    lastCommitSha = event.sha;
+                  } else {
+                    core.setOutput('should-run', 'false');
+                    core.setOutput('is-pr', 'true');
+                    core.setOutput('pr-number', String(prNum));
+                    core.setOutput('pr-sha', '');
+                    core.info('TOCTOU: PR was updated after the /run-mcpchecker comment');
+                    await github.rest.issues.createComment({
+                      owner, repo, issue_number: prNum,
+                      body: '**Evaluation not started:** the PR was updated after this ' +
+                            '`/run-mcpchecker` comment was posted. Please re-review and ' +
+                            'comment `/run-mcpchecker` again.',
+                    });
+                    return;
+                  }
+                } else if (event.event === 'head_ref_force_pushed') {
+                  if (seenComment) {
+                    core.setOutput('should-run', 'false');
+                    core.setOutput('is-pr', 'true');
+                    core.setOutput('pr-number', String(prNum));
+                    core.setOutput('pr-sha', '');
+                    core.info('TOCTOU: PR was force-pushed after the /run-mcpchecker comment');
+                    await github.rest.issues.createComment({
+                      owner, repo, issue_number: prNum,
+                      body: '**Evaluation not started:** the PR was force-pushed after this ' +
+                            '`/run-mcpchecker` comment was posted. Please re-review and ' +
+                            'comment `/run-mcpchecker` again.',
+                    });
+                    return;
+                  }
+                  // After a force-push the old commit SHAs are invalid; reset
+                  // and let subsequent committed events repopulate.
+                  lastCommitSha = null;
+                } else if (event.event === 'commented' && event.id === commentId) {
+                  seenComment = true;
+                }
+              }
+
+              if (!seenComment) {
+                core.setOutput('should-run', 'false');
+                return
+              }
+
+              if (!lastCommitSha) {
+                core.setOutput('should-run', 'false');
+                core.setOutput('is-pr', 'true');
+                core.setOutput('pr-number', String(prNum));
+                core.setOutput('pr-sha', '');
+                core.warning('Could not determine the PR head SHA from the timeline');
+                return;
+              }
+
+              core.setOutput('should-run', 'true');
+              core.setOutput('is-pr', 'true');
+              core.setOutput('pr-number', String(prNum));
+              core.setOutput('pr-sha', lastCommitSha);
+              core.info(`Pinned to SHA: ${lastCommitSha}`);
+            } else {
+              core.setOutput('should-run', 'true');
+              core.setOutput('is-pr', 'false');
+              core.setOutput('pr-sha', context.sha);
+            }
+
+      - name: Select suite
+        id: suite
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          INPUT_SUITE: ${{ github.event.inputs.suite }}
         run: |
-          if [[ "${{ github.event_name }}" == "issue_comment" ]]; then
-            # Check if commenter has write access
-            PERMISSION=$(gh api "repos/${{ github.repository }}/collaborators/${{ github.event.comment.user.login }}/permission" --jq '.permission')
-
-            if [[ "$PERMISSION" == "admin" || "$PERMISSION" == "write" ]]; then
-              echo "should-run=true" >> $GITHUB_OUTPUT
-              echo "is-pr=true" >> $GITHUB_OUTPUT
-              PR_NUMBER="${{ github.event.issue.number }}"
-              echo "pr-number=$PR_NUMBER" >> $GITHUB_OUTPUT
-
-              # Capture SHA at trigger time to prevent TOCTOU race condition
-              # This ensures we run the exact code the maintainer reviewed
-              PR_SHA=$(gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" --json headRefOid --jq '.headRefOid')
-              echo "pr-sha=$PR_SHA" >> $GITHUB_OUTPUT
-              echo "Pinned to SHA: $PR_SHA"
-            else
-              echo "should-run=false" >> $GITHUB_OUTPUT
-              echo "User ${{ github.event.comment.user.login }} does not have permission to trigger evaluations"
-            fi
-          else
-            echo "should-run=true" >> $GITHUB_OUTPUT
-            echo "is-pr=false" >> $GITHUB_OUTPUT
-            echo "pr-sha=${{ github.sha }}" >> $GITHUB_OUTPUT
-          fi
-
           # Suite selection: defaults to 'core', can be overridden by workflow_dispatch input or PR comment
-          SUITE="${{ github.event.inputs.suite || 'core' }}"
+          SUITE="${INPUT_SUITE:-core}"
 
-          if [[ "${{ github.event_name }}" == "issue_comment" ]]; then
+          if [[ "$EVENT_NAME" == "issue_comment" ]]; then
             # Parse /run-mcpchecker [suite] from PR comment
-            COMMENT_BODY="${{ github.event.comment.body }}"
-            COMMENT_BODY="${COMMENT_BODY//[[:space:]]/ }"
-            read -r _ FIRST_WORD _ <<< "$COMMENT_BODY"
+            BODY="${COMMENT_BODY//[[:space:]]/ }"
+            read -r _ FIRST_WORD _ <<< "$BODY"
             case "${FIRST_WORD,,}" in
-              core|helm|kubevirt|kiali|tekton|all)
+              core|helm|kubevirt|kiali|tekton|netobserv|all)
                 SUITE="${FIRST_WORD,,}"
                 ;;
             esac
@@ -121,29 +209,33 @@ jobs:
           # All suites use the same eval.yaml file; suite controls label-selector + infra.
           case "$SUITE" in
             helm)
-              echo "label-selector=suite=helm" >> $GITHUB_OUTPUT
-              echo "toolsets=core,config,helm" >> $GITHUB_OUTPUT
+              echo "label-selector=suite=helm" >> "$GITHUB_OUTPUT"
+              echo "toolsets=core,config,helm" >> "$GITHUB_OUTPUT"
               ;;
             kubevirt)
-              echo "label-selector=suite=kubevirt" >> $GITHUB_OUTPUT
-              echo "toolsets=core,config,kubevirt,tekton" >> $GITHUB_OUTPUT
+              echo "label-selector=suite=kubevirt" >> "$GITHUB_OUTPUT"
+              echo "toolsets=core,config,kubevirt,tekton" >> "$GITHUB_OUTPUT"
               ;;
             kiali)
-              echo "label-selector=suite=kiali" >> $GITHUB_OUTPUT
-              echo "toolsets=core,config,kiali" >> $GITHUB_OUTPUT
+              echo "label-selector=suite=kiali" >> "$GITHUB_OUTPUT"
+              echo "toolsets=core,config,kiali" >> "$GITHUB_OUTPUT"
               ;;
             tekton)
-              echo "label-selector=suite=tekton" >> $GITHUB_OUTPUT
-              echo "toolsets=core,tekton" >> $GITHUB_OUTPUT
+              echo "label-selector=suite=tekton" >> "$GITHUB_OUTPUT"
+              echo "toolsets=core,tekton" >> "$GITHUB_OUTPUT"
+              ;;
+            netobserv)
+              echo "label-selector=suite=netobserv" >> "$GITHUB_OUTPUT"
+              echo "toolsets=core,netobserv" >> "$GITHUB_OUTPUT"
               ;;
             all)
-              echo "label-selector=" >> $GITHUB_OUTPUT  # No filter: run all taskSets
-              echo "toolsets=core,config,helm,kiali,kubevirt,tekton" >> $GITHUB_OUTPUT
+              echo "label-selector=" >> "$GITHUB_OUTPUT"  # No filter: run all taskSets
+              echo "toolsets=core,config,helm,kiali,kubevirt,tekton,netobserv" >> "$GITHUB_OUTPUT"
               ;;
             *)
               # Default to core suite (matches 'core' or any unrecognized suite)
-              echo "label-selector=suite=core" >> $GITHUB_OUTPUT
-              echo "toolsets=core,config" >> $GITHUB_OUTPUT
+              echo "label-selector=suite=core" >> "$GITHUB_OUTPUT"
+              echo "toolsets=core,config" >> "$GITHUB_OUTPUT"
               ;;
           esac
 
@@ -155,7 +247,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.0
         with:
           # Use pinned SHA to prevent TOCTOU attacks
           # For PRs: the SHA captured when maintainer commented
@@ -168,7 +260,13 @@ jobs:
           go-version-file: go.mod
 
       - name: Setup Kind cluster
-        run: make kind-create-cluster KIND_CLUSTER_NAME=${{ env.KIND_CLUSTER_NAME }}
+        run: make kind-create-cluster KIND_CLUSTER_NAME="$KIND_CLUSTER_NAME"
+
+      # Only the core suite needs a resize-capable StorageClass (for resize-pvc).
+      # Runs for suite=core and for the "all" run (empty label-selector).
+      - name: Install CSI hostPath driver (resize-capable StorageClass)
+        if: needs.check-trigger.outputs.label-selector == 'suite=core' || needs.check-trigger.outputs.label-selector == ''
+        run: make csi-hostpath-install
 
       - name: Install Istio/Kiali and bookinfo demo
         if: contains(needs.check-trigger.outputs.toolsets, 'kiali')
@@ -181,6 +279,10 @@ jobs:
       - name: Install Tekton
         if: contains(needs.check-trigger.outputs.toolsets, 'tekton')
         run: make tekton-install
+
+      - name: Install NetObserv mock plugin
+        if: contains(needs.check-trigger.outputs.toolsets, 'netobserv')
+        run: make setup-netobserv
 
       - name: Start MCP server
         run: make run-server
@@ -217,7 +319,9 @@ jobs:
         if: always()
         run: |
           make stop-server || true
-          make kind-delete-cluster KIND_CLUSTER_NAME=${{ env.KIND_CLUSTER_NAME }} || true
+          make stop-netobserv || true
+          make teardown-netobserv || true
+          make kind-delete-cluster KIND_CLUSTER_NAME="$KIND_CLUSTER_NAME" || true
 
       # Compare PR results against baseline from main branch
       - name: Fetch baseline results from main
@@ -262,19 +366,28 @@ jobs:
         if: always() && needs.check-trigger.outputs.is-pr == 'true'
         env:
           DIFF_OUTPUT: ${{ steps.mcpchecker-diff.outputs.diff-output }}
+          PR_NUMBER: ${{ needs.check-trigger.outputs.pr-number }}
+          PR_SHA: ${{ needs.check-trigger.outputs.pr-sha }}
+          TASKS_PASSED: ${{ steps.mcpchecker.outputs.tasks-passed }}
+          TASKS_TOTAL: ${{ steps.mcpchecker.outputs.tasks-total }}
+          TASK_PASS_RATE: ${{ steps.mcpchecker.outputs.task-pass-rate }}
+          ASSERTIONS_PASSED: ${{ steps.mcpchecker.outputs.assertions-passed }}
+          ASSERTIONS_TOTAL: ${{ steps.mcpchecker.outputs.assertions-total }}
+          PASSED: ${{ steps.mcpchecker.outputs.passed }}
+          HAS_DIFF: ${{ steps.diff-check.outputs.has-diff || 'false' }}
         run: |
           mkdir -p eval-context
           cat > eval-context/context.json << EOF
           {
-            "pr_number": "${{ needs.check-trigger.outputs.pr-number }}",
-            "pr_sha": "${{ needs.check-trigger.outputs.pr-sha }}",
-            "tasks_passed": "${{ steps.mcpchecker.outputs.tasks-passed }}",
-            "tasks_total": "${{ steps.mcpchecker.outputs.tasks-total }}",
-            "task_pass_rate": "${{ steps.mcpchecker.outputs.task-pass-rate }}",
-            "assertions_passed": "${{ steps.mcpchecker.outputs.assertions-passed }}",
-            "assertions_total": "${{ steps.mcpchecker.outputs.assertions-total }}",
-            "passed": "${{ steps.mcpchecker.outputs.passed }}",
-            "has_diff": "${{ steps.diff-check.outputs.has-diff || 'false' }}"
+            "pr_number": "${PR_NUMBER}",
+            "pr_sha": "${PR_SHA}",
+            "tasks_passed": "${TASKS_PASSED}",
+            "tasks_total": "${TASKS_TOTAL}",
+            "task_pass_rate": "${TASK_PASS_RATE}",
+            "assertions_passed": "${ASSERTIONS_PASSED}",
+            "assertions_total": "${ASSERTIONS_TOTAL}",
+            "passed": "${PASSED}",
+            "has_diff": "${HAS_DIFF}"
           }
           EOF
           if [ -n "$DIFF_OUTPUT" ]; then
@@ -301,7 +414,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.0
         with:
           ref: main
 

@@ -10,10 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
-	internalk8s "github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
-	"github.com/containers/kubernetes-mcp-server/pkg/mcplog"
-	"github.com/containers/kubernetes-mcp-server/pkg/telemetry"
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"go.opentelemetry.io/otel"
@@ -21,7 +17,11 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/time/rate"
-	"k8s.io/klog/v2"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
+	internalk8s "github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
+	"github.com/containers/kubernetes-mcp-server/pkg/mcplog"
+	"github.com/containers/kubernetes-mcp-server/pkg/telemetry"
 )
 
 // redactedHeaders lists the request header names that protocolReceivingMiddleware
@@ -59,7 +59,7 @@ var redactedHeaders = map[string]bool{
 func protocolReceivingMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
 	return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
 		rawParams := req.GetParams()
-		logger := klog.FromContext(ctx)
+		logger := klogutil.FromContext(ctx)
 		// Gate the JSON marshal explicitly: Info's args are evaluated
 		// before the V(6) check, so an unguarded jsonCompact(rawParams)
 		// would marshal every request even at the default log_level=0.
@@ -111,7 +111,7 @@ func protocolReceivingMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
 // Sanitization is applied identically to the receiving path.
 func protocolSendingMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
 	return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
-		logger := klog.FromContext(ctx)
+		logger := klogutil.FromContext(ctx)
 		if logger.V(6).Enabled() {
 			logger.V(6).Info("mcp protocol", "mcp.server.method", method, "mcp.params", mcplog.Sanitize(jsonCompact(req.GetParams())))
 		}
@@ -202,7 +202,7 @@ func traceContextPropagationMiddleware(next mcp.MethodHandler) mcp.MethodHandler
 			return next(ctx, method, req)
 		}
 
-		logger := klog.FromContext(ctx)
+		logger := klogutil.FromContext(ctx)
 
 		// Extract trace context from request params metadata
 		if params := req.GetParams(); params != nil {

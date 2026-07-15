@@ -72,33 +72,13 @@ config:
             toolPattern: ".*"
         minToolCalls: 1
         maxToolCalls: 20
-    # Observability tasks
-    - glob: ../tasks/observability/*/*.yaml
+    # NetObserv tasks
+    - glob: ../tasks/netobserv/*/*.yaml
       labelSelector:
-        suite: observability
+        suite: netobserv
       assertions:
         toolsUsed:
           - server: kubernetes
-            toolPattern: ".*"
+            toolPattern: "netobserv_.*"
         minToolCalls: 1
-        maxToolCalls: 20
-    # OADP tasks - uses core toolset, requires OADP/Velero on cluster
-    - glob: ../tasks/oadp/*/*.yaml
-      labelSelector:
-        suite: oadp
-      assertions:
-        toolsUsed:
-          - server: kubernetes
-            toolPattern: ".*"
-        minToolCalls: 1
-        maxToolCalls: 15
-    # Cluster diagnostics tasks
-    - glob: ../tasks/cluster-diagnostics/*/*.yaml
-      labelSelector:
-        suite: cluster-diagnostics
-      assertions:
-        toolsUsed:
-          - server: kubernetes
-            toolPattern: ".*"
-        minToolCalls: 1
-        maxToolCalls: 20
+        maxToolCalls: 10

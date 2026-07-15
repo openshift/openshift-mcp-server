@@ -12,21 +12,23 @@ import (
 
 type ProviderSingleTestSuite struct {
 	BaseProviderSuite
-	mockServer                *test.MockServer
 	originalIsInClusterConfig func() (*rest.Config, error)
+	mockServer                *test.MockServer
 	provider                  Provider
 }
 
 func (s *ProviderSingleTestSuite) SetupTest() {
 	// Single cluster provider is used when in-cluster or when the multi-cluster feature is disabled.
-	// For this test suite we simulate an in-cluster deployment.
+	// For this test suite we simulate an in-cluster deployment backed by a mock API server.
 	s.originalIsInClusterConfig = InClusterConfig
 	s.mockServer = test.NewMockServer()
+	// Default discovery simulates a vanilla (non-OpenShift) cluster.
+	s.mockServer.Handle(test.NewDiscoveryClientHandler())
 	InClusterConfig = func() (*rest.Config, error) {
 		return s.mockServer.Config(), nil
 	}
 	provider, err := NewProvider(s.T().Context(), &config.StaticConfig{})
-	s.Require().NoError(err, "Expected no error creating provider with kubeconfig")
+	s.Require().NoError(err, "Expected no error creating provider")
 	s.provider = provider
 }
 
@@ -41,19 +43,25 @@ func (s *ProviderSingleTestSuite) TestType() {
 	s.IsType(&singleClusterProvider{}, s.provider)
 }
 
-func (s *ProviderSingleTestSuite) TestWithNonOpenShiftCluster() {
-	s.Run("IsOpenShift returns false", func() {
-		inOpenShift := s.provider.IsOpenShift(s.T().Context())
-		s.False(inOpenShift, "Expected InOpenShift to return false")
+func (s *ProviderSingleTestSuite) TestWithOpenShiftCluster() {
+	// Serve the OpenShift discovery document so the Project GVK is present.
+	s.mockServer.ResetHandlers()
+	s.mockServer.Handle(test.NewInOpenShiftHandler())
+	s.Run("has OpenShift Project GVK", func() {
+		hasProjects := s.provider.AnyTargetHasGVKs(s.T().Context(), []schema.GroupVersionKind{
+			{Group: "project.openshift.io", Version: "v1", Kind: "Project"},
+		})
+		s.True(hasProjects, "Expected provider to report OpenShift Project GVK available")
 	})
 }
 
-func (s *ProviderSingleTestSuite) TestWithOpenShiftCluster() {
-	s.mockServer.Handle(test.NewInOpenShiftHandler())
-
-	s.Run("IsOpenShift returns true", func() {
-		inOpenShift := s.provider.IsOpenShift(s.T().Context())
-		s.True(inOpenShift, "Expected InOpenShift to return true")
+func (s *ProviderSingleTestSuite) TestWithNonOpenShiftGVK() {
+	s.Run("does not have non-existent GVK", func() {
+		// Default (non-OpenShift) discovery returns a 404 for the missing GroupVersion.
+		hasGVK := s.provider.AnyTargetHasGVKs(s.T().Context(), []schema.GroupVersionKind{
+			{Group: "nonexistent.example.com", Version: "v1", Kind: "Foo"},
+		})
+		s.False(hasGVK, "Expected provider to report no nonexistent GVK")
 	})
 }
 
@@ -82,56 +90,12 @@ func (s *ProviderSingleTestSuite) TestGetDerivedKubernetes() {
 
 func (s *ProviderSingleTestSuite) TestGetDefaultTarget() {
 	s.Run("GetDefaultTarget returns empty string", func() {
-		s.Empty(s.provider.GetDefaultTarget(), "Expected fake-context as default target")
+		s.Empty(s.provider.GetDefaultTarget(), "Expected empty string as default target")
 	})
 }
 
 func (s *ProviderSingleTestSuite) TestGetTargetParameterName() {
 	s.Empty(s.provider.GetTargetParameterName(), "Expected empty string as target parameter name")
-}
-
-func (s *ProviderSingleTestSuite) TestHasGVKs() {
-	handler := test.NewDiscoveryClientHandler()
-	s.mockServer.Handle(handler)
-
-	s.Run("returns true for nil GVKs list", func() {
-		s.True(s.provider.HasGVKs(s.T().Context(), nil))
-	})
-
-	s.Run("returns true for empty GVKs list", func() {
-		s.True(s.provider.HasGVKs(s.T().Context(), []schema.GroupVersionKind{}))
-	})
-
-	s.Run("returns true for a single GVK that exists on the cluster", func() {
-		result := s.provider.HasGVKs(s.T().Context(), []schema.GroupVersionKind{
-			{Group: "", Version: "v1", Kind: "Pod"},
-		})
-		s.True(result)
-	})
-
-	s.Run("returns true when all GVKs exist on the cluster", func() {
-		result := s.provider.HasGVKs(s.T().Context(), []schema.GroupVersionKind{
-			{Group: "", Version: "v1", Kind: "Pod"},
-			{Group: "", Version: "v1", Kind: "Node"},
-			{Group: "apps", Version: "v1", Kind: "Deployment"},
-		})
-		s.True(result)
-	})
-
-	s.Run("returns false when a GVK does not exist on the cluster", func() {
-		result := s.provider.HasGVKs(s.T().Context(), []schema.GroupVersionKind{
-			{Group: "nonexistent.example.com", Version: "v1", Kind: "FakeResource"},
-		})
-		s.False(result)
-	})
-
-	s.Run("returns false when any GVK in the list does not exist", func() {
-		result := s.provider.HasGVKs(s.T().Context(), []schema.GroupVersionKind{
-			{Group: "", Version: "v1", Kind: "Pod"},
-			{Group: "nonexistent.example.com", Version: "v1", Kind: "FakeResource"},
-		})
-		s.False(result)
-	})
 }
 
 func TestProviderSingle(t *testing.T) {

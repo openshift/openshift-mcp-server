@@ -10,6 +10,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/internal/test"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/stretchr/testify/suite"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -22,14 +23,11 @@ type ProviderKubeconfigTestSuite struct {
 
 func (s *ProviderKubeconfigTestSuite) SetupTest() {
 	// Kubeconfig provider is used when the multi-cluster feature is enabled with the kubeconfig strategy.
-	// For this test suite we simulate a kubeconfig with multiple contexts.
+	// For this test suite we back the kubeconfig context with a mock API server.
 	s.mockServer = test.NewMockServer()
-	kubeconfig := s.mockServer.Kubeconfig()
-	for i := 0; i < 10; i++ {
-		// Add multiple fake contexts to force multi-cluster behavior
-		kubeconfig.Contexts[fmt.Sprintf("context-%d", i)] = clientcmdapi.NewContext()
-	}
-	provider, err := NewProvider(s.T().Context(), &config.StaticConfig{KubeConfig: test.KubeconfigFile(s.T(), kubeconfig)})
+	// Default discovery simulates a vanilla (non-OpenShift) cluster.
+	s.mockServer.Handle(test.NewDiscoveryClientHandler())
+	provider, err := NewProvider(s.T().Context(), &config.StaticConfig{KubeConfig: s.mockServer.KubeconfigFile(s.T())})
 	s.Require().NoError(err, "Expected no error creating provider with kubeconfig")
 	s.provider = provider
 }
@@ -44,18 +42,25 @@ func (s *ProviderKubeconfigTestSuite) TestType() {
 	s.IsType(&kubeConfigClusterProvider{}, s.provider)
 }
 
-func (s *ProviderKubeconfigTestSuite) TestWithNonOpenShiftCluster() {
-	s.Run("IsOpenShift returns false", func() {
-		inOpenShift := s.provider.IsOpenShift(s.T().Context())
-		s.False(inOpenShift, "Expected InOpenShift to return false")
+func (s *ProviderKubeconfigTestSuite) TestWithOpenShiftCluster() {
+	// Serve the OpenShift discovery document so the Project GVK is present.
+	s.mockServer.ResetHandlers()
+	s.mockServer.Handle(test.NewInOpenShiftHandler())
+	s.Run("has OpenShift Project GVK", func() {
+		hasProjects := s.provider.AnyTargetHasGVKs(s.T().Context(), []schema.GroupVersionKind{
+			{Group: "project.openshift.io", Version: "v1", Kind: "Project"},
+		})
+		s.True(hasProjects, "Expected provider to report OpenShift Project GVK available")
 	})
 }
 
-func (s *ProviderKubeconfigTestSuite) TestWithOpenShiftCluster() {
-	s.mockServer.Handle(test.NewInOpenShiftHandler())
-	s.Run("IsOpenShift returns true", func() {
-		inOpenShift := s.provider.IsOpenShift(s.T().Context())
-		s.True(inOpenShift, "Expected InOpenShift to return true")
+func (s *ProviderKubeconfigTestSuite) TestWithNonOpenShiftGVK() {
+	s.Run("does not have non-existent GVK", func() {
+		// Default (non-OpenShift) discovery returns a 404 for the missing GroupVersion.
+		hasGVK := s.provider.AnyTargetHasGVKs(s.T().Context(), []schema.GroupVersionKind{
+			{Group: "nonexistent.example.com", Version: "v1", Kind: "Foo"},
+		})
+		s.False(hasGVK, "Expected provider to report no nonexistent GVK")
 	})
 }
 
@@ -63,11 +68,8 @@ func (s *ProviderKubeconfigTestSuite) TestGetTargets() {
 	s.Run("GetTargets returns all contexts defined in kubeconfig", func() {
 		targets, err := s.provider.GetTargets(s.T().Context())
 		s.Require().NoError(err, "Expected no error from GetTargets")
-		s.Len(targets, 11, "Expected 11 targets from GetTargets")
+		s.NotEmpty(targets, "Expected at least one target from GetTargets")
 		s.Contains(targets, "fake-context", "Expected fake-context in targets from GetTargets")
-		for i := 0; i < 10; i++ {
-			s.Contains(targets, fmt.Sprintf("context-%d", i), "Expected context-%d in targets from GetTargets", i)
-		}
 	})
 }
 
@@ -98,14 +100,14 @@ func (s *ProviderKubeconfigTestSuite) TestGetDefaultTarget() {
 
 func (s *ProviderKubeconfigTestSuite) TestEmptyCurrentContext() {
 	s.Run("with single context auto-selects it as default target", func() {
-		kubeconfig := s.mockServer.Kubeconfig()
+		kubeconfig := test.KubeConfigFake()
 		kubeconfig.CurrentContext = ""
 		provider, err := NewProvider(s.T().Context(), &config.StaticConfig{KubeConfig: test.KubeconfigFile(s.T(), kubeconfig)})
 		s.Require().NoError(err, "Expected no error creating provider with empty current-context and single context")
 		s.Equal("fake-context", provider.GetDefaultTarget(), "Expected auto-selected fake-context as default target")
 	})
 	s.Run("with multiple contexts returns error", func() {
-		kubeconfig := s.mockServer.Kubeconfig()
+		kubeconfig := test.KubeConfigFake()
 		kubeconfig.CurrentContext = ""
 		kubeconfig.Contexts["another-context"] = clientcmdapi.NewContext()
 		_, err := NewProvider(s.T().Context(), &config.StaticConfig{KubeConfig: test.KubeconfigFile(s.T(), kubeconfig)})
@@ -129,7 +131,11 @@ func (s *ProviderKubeconfigTestSuite) TestConcurrentReads() {
 			func() { _, _ = s.provider.GetTargets(context.Background()) },
 			func() { _ = s.provider.GetDefaultTarget() },
 			func() { _ = s.provider.IsMultiTarget() },
-			func() { _ = s.provider.IsOpenShift(context.Background()) },
+			func() {
+				_ = s.provider.AnyTargetHasGVKs(s.T().Context(), []schema.GroupVersionKind{
+					{Group: "project.openshift.io", Version: "v1", Kind: "Project"},
+				})
+			},
 			func() { _, _ = s.provider.GetDerivedKubernetes(context.Background(), "fake-context") },
 			func() { _ = s.provider.GetTargetParameterName() },
 		}
@@ -153,7 +159,7 @@ func (s *ProviderKubeconfigTestSuite) TestConcurrentLazyManagerInit() {
 		// Build a kubeconfig with several valid but unitialized contexts.
 		// Calling GetDerivedKubernetes for them simultaneusly exercises the write-lock
 		// upgrade path inside managerForContext.
-		kubeconfig := s.mockServer.Kubeconfig()
+		kubeconfig := test.KubeConfigFake()
 		const extraContexts = 5
 		for i := range extraContexts {
 			ctx := clientcmdapi.NewContext()
@@ -188,7 +194,7 @@ func (s *ProviderKubeconfigTestSuite) TestWatchTargetsWithConcurrentReaders() {
 		s.T().Setenv("CLUSTER_STATE_POLL_INTERVAL_MS", "50")
 		s.T().Setenv("CLUSTER_STATE_DEBOUNCE_WINDOW_MS", "10")
 
-		kubeconfig := s.mockServer.Kubeconfig()
+		kubeconfig := test.KubeConfigFake()
 		const extraContexts = 5
 		for i := range extraContexts {
 			ctx := clientcmdapi.NewContext()
@@ -221,7 +227,9 @@ func (s *ProviderKubeconfigTestSuite) TestWatchTargetsWithConcurrentReaders() {
 						_, _ = provider.GetTargets(context.Background())
 						_ = provider.GetDefaultTarget()
 						_ = provider.IsMultiTarget()
-						_ = provider.IsOpenShift(context.Background())
+						_ = provider.AnyTargetHasGVKs(s.T().Context(), []schema.GroupVersionKind{
+							{Group: "project.openshift.io", Version: "v1", Kind: "Project"},
+						})
 						_, _ = provider.GetDerivedKubernetes(context.Background(), "fake-context")
 					}
 				}

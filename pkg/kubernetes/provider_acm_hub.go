@@ -118,6 +118,8 @@ type acmHubClusterProvider struct {
 	clusterProxyCAFile string
 	watchKubeConfig    bool // whether or not the kubeconfig should be watched for changes
 
+	api.TargetCompatibilityToolFiltersEnabledProvider
+
 	// config for token exchange
 	targetTokenConfigs map[string]*tokenexchange.TargetTokenExchangeConfig
 	exchangeStrategy   string
@@ -187,7 +189,7 @@ func newACMHubClusterProvider(ctx context.Context, cfg api.BaseConfig) (Provider
 		return nil, fmt.Errorf("missing required config for strategy '%s'", ClusterProviderACM)
 	}
 
-	return newACMClusterProvider(ctx, m, providerCfg.(*ACMProviderConfig), false)
+	return newACMClusterProvider(ctx, m, providerCfg.(*ACMProviderConfig), false, cfg)
 }
 
 func newACMKubeConfigClusterProvider(ctx context.Context, cfg api.BaseConfig) (Provider, error) {
@@ -206,7 +208,7 @@ func newACMKubeConfigClusterProvider(ctx context.Context, cfg api.BaseConfig) (P
 		)
 	}
 
-	return newACMClusterProvider(ctx, baseManager, &acmKubeConfigProviderCfg.ACMProviderConfig, true)
+	return newACMClusterProvider(ctx, baseManager, &acmKubeConfigProviderCfg.ACMProviderConfig, true, cfg)
 }
 
 func discoverClusterProxyHost(ctx context.Context, m *Manager, isClusterProviderACMKubeConfig bool) (string, error) {
@@ -249,7 +251,7 @@ func discoverClusterProxyHost(ctx context.Context, m *Manager, isClusterProvider
 	return "", fmt.Errorf("failed to auto-discover cluster-proxy host: route and service not found")
 }
 
-func newACMClusterProvider(ctx context.Context, m *Manager, cfg *ACMProviderConfig, watchKubeConfig bool) (Provider, error) {
+func newACMClusterProvider(ctx context.Context, m *Manager, cfg *ACMProviderConfig, watchKubeConfig bool, baseCfg api.BaseConfig) (Provider, error) {
 	logger := klog.FromContext(ctx)
 
 	if !m.IsACMHub(ctx) {
@@ -283,6 +285,7 @@ func newACMClusterProvider(ctx context.Context, m *Manager, cfg *ACMProviderConf
 		skipTLSVerify:      cfg.ClusterProxyAddonSkipTLSVerify,
 		kubeConfigWatcher:  watcher.NewKubeconfig(ctx, m.kubernetes.clientCmdConfig),
 		clusterWatcher:     watcher.NewClusterState(ctx, m.kubernetes.DiscoveryClient()),
+		TargetCompatibilityToolFiltersEnabledProvider: baseCfg,
 	}
 
 	resourceVersion, err := provider.refreshClusters(ctx)
@@ -295,8 +298,8 @@ func newACMClusterProvider(ctx context.Context, m *Manager, cfg *ACMProviderConf
 	return provider, nil
 }
 
-func (p *acmHubClusterProvider) IsOpenShift(ctx context.Context) bool {
-	return p.hubManager.IsOpenShift(ctx)
+func (p *acmHubClusterProvider) AnyTargetHasGVKs(_ context.Context, _ []schema.GroupVersionKind) bool {
+	return true // TODO: implement this properly
 }
 
 func (p *acmHubClusterProvider) IsMultiTarget() bool {

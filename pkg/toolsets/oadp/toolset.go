@@ -24,7 +24,7 @@ func (t *Toolset) GetDescription() string {
 }
 
 // GetTools returns nil — OADP resources are managed via the core toolset's generic resource tools.
-func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
+func (t *Toolset) GetTools(_ api.FilteringProvider) []api.ServerTool {
 	return nil
 }
 

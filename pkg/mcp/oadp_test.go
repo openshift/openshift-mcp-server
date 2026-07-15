@@ -5,22 +5,24 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/suite"
-	"golang.org/x/sync/errgroup"
 
+	"github.com/containers/kubernetes-mcp-server/internal/test"
 	oadpToolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/oadp"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1spec "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
-var oadpApis = []schema.GroupVersionResource{
-	{Group: "velero.io", Version: "v1", Resource: "backups"},
-	{Group: "velero.io", Version: "v1", Resource: "restores"},
-	{Group: "velero.io", Version: "v1", Resource: "backupstoragelocations"},
-	{Group: "oadp.openshift.io", Version: "v1alpha1", Resource: "dataprotectionapplications"},
+var oadpCRDs = []*apiextensionsv1spec.CustomResourceDefinition{
+	test.CRD("velero.io", "v1", "backups", "Backup", "backup", true),
+	test.CRD("velero.io", "v1", "restores", "Restore", "restore", true),
+	test.CRD("velero.io", "v1", "backupstoragelocations", "BackupStorageLocation", "backupstoragelocation", true),
+	test.CRD("oadp.openshift.io", "v1alpha1", "dataprotectionapplications", "DataProtectionApplication", "dataprotectionapplication", true),
 }
 
 type OADPSuite struct {
@@ -28,26 +30,16 @@ type OADPSuite struct {
 }
 
 func (s *OADPSuite) SetupSuite() {
-	ctx := s.T().Context()
-	tasks, _ := errgroup.WithContext(ctx)
-	for _, api := range oadpApis {
-		gvr := api
-		tasks.Go(func() error { return EnvTestEnableCRD(ctx, gvr.Group, gvr.Version, gvr.Resource) })
-	}
-	s.Require().NoError(tasks.Wait())
+	_, err := envtest.InstallCRDs(test.EnvTestRestConfig(), envtest.CRDInstallOptions{CRDs: oadpCRDs})
+	s.Require().NoError(err)
 
-	_, err := kubernetes.NewForConfigOrDie(envTestRestConfig).CoreV1().Namespaces().
-		Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "openshift-adp"}}, metav1.CreateOptions{})
+	_, err = kubernetes.NewForConfigOrDie(test.EnvTestRestConfig()).CoreV1().Namespaces().
+		Create(s.T().Context(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "openshift-adp"}}, metav1.CreateOptions{})
 	s.Require().NoError(err)
 }
 
 func (s *OADPSuite) TearDownSuite() {
-	tasks, _ := errgroup.WithContext(s.T().Context())
-	for _, api := range oadpApis {
-		gvr := api
-		tasks.Go(func() error { return EnvTestDisableCRD(s.T().Context(), gvr.Group, gvr.Version, gvr.Resource) })
-	}
-	s.Require().NoError(tasks.Wait())
+	s.Require().NoError(envtest.UninstallCRDs(test.EnvTestRestConfig(), envtest.CRDInstallOptions{CRDs: oadpCRDs}))
 }
 
 func (s *OADPSuite) SetupTest() {
@@ -126,7 +118,7 @@ func (s *OADPSuite) TestTroubleshootPromptCustomNamespace() {
 
 func (s *OADPSuite) TestTroubleshootPromptWithBackup() {
 	s.Run("with existing backup", func() {
-		dynamicClient := dynamic.NewForConfigOrDie(envTestRestConfig)
+		dynamicClient := dynamic.NewForConfigOrDie(test.EnvTestRestConfig())
 		backup := &unstructured.Unstructured{
 			Object: map[string]any{
 				"apiVersion": "velero.io/v1",

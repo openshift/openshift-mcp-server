@@ -1,9 +1,0 @@
-$schema: https://json-schema.org/draft/2020-12/schema
-title: db_storage extension configuration
-type: object
-properties:
-    datasource:
-        type: string
-    driver:
-        type: string
-additionalProperties: false

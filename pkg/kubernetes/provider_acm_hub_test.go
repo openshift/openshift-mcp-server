@@ -58,13 +58,6 @@ func (s *ProviderACMHubTestSuite) TestType() {
 	s.IsType(&acmHubClusterProvider{}, s.provider)
 }
 
-func (s *ProviderACMHubTestSuite) TestWithNonOpenShiftCluster() {
-	s.Run("IsOpenShift returns false", func() {
-		inOpenShift := s.provider.IsOpenShift(s.T().Context())
-		s.False(inOpenShift, "Expected IsOpenShift to return false")
-	})
-}
-
 func (s *ProviderACMHubTestSuite) TestGetTargets() {
 	s.Run("GetTargets returns managed clusters in sorted order", func() {
 		targets, err := s.provider.GetTargets(s.T().Context())

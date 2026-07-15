@@ -17,7 +17,8 @@ import (
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/google/uuid"
-	"k8s.io/klog/v2"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 )
 
 const (
@@ -171,7 +172,7 @@ func BuildClientAssertion(
 		return "", time.Time{}, fmt.Errorf("failed to sign JWT assertion: %w", err)
 	}
 
-	klog.FromContext(ctx).V(4).Info("Built JWT client assertion",
+	klogutil.FromContext(ctx).V(4).Info("Built JWT client assertion",
 		"jwt.client_assertion.issuer", clientID,
 		"jwt.client_assertion.audience", tokenURL,
 		"jwt.client_assertion.jti", claims.ID,
@@ -187,7 +188,7 @@ func (c *TargetTokenExchangeConfig) GetOrBuildAssertion(ctx context.Context) (st
 	c.assertionMutex.Lock()
 	defer c.assertionMutex.Unlock()
 
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 
 	// Check if cached assertion is still valid (with margin)
 	if c.cachedAssertion != "" && time.Now().Add(AssertionRefreshMargin).Before(c.cachedAssertionExpiry) {

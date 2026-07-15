@@ -1,7 +1,0 @@
-$schema: https://json-schema.org/draft/2020-12/schema
-title: unroll processor configuration
-type: object
-properties:
-    recursive:
-        type: boolean
-additionalProperties: false

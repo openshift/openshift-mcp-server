@@ -11,6 +11,7 @@
 package logging
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -18,12 +19,14 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/go-logr/logr"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/textlogger"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 )
 
 // StderrSentinel is the magic value users put in log_file to route logs to
@@ -89,6 +92,40 @@ type Sink struct {
 	// the MCP SDK as its server-activity logger. It routes through klog and
 	// therefore through this Sink, so log_file changes follow it.
 	sdkLogger *slog.Logger
+
+	// logProvider is the OTel LoggerProvider backing the secondary log sink
+	// (if configured). Close calls Shutdown on it to flush pending records
+	// before releasing the file descriptor. Nil when OTel logging is not
+	// configured.
+	logProvider LogProvider
+}
+
+// LogProvider is implemented by providers that buffer log records and need
+// a graceful shutdown to flush them (e.g. *sdklog.LoggerProvider).
+type LogProvider interface {
+	Shutdown(ctx context.Context) error
+}
+
+// Option configures optional Sink behavior.
+type Option func(*sinkOptions)
+
+type sinkOptions struct {
+	otelSink     logr.LogSink
+	otelProvider LogProvider
+}
+
+// WithOtelLogSink adds an OpenTelemetry logr bridge sink alongside the text
+// logger. When set, every klog call is forwarded to both the text logger
+// (which writes through the Sink's io.Writer) and the OTel bridge (which
+// exports log records via the OTel SDK). The text logger is always the
+// primary — OTel failures never block local logging.
+//
+// The provider is shut down by Sink.Close to flush pending log records.
+func WithOtelLogSink(sink logr.LogSink, provider LogProvider) Option {
+	return func(o *sinkOptions) {
+		o.otelSink = sink
+		o.otelProvider = provider
+	}
 }
 
 // New configures klog and returns a Sink ready to use.
@@ -106,7 +143,7 @@ type Sink struct {
 // cmd.Complete and reuses it for the process lifetime.
 //
 // On error, the caller does not need to Close — no file is opened.
-func New(cfg *config.StaticConfig, httpOut, errOut io.Writer) (*Sink, error) {
+func New(cfg *config.StaticConfig, httpOut, errOut io.Writer, opts ...Option) (*Sink, error) {
 	s := &Sink{
 		httpOut:  httpOut,
 		errOut:   errOut,
@@ -123,11 +160,28 @@ func New(cfg *config.StaticConfig, httpOut, errOut io.Writer) (*Sink, error) {
 		_ = s.klogFlags.Set("v", strconv.Itoa(cfg.LogLevel))
 	}
 
+	var o sinkOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+
 	cfgOpts := []textlogger.ConfigOption{
 		textlogger.Output(s),
 		textlogger.Verbosity(maxTextloggerVerbosity),
 	}
-	klog.SetLoggerWithOptions(textlogger.NewLogger(textlogger.NewConfig(cfgOpts...)))
+	textLogger := textlogger.NewLogger(textlogger.NewConfig(cfgOpts...))
+
+	if o.otelSink != nil {
+		klog.SetLoggerWithOptions(logr.New(&teeSink{
+			primary:   textLogger.GetSink(),
+			secondary: o.otelSink,
+		}))
+		s.logProvider = o.otelProvider
+		klogutil.SetOtelLogSinkActive(true)
+	} else {
+		klog.SetLoggerWithOptions(textLogger)
+		klogutil.SetOtelLogSinkActive(false)
+	}
 
 	s.sdkLogger = slog.New(logr.ToSlogHandler(klog.Background()))
 	return s, nil
@@ -186,7 +240,21 @@ func (s *Sink) Reload(cfg *config.StaticConfig) error {
 // (e.g. an error log emitted by the caller's defer when Close itself
 // returns an error) lands somewhere visible instead of being swallowed by
 // the file descriptor we are about to close.
+//
+// When an OTel LogProvider is configured, Close shuts it down first so
+// pending log records are flushed to the backend while the text sink is
+// still active.
 func (s *Sink) Close() error {
+	// Flush OTel logs before closing the file-based sink. This runs outside
+	// the write lock — the provider shutdown may itself emit log calls that
+	// need to pass through Write.
+	if s.logProvider != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_ = s.logProvider.Shutdown(ctx)
+		cancel()
+		s.logProvider = nil
+	}
+
 	// Exclusive lock so the swap+close can't race an in-flight Write (see mu).
 	s.mu.Lock()
 	defer s.mu.Unlock()

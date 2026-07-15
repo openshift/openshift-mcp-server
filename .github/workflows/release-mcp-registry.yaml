@@ -22,11 +22,17 @@ permissions:
 jobs:
   publish:
     name: Publish to MCP Registry
-    if: github.repository == 'containers/kubernetes-mcp-server' && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    # Only act on this repository's own tag-push releases (or a manual dispatch).
+    if: >-
+      github.repository == 'containers/kubernetes-mcp-server' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.0
         with:
           # Use head_sha (not head_branch) to checkout the exact commit that Release validated
           ref: ${{ inputs.tag || github.event.workflow_run.head_sha }}
