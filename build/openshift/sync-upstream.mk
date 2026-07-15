@@ -112,7 +112,7 @@ sync-upstream-pr: ## Create/update PR to sync with upstream (requires gh CLI)
 		echo "  Creating new PR..."; \
 		gh pr create \
 			--repo "$(OWNER_REPO)" \
-			--title "chore: sync with upstream $$(date +'%Y-%m-%d') - $$BEHIND_COUNT new commits" \
+			--title "NO-JIRA: sync with upstream $$(date +'%Y-%m-%d')" \
 			--body "### 🔄 Upstream Sync"$$'\n'$$'\n'"This PR syncs the fork with the latest upstream changes."$$'\n'$$'\n'"**Changes:**"$$'\n'"$$CHANGELOG" \
 			--base main \
 			--head $(SYNC_BRANCH_NAME); \
