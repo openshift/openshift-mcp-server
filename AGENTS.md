@@ -35,8 +35,16 @@ Most changes will not require touching them unless the version or packaging need
 
 ### Logging
 
-When adding log lines, always use a contextual logger (`klog.FromContext(ctx)`). If necessary, add a `ctx` parameter to the function, and wire
+When adding log lines, always use a contextual logger (`klogutil.FromContext(ctx)` from `pkg/klogutil`). If necessary, add a `ctx` parameter to the function, and wire
 the context through to where you need a logger.
+
+`klogutil.FromContext` wraps `klog.FromContext` and injects the context into the logger's values so
+the OpenTelemetry log bridge can extract the active trace span for log-trace correlation. Do not use
+`klog.FromContext` directly in production code.
+
+If you start a new trace span (e.g. `ctx, span := tracer.Start(ctx, "op")`), you must call
+`klogutil.FromContext(ctx)` again to pick up the new span — the logger captured before the span was
+created still carries the old (or empty) span context.
 
 ### Adding new MCP tools
 

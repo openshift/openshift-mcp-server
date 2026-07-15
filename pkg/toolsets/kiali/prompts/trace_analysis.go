@@ -3,10 +3,9 @@ package prompts
 import (
 	"fmt"
 
-	"k8s.io/klog/v2"
-
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	kialiclient "github.com/containers/kubernetes-mcp-server/pkg/kiali"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kiali/tools"
 )
 
@@ -47,7 +46,7 @@ func traceAnalysisHandler(params api.PromptHandlerParams) (*api.PromptCallResult
 		return nil, fmt.Errorf("service argument is required")
 	}
 
-	klog.Infof("Starting trace analysis prompt for %s/%s...", namespace, service)
+	klogutil.FromContext(params.Context).Info("Starting trace analysis prompt...", "namespace", namespace, "service", service)
 
 	kiali := kialiclient.NewKiali(params, params.RESTConfig())
 

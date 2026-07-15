@@ -14,8 +14,9 @@ import (
 	"helm.sh/helm/v3/pkg/registry"
 	"helm.sh/helm/v3/pkg/release"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/yaml"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 )
 
 type Kubernetes interface {
@@ -127,7 +128,7 @@ func (h *Helm) newAction(ctx context.Context, namespace string, allNamespaces bo
 		return nil, err
 	}
 	cfg.RegistryClient = registryClient
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 	return cfg, cfg.Init(h.kubernetes, applicableNamespace, storageDriver, func(format string, v ...any) {
 		if logger.V(5).Enabled() {
 			logger.V(5).Info(fmt.Sprintf(format, v...))

@@ -12,10 +12,11 @@ import (
 	"os"
 	"strings"
 
+	"k8s.io/client-go/rest"
+
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
-	"k8s.io/client-go/rest"
-	"k8s.io/klog/v2"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 )
 
 type Kiali struct {
@@ -87,7 +88,7 @@ func (k *Kiali) validateAndGetURL(endpoint string) (string, error) {
 }
 
 func (k *Kiali) createHTTPClient(ctx context.Context) *http.Client {
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 	// Base TLS configuration with minimum version for security
 	tlsConfig := &tls.Config{
 		MinVersion:         tls.VersionTLS12,
@@ -174,7 +175,7 @@ func (k *Kiali) ExecuteRequest(ctx context.Context, endpoint string, arguments m
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal arguments: %w", err)
 	}
-	klog.FromContext(ctx).V(0).Info("kiali API call", "url.full", ApiCallURL)
+	klogutil.FromContext(ctx).V(0).Info("kiali API call", "url.full", ApiCallURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ApiCallURL, strings.NewReader(string(jsonData)))
 	if err != nil {
 		return "", err

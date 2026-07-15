@@ -10,9 +10,17 @@ This reference focuses on TOML file configuration. For CLI arguments, see the [C
 
 ## Table of Contents
 
+- [Table of Contents](#table-of-contents)
 - [Configuration Loading](#configuration-loading)
+  - [Usage](#usage)
 - [Drop-in Configuration](#drop-in-configuration)
+  - [How Drop-in Files Work](#how-drop-in-files-work)
+  - [Example Directory Structure](#example-directory-structure)
+  - [Example Drop-in Files](#example-drop-in-files)
 - [Dynamic Configuration Reload](#dynamic-configuration-reload)
+  - [How to Reload](#how-to-reload)
+  - [What Gets Reloaded](#what-gets-reloaded)
+  - [Limitations](#limitations)
 - [Configuration Reference](#configuration-reference-1)
   - [Server Settings](#server-settings)
   - [HTTP Server Security](#http-server-security)
@@ -30,9 +38,11 @@ This reference focuses on TOML file configuration. For CLI arguments, see the [C
   - [Validation](#validation)
   - [Confirmation Rules](#confirmation-rules)
   - [Toolset-Specific Configuration](#toolset-specific-configuration)
+    - [Helm Configuration](#helm-configuration)
   - [Cluster Provider Configuration](#cluster-provider-configuration)
 - [CLI Configuration Options](#cli-configuration-options)
 - [Complete Example](#complete-example)
+- [Related Documentation](#related-documentation)
 
 ## Configuration Loading
 
@@ -133,6 +143,7 @@ The server will:
 | `log_level` | integer | `0` | Logging verbosity level (0-9). Higher values produce more verbose output. Similar to [kubectl logging levels](https://kubernetes.io/docs/reference/kubectl/quick-reference/#kubectl-output-verbosity-and-debugging). |
 | `log_file` | string | `""` | Path to a server log file. Required for logging in stdio mode (where stdout is reserved for the MCP protocol); replaces stdout logging in HTTP mode. The file is created if it does not exist and opened in append mode (`O_APPEND`, `0o600`). Use the special value `stderr` to route logs to stderr without opening a file. |
 | `port` | string | `""` | When set, starts the MCP server in HTTP mode (Streamable HTTP at `/mcp`, SSE at `/sse`) on the specified port. |
+| `bind_address` | string | `"0.0.0.0"` | Address to bind the HTTP server to. Set to `127.0.0.1` to restrict to localhost. A warning is logged when listening on all interfaces (`0.0.0.0` or `::`) without TLS or OAuth. |
 | `sse_base_url` | string | `""` | Base URL for Server-Sent Events (SSE) connections. Used when the server is behind a reverse proxy. |
 | `list_output` | string | `"table"` | Output format for resource list operations. Valid values: `yaml`, `table`. |
 | `stateless` | boolean | `false` | When `true`, disables tool and prompt change notifications. Useful for container deployments, load balancing, and serverless environments. |
@@ -273,6 +284,7 @@ Control what operations the MCP server can perform on your Kubernetes cluster. T
 |-------|------|---------|-------------|
 | `read_only` | boolean | `false` | When `true`, only exposes tools annotated with `readOnlyHint=true`. Prevents any write operations on the cluster. |
 | `disable_destructive` | boolean | `false` | When `true`, disables tools annotated with `destructiveHint=true` (delete, update operations). Has no effect when `read_only` is `true`. |
+| `experimental_enable_target_compatibility_tool_filters` | boolean | `false` | Controls cluster-capability tool filtering. Tools that require API groups absent from the cluster (for example the OpenShift-only `projects_list`) are hidden. **NOTE:** This feature is experimental, and this option is subject to change or removal in a future release. |
 
 **Example:**
 ```toml
@@ -281,6 +293,9 @@ read_only = true
 
 # Or allow writes but prevent deletions
 disable_destructive = true
+
+# Probe every target for API-group compatibility
+experimental_enable_target_compatibility_tool_filters = true
 ```
 
 ### Toolsets
@@ -295,22 +310,16 @@ Toolsets group related tools together. Enable only the toolsets you need to redu
 
 <!-- AVAILABLE-TOOLSETS-START -->
 
-| Toolset               | Description                                                                                                                                                                                                      | Default |
-|-----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| cluster-diagnostics   | Tools for cluster diagnostics and troubleshooting                                                                                                                                                                |         |
-| config                | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                                                          | ✓       |
-| core                  | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                                                              | ✓       |
-| helm                  | Tools for managing Helm charts and releases                                                                                                                                                                      |         |
-| kcp                   | Manage kcp workspaces and multi-tenancy features                                                                                                                                                                 |         |
-| kubevirt              | OpenShift Virtualization tools for managing virtual machines, check the [OpenShift Virtualization documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/kubevirt.md) for more details. |         |
-| oadp                  | OADP (OpenShift API for Data Protection) tools for managing Velero backups, restores, and schedules                                                                                                              |         |
-| observability/logs    | Toolset for querying Loki logs                                                                                                                                                                                   |         |
-| observability/metrics | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                                                    |         |
-| observability/otelcol | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                                                       |         |
-| observability/traces  | Toolset for querying Tempo                                                                                                                                                                                       |         |
-| openshift             | OpenShift-specific tools for cluster management and troubleshooting                                                                                                                                              |         |
-| ossm                  | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                                                  |         |
-| tekton                | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns.                                                                                                                               |         |
+| Toolset   | Description                                                                                                                                                                                                                             | Default |
+|-----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| config    | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                                                                                 | ✓       |
+| core      | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                                                                                     | ✓       |
+| helm      | Tools for managing Helm charts and releases                                                                                                                                                                                             |         |
+| kcp       | Manage kcp workspaces and multi-tenancy features                                                                                                                                                                                        |         |
+| kiali     | Most common tools for managing Kiali, check the [Kiali documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/KIALI.md) for more details.                                                                    |         |
+| kubevirt  | KubeVirt virtual machine management tools, check the [KubeVirt documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/kubevirt.md) for more details.                                                         |         |
+| netobserv | Network observability tools backed by the NetObserv console plugin API (flows, metrics, export). Check the [NetObserv documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/NETOBSERV.md) for more details. |         |
+| tekton    | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns.                                                                                                                                                      |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -713,6 +722,7 @@ The following options can be set via command-line arguments. CLI arguments overr
 | Option | Description |
 |--------|-------------|
 | `--port` | Start in HTTP mode on the specified port |
+| `--bind-address` | Address to bind the HTTP server to (default: `0.0.0.0`) |
 | `--log-level` | Logging verbosity (0-9) |
 | `--log-file` | Path to a server log file. Required for logging in stdio mode; replaces stdout logging in HTTP mode. Use `stderr` to log to the standard error stream. |
 | `--config` | Path to main TOML configuration file |
@@ -738,6 +748,7 @@ A comprehensive configuration file demonstrating all major options:
 log_level = 2
 log_file = "/var/log/kubernetes-mcp-server.log"
 port = "8080"
+bind_address = "0.0.0.0"
 list_output = "table"
 stateless = false
 

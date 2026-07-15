@@ -7,7 +7,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	authv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
-	"k8s.io/klog/v2"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 )
 
 // CanI checks if the current identity can perform verb on resource.
@@ -40,7 +41,7 @@ func CanI(
 		return false, err
 	}
 
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 	if logger.V(5).Enabled() {
 		if response.Status.Allowed {
 			logger.V(5).Info("RBAC check allowed",

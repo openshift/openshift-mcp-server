@@ -8,8 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/config"
-	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -18,7 +16,9 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
-	"k8s.io/klog/v2"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 )
 
 // tracingEnabled indicates whether OpenTelemetry tracing is active.
@@ -44,7 +44,7 @@ func Enabled() bool {
 func getSamplerFromEnv(ctx context.Context) trace.Sampler {
 	samplerType := os.Getenv("OTEL_TRACES_SAMPLER")
 	samplerArg := os.Getenv("OTEL_TRACES_SAMPLER_ARG")
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 
 	// Parse sampler argument (ratio) if provided
 	ratio := 1.0 // Default to 100% sampling
@@ -116,7 +116,7 @@ func getSamplerFromEnv(ctx context.Context) trace.Sampler {
 //   - "http": Alias for "http/protobuf"
 func createExporter(ctx context.Context) (*otlptrace.Exporter, error) {
 	protocol := strings.ToLower(os.Getenv("OTEL_EXPORTER_OTLP_PROTOCOL"))
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 
 	switch protocol {
 	case "http/protobuf", "http":
@@ -146,7 +146,7 @@ func createExporter(ctx context.Context) (*otlptrace.Exporter, error) {
 // Tracing is only enabled if OTEL_EXPORTER_OTLP_ENDPOINT is set.
 // Check telemetry.Enabled() to determine if tracing is active.
 func InitTracer(ctx context.Context, serviceName, serviceVersion string) (func(), error) {
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 	// Check if OTLP endpoint is configured - if not, skip all tracing setup
 	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
 	if endpoint == "" {
@@ -225,7 +225,7 @@ func InitTracer(ctx context.Context, serviceName, serviceVersion string) (func()
 // The config values can be overridden by environment variables.
 // Check telemetry.Enabled() to determine if tracing is active.
 func InitTracerWithConfig(ctx context.Context, cfg *config.TelemetryConfig, serviceName, serviceVersion string) (func(), error) {
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 
 	if cfg == nil || !cfg.IsEnabled() {
 		logger.V(2).Info("Telemetry not enabled, tracing disabled")
@@ -293,7 +293,7 @@ func InitTracerWithConfig(ctx context.Context, cfg *config.TelemetryConfig, serv
 func getSamplerFromConfig(ctx context.Context, cfg *config.TelemetryConfig) trace.Sampler {
 	samplerType := cfg.GetTracesSampler()
 	samplerArg := cfg.GetTracesSamplerArg()
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 
 	ratio := 1.0 // Default to 100% sampling
 	if samplerArg != "" {
@@ -361,7 +361,7 @@ func getSamplerFromConfig(ctx context.Context, cfg *config.TelemetryConfig) trac
 func createExporterWithConfig(ctx context.Context, cfg *config.TelemetryConfig) (*otlptrace.Exporter, error) {
 	protocol := strings.ToLower(cfg.GetProtocol())
 	endpoint := cfg.GetEndpoint()
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 
 	switch protocol {
 	case "http/protobuf", "http":

@@ -14,11 +14,11 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"golang.org/x/time/rate"
-	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	internalk8s "github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/metrics"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
@@ -78,6 +78,13 @@ func (c *Configuration) isToolApplicable(tool api.ServerTool) bool {
 	if c.DisabledTools != nil && slices.Contains(c.DisabledTools, tool.Tool.Name) {
 		return false
 	}
+	if c.EnableTargetCompatibilityToolFilters {
+		for _, filter := range tool.TargetCompatibilityFilters {
+			if !filter() {
+				return false
+			}
+		}
+	}
 	return true
 }
 
@@ -114,7 +121,7 @@ type Server struct {
 func NewServer(ctx context.Context, configuration Configuration, targetProvider internalk8s.Provider) (*Server, error) {
 	sdkLogger := configuration.SDKLogger
 	if sdkLogger == nil {
-		sdkLogger = slog.New(logr.ToSlogHandler(klog.Background()))
+		sdkLogger = slog.New(logr.ToSlogHandler(klogutil.FromContext(ctx)))
 	}
 	s := &Server{
 		server: mcp.NewServer(
@@ -549,7 +556,7 @@ func (s *Server) GetEnabledResourceTemplates() []string {
 // concurrent readers (rate-limit closure, confirmation rules, list output...)
 // can never observe a new-but-rejected configuration.
 func (s *Server) ReloadConfiguration(ctx context.Context, newConfig *config.StaticConfig) error {
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 	logger.V(1).Info("Reloading MCP server configuration...")
 
 	// Validate config-level invariants (same checks as startup)

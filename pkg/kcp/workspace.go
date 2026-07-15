@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
-	"k8s.io/klog/v2"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 )
 
 // WorkspaceGVR is the GroupVersionResource for kcp workspaces.
@@ -55,7 +55,7 @@ func DiscoverWorkspacesRecursive(
 	parentWorkspace string,
 	discovered map[string]bool,
 ) error {
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 	// Parse base URL from the config
 	baseURL, _ := ParseServerURL(baseRestConfig.Host)
 
@@ -131,6 +131,6 @@ func DiscoverAllWorkspaces(
 		workspaces = append(workspaces, ws)
 	}
 
-	klog.FromContext(ctx).V(2).Info("Discovered workspaces via kcp API (including nested)", "num_workspaces", len(workspaces))
+	klogutil.FromContext(ctx).V(2).Info("Discovered workspaces via kcp API (including nested)", "num_workspaces", len(workspaces))
 	return workspaces, nil
 }

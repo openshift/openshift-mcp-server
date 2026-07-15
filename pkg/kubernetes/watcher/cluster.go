@@ -8,9 +8,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/openshift"
+	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
-	"k8s.io/klog/v2"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 )
 
 const (
@@ -44,7 +46,7 @@ var _ Watcher = (*ClusterState)(nil)
 func NewClusterState(ctx context.Context, discoveryClient discovery.CachedDiscoveryInterface) *ClusterState {
 	pollInterval := DefaultClusterStatePollInterval
 	debounceWindow := DefaultClusterStateDebounceWindow
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 
 	// Allow override via environment variable for testing
 	if envInterval := os.Getenv("CLUSTER_STATE_POLL_INTERVAL_MS"); envInterval != "" {
@@ -73,7 +75,7 @@ func NewClusterState(ctx context.Context, discoveryClient discovery.CachedDiscov
 // and triggers a debounced reload when changes are detected.
 // It can only be called once per ClusterState instance.
 func (w *ClusterState) Watch(ctx context.Context, onChange func() error) {
-	logger := klog.FromContext(ctx)
+	logger := klogutil.FromContext(ctx)
 
 	w.mu.Lock()
 	if w.started {
@@ -187,6 +189,11 @@ func (w *ClusterState) captureState() clusterState {
 		}
 		sort.Strings(state.apiGroups)
 	}
-	state.isOpenShift = openshift.IsOpenshift(w.discoveryClient)
+	// Check if this is an OpenShift cluster by looking for the Project GVK
+	// For backward compatibility, treat discovery errors as "not OpenShift"
+	hasProject, err := api.HasGVKs(w.discoveryClient, []schema.GroupVersionKind{
+		{Group: "project.openshift.io", Version: "v1", Kind: "Project"},
+	})
+	state.isOpenShift = err == nil && hasProject
 	return state
 }

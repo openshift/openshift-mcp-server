@@ -9,13 +9,13 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/api"
-	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	authv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
-	"k8s.io/klog/v2"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 )
 
 // AccessControlRoundTripper intercepts HTTP requests to enforce access control
@@ -45,7 +45,7 @@ func NewAccessControlRoundTripper(ctx context.Context, cfg AccessControlRoundTri
 	var apiPathPrefix string
 	if cfg.HostURL != "" {
 		if hostURL, err := url.Parse(cfg.HostURL); err != nil {
-			klogutil.LogWarn(klog.FromContext(ctx),
+			klogutil.LogWarn(klogutil.FromContext(ctx),
 				"failed to parse Kubernetes API server host to determine API path prefix",
 				klogutil.Field("url.full", cfg.HostURL),
 				klogutil.Err(err),
@@ -142,7 +142,7 @@ func (rt *AccessControlRoundTripper) RoundTrip(req *http.Request) (*http.Respons
 		validationReq.Body = body
 	}
 
-	logger := klog.FromContext(req.Context())
+	logger := klogutil.FromContext(req.Context())
 	for _, v := range rt.validators {
 		if validationErr := v.Validate(req.Context(), validationReq); validationErr != nil {
 			if ve, ok := validationErr.(*api.ValidationError); ok {

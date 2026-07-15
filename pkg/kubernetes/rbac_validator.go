@@ -3,10 +3,10 @@ package kubernetes
 import (
 	"context"
 
+	authv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
+
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
-	authv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
-	"k8s.io/klog/v2"
 )
 
 // RBACValidator pre-checks RBAC permissions before execution.
@@ -37,7 +37,7 @@ func (v *RBACValidator) Validate(ctx context.Context, req *api.HTTPValidationReq
 
 	allowed, err := CanI(ctx, authClient, req.GVR, req.Namespace, req.ResourceName, req.Verb)
 	if err != nil {
-		klogutil.LogInfo(klog.FromContext(ctx).V(4), "RBAC pre-validation failed", klogutil.Err(err))
+		klogutil.LogInfo(klogutil.FromContext(ctx).V(4), "RBAC pre-validation failed", klogutil.Err(err))
 		return nil
 	}
 

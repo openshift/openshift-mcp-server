@@ -28,6 +28,7 @@ Choose the guide that matches your needs:
 - **[OpenTelemetry Collector](./observability/otelcol.md)** - Component discovery, schemas, and config validation (`observability/otelcol` toolset, via [obs-mcp](https://github.com/rhobs/obs-mcp))
 - **[OADP](OADP.md)** - Tools for OpenShift API for Data Protection (Velero backups, restores, schedules)
 - **[Kiali](KIALI.md)** - Tools for Kiali ServiceMesh with Istio
+- **[NetObserv](NETOBSERV.md)** - Network observability flows, metrics, and alerts (Helm on OpenShift)
 - **[KubeVirt](kubevirt.md)** - KubeVirt virtual machine management tools
 
 ## Feature Specifications

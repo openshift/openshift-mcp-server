@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 
+	"github.com/google/jsonschema-go/jsonschema"
+
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
-	"github.com/google/jsonschema-go/jsonschema"
-	"k8s.io/klog/v2"
 )
 
 // ErrConfirmationDenied is returned when the user declines a confirmation prompt
@@ -57,7 +57,7 @@ func CheckConfirmation(ctx context.Context, elicitor api.Elicitor, message, fall
 			if fallback == "deny" {
 				return ErrConfirmationDenied
 			}
-			klogutil.LogWarn(klog.FromContext(ctx), "Confirmation rules matched but client does not support elicitation, proceeding with fallback \"allow\"", klogutil.Field("message", message))
+			klogutil.LogWarn(klogutil.FromContext(ctx), "Confirmation rules matched but client does not support elicitation, proceeding with fallback \"allow\"", klogutil.Field("message", message))
 			return nil
 		}
 		return err
