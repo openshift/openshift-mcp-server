@@ -29,7 +29,7 @@ func (t *Toolset) GetDescription() string {
 }
 
 // GetTools returns all tools provided by this toolset.
-func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
+func (t *Toolset) GetTools(_ api.FilteringProvider) []api.ServerTool {
 	return slices.Concat(
 		toolset_tools.InitListMetrics(),
 		toolset_tools.InitExecuteInstantQuery(),
@@ -62,7 +62,7 @@ func (t *Toolset) GetResourceTemplates() []api.ServerResourceTemplate {
 
 func init() {
 	toolsets.Register(&Toolset{})
-	toolsets.Register(&tempo.Toolset{NewTempoLoader: toolset_tools.NewTempoLoader})
-	toolsets.Register(&logs.Toolset{NewLokiLoader: toolset_tools.NewLokiLoader})
+	toolsets.Register(&tempo.Toolset{})
+	toolsets.Register(&logs.Toolset{})
 	toolsets.Register(&otelcol.Toolset{})
 }

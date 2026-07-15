@@ -336,10 +336,10 @@ github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJwooC2xJA040=
 github.com/opencontainers/image-spec v1.1.1/go.mod h1:qpqAh3Dmcf36wStyyWU+kCeDgrGnAve2nCC8+7h8Q0M=
-github.com/os-observability/redhat-opentelemetry-collector/configschemas v0.0.0-20260611132535-04e24ebf54ab h1:4HWk+v8GBIJyPLP4mRGfvncjmDbtqxK8gfvAo76CDQw=
-github.com/os-observability/redhat-opentelemetry-collector/configschemas v0.0.0-20260611132535-04e24ebf54ab/go.mod h1:ThsbZTM538g95wb3Aj/+XHfFfpW/YBHdO5o6W0f+IRw=
-github.com/pavolloffay/opentelemetry-mcp-server/modules/collectorschema v0.0.0-20260520093054-4540dfe82192 h1:BSUqid8PYcMHLM1mvYdsHgO0vSaj5YL346Dw1fU9IGA=
-github.com/pavolloffay/opentelemetry-mcp-server/modules/collectorschema v0.0.0-20260520093054-4540dfe82192/go.mod h1:8O9OWWUERoegxTzJcN0c/613/qzTBkoDESFJiE/dLxg=
+github.com/os-observability/redhat-opentelemetry-collector/configschemas v0.0.0-20260617154302-0835b732e6cd h1:sSOiEB68HiUbYx4iScn1FCyuksa5LWN7G3GXfnlUk2o=
+github.com/os-observability/redhat-opentelemetry-collector/configschemas v0.0.0-20260617154302-0835b732e6cd/go.mod h1:ThsbZTM538g95wb3Aj/+XHfFfpW/YBHdO5o6W0f+IRw=
+github.com/pavolloffay/opentelemetry-mcp-server/modules/schemagen v0.0.0-20260710124846-8bb49fd6ccc7 h1:mUR6Z3GIYvOMUIkcs+2p0ggzkaK7La3ZF7Ki8X9Kx0A=
+github.com/pavolloffay/opentelemetry-mcp-server/modules/schemagen v0.0.0-20260710124846-8bb49fd6ccc7/go.mod h1:wW9qWwV3FCBH7YduES6KvpOw9dz5+Y63+yZqiQ9eT2Y=
 github.com/pborman/getopt v0.0.0-20170112200414-7148bc3a4c30/go.mod h1:85jBQOZwpVEaDAr341tbn15RS4fCAsIst0qp7i8ex1o=
 github.com/peterbourgon/diskv v2.0.1+incompatible h1:UBdAOUP5p4RWqPBg048CAvpKN+vxiaj6gdUUzhl4XmI=
 github.com/peterbourgon/diskv v2.0.1+incompatible/go.mod h1:uqqh8zWWbv1HBMNONnaR/tNboyR3/BZd58JJSHlUSCU=
@@ -356,8 +356,8 @@ github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRI
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/poy/onpar v1.1.2 h1:QaNrNiZx0+Nar5dLgTVp5mXkyoVFIbepjyEoGSnhbAY=
 github.com/poy/onpar v1.1.2/go.mod h1:6X8FLNoxyr9kkmnlqpK6LSoiOtrO6MICtWwEuWkLjzg=
-github.com/prometheus/alertmanager v0.33.0 h1:AAVa3wpCsaDxisTUUPXx+1qhnA2mx0f8Cc+smpAtN7w=
-github.com/prometheus/alertmanager v0.33.0/go.mod h1:V06Uc8EZ5X5wLOJRGhtXx+EE2LgrinFIADbKWMVm1RY=
+github.com/prometheus/alertmanager v0.33.1 h1:PJHGvTdb8Q0ZEpJnWff120WxB2kxIScLa707AaIudTo=
+github.com/prometheus/alertmanager v0.33.1/go.mod h1:V06Uc8EZ5X5wLOJRGhtXx+EE2LgrinFIADbKWMVm1RY=
 github.com/prometheus/client_golang v1.23.2 h1:Je96obch5RDVy3FDMndoUsjAhG5Edi49h0RJWRi/o0o=
 github.com/prometheus/client_golang v1.23.2/go.mod h1:Tb1a6LWHB3/SPIzCoaDXI4I8UHKeFTEQ1YCr+0Gyqmg=
 github.com/prometheus/client_golang/exp v0.0.0-20260602051030-3537b20ac86b h1:633sracZPrB7O7T6r5skFtwqXDOrXlQkE9Wr5DnYVJE=
@@ -380,8 +380,8 @@ github.com/redis/go-redis/extra/redisotel/v9 v9.0.5 h1:EfpWLLCyXw8PSM2/XNJLjI3Pb
 github.com/redis/go-redis/extra/redisotel/v9 v9.0.5/go.mod h1:WZjPDy7VNzn77AAfnAfVjZNvfJTYfPetfZk5yoSTLaQ=
 github.com/redis/go-redis/v9 v9.7.3 h1:YpPyAayJV+XErNsatSElgRZZVCwXX9QzkKYNvO7x0wM=
 github.com/redis/go-redis/v9 v9.7.3/go.mod h1:bGUrSggJ9X9GUmZpZNEOQKaANxSGgOEBRltRTZHSvrA=
-github.com/rhobs/obs-mcp v0.5.0 h1:T+lMubCQzxpO+PpPMYQSNQ4ezmneJwi2pwoNlYXBV1s=
-github.com/rhobs/obs-mcp v0.5.0/go.mod h1:XtTCc6TRtyASgtkxzqYEjl7hE7Fyh7IwtOsl/tqwi9Q=
+github.com/rhobs/obs-mcp v0.6.0 h1:Db7tNlAnRm2dZEz0WObdTRveK580DW0+DmtqUvqgiik=
+github.com/rhobs/obs-mcp v0.6.0/go.mod h1:CM/YrcWJvOA9h1i+LSraYBJpKC2/msIaXVjlDOSr6Us=
 github.com/rivo/uniseg v0.2.0 h1:S1pD9weZBuJdFmowNwbpi7BJ8TNftyUImj/0WQi72jY=
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=

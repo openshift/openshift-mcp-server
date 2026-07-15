@@ -2,16 +2,12 @@ package traces
 
 import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
-
-	tempoclient "github.com/rhobs/obs-mcp/pkg/traces/tempo"
 )
 
 const ToolsetName = "observability/traces"
 
 // Toolset implements the observability toolset for Tempo.
-type Toolset struct {
-	NewTempoLoader func(params api.ToolHandlerParams, url string) (tempoclient.Loader, error)
-}
+type Toolset struct{}
 
 var _ api.Toolset = (*Toolset)(nil)
 
@@ -22,18 +18,17 @@ func (t *Toolset) GetName() string {
 
 // GetDescription returns a human-readable description of the toolset.
 func (t *Toolset) GetDescription() string {
-	return "Toolset for querying Tempo"
+	return "Distributed tracing tools for discovering Tempo instances, searching and retrieving traces, and exploring trace attributes."
 }
 
 // GetTools returns all tools provided by this toolset.
-func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
+func (t *Toolset) GetTools(_ api.FilteringProvider) []api.ServerTool {
 	return []api.ServerTool{
-		// TODO: merge the two conversion steps into one call
-		ListInstancesTool.ToServerTool(ToServerHandler(t.NewTempoLoader, t.ListInstancesHandler)),
-		GetTraceByIDTool.ToServerTool(ToServerHandler(t.NewTempoLoader, t.GetTraceByIDHandler)),
-		SearchTracesTool.ToServerTool(ToServerHandler(t.NewTempoLoader, t.SearchTracesHandler)),
-		SearchTagsTool.ToServerTool(ToServerHandler(t.NewTempoLoader, t.SearchTagsHandler)),
-		SearchTagValuesTool.ToServerTool(ToServerHandler(t.NewTempoLoader, t.SearchTagValuesHandler)),
+		initListInstances(),
+		initGetTraceByID(),
+		initSearchTraces(),
+		initSearchTags(),
+		initSearchTagValues(),
 	}
 }
 

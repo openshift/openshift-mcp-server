@@ -1,9 +1,0 @@
-.bin/
-tmp/
-testdata/actual_generated_schema.yaml
-
-build/otelcol-contrib
-build/test-schemas
-build/test_output/
-build/vendor/
-build/contrim
