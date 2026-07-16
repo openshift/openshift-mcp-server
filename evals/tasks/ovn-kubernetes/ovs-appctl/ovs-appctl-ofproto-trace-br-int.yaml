@@ -1,0 +1,29 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "ovs-appctl-ofproto-trace-br-int"
+  difficulty: medium
+  category: "OVS OpenFlow"
+  description: "Trace a TCP packet through the OpenFlow pipeline on the br-int bridge of an ovnkube-node pod"
+  labels:
+    suite: ovn-kubernetes
+    requires: ovn-kubernetes
+spec:
+  limits:
+    timeout: "5m"
+  setup:
+    - script:
+        file: ./setup.sh
+  prompt:
+    inline: |
+      Trace a TCP packet through the OpenFlow pipeline on the br-int bridge on one of the ovnkube-node pods.
+      Use a simple flow specification like "in_port=1,tcp,nw_src=10.0.0.1,nw_dst=10.0.0.2,tp_dst=80".
+      Show the raw output of the trace command, do not summarize.
+  verify:
+    - llmJudge:
+        contains: "Traces the TCP packet through the OpenFlow tables on br-int and shows the resulting datapath actions taken on the packet at the end of the pipeline"
+        reasoning: "ofproto/trace simulates a packet through the OpenFlow pipeline and always ends with a Datapath actions line describing the final disposition"
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "ovs_appctl"
