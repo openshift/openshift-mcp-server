@@ -7,7 +7,7 @@
       "readOnlyHint": true,
       "title": "TNF: Check Fencing Config"
     },
-    "description": "Check fencing configuration and readiness for a Two-Node Fencing (TNF) cluster. Validates cluster topology, critical operator health (etcd, machine-api, baremetal), Machine/Node/BareMetalHost correlation, BMC addresses and credentials, FenceAgentsRemediation templates and active remediations, and NodeHealthCheck resources. Returns a diagnostic summary identifying configuration issues that could prevent fencing from functioning correctly.",
+    "description": "Check fencing configuration and readiness for a Two-Node Fencing (TNF) cluster. Validates cluster topology, critical operator health (etcd, machine-api, baremetal), Machine/Node/BareMetalHost correlation, BMC addresses and credentials, pacemaker/STONITH fencing status via Kubernetes resources. Returns a diagnostic summary identifying configuration issues that could prevent fencing from functioning correctly.",
     "inputSchema": {
       "properties": {
         "namespace": {
