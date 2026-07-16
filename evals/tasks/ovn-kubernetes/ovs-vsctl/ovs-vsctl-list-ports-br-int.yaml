@@ -1,0 +1,27 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "ovs-vsctl-list-ports-br-int"
+  difficulty: easy
+  category: "OVS Configuration"
+  description: "List ports attached to the br-int bridge on an ovnkube-node pod"
+  labels:
+    suite: ovn-kubernetes
+    requires: ovn-kubernetes
+spec:
+  limits:
+    timeout: "5m"
+  setup:
+    - script:
+        file: ./setup.sh
+  prompt:
+    inline: |
+      List all the ports attached to the br-int bridge on one of the ovnkube-node pods.
+  verify:
+    - llmJudge:
+        contains: "Lists the ports attached to br-int on the ovnkube-node pod, which typically includes the ovn-k8s-mp0 management port used by the local node and pod interface ports for pods scheduled on that node"
+        reasoning: "br-int on any OVN-K node has ovn-k8s-mp0 as the management port and one veth-style port per pod scheduled on that node. On a busy cluster there can be many pod ports"
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "ovs_vsctl"

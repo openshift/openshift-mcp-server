@@ -1,0 +1,28 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "ovs-ofctl-dump-flows-br-int"
+  difficulty: easy
+  category: "OVS OpenFlow"
+  description: "Dump OpenFlow flows from the br-int bridge on an ovnkube-node pod"
+  labels:
+    suite: ovn-kubernetes
+    requires: ovn-kubernetes
+spec:
+  limits:
+    timeout: "5m"
+  setup:
+    - script:
+        file: ./setup.sh
+  prompt:
+    inline: |
+      Dump the OpenFlow flows from the br-int bridge on one of the ovnkube-node pods.
+      Limit the output to the first 50 lines and show them raw without summarization.
+  verify:
+    - llmJudge:
+        contains: "Shows raw OpenFlow flow entries from br-int with fields such as cookie, table, priority, match conditions and actions that OVN uses to implement its logical pipeline in the datapath"
+        reasoning: "The tool returns raw ovs-ofctl output containing flow entries with structural fields (cookie, table, priority, match, actions). These fields are always present in dump-flows output on any healthy OVN-K node."
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "ovs_ofctl"
