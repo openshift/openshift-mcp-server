@@ -137,4 +137,4 @@ make run-netobserv-evals   # mock + MCP server + mcpchecker (target: >= 80% pass
 
 Manual steps: `make setup-netobserv`, `make run-server TOOLSETS=core,netobserv MCP_CONFIG_DIR=dev/config/mcp-configs`, `make run-evals EVAL_LABEL_SELECTOR=suite=netobserv`.
 
-Maintainers can trigger CI with `/run-mcpchecker netobserv` on a pull request. See [evals/README.md](../evals/README.md) and [evals/tasks/netobserv/README.md](../evals/tasks/netobserv/README.md).
+Maintainers can trigger CI by submitting a PR review containing `/run-mcpchecker netobserv`. See [evals/README.md](../evals/README.md) and [evals/tasks/netobserv/README.md](../evals/tasks/netobserv/README.md).
