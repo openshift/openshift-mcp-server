@@ -310,8 +310,8 @@ Toolsets group related tools together. Enable only the toolsets you need to redu
 
 <!-- AVAILABLE-TOOLSETS-START -->
 
-| Toolset   | Description                                                                                                                                                                                                                             | Default |
-|-----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| Toolset               | Description                                                                                                                                                                                                                             | Default |
+|-----------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
 | config    | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                                                                                 | ✓       |
 | core      | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                                                                                     | ✓       |
 | helm      | Tools for managing Helm charts and releases                                                                                                                                                                                             |         |
@@ -319,6 +319,10 @@ Toolsets group related tools together. Enable only the toolsets you need to redu
 | kiali     | Most common tools for managing Kiali, check the [Kiali documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/KIALI.md) for more details.                                                                    |         |
 | kubevirt  | KubeVirt virtual machine management tools, check the [KubeVirt documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/kubevirt.md) for more details.                                                         |         |
 | netobserv | Network observability tools backed by the NetObserv console plugin API (flows, metrics, export). Check the [NetObserv documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/NETOBSERV.md) for more details. |         |
+| observability/logs    | Toolset for querying Loki logs                                                                                                                                                                                                          |         |
+| observability/metrics | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                                                                           |         |
+| observability/otelcol | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                                                                              |         |
+| observability/traces  | Distributed tracing tools for discovering Tempo instances, searching and retrieving traces, and exploring trace attributes.                                                                                                             |         |
 | tekton    | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns.                                                                                                                                                      |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
@@ -700,6 +704,7 @@ The Helm toolset supports an optional `allowed_registries` allowlist to restrict
 
 Refer to individual toolset documentation for available options:
 - [Kiali Configuration](KIALI.md)
+- [Metrics](observability/metrics.md), [Logs](observability/logs.md), [Tracing](observability/tracing.md), [OpenTelemetry Collector](observability/otelcol.md)
 
 ### Cluster Provider Configuration
 
@@ -812,6 +817,12 @@ traces_sampler_arg = 0.1
 # Toolset-specific configuration
 [toolset_configs.kiali]
 url = "https://kiali.example.com"
+
+# Observability toolsets — see docs/observability/{metrics,logs,tracing,otelcol}.md
+# [toolset_configs."observability/metrics"]
+# [toolset_configs."observability/logs"]
+# [toolset_configs."observability/traces"]
+# [toolset_configs."observability/otelcol"]
 
 [toolset_configs.helm]
 allowed_registries = ["oci://ghcr.io/myorg", "https://charts.example.com"]
