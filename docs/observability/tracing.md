@@ -126,7 +126,7 @@ insecure = false
 
 # Resolve Tempo query URLs via OpenShift Routes instead of in-cluster Services.
 # Default: false
-useRoute = false
+use_route = false
 ```
 
 ### Configuration reference
@@ -135,7 +135,7 @@ useRoute = false
 |--------|------|---------|-------------|
 | `auth_mode` | string | `"header"` | Bearer token source: `"header"` or `"kubeconfig"` |
 | `insecure` | bool | `false` | Skip TLS certificate verification |
-| `useRoute` | bool | `false` | Use OpenShift `Route` resources for Tempo gateway/query URLs |
+| `use_route` | bool | `false` | Use OpenShift `Route` resources for Tempo gateway/query URLs |
 
 ---
 
@@ -147,7 +147,7 @@ Bearer token behavior matches the [metrics toolset](./metrics.md) (**Authenticat
 
 ## Instance discovery
 
-The server lists **`TempoStack`** and **`TempoMonolithic`** objects cluster-wide and derives query-frontend or gateway base URLs from each resource. With **`useRoute = true`**, it prefers OpenShift `Route` hosts where available.
+The server lists **`TempoStack`** and **`TempoMonolithic`** objects cluster-wide and derives query-frontend or gateway base URLs from each resource. With **`use_route = true`**, it prefers OpenShift `Route` hosts where available.
 
 Chosen instances are **validated** against this discovery list before any request is sent, so callers cannot point tools at arbitrary URLs.
 
@@ -156,7 +156,7 @@ Chosen instances are **validated** against this discovery list before any reques
 ## Prerequisites
 
 - **Tempo Operator** workloads in the cluster (`TempoStack` and/or `TempoMonolithic` CRs).
-- **RBAC** on the MCP identity to **list** `TempoStack` and `TempoMonolithic` objects cluster-wide. If **`useRoute`** is enabled, the server also **gets** `Route` resources in each Tempo namespace to resolve external hosts.
+- **RBAC** on the MCP identity to **list** `TempoStack` and `TempoMonolithic` objects cluster-wide. If **`use_route`** is enabled, the server also **gets** `Route` resources in each Tempo namespace to resolve external hosts.
 - **Bearer token** with permission to reach the resolved Tempo query API (same patterns as the metrics toolset).
 
 ---

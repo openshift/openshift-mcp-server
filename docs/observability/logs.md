@@ -122,7 +122,7 @@ insecure = false
 
 # Resolve Loki query URLs via OpenShift Routes instead of in-cluster Services.
 # Default: false
-useRoute = false
+use_route = false
 ```
 
 ### Configuration reference
@@ -132,7 +132,7 @@ useRoute = false
 | `auth_mode` | string | `"header"` | Bearer token source: `"header"` or `"kubeconfig"` |
 | `loki_url` | string | — | Loki API endpoint URL (optional; use LokiStack discovery if unset) |
 | `insecure` | bool | `false` | Skip TLS certificate verification |
-| `useRoute` | bool | `false` | Use OpenShift `Route` resources for LokiStack gateway URLs |
+| `use_route` | bool | `false` | Use OpenShift `Route` resources for LokiStack gateway URLs |
 
 ---
 
@@ -154,7 +154,7 @@ In `header` mode, you can either set `loki_url` **or** use LokiStack discovery (
 
 ## Instance discovery
 
-The server lists **`LokiStack`** objects cluster-wide and derives gateway base URLs from each resource. With **`useRoute = true`**, it prefers OpenShift `Route` hosts where available.
+The server lists **`LokiStack`** objects cluster-wide and derives gateway base URLs from each resource. With **`use_route = true`**, it prefers OpenShift `Route` hosts where available.
 
 Chosen instances are **validated** against this discovery list before any request is sent, so callers cannot point tools at arbitrary URLs.
 
@@ -163,7 +163,7 @@ Chosen instances are **validated** against this discovery list before any reques
 ## Prerequisites
 
 - **Loki Operator** workloads in the cluster (`LokiStack` CRs) or a standalone Loki endpoint.
-- **RBAC** on the MCP identity to **list** `LokiStack` objects cluster-wide. If **`useRoute`** is enabled, the server also **gets** `Route` resources in each Loki namespace to resolve external hosts.
+- **RBAC** on the MCP identity to **list** `LokiStack` objects cluster-wide. If **`use_route`** is enabled, the server also **gets** `Route` resources in each Loki namespace to resolve external hosts.
 - **Bearer token** with permission to reach the resolved Loki API (same patterns as the metrics toolset).
 
 ---
