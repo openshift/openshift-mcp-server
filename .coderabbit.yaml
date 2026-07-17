@@ -1,4 +1,4 @@
 reviews:
   auto_review:
     ignore_title_keywords:
-      - "Sync downstream"
+      - "NO-JIRA: sync with upstream"
