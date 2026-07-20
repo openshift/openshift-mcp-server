@@ -59,12 +59,7 @@ func AuthorizationMiddleware(cfgState *config.StaticConfigState, oauthState *oau
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			logger := klogutil.FromContext(r.Context())
 			// Skip auth for infrastructure endpoints (health, metrics) and well-known endpoints
-			// Use prefix matching per endpoint to handle sub-paths like /.well-known/oauth-protected-resource/sse
-			requestPath := r.URL.EscapedPath()
-			isWellKnown := !strings.Contains(requestPath, "..") && slices.ContainsFunc(WellKnownEndpoints, func(ep string) bool {
-				return requestPath == ep || strings.HasPrefix(requestPath, ep+"/")
-			})
-			if slices.Contains(infraPaths, r.URL.Path) || isWellKnown {
+			if slices.Contains(infraPaths, r.URL.Path) || isWellKnownPath(r.URL.EscapedPath()) {
 				next.ServeHTTP(w, r)
 				return
 			}

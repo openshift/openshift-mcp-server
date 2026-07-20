@@ -155,6 +155,13 @@ func (w *WellKnown) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 
 	requestPath := request.URL.EscapedPath()
 
+	// Validate that the request targets a known well-known endpoint to prevent
+	// proxying arbitrary paths to the upstream authorization server.
+	if !isWellKnownPath(requestPath) {
+		http.Error(writer, "Not a well-known endpoint", http.StatusNotFound)
+		return
+	}
+
 	// Validate the URL path to prevent path traversal
 	upstreamURL, err := url.JoinPath(authURL, requestPath)
 	if err != nil || !strings.HasPrefix(upstreamURL, authURL+"/") {
@@ -406,6 +413,21 @@ func copyMap(src map[string]interface{}) map[string]interface{} {
 		dst[k] = v
 	}
 	return dst
+}
+
+// isWellKnownPath reports whether path matches one of the known
+// well-known endpoints (exact match or sub-path, e.g. /sse suffix).
+// Paths containing ".." are rejected to prevent path traversal bypasses.
+func isWellKnownPath(path string) bool {
+	if strings.Contains(path, "..") {
+		return false
+	}
+	for _, ep := range WellKnownEndpoints {
+		if path == ep || strings.HasPrefix(path, ep+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 func withCORSHeaders(writer http.ResponseWriter) {
