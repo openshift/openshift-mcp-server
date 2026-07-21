@@ -13,16 +13,9 @@ import (
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	_ "github.com/containers/kubernetes-mcp-server/pkg/mcp"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
 
-	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/config"
-	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/core"
-	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/helm"
-	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kcp"
-	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kiali"
-	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt"
-	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/netobserv"
-	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/tekton"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
