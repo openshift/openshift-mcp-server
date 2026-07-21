@@ -153,17 +153,17 @@ func (w *WellKnown) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		return
 	}
 
-	requestPath := request.URL.EscapedPath()
-
-	// Validate that the request targets a known well-known endpoint to prevent
-	// proxying arbitrary paths to the upstream authorization server.
-	if !isWellKnownPath(requestPath) {
+	// Resolve the request path to a hardcoded well-known endpoint constant.
+	// Using the constant (not the user-supplied path) to build the upstream URL
+	// breaks the taint chain from user input to outbound HTTP request (SSRF).
+	matchedEndpoint := matchWellKnownEndpoint(request.URL.EscapedPath())
+	if matchedEndpoint == "" {
 		http.Error(writer, "Not a well-known endpoint", http.StatusNotFound)
 		return
 	}
 
-	// Validate the URL path to prevent path traversal
-	upstreamURL, err := url.JoinPath(authURL, requestPath)
+	// Build the upstream URL from the hardcoded endpoint constant only.
+	upstreamURL, err := url.JoinPath(authURL, matchedEndpoint)
 	if err != nil || !strings.HasPrefix(upstreamURL, authURL+"/") {
 		http.Error(writer, "Invalid well-known path", http.StatusBadRequest)
 		return
@@ -175,7 +175,7 @@ func (w *WellKnown) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 	resourceMetadata, respHeaders, err := w.fetchWellKnownEndpoint(request, upstreamURL)
 	if err != nil {
 		klogutil.LogInfo(logger.V(1), "Well-known proxy failed to fetch endpoint",
-			klogutil.Field("url.path", requestPath),
+			klogutil.Field("url.path", matchedEndpoint),
 			klogutil.Err(err),
 		)
 		http.Error(writer, "Failed to fetch well-known metadata", http.StatusInternalServerError)
@@ -184,10 +184,9 @@ func (w *WellKnown) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 
 	// If direct fetch returned nil (404), generate metadata using the configured generator.
 	// This provides fallback support for OIDC providers that only implement openid-configuration.
-	// Use prefix matching to handle paths like /.well-known/oauth-protected-resource/sse
 	if resourceMetadata == nil {
-		switch {
-		case strings.HasPrefix(requestPath, oauthAuthorizationServerEndpoint):
+		switch matchedEndpoint {
+		case oauthAuthorizationServerEndpoint:
 			resourceMetadata, err = w.generateAuthorizationServerMetadata(request)
 			if err != nil {
 				klogutil.LogInfo(logger.V(1), "Well-known proxy failed to generate authorization server metadata",
@@ -197,7 +196,7 @@ func (w *WellKnown) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 				return
 			}
 			respHeaders = nil
-		case strings.HasPrefix(requestPath, oauthProtectedResourceEndpoint):
+		case oauthProtectedResourceEndpoint:
 			resourceMetadata, err = w.generateProtectedResourceMetadata(request)
 			if err != nil {
 				klogutil.LogInfo(logger.V(1), "Well-known proxy failed to generate protected resource metadata",
@@ -415,19 +414,26 @@ func copyMap(src map[string]interface{}) map[string]interface{} {
 	return dst
 }
 
-// isWellKnownPath reports whether path matches one of the known
-// well-known endpoints (exact match or sub-path, e.g. /sse suffix).
+// matchWellKnownEndpoint returns the hardcoded well-known endpoint constant
+// that matches path (exact or sub-path, e.g. /sse suffix), or "" if none match.
 // Paths containing ".." are rejected to prevent path traversal bypasses.
-func isWellKnownPath(path string) bool {
+// Returning the constant (not the user-supplied path) breaks the taint chain
+// for SSRF analysis.
+func matchWellKnownEndpoint(path string) string {
 	if strings.Contains(path, "..") {
-		return false
+		return ""
 	}
 	for _, ep := range WellKnownEndpoints {
 		if path == ep || strings.HasPrefix(path, ep+"/") {
-			return true
+			return ep
 		}
 	}
-	return false
+	return ""
+}
+
+// isWellKnownPath reports whether path matches one of the known well-known endpoints.
+func isWellKnownPath(path string) bool {
+	return matchWellKnownEndpoint(path) != ""
 }
 
 func withCORSHeaders(writer http.ResponseWriter) {
