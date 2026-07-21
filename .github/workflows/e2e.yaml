@@ -34,11 +34,8 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Create Kind cluster
-        run: make kind-create-cluster
-
-      - name: Build and load e2e image
-        run: make e2e-image
+      - name: Setup cluster and build e2e image
+        run: make e2e-full-setup
 
       - name: Run e2e tests
         env:

@@ -56,6 +56,9 @@ e2e-image: ## Build the e2e container image and load it into the Kind cluster
 	fi; \
 	$(KIND) load docker-image $(E2E_IMAGE) --name $(KIND_CLUSTER_NAME)
 
+.PHONY: e2e-full-setup
+e2e-full-setup: kind-create-cluster kuadrant-setup e2e-image ## Create Kind cluster, install Kuadrant MCP Gateway, and build e2e image
+
 .PHONY: e2e-test
-e2e-test: uv kubectl helm ## Run all e2e tests
+e2e-test: uv kubectl helm ## Run all e2e tests (auto-skips tests whose infrastructure is missing)
 	KUBECTL_BIN=$(KUBECTL) HELM_BIN=$(HELM) MCP_SERVER_IMAGE=$(E2E_IMAGE) $(UV) run --directory $(E2E_DIR) --locked pytest -v $(PYTEST_ARGS)

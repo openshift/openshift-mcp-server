@@ -12,3 +12,6 @@ dependencies = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+markers = [
+    "kuadrant: tests requiring Kuadrant MCP Gateway (install with 'make kuadrant-setup')",
+]
