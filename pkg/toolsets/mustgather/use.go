@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
-	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
 	"github.com/google/jsonschema-go/jsonschema"
 	"k8s.io/utils/ptr"
 )
@@ -14,7 +13,7 @@ func initUse() []api.ServerTool {
 		{
 			Tool: api.Tool{
 				Name:        "mustgather_use",
-				Description: "Load a must-gather archive from a given filesystem path for analysis. Must be called before any other mustgather_* tools.",
+				Description: "Load a must-gather archive from a given filesystem path for analysis. Other mustgather_* tools can also accept a path argument directly.",
 				Annotations: api.ToolAnnotations{
 					Title:        "Load Must-Gather Archive",
 					ReadOnlyHint: ptr.To(true),
@@ -43,16 +42,13 @@ func mustgatherUse(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		return api.NewToolCallResult("", fmt.Errorf("path is required")), nil
 	}
 
-	p, err := mg.NewProvider(path)
+	p, err := InitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to load must-gather archive: %w", err)), nil
 	}
 
-	setProvider(p)
-
 	metadata := p.GetMetadata()
 
-	// Build summary
 	output := "Must-gather archive loaded successfully\n"
 	output += "=======================================\n\n"
 	output += fmt.Sprintf("Path: %s\n", metadata.Path)

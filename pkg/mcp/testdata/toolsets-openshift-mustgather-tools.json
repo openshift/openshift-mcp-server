@@ -6,7 +6,12 @@
     },
     "description": "Get ETCD cluster health status including endpoint health and active alarms from the must-gather archive",
     "inputSchema": {
-      "properties": {},
+      "properties": {
+        "path": {
+          "description": "Path to the must-gather archive directory (optional if mustgather_use was called earlier)",
+          "type": "string"
+        }
+      },
       "type": "object"
     },
     "name": "mustgather_etcd_health",
@@ -23,6 +28,10 @@
         "limit": {
           "description": "Maximum number of resource types to show (default: 50, sorted by count descending)",
           "type": "integer"
+        },
+        "path": {
+          "description": "Path to the must-gather archive directory (optional if mustgather_use was called earlier)",
+          "type": "string"
         }
       },
       "type": "object"
@@ -49,6 +58,10 @@
         "namespace": {
           "description": "Resource namespace",
           "type": "string"
+        },
+        "path": {
+          "description": "Path to the must-gather archive directory (optional if mustgather_use was called earlier)",
+          "type": "string"
         }
       },
       "required": [
@@ -73,6 +86,10 @@
         },
         "namespace": {
           "description": "Filter by namespace",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path to the must-gather archive directory (optional if mustgather_use was called earlier)",
           "type": "string"
         },
         "since": {
@@ -117,6 +134,10 @@
           "description": "Filter by namespace",
           "type": "string"
         },
+        "path": {
+          "description": "Path to the must-gather archive directory (optional if mustgather_use was called earlier)",
+          "type": "string"
+        },
         "reason": {
           "description": "Filter by event reason (partial match)",
           "type": "string"
@@ -148,6 +169,10 @@
     "description": "Get active Prometheus alerts from the must-gather archive",
     "inputSchema": {
       "properties": {
+        "path": {
+          "description": "Path to the must-gather archive directory (optional if mustgather_use was called earlier)",
+          "type": "string"
+        },
         "state": {
           "description": "Filter by alert state: firing, pending (default: all)",
           "type": "string"
@@ -166,6 +191,10 @@
     "description": "Get Prometheus alerting and recording rules from the must-gather archive",
     "inputSchema": {
       "properties": {
+        "path": {
+          "description": "Path to the must-gather archive directory (optional if mustgather_use was called earlier)",
+          "type": "string"
+        },
         "type": {
           "description": "Filter by rule type: alerting, recording (default: all)",
           "type": "string"
@@ -184,6 +213,10 @@
     "description": "Get Prometheus TSDB and runtime status from the must-gather archive",
     "inputSchema": {
       "properties": {
+        "path": {
+          "description": "Path to the must-gather archive directory (optional if mustgather_use was called earlier)",
+          "type": "string"
+        },
         "replica": {
           "description": "Prometheus replica (0, 1, or all). Default: all",
           "type": "string"
@@ -204,6 +237,10 @@
       "properties": {
         "health": {
           "description": "Filter by health status: up, down, unknown (default: all)",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path to the must-gather archive directory (optional if mustgather_use was called earlier)",
           "type": "string"
         },
         "replica": {
@@ -227,6 +264,10 @@
         "limit": {
           "description": "Number of top entries to show per category (default: 10)",
           "type": "integer"
+        },
+        "path": {
+          "description": "Path to the must-gather archive directory (optional if mustgather_use was called earlier)",
+          "type": "string"
         },
         "replica": {
           "description": "Prometheus replica (0, 1, or all). Default: 0",
@@ -257,6 +298,10 @@
         "node": {
           "description": "Node name",
           "type": "string"
+        },
+        "path": {
+          "description": "Path to the must-gather archive directory (optional if mustgather_use was called earlier)",
+          "type": "string"
         }
       },
       "required": [
@@ -277,6 +322,10 @@
       "properties": {
         "node": {
           "description": "Node name",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path to the must-gather archive directory (optional if mustgather_use was called earlier)",
           "type": "string"
         },
         "tail": {
@@ -312,6 +361,10 @@
           "description": "Node name",
           "type": "string"
         },
+        "path": {
+          "description": "Path to the must-gather archive directory (optional if mustgather_use was called earlier)",
+          "type": "string"
+        },
         "tail": {
           "description": "Maximum number of matching lines to return (0 for all)",
           "type": "integer"
@@ -344,6 +397,10 @@
         },
         "namespace": {
           "description": "Pod namespace",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path to the must-gather archive directory (optional if mustgather_use was called earlier)",
           "type": "string"
         },
         "pod": {
@@ -387,6 +444,10 @@
         },
         "namespace": {
           "description": "Pod namespace",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path to the must-gather archive directory (optional if mustgather_use was called earlier)",
           "type": "string"
         },
         "pod": {
@@ -433,6 +494,10 @@
         },
         "namespace": {
           "description": "Pod namespace",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path to the must-gather archive directory (optional if mustgather_use was called earlier)",
           "type": "string"
         },
         "pod": {
@@ -489,6 +554,10 @@
         "namespace": {
           "description": "Filter by namespace",
           "type": "string"
+        },
+        "path": {
+          "description": "Path to the must-gather archive directory (optional if mustgather_use was called earlier)",
+          "type": "string"
         }
       },
       "required": [
@@ -504,7 +573,7 @@
       "readOnlyHint": true,
       "title": "Load Must-Gather Archive"
     },
-    "description": "Load a must-gather archive from a given filesystem path for analysis. Must be called before any other mustgather_* tools.",
+    "description": "Load a must-gather archive from a given filesystem path for analysis. Other mustgather_* tools can also accept a path argument directly.",
     "inputSchema": {
       "properties": {
         "path": {
