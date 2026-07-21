@@ -1,0 +1,46 @@
+kind: Task
+metadata:
+  labels:
+    suite: lvms
+    project: lvms
+    requires: lvms
+  annotations:
+    project-name: "LVMS"
+    project-url: "https://github.com/openshift/lvm-operator"
+  name: "lvms-troubleshoot-prompt"
+  difficulty: medium
+  description: "Use the lvms-troubleshoot prompt to diagnose LVMS storage health"
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="openshift-lvm-storage"
+
+      # Verify LVMS is installed
+      if ! kubectl get crd lvmclusters.lvm.topolvm.io > /dev/null 2>&1; then
+          echo "LVMS CRD not found - LVMS must be installed"
+          exit 1
+      fi
+
+      echo "LVMS installed. Testing lvms-troubleshoot prompt."
+  verify:
+    inline: |-
+      #!/usr/bin/env bash
+      echo "=== Verification ==="
+      echo "The agent should have:"
+      echo "  1. Used the lvms-troubleshoot prompt"
+      echo "  2. Received pre-fetched LVMCluster status, node statuses, and pod info"
+      echo "  3. Analyzed vg_attr and other LVMS-specific fields"
+      echo "  4. Reported findings on cluster health"
+      exit 0
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      exit 0
+  prompt:
+    inline: |-
+      Use the lvms-troubleshoot prompt to check the health of LVMS storage on this cluster.
+      Report your findings including:
+      - LVMCluster state
+      - Volume group health on each node
+      - Any issues or warnings detected

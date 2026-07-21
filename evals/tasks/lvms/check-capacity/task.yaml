@@ -1,0 +1,68 @@
+kind: Task
+metadata:
+  labels:
+    suite: lvms
+    project: lvms
+    requires: lvms
+  annotations:
+    project-name: "LVMS"
+    project-url: "https://github.com/openshift/lvm-operator"
+  name: "check-lvms-capacity"
+  difficulty: medium
+  description: "Check LVMS storage capacity and thin pool utilization across nodes"
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="openshift-lvm-storage"
+
+      # Verify LVMS is installed
+      if ! kubectl get crd lvmclusters.lvm.topolvm.io > /dev/null 2>&1; then
+          echo "LVMS CRD not found - LVMS must be installed"
+          exit 1
+      fi
+
+      # Check if an LVMCluster exists and is ready
+      CLUSTER=$(kubectl get lvmclusters -n "$NS" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+      if [ -z "$CLUSTER" ]; then
+          echo "No LVMCluster found - LVMS must be configured"
+          exit 1
+      fi
+
+      STATE=$(kubectl get lvmcluster "$CLUSTER" -n "$NS" -o jsonpath='{.status.state}' 2>/dev/null)
+      if [ "$STATE" != "Ready" ]; then
+          echo "LVMCluster '$CLUSTER' is not ready (state: $STATE)"
+          exit 1
+      fi
+
+      echo "LVMS is configured with LVMCluster: $CLUSTER"
+  verify:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="openshift-lvm-storage"
+
+      echo "=== Verification: Checking agent capacity analysis ==="
+
+      # List node statuses
+      kubectl get lvmvolumegroupnodestatuses -n "$NS" -o custom-columns='NODE:.metadata.name,STATUS:.status' 2>/dev/null || true
+
+      echo ""
+      echo "=== Capacity Eval Complete ==="
+      echo "The agent should have:"
+      echo "  1. Queried LVMS volume group status across nodes"
+      echo "  2. Reported per-node storage capacity (total, allocatable)"
+      echo "  3. Identified any nodes with low available space"
+      echo "  4. Provided capacity planning recommendations if applicable"
+      echo ""
+
+      exit 0
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      # No cleanup needed - read-only operation
+      exit 0
+  prompt:
+    inline: |-
+      We're planning to deploy several new applications that will need persistent storage.
+      How much LVMS storage capacity do we have available across the cluster, and are there
+      any nodes running low on space?

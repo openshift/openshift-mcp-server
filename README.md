@@ -274,6 +274,7 @@ and only needed for the project-specific scenarios noted.
 | [Kiali](https://kiali.io) | `kiali` | 16 |
 | [Kubernetes](https://kubernetes.io) | - | 32 |
 | [KubeVirt](https://kubevirt.io) | `kubevirt`, `tekton` | 19 |
+| [LVMS](https://github.com/openshift/lvm-operator) | `lvms` | 11 |
 | [Tekton](https://tekton.dev) | `tekton` | 9 |
 
 <!-- VALIDATED-PROJECTS-END -->
@@ -292,6 +293,7 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 | kcp       | Manage kcp workspaces and multi-tenancy features                                                                                                                                                                                        |         |
 | kiali     | Most common tools for managing Kiali, check the [Kiali documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/KIALI.md) for more details.                                                                    |         |
 | kubevirt  | KubeVirt virtual machine management tools, check the [KubeVirt documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/kubevirt.md) for more details.                                                         |         |
+| lvms      | LVMS (Logical Volume Manager Storage) troubleshooting prompts for diagnosing storage issues                                                                                                                                             |         |
 | netobserv | Network observability tools backed by the NetObserv console plugin API (flows, metrics, export). Check the [NetObserv documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/NETOBSERV.md) for more details. |         |
 | observability/logs    | Toolset for querying Loki logs                                                                                                                                                                                                          |         |
 | observability/metrics | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                                                                           |         |
@@ -497,6 +499,19 @@ In case multi-cluster support is enabled (default) and you have access to multip
   - `action` (`string`) **(required)** - The lifecycle action to perform: 'start' (changes runStrategy to Always), 'stop' (changes runStrategy to Halted), or 'restart' (stops then starts the VM)
   - `name` (`string`) **(required)** - The name of the virtual machine
   - `namespace` (`string`) **(required)** - The namespace of the virtual machine
+
+</details>
+
+<details>
+
+<summary>lvms</summary>
+
+- **lvms-troubleshoot** - Diagnose LVMS storage issues by gathering LVMCluster status, volume group health, and node-level LVM data with interpretation of domain-specific fields
+  - `namespace` (`string`) - The LVMS namespace (default: openshift-lvm-storage)
+  - `node` (`string`) - Specific node to inspect (default: all nodes with LVMS)
+
+- **lvms-capacity** - Check LVMS storage capacity across all nodes including available space per node, PVC usage, and capacity warnings
+  - `namespace` (`string`) - The LVMS namespace (default: openshift-lvm-storage)
 
 </details>
 

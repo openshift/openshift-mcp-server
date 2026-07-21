@@ -1,0 +1,42 @@
+kind: Task
+metadata:
+  labels:
+    suite: lvms
+    project: lvms
+    requires: lvms
+  annotations:
+    project-name: "LVMS"
+    project-url: "https://github.com/openshift/lvm-operator"
+  name: "show-volume-groups"
+  difficulty: medium
+  description: "Show LVM volume groups on nodes using vgs command"
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="openshift-lvm-storage"
+
+      if ! kubectl get crd lvmclusters.lvm.topolvm.io > /dev/null 2>&1; then
+          echo "LVMS CRD not found - LVMS must be installed"
+          exit 1
+      fi
+
+      echo "LVMS installed. This task requires running vgs on nodes."
+  verify:
+    inline: |-
+      #!/usr/bin/env bash
+      echo "=== Verification ==="
+      echo "The agent should have:"
+      echo "  1. Run 'vgs' command on the node(s)"
+      echo "  2. Shown VG name, PV count, LV count, size, free space"
+      echo "  3. This requires node debug access"
+      exit 0
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      exit 0
+  prompt:
+    inline: |-
+      How is LVMS organizing storage on each node? I want to understand the
+      volume group layout - total capacity, how much is free, and how many
+      logical volumes exist in each VG.

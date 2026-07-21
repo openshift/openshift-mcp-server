@@ -1,0 +1,54 @@
+kind: Task
+metadata:
+  labels:
+    suite: lvms
+    project: lvms
+    requires: lvms
+  annotations:
+    project-name: "LVMS"
+    project-url: "https://github.com/openshift/lvm-operator"
+  name: "diagnose-disk-not-used"
+  difficulty: hard
+  description: "Diagnose why a specific disk is not being used by LVMS"
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="openshift-lvm-storage"
+
+      # Verify LVMS is installed
+      if ! kubectl get crd lvmclusters.lvm.topolvm.io > /dev/null 2>&1; then
+          echo "LVMS CRD not found - LVMS must be installed"
+          exit 1
+      fi
+
+      echo "LVMS installed. This task tests disk filtering knowledge."
+      echo ""
+      echo "The agent must know LVMS device filtering rules:"
+      echo "- Read-only devices are excluded"
+      echo "- Devices with children (partitions) are excluded"
+      echo "- Devices with reserved partition labels are excluded"
+      echo "- LVM2_member fstype devices are excluded unless explicitly listed"
+      echo "- Loop devices in use by Kubernetes are excluded"
+  verify:
+    inline: |-
+      #!/usr/bin/env bash
+      echo "=== Verification ==="
+      echo "The agent should have:"
+      echo "  1. Identified the node where the disk exists"
+      echo "  2. Run lsblk to inspect disk properties"
+      echo "  3. Checked LVMCluster deviceSelector configuration"
+      echo "  4. Identified which LVMS filtering rule excludes the disk"
+      echo "  5. Suggested how to make the disk available (if possible)"
+      exit 0
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      exit 0
+  prompt:
+    inline: |-
+      A user reports that /dev/sdb on node worker-1 is not being used by LVMS
+      even though they expected it to be available for storage.
+
+      Investigate why this disk is not being used by LVMS and explain
+      the reason to the user.

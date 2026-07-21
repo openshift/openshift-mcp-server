@@ -1,0 +1,52 @@
+kind: Task
+metadata:
+  labels:
+    suite: lvms
+    project: lvms
+    requires: lvms
+  annotations:
+    project-name: "LVMS"
+    project-url: "https://github.com/openshift/lvm-operator"
+  name: "check-thin-pool-utilization"
+  difficulty: medium
+  description: "Check actual thin pool data and metadata utilization on nodes"
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      NS="openshift-lvm-storage"
+
+      # Verify LVMS is installed and ready
+      if ! kubectl get crd lvmclusters.lvm.topolvm.io > /dev/null 2>&1; then
+          echo "LVMS CRD not found - LVMS must be installed"
+          exit 1
+      fi
+
+      CLUSTER=$(kubectl get lvmclusters -n "$NS" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+      if [ -z "$CLUSTER" ]; then
+          echo "No LVMCluster found - LVMS must be configured"
+          exit 1
+      fi
+
+      echo "LVMS is configured. This task requires checking LIVE thin pool utilization."
+  verify:
+    inline: |-
+      #!/usr/bin/env bash
+      echo "=== Verification ==="
+      echo "The agent should have:"
+      echo "  1. Run 'lvs' command on the node to get thin pool data"
+      echo "  2. Reported data_percent and metadata_percent for thin pools"
+      echo "  3. This CANNOT be done with resources_list/resources_get"
+      echo ""
+      echo "If the agent only queried LVMVolumeGroupNodeStatus CRD,"
+      echo "it did NOT get live thin pool utilization - that requires lvs on node."
+      exit 0
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      exit 0
+  prompt:
+    inline: |-
+      What is the current thin pool utilization on each node? I need the actual
+      data_percent and metadata_percent values from the LVM thin pools, not just
+      the Kubernetes CRD status.
