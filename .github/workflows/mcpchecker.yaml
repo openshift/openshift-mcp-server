@@ -77,7 +77,7 @@ jobs:
     outputs:
       should-run: ${{ steps.check.outputs.should-run }}
       toolsets: ${{ steps.suite.outputs.toolsets }}
-      label-selector: ${{ steps.suite.outputs.label-selector }}
+      eval-config: ${{ steps.suite.outputs.eval-config }}
       pr-number: ${{ steps.check.outputs.pr-number }}
       pr-sha: ${{ steps.check.outputs.pr-sha }}
       is-pr: ${{ steps.check.outputs.is-pr }}
@@ -214,36 +214,37 @@ jobs:
             SUITE="${INPUT_SUITE:-core}"
           fi
 
-          # Select label-selector and infrastructure based on suite.
-          # All suites use the same eval.yaml file; suite controls label-selector + infra.
+          # Select eval config and infrastructure based on suite.
+          # Each eval file includes core + config tasks alongside the suite-specific tasks.
+          EVAL_DIR="evals/core-eval-testing/builtin-openai"
           case "$SUITE" in
             helm)
-              echo "label-selector=suite=helm" >> "$GITHUB_OUTPUT"
+              echo "eval-config=${EVAL_DIR}/eval-helm.yaml" >> "$GITHUB_OUTPUT"
               echo "toolsets=core,config,helm" >> "$GITHUB_OUTPUT"
               ;;
             kubevirt)
-              echo "label-selector=suite=kubevirt" >> "$GITHUB_OUTPUT"
+              echo "eval-config=${EVAL_DIR}/eval-kubevirt.yaml" >> "$GITHUB_OUTPUT"
               echo "toolsets=core,config,kubevirt,tekton" >> "$GITHUB_OUTPUT"
               ;;
             kiali)
-              echo "label-selector=suite=kiali" >> "$GITHUB_OUTPUT"
+              echo "eval-config=${EVAL_DIR}/eval-kiali.yaml" >> "$GITHUB_OUTPUT"
               echo "toolsets=core,config,kiali" >> "$GITHUB_OUTPUT"
               ;;
             tekton)
-              echo "label-selector=suite=tekton" >> "$GITHUB_OUTPUT"
-              echo "toolsets=core,tekton" >> "$GITHUB_OUTPUT"
+              echo "eval-config=${EVAL_DIR}/eval-tekton.yaml" >> "$GITHUB_OUTPUT"
+              echo "toolsets=core,config,tekton" >> "$GITHUB_OUTPUT"
               ;;
             netobserv)
-              echo "label-selector=suite=netobserv" >> "$GITHUB_OUTPUT"
-              echo "toolsets=core,netobserv" >> "$GITHUB_OUTPUT"
+              echo "eval-config=${EVAL_DIR}/eval-netobserv.yaml" >> "$GITHUB_OUTPUT"
+              echo "toolsets=core,config,netobserv" >> "$GITHUB_OUTPUT"
               ;;
             all)
-              echo "label-selector=" >> "$GITHUB_OUTPUT"  # No filter: run all taskSets
+              echo "eval-config=${EVAL_DIR}/eval-all.yaml" >> "$GITHUB_OUTPUT"
               echo "toolsets=core,config,helm,kiali,kubevirt,tekton,netobserv" >> "$GITHUB_OUTPUT"
               ;;
             *)
               # Default to core suite (matches 'core' or any unrecognized suite)
-              echo "label-selector=suite=core" >> "$GITHUB_OUTPUT"
+              echo "eval-config=${EVAL_DIR}/eval-core.yaml" >> "$GITHUB_OUTPUT"
               echo "toolsets=core,config" >> "$GITHUB_OUTPUT"
               ;;
           esac
@@ -277,10 +278,9 @@ jobs:
       - name: Setup Kind cluster
         run: make kind-create-cluster KIND_CLUSTER_NAME="$KIND_CLUSTER_NAME"
 
-      # Only the core suite needs a resize-capable StorageClass (for resize-pvc).
-      # Runs for suite=core and for the "all" run (empty label-selector).
+      # Core tasks always run (every eval includes them) and the resize-pvc
+      # task needs a resize-capable StorageClass, so always install the CSI driver.
       - name: Install CSI hostPath driver (resize-capable StorageClass)
-        if: needs.check-trigger.outputs.label-selector == 'suite=core' || needs.check-trigger.outputs.label-selector == ''
         run: make csi-hostpath-install
 
       - name: Install Istio/Kiali and bookinfo demo
@@ -309,9 +309,8 @@ jobs:
         id: mcpchecker
         uses: mcpchecker/mcpchecker/.github/actions/mcpchecker-action@v0.0.19
         with:
-          eval-config: 'evals/openai-agent/eval.yaml'
+          eval-config: ${{ needs.check-trigger.outputs.eval-config }}
           mcpchecker-version: 'latest'
-          label-selector: ${{ needs.check-trigger.outputs.label-selector }}
           task-filter: ${{ github.event.inputs.task-filter || '' }}
           output-format: 'json'
           verbose: ${{ github.event.inputs.verbose || 'false' }}
@@ -342,12 +341,13 @@ jobs:
       - name: Fetch baseline results from main
         if: needs.check-trigger.outputs.is-pr == 'true'
         env:
-          EVAL_CONFIG: 'evals/openai-agent/eval.yaml'
+          EVAL_CONFIG: ${{ needs.check-trigger.outputs.eval-config }}
         run: |
-          # Derive agent name from eval-config path (same logic as commit-results job)
-          AGENT_NAME=$(echo "$EVAL_CONFIG" | sed 's|evals/||; s|/eval\.yaml||')
+          # Derive result name from eval-config path: eval-core.yaml -> builtin-openai-core
+          SUITE=$(basename "$EVAL_CONFIG" .yaml | sed 's/^eval-//')
+          RESULT_NAME="builtin-openai-${SUITE}"
           git fetch origin main --depth=1
-          git show "origin/main:evals/results/${AGENT_NAME}-latest.json" > /tmp/baseline-results.json 2>/dev/null || true
+          git show "origin/main:evals/results/${RESULT_NAME}-latest.json" > /tmp/baseline-results.json 2>/dev/null || true
 
       - name: Check diff prerequisites
         id: diff-check
@@ -441,10 +441,11 @@ jobs:
 
       - name: Copy results to evals/results
         env:
-          EVAL_CONFIG: 'evals/openai-agent/eval.yaml'
+          EVAL_CONFIG: ${{ needs.check-trigger.outputs.eval-config }}
         run: |
-          # Extract agent name from eval-config path
-          AGENT_NAME=$(echo "$EVAL_CONFIG" | sed 's|evals/||; s|/eval\.yaml||')
+          # Derive result name from eval-config path: eval-core.yaml -> builtin-openai-core
+          SUITE=$(basename "$EVAL_CONFIG" .yaml | sed 's/^eval-//')
+          RESULT_NAME="builtin-openai-${SUITE}"
 
           mkdir -p evals/results
           # Copy the most recent mcpchecker results file with agent-specific name
@@ -453,7 +454,7 @@ jobs:
             echo "Error: No mcpchecker results file found"
             exit 1
           fi
-          cp "$RESULTS_FILE" "evals/results/${AGENT_NAME}-latest.json"
+          cp "$RESULTS_FILE" "evals/results/${RESULT_NAME}-latest.json"
 
       - name: Create Pull Request
         env:
