@@ -145,18 +145,17 @@ Bearer token behavior matches the [metrics toolset](./metrics.md) (**Authenticat
 When the `observability/logs` toolset is enabled, the Loki URL is determined in this order:
 
 1. `loki_url` in the `[toolset_configs."observability/logs"]` config section (if set)
-2. `LOKI_URL` environment variable
-3. Default: `http://localhost:3100` (kubeconfig mode only)
+2. Otherwise LokiStack discovery via `lokiNamespace` and `lokiName` on the tool call (use `loki_list_instances` first)
 
-In `header` mode, you can either set `loki_url` **or** use LokiStack discovery (`loki_list_instances` + `lokiNamespace`/`lokiName` arguments on each tool call).
+If neither is provided, the tool returns an error. There is no environment-variable fallback or localhost default when the toolset is embedded in this server.
 
 ---
 
 ## Instance discovery
 
-The server lists **`LokiStack`** objects cluster-wide and derives gateway base URLs from each resource. With **`use_route = true`**, it prefers OpenShift `Route` hosts where available.
+When `loki_url` is not set, the server lists **`LokiStack`** objects cluster-wide and derives gateway base URLs from each resource. With **`use_route = true`**, each instance's URL is resolved via an OpenShift `Route`; if Route resolution fails for any instance, discovery returns an error (there is no fallback to service URLs). Chosen instances are **validated** against this discovery list before any request is sent, so callers cannot point tools at arbitrary URLs.
 
-Chosen instances are **validated** against this discovery list before any request is sent, so callers cannot point tools at arbitrary URLs.
+When `loki_url` is set, that URL is used directly and LokiStack discovery is skipped (`lokiNamespace` / `lokiName` are optional in that case).
 
 ---
 
