@@ -90,7 +90,7 @@ LLM judge strings in tasks assume the **mock** responses (`netobserv-eval`, `eva
 
 ## Maintainer trigger
 
-On a PR, comment:
+On a PR, submit a review (Files changed → Review changes) containing:
 
 ```text
 /run-mcpchecker netobserv

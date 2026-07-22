@@ -3,6 +3,8 @@ package kiali
 import (
 	"slices"
 
+	"k8s.io/utils/ptr"
+
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kiali/internal/defaults"
@@ -23,11 +25,12 @@ func (t *Toolset) GetDescription() string {
 }
 
 func (t *Toolset) GetTools(_ api.FilteringProvider) []api.ServerTool {
-	return slices.Concat(
+	tools := slices.Concat(
 		kialiTools.InitGetMeshTrafficGraph(),
 		kialiTools.InitGetMeshStatus(),
 		kialiTools.InitManageIstioConfigRead(),
 		kialiTools.InitManageIstioConfig(),
+		kialiTools.InitListMeshClusters(),
 		kialiTools.InitListOrGetResources(),
 		kialiTools.InitListTraces(),
 		kialiTools.InitGetTraceDetails(),
@@ -35,10 +38,16 @@ func (t *Toolset) GetTools(_ api.FilteringProvider) []api.ServerTool {
 		kialiTools.InitGetLogs(),
 		kialiTools.InitGetMetrics(),
 	)
+	// Kiali calls a single configured endpoint; mesh scope is selected via meshCluster,
+	// not the provider-level context parameter injected for core Kubernetes tools.
+	for i := range tools {
+		tools[i].ClusterAware = ptr.To(false)
+	}
+	return tools
 }
 
 func (t *Toolset) GetPrompts() []api.ServerPrompt {
-	return slices.Concat(
+	prompts := slices.Concat(
 		kialiPrompts.InitListApplications(),
 		kialiPrompts.InitListIstioConfig(),
 		kialiPrompts.InitListNamespaces(),
@@ -51,6 +60,11 @@ func (t *Toolset) GetPrompts() []api.ServerPrompt {
 		kialiPrompts.InitTraceAnalysis(),
 		kialiPrompts.InitIstioConfigReview(),
 	)
+	// Same as tools: mesh scope is not selected via provider context.
+	for i := range prompts {
+		prompts[i].ClusterAware = ptr.To(false)
+	}
+	return prompts
 }
 
 func (t *Toolset) GetResources() []api.ServerResource {
