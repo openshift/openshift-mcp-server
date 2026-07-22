@@ -257,6 +257,29 @@ func (s *WellknownSuite) TestOAuthScopesOverride() {
 	})
 }
 
+func (s *WellknownSuite) TestIsWellKnownPath() {
+	s.Run("accepts known endpoints", func() {
+		s.True(isWellKnownPath("/.well-known/oauth-authorization-server"))
+		s.True(isWellKnownPath("/.well-known/oauth-protected-resource"))
+		s.True(isWellKnownPath("/.well-known/openid-configuration"))
+	})
+	s.Run("accepts known endpoints with sub-paths", func() {
+		s.True(isWellKnownPath("/.well-known/oauth-protected-resource/sse"))
+		s.True(isWellKnownPath("/.well-known/oauth-authorization-server/extra"))
+	})
+	s.Run("rejects unknown endpoints", func() {
+		s.False(isWellKnownPath("/.well-known/unknown"))
+		s.False(isWellKnownPath("/.well-known/jwks.json"))
+		s.False(isWellKnownPath("/.well-known/"))
+		s.False(isWellKnownPath("/.well-known/admin"))
+		s.False(isWellKnownPath("/other-path"))
+	})
+	s.Run("rejects paths with path traversal", func() {
+		s.False(isWellKnownPath("/.well-known/oauth-authorization-server/../../admin"))
+		s.False(isWellKnownPath("/.well-known/../secrets"))
+	})
+}
+
 func (s *WellknownSuite) TestPathTraversal() {
 	s.StaticConfig.RequireOAuth = true
 	s.StartServer()

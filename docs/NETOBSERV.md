@@ -84,6 +84,8 @@ Grant the release ServiceAccount permission to:
 
 On OpenShift, synthesized plugin URLs use HTTPS. Mount the pod service account so the server can use the cluster service CA. For a custom `url` over HTTPS, set `certificate_authority` or `insecure = true` (development only).
 
+Global `tls_min_version` / `tls_cipher_suites` (and `TLS_MIN_VERSION` / `TLS_CIPHER_SUITES` env overrides) apply to the NetObserv HTTP client. See [configuration.md](configuration.md#server-settings).
+
 ## Configuration reference
 
 | Field | Default (OpenShift in-cluster) | Description |
@@ -137,4 +139,4 @@ make run-netobserv-evals   # mock + MCP server + mcpchecker (target: >= 80% pass
 
 Manual steps: `make setup-netobserv`, `make run-server TOOLSETS=core,netobserv MCP_CONFIG_DIR=dev/config/mcp-configs`, `make run-evals EVAL_LABEL_SELECTOR=suite=netobserv`.
 
-Maintainers can trigger CI with `/run-mcpchecker netobserv` on a pull request. See [evals/README.md](../evals/README.md) and [evals/tasks/netobserv/README.md](../evals/tasks/netobserv/README.md).
+Maintainers can trigger CI by submitting a PR review containing `/run-mcpchecker netobserv`. See [evals/README.md](../evals/README.md) and [evals/tasks/netobserv/README.md](../evals/tasks/netobserv/README.md).

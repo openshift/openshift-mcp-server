@@ -15,13 +15,16 @@ import warnings
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import httpx
 import pytest
 import pytest_asyncio
 import yaml
 from kubernetes_asyncio import config as k8s_config
 from kubernetes_asyncio.client import (
     ApiClient,
+    ApiException,
     CoreV1Api,
+    CustomObjectsApi,
     V1Namespace,
     V1ObjectMeta,
 )
@@ -105,8 +108,36 @@ class ServerDeployment:
                 yield session
 
 
+class GatewayConnection:
+    """An MCP gateway reachable via port-forward.
+
+    Wraps the gateway URL and the Host header required by the gateway
+    listener so that callers get the same ``connect_mcp()`` interface as
+    :class:`ServerDeployment`.
+    """
+
+    def __init__(self, url: str, host: str):
+        self.url = url
+        self.host = host
+
+    @asynccontextmanager
+    async def connect_mcp(self):
+        """Connect an MCP client session through the gateway."""
+        async with httpx.AsyncClient(
+            headers={"Host": self.host},
+            follow_redirects=True,
+            timeout=httpx.Timeout(30.0, read=300.0),
+        ) as http_client:
+            async with streamable_http_client(
+                f"{self.url}/mcp", http_client=http_client,
+            ) as (read, write, _):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    yield session
+
+
 @pytest_asyncio.fixture
-async def deploy_server(kubeconfig, chart_path, server_image, helm_bin, kubectl_bin):
+async def deploy_server(k8s_core_v1, chart_path, server_image, helm_bin, kubectl_bin):
     """Factory fixture for deploying MCP server instances.
 
     Usage::
@@ -119,17 +150,15 @@ async def deploy_server(kubeconfig, chart_path, server_image, helm_bin, kubectl_
             async with server.connect_mcp() as session:
                 result = await session.list_tools()
     """
-    await k8s_config.load_kube_config(config_file=kubeconfig)
-    api = ApiClient()
-    core_v1 = CoreV1Api(api)
-
     deployments: list[ServerDeployment] = []
 
-    async def _deploy(name: str, config_toml: str = "") -> ServerDeployment:
-        namespace = await _create_namespace(core_v1, name)
+    async def _deploy(
+        name: str, config_toml: str = "", extra_values: dict | None = None,
+    ) -> ServerDeployment:
+        namespace = await _create_namespace(k8s_core_v1, name)
         await _helm_install(
-            core_v1, namespace, name, chart_path, server_image, config_toml,
-            helm_bin,
+            k8s_core_v1, namespace, name, chart_path, server_image, config_toml,
+            helm_bin, extra_values,
         )
         server_url, proc = _start_port_forward(namespace, name, kubectl_bin)
         try:
@@ -152,7 +181,7 @@ async def deploy_server(kubeconfig, chart_path, server_image, helm_bin, kubectl_
             except Exception:
                 pass
             if isinstance(exc, TimeoutError):
-                diag = await _dump_pod_diagnostics(core_v1, namespace, name)
+                diag = await _dump_pod_diagnostics(k8s_core_v1, namespace, name)
                 raise RuntimeError(
                     f"Server at {server_url} failed health check.\n"
                     f"--- port-forward stderr ---\n{pf_stderr}\n{diag}"
@@ -183,11 +212,9 @@ async def deploy_server(kubeconfig, chart_path, server_image, helm_bin, kubectl_
                 if fh:
                     fh.close()
         try:
-            await core_v1.delete_namespace(dep.namespace)
+            await k8s_core_v1.delete_namespace(dep.namespace)
         except Exception:
             pass
-
-    await api.close()
 
 
 # ---------------------------------------------------------------------------
@@ -245,6 +272,7 @@ async def _helm_install(
     image: str,
     config_toml: str,
     helm_bin: str,
+    extra_values: dict | None = None,
 ) -> None:
     config = {}
     if config_toml.strip():
@@ -273,6 +301,8 @@ async def _helm_install(
         },
         "ingress": {"enabled": False},
     }
+    if extra_values:
+        values.update(extra_values)
 
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".yaml", delete=False
@@ -376,6 +406,85 @@ async def _wait_for_healthz(url: str, timeout: float = 30.0) -> None:
         except (urllib.error.URLError, OSError):
             await asyncio.sleep(0.5)
     raise TimeoutError(f"Server at {url}/healthz not reachable within {timeout}s")
+
+
+# ---------------------------------------------------------------------------
+# Kuadrant MCP Gateway fixtures
+# ---------------------------------------------------------------------------
+
+GATEWAY_NAMESPACE = os.environ.get("GATEWAY_NAMESPACE", "gateway-system")
+GATEWAY_SERVICE = os.environ.get("GATEWAY_SERVICE", "mcp-gateway-istio")
+GATEWAY_HOST = os.environ.get("GATEWAY_HOST", "mcp.127-0-0-1.sslip.io")
+
+
+@pytest_asyncio.fixture
+async def k8s_api_client(kubeconfig) -> ApiClient:
+    """Shared Kubernetes API client.
+
+    Loads the kubeconfig once and provides an :class:`ApiClient` that is
+    closed automatically after the test.  All typed client fixtures
+    (``k8s_core_v1``, ``k8s_custom_objects``) depend on this rather than
+    creating their own connections.
+    """
+    await k8s_config.load_kube_config(config_file=kubeconfig)
+    api = ApiClient()
+    yield api
+    await api.close()
+
+
+@pytest_asyncio.fixture
+async def k8s_core_v1(k8s_api_client) -> CoreV1Api:
+    """Kubernetes CoreV1Api backed by the shared API client."""
+    return CoreV1Api(k8s_api_client)
+
+
+@pytest_asyncio.fixture
+async def k8s_custom_objects(k8s_api_client) -> CustomObjectsApi:
+    """Kubernetes CustomObjectsApi backed by the shared API client."""
+    return CustomObjectsApi(k8s_api_client)
+
+
+@pytest_asyncio.fixture
+async def kuadrant_gateway(k8s_core_v1, kubectl_bin) -> GatewayConnection:
+    """Port-forward to the Kuadrant MCP Gateway and yield a GatewayConnection.
+
+    Auto-skips the test if the gateway service is not present in the cluster.
+    Use the returned object's ``connect_mcp()`` context manager to open an MCP
+    session through the gateway.
+    """
+    try:
+        await k8s_core_v1.read_namespaced_service(
+            name=GATEWAY_SERVICE, namespace=GATEWAY_NAMESPACE,
+        )
+    except ApiException as exc:
+        if exc.status != 404:
+            raise
+        pytest.skip(
+            f"Kuadrant MCP Gateway service {GATEWAY_NAMESPACE}/{GATEWAY_SERVICE} "
+            f"not found — install with 'make kuadrant-setup'"
+        )
+
+    gateway_url, proc = _start_port_forward(
+        GATEWAY_NAMESPACE, GATEWAY_SERVICE, kubectl_bin,
+    )
+    try:
+        yield GatewayConnection(gateway_url, GATEWAY_HOST)
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+        for attr in ("_stderr_file", "_stdout_file"):
+            fh = getattr(proc, attr, None)
+            if fh:
+                fh.close()
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 
 async def _dump_pod_diagnostics(

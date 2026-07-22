@@ -29,8 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7.0.0
-      - uses: actions/setup-go@v6
+        uses: actions/checkout@v7.0.1
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - name: Run make format
@@ -48,8 +48,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7.0.0
-      - uses: actions/setup-go@v6
+        uses: actions/checkout@v7.0.1
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - name: Update README tools
@@ -77,8 +77,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7.0.0
-      - uses: actions/setup-go@v6
+        uses: actions/checkout@v7.0.1
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - name: Build
@@ -98,8 +98,8 @@ jobs:
           - ppc64le
     steps:
       - name: Checkout
-        uses: actions/checkout@v7.0.0
-      - uses: actions/setup-go@v6
+        uses: actions/checkout@v7.0.1
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - name: Build

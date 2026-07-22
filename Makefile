@@ -171,14 +171,14 @@ local-env-setup-tekton: ## Setup complete local development environment with Kin
 	@echo "Tekton Pipelines is now available!"
 	@echo "Check status with: make tekton-status"
 
-.PHONY: local-env-setup-oadp
-local-env-setup-oadp: ## Setup complete local development environment with Kind cluster and OADP/Velero
+.PHONY: local-env-setup-kuadrant
+local-env-setup-kuadrant: ## Setup complete local development environment with Kind cluster and Kuadrant MCP Gateway
 	@echo "========================================="
 	@echo "Kubernetes MCP Server - Local Setup"
-	@echo "          with OADP / Velero"
+	@echo "     with Kuadrant MCP Gateway"
 	@echo "========================================="
 	$(MAKE) kind-create-cluster
-	$(MAKE) oadp-install
+	$(MAKE) kuadrant-setup
 	$(MAKE) build
 	@echo ""
 	@echo "========================================="
@@ -186,13 +186,13 @@ local-env-setup-oadp: ## Setup complete local development environment with Kind 
 	@echo "========================================="
 	@echo ""
 	@echo "Run the MCP server with:"
-	@echo "  ./$(BINARY_NAME) --toolsets core,config,oadp"
+	@echo "  ./$(BINARY_NAME)"
 	@echo ""
 	@echo "Or run with MCP inspector:"
-	@echo "  npx @modelcontextprotocol/inspector@latest $$(pwd)/$(BINARY_NAME) --toolsets core,config,oadp"
+	@echo "  npx @modelcontextprotocol/inspector@latest \$$(pwd)/$(BINARY_NAME)"
 	@echo ""
-	@echo "OADP / Velero is now available!"
-	@echo "Check status with: make oadp-status"
+	@echo "Kuadrant MCP Gateway is now available!"
+	@echo "Check status with: make kuadrant-status"
 
 .PHONY: local-env-teardown
 local-env-teardown: ## Tear down the local Kind cluster

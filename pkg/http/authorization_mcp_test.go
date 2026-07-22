@@ -593,6 +593,28 @@ func (s *AuthorizationSuite) TestAuthorizationPassthroughRejectedWithoutSkipFlag
 	s.stopRunningServer()
 }
 
+func (s *AuthorizationSuite) TestAuthorizationUnknownWellKnownPathRequiresAuth() {
+	s.StartServer()
+
+	unknownPaths := []string{
+		"/.well-known/unknown-endpoint",
+		"/.well-known/jwks.json",
+		"/.well-known/admin",
+		"/.well-known/",
+	}
+	for _, path := range unknownPaths {
+		s.Run(fmt.Sprintf("%s requires auth", path), func() {
+			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%s%s", s.StaticConfig.Port, path), nil)
+			s.Require().NoError(err)
+			resp, err := http.DefaultClient.Do(req)
+			s.Require().NoError(err)
+			s.T().Cleanup(func() { _ = resp.Body.Close() })
+			s.Equal(http.StatusUnauthorized, resp.StatusCode, "Unknown well-known path should require auth")
+		})
+	}
+	s.stopRunningServer()
+}
+
 func (s *AuthorizationSuite) TestAuthorizationExemptEndpointsFromOAuth() {
 	// https://github.com/containers/kubernetes-mcp-server/issues/932
 	// https://github.com/containers/kubernetes-mcp-server/issues/964

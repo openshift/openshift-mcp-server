@@ -33,15 +33,23 @@
   },
   {
     "annotations": {
-      "destructiveHint": false,
-      "openWorldHint": false,
-      "title": "Tekton: Restart PipelineRun"
+      "destructiveHint": true,
+      "openWorldHint": true,
+      "title": "Tekton: PipelineRun Lifecycle"
     },
-    "description": "Restart a Tekton PipelineRun by creating a new PipelineRun with the same spec",
+    "description": "Manage a Tekton PipelineRun lifecycle by restarting it with the same spec or cancelling it by setting spec.status to Cancelled.",
     "inputSchema": {
       "properties": {
+        "action": {
+          "description": "Lifecycle action to perform: 'restart' creates a new PipelineRun with the same spec; 'cancel' sets spec.status to Cancelled.",
+          "enum": [
+            "restart",
+            "cancel"
+          ],
+          "type": "string"
+        },
         "name": {
-          "description": "Name of the PipelineRun to restart",
+          "description": "Name of the PipelineRun to manage",
           "type": "string"
         },
         "namespace": {
@@ -50,12 +58,47 @@
         }
       },
       "required": [
+        "name",
+        "action"
+      ],
+      "type": "object"
+    },
+    "name": "tekton_pipelinerun_lifecycle",
+    "title": "Tekton: PipelineRun Lifecycle"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "Tekton: Get PipelineRun Logs"
+    },
+    "description": "Get logs for all TaskRuns owned by a Tekton PipelineRun. Use this to inspect PipelineRun execution output without locating pods manually.",
+    "inputSchema": {
+      "properties": {
+        "name": {
+          "description": "Name of the PipelineRun to get logs from",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Namespace of the PipelineRun",
+          "type": "string"
+        },
+        "tail": {
+          "default": 100,
+          "description": "Number of lines to retrieve from the end of each container log (default: 100)",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
         "name"
       ],
       "type": "object"
     },
-    "name": "tekton_pipelinerun_restart",
-    "title": "Tekton: Restart PipelineRun"
+    "name": "tekton_pipelinerun_logs",
+    "title": "Tekton: Get PipelineRun Logs"
   },
   {
     "annotations": {

@@ -36,7 +36,7 @@ A powerful and flexible Kubernetes [Model Context Protocol (MCP)](https://blog.m
   - **Uninstall** a Helm release in the current or provided namespace.
 - **🔧 Tekton**: Tekton-specific operations that complement generic Kubernetes resource management.
   - **Pipeline**: Start a Tekton Pipeline by creating a PipelineRun.
-  - **PipelineRun**: Restart a PipelineRun with the same spec.
+  - **PipelineRun**: Restart, cancel, troubleshoot, and retrieve PipelineRun logs.
   - **Task**: Start a Tekton Task by creating a TaskRun.
   - **TaskRun**: Restart a TaskRun with the same spec, and retrieve TaskRun logs via pod resolution.
 - **🔭 Observability**: Optional OpenTelemetry distributed tracing and metrics with custom sampling rates. Includes `/stats` endpoint for real-time statistics. See [OTEL.md](docs/OTEL.md).
@@ -274,6 +274,7 @@ and only needed for the project-specific scenarios noted.
 | [Kiali](https://kiali.io) | `kiali` | 16 |
 | [Kubernetes](https://kubernetes.io) | - | 32 |
 | [KubeVirt](https://kubevirt.io) | `kubevirt`, `tekton` | 19 |
+| [NetObserv](https://netobserv.io) | `netobserv` | 4 |
 | [Tekton](https://tekton.dev) | `tekton` | 9 |
 
 <!-- VALIDATED-PROJECTS-END -->
@@ -293,11 +294,7 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 | kiali     | Most common tools for managing Kiali, check the [Kiali documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/KIALI.md) for more details.                                                                    |         |
 | kubevirt  | KubeVirt virtual machine management tools, check the [KubeVirt documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/kubevirt.md) for more details.                                                         |         |
 | netobserv | Network observability tools backed by the NetObserv console plugin API (flows, metrics, export). Check the [NetObserv documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/NETOBSERV.md) for more details. |         |
-| observability/logs    | Toolset for querying Loki logs                                                                                                                                                                                                          |         |
-| observability/metrics | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                                                                           |         |
-| observability/otelcol | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                                                                              |         |
-| observability/traces  | Distributed tracing tools for discovering Tempo instances, searching and retrieving traces, and exploring trace attributes.                                                                                                             |         |
-| tekton    | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns.                                                                                                                                                      |         |
+| tekton    | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, TaskRuns, and troubleshooting.                                                                                                                                     |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -464,6 +461,90 @@ In case multi-cluster support is enabled (default) and you have access to multip
 
 - **kcp_workspace_describe** - Get detailed information about a specific kcp workspace
   - `workspace` (`string`) **(required)** - Name or path of the workspace to describe
+
+</details>
+
+<details>
+
+<summary>kiali</summary>
+
+- **kiali_get_mesh_traffic_graph** - Returns service-to-service traffic topology, dependencies, and network metrics (throughput, response time, mTLS) for the specified namespaces. Use this to diagnose routing issues, latency, or find upstream/downstream dependencies.
+  - `graphType` (`string`) - Granularity of the graph. 'app' aggregates by app name, 'versionedApp' separates by versions, 'workload' maps specific pods/deployments. Default: versionedApp.
+  - `meshCluster` (`string`) - Optional Istio mesh cluster name from kiali_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
+  - `namespaces` (`string`) **(required)** - Comma-separated list of namespaces to map
+
+- **kiali_get_mesh_status** - Retrieves the high-level health, topology, and environment details of the Istio service mesh. Returns multi-cluster control plane status (istiod), data plane namespace health (including ambient mesh status), observability stack health (Prometheus, Grafana...), and component connectivity. Use this tool as the first step to diagnose mesh-wide issues, verify Istio/Kiali versions, or check overall health before drilling into specific workloads.
+
+- **kiali_manage_istio_config_read** - Read Istio, Gateway API, and Inference API config. 'list' groups by namespace→'group/version/kind'→{valid:[...],invalid:[...]} where valid/invalid arrays contain resource names; omit group/kind to retrieve ALL config types in a single call. Supports Istio (networking.istio.io, security.istio.io), Gateway API (gateway.networking.k8s.io), and Inference API (inference.networking.k8s.io) when installed. 'get' returns full YAML. For writes use manage_istio_config.
+  - `action` (`string`) **(required)** - Action to perform (read-only)
+  - `group` (`string`) - API group of the Istio object. Required ONLY for 'get' action. For 'list', OMIT group and kind to retrieve ALL config types in a single call. Use 'gateway.networking.k8s.io' for Gateway API resources. Use 'inference.networking.k8s.io' for Inference API resources.
+  - `kind` (`string`) - Kind of the Istio object. Required ONLY for 'get' action. For 'list', OMIT to return all kinds at once — do NOT call separately for each kind.
+  - `meshCluster` (`string`) - Optional Istio mesh cluster name from kiali_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
+  - `namespace` (`string`) - Namespace containing the Istio object. For 'list', if not provided, returns objects across all namespaces. For 'get', required.
+  - `object` (`string`) - Name of the Istio object. Required for 'get' action.
+  - `serviceName` (`string`) - Filter Istio configurations (VirtualServices, DestinationRules, and their referenced Gateways) that affect a specific service. Only applicable for 'list' action
+  - `version` (`string`) - API version. Use 'v1' for all resource types. Required for 'get' action.
+
+- **kiali_manage_istio_config** - Create, patch, or delete Istio, Gateway API, and Inference API config. Supports Istio resources (networking.istio.io, security.istio.io), Gateway API resources (gateway.networking.k8s.io), and Inference API resources (inference.networking.k8s.io) when installed on the cluster. For list and get (read-only) use manage_istio_config_read.
+  - `action` (`string`) **(required)** - Action to perform (write)
+  - `data` (`string`) - JSON or YAML data for the resource. Required for create and patch actions. For create, you can provide partial content (e.g. only spec) and it will be merged onto a valid template with defaults. Arrays (like servers, http, etc.) are REPLACED entirely, so include ALL elements you want.
+  - `group` (`string`) **(required)** - API group of the Istio object. Use 'gateway.networking.k8s.io' for Gateway API resources. Use 'inference.networking.k8s.io' for Inference API resources.
+  - `kind` (`string`) **(required)** - Kind of the Istio object (e.g., 'VirtualService', 'DestinationRule').
+  - `meshCluster` (`string`) - Optional Istio mesh cluster name from kiali_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
+  - `namespace` (`string`) **(required)** - Namespace containing the Istio object.
+  - `object` (`string`) **(required)** - Name of the Istio object.
+  - `version` (`string`) **(required)** - API version. Use 'v1' for all resource types.
+
+- **kiali_list_mesh_clusters** - Returns the list of Istio mesh clusters that Kiali can access. Each entry includes its name and whether it is the home cluster (where Kiali is deployed). Call this tool before using meshCluster on other Kiali tools when the target cluster is unknown.
+
+- **kiali_get_resource_details** - Fetches a list of resources OR retrieves detailed data for a specific resource. If 'resourceName' is omitted, it returns a list. If 'resourceName' is provided, it returns details for that specific resource.
+  - `meshCluster` (`string`) - Optional Istio mesh cluster name from kiali_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
+  - `namespaces` (`string`) - Comma-separated list of namespaces to query (e.g., 'bookinfo' or 'bookinfo,default'). If not provided, it will query across all accessible namespaces.
+  - `resourceName` (`string`) - Optional. The specific name of the resource. If left empty, the tool returns a list of all resources of the specified type. If provided, the tool returns deep details for this specific resource.
+  - `resourceType` (`string`) **(required)** - The type of resource to query. Use 'app' for Kiali applications (grouped by the Kubernetes 'app' label). Use 'argoapp' for ArgoCD Application CRDs (requires ArgoCD installed and the Kiali service account must have read permissions on applications.argoproj.io).
+
+- **kiali_list_traces** - Lists distributed traces for a service in a namespace. Returns a summary (namespace, service, total_found, avg_duration_ms) and a list of traces with id, duration_ms, spans_count, root_op, slowest_service, has_errors. Use get_trace_details with a trace id to get full hierarchy.
+  - `errorOnly` (`boolean`) - If true, only consider traces that contain errors. Default false.
+  - `limit` (`integer`) - Maximum number of traces to return. Default 10.
+  - `lookbackSeconds` (`integer`) - How far back to search. Default 600 (10m).
+  - `meshCluster` (`string`) - Optional Istio mesh cluster name from kiali_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
+  - `namespace` (`string`) **(required)** - Kubernetes namespace of the service.
+  - `serviceName` (`string`) **(required)** - Service name to search traces for (required). Returns multiple traces up to limit.
+
+- **kiali_get_trace_details** - Fetches a single distributed trace by trace_id and returns its call hierarchy (service tree with duration, status, and nested calls). Use this after list_traces to drill into a specific trace.
+  - `traceId` (`string`) **(required)** - Trace ID to fetch and summarize. If provided, namespace/service_name are ignored.
+
+- **kiali_get_pod_performance** - Returns a human-readable text summary with current Pod CPU/memory usage (from Prometheus) compared to Kubernetes requests/limits (from the Pod spec). Useful to answer questions like 'Is this workload using too much memory?'
+  - `meshCluster` (`string`) - Optional Istio mesh cluster name from kiali_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
+  - `namespace` (`string`) **(required)** - Kubernetes namespace of the Pod.
+  - `podName` (`string`) - Kubernetes Pod name. If workloadName is provided, the tool will attempt to resolve a Pod from that workload first.
+  - `queryTime` (`string`) - Optional end timestamp (RFC3339) for the query. Defaults to now.
+  - `timeRange` (`string`) - Time window used to compute CPU rate (Prometheus duration like '5m', '10m', '1h', '1d'). Defaults to '10m'.
+  - `workloadName` (`string`) - Kubernetes Workload name (e.g. Deployment/StatefulSet/etc). Tool will look up the workload and pick one of its Pods. If not found, it will fall back to treating this value as a podName.
+
+- **kiali_get_logs** - Get the logs of a Kubernetes Pod (or workload name that will be resolved to a pod) in a namespace. Output is plain text, matching kubernetes-mcp-server pods_log. The line_count field tells you the total number of log lines returned. Analyze ALL of them, but summarize the results unless the user explicitly asks for the raw output. Do not omit any error or warning lines.
+  - `container` (`string`) - Optional. Name of the Pod container to get the logs from.
+  - `format` (`string`) - Output formatting for chat. 'codeblock' wraps logs in ~~~ fences (recommended). 'plain' returns raw text like kubernetes-mcp-server pods_log.
+  - `meshCluster` (`string`) - Optional Istio mesh cluster name from kiali_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
+  - `name` (`string`) **(required)** - Name of the Pod to get the logs from. If it does not exist, it will be treated as a workload name and a running pod will be selected.
+  - `namespace` (`string`) **(required)** - Namespace to get the Pod logs from
+  - `previous` (`boolean`) - Optional. Return previous terminated container logs
+  - `severity` (`string`) - Optional severity filter applied client-side. Accepts 'ERROR', 'WARN' or combinations like 'ERROR,WARN'.
+  - `tail` (`integer`) - Number of lines to retrieve from the end of the logs (Optional, defaults to 50). Cannot exceed 200 lines.
+  - `workload` (`string`) - Optional. Workload name override (used when name lookup fails).
+
+- **kiali_get_metrics** - Returns a compact JSON summary of Istio metrics (latency quantiles, traffic trends, throughput, payload sizes) for the given resource.
+  - `byLabels` (`string`) - Comma-separated list of labels to group metrics by (e.g., 'source_workload,destination_service'). Optional
+  - `direction` (`string`) - Traffic direction. Optional, defaults to 'outbound'
+  - `meshCluster` (`string`) - Optional Istio mesh cluster name from kiali_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
+  - `namespace` (`string`) **(required)** - Namespace to get metrics from
+  - `quantiles` (`string`) - Comma-separated list of quantiles for histogram metrics (e.g., '0.5,0.95,0.99'). Optional
+  - `rateInterval` (`string`) - Rate interval for metrics (e.g., '1m', '5m'). Optional, defaults to '10m'
+  - `reporter` (`string`) - Metrics reporter(s). Comma-separated list of: 'source', 'destination', 'waypoint', or the special value 'both' (no reporter filter). Optional, defaults to 'source'. Example: 'source,waypoint'
+  - `requestProtocol` (`string`) - Filter by request protocol (e.g., 'http', 'grpc', 'tcp'). Optional
+  - `resourceName` (`string`) **(required)** - Name of the resource to get metrics for
+  - `resourceType` (`string`) **(required)** - Type of resource to get metrics
+  - `step` (`string`) - Step between data points in seconds (e.g., '15'). Optional, defaults to 15 seconds
 
 </details>
 
@@ -1061,9 +1142,15 @@ Use tempo_search_tags to discover available tag names.
   - `namespace` (`string`) - Namespace of the Pipeline
   - `params` (`object`) - Parameter values to pass to the Pipeline. Keys are parameter names; values can be a string, an array of strings, or an object (map of string to string) depending on the parameter type defined in the Pipeline spec
 
-- **tekton_pipelinerun_restart** - Restart a Tekton PipelineRun by creating a new PipelineRun with the same spec
-  - `name` (`string`) **(required)** - Name of the PipelineRun to restart
+- **tekton_pipelinerun_lifecycle** - Manage a Tekton PipelineRun lifecycle by restarting it with the same spec or cancelling it by setting spec.status to Cancelled.
+  - `action` (`string`) **(required)** - Lifecycle action to perform: 'restart' creates a new PipelineRun with the same spec; 'cancel' sets spec.status to Cancelled.
+  - `name` (`string`) **(required)** - Name of the PipelineRun to manage
   - `namespace` (`string`) - Namespace of the PipelineRun
+
+- **tekton_pipelinerun_logs** - Get logs for all TaskRuns owned by a Tekton PipelineRun. Use this to inspect PipelineRun execution output without locating pods manually.
+  - `name` (`string`) **(required)** - Name of the PipelineRun to get logs from
+  - `namespace` (`string`) - Namespace of the PipelineRun
+  - `tail` (`integer`) - Number of lines to retrieve from the end of each container log (default: 100)
 
 - **tekton_task_start** - Start a Tekton Task by creating a TaskRun that references it
   - `name` (`string`) **(required)** - Name of the Task to start
@@ -1181,6 +1268,32 @@ Use tempo_search_tags to discover available tag names.
 
 - **istio-config-review** - Review and validate Istio configuration in a namespace, checking for misconfigurations and best practice violations
   - `namespace` (`string`) **(required)** - Namespace to review Istio configuration for
+
+</details>
+
+<details>
+
+<summary>kubevirt</summary>
+
+- **vm-troubleshoot** - Generate a step-by-step troubleshooting guide for diagnosing KubeVirt VirtualMachine issues
+  - `namespace` (`string`) **(required)** - The namespace of the VirtualMachine to troubleshoot
+  - `name` (`string`) **(required)** - The name of the VirtualMachine to troubleshoot
+
+- **windows-golden-image** - Guides creation of a Windows golden image via the KubeVirt windows-efi-installer Tekton pipeline
+  - `winImageDownloadURL` (`string`) **(required)** - Microsoft Windows ISO download URL (must be https://)
+  - `namespace` (`string`) - Target namespace for the PipelineRun
+  - `windowsVersion` (`string`) - Windows version: 10, 11, 2k22 (default), or 2k25
+  - `pipelineVersion` (`string`) - Pipeline version (default: latest). Use specific version like 0.25.0 if needed
+
+</details>
+
+<details>
+
+<summary>tekton</summary>
+
+- **pipeline-troubleshoot** - Gather PipelineRun status, TaskRuns, logs, events, Pipeline-as-Code Repository, and TektonConfig context for Tekton troubleshooting
+  - `namespace` (`string`) **(required)** - Namespace of the PipelineRun to troubleshoot
+  - `name` (`string`) **(required)** - Name of the PipelineRun to troubleshoot
 
 </details>
 
