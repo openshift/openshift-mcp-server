@@ -156,19 +156,33 @@ write-kiali-mcp-config-openshift: ## OpenShift: write Kiali Route URL into $(KIA
 	probe_root="https://$$kiali_host/api"; \
 	probe_kiali="https://$$kiali_host/kiali/api"; \
 	base_url=""; \
+	curl_cfg=""; \
+	trap 'rm -f "$$curl_cfg"' EXIT; \
 	if [ -n "$$kiali_token" ]; then \
-	  code_kiali="$$(curl -ksS -o /dev/null -w '%{http_code}' --max-time 15 -H "Authorization: Bearer $$kiali_token" "$$probe_kiali" 2>/dev/null || echo 000)"; \
-	  code_root="$$(curl -ksS -o /dev/null -w '%{http_code}' --max-time 15 -H "Authorization: Bearer $$kiali_token" "$$probe_root" 2>/dev/null || echo 000)"; \
+	  curl_cfg="$$(mktemp)"; \
+	  chmod 600 "$$curl_cfg"; \
+	  printf 'header = "Authorization: Bearer %s"\n' "$$kiali_token" > "$$curl_cfg"; \
+	  code_kiali="$$(curl -ksS -o /dev/null -w '%{http_code}' --max-time 15 -K "$$curl_cfg" "$$probe_kiali" 2>/dev/null || echo 000)"; \
+	  code_root="$$(curl -ksS -o /dev/null -w '%{http_code}' --max-time 15 -K "$$curl_cfg" "$$probe_root" 2>/dev/null || echo 000)"; \
+	  rm -f "$$curl_cfg"; \
+	  curl_cfg=""; \
 	else \
 	  code_kiali="$$(curl -ksS -o /dev/null -w '%{http_code}' --max-time 15 "$$probe_kiali" 2>/dev/null || echo 000)"; \
 	  code_root="$$(curl -ksS -o /dev/null -w '%{http_code}' --max-time 15 "$$probe_root" 2>/dev/null || echo 000)"; \
 	fi; \
-	case "$$code_kiali" in 2*|3*) base_url="$$base_kiali" ;; esac; \
-	case "$$code_root" in 2*|3*) base_url="$$base_root" ;; esac; \
-	if [ -z "$$base_url" ]; then \
-	  echo "Neither $$probe_root (HTTP $$code_root) nor $$probe_kiali (HTTP $$code_kiali) responded OK; defaulting to $$base_root" >&2; \
-	  base_url="$$base_root"; \
-	fi; \
+	: "Prefer base_root when both probes succeed (Sail serves at /); base_kiali only if root fails"; \
+	case "$$code_root" in \
+	  2*|3*) base_url="$$base_root" ;; \
+	  *) \
+	    case "$$code_kiali" in \
+	      2*|3*) base_url="$$base_kiali" ;; \
+	      *) \
+	        echo "Neither $$probe_root (HTTP $$code_root) nor $$probe_kiali (HTTP $$code_kiali) responded OK; defaulting to $$base_root" >&2; \
+	        base_url="$$base_root"; \
+	        ;; \
+	    esac; \
+	    ;; \
+	esac; \
 	mkdir -p "$$(dirname "$$out")"; \
 	printf '%s\n' \
 	  '[toolset_configs.kiali]' \
@@ -197,7 +211,7 @@ fix-istiod-validating-webhook: ## OpenShift/Sail: alias Service istiod + sync we
 	fi; \
 	echo "==> fix-istiod-validating-webhook: ensuring Service/istiod aliases $$rev_svc"; \
 	$$cli get svc "$$rev_svc" -n "$$ns" -o json | \
-	  jq 'del(.metadata.resourceVersion,.metadata.uid,.metadata.creationTimestamp,.metadata.managedFields,.metadata.ownerReferences,.status,.spec.clusterIP,.spec.clusterIPs) | .metadata.name="istiod" | .metadata.annotations["mcp.local/alias-for"]=$$rev' --arg rev "$$rev_svc" | \
+	  jq 'del(.metadata.resourceVersion,.metadata.uid,.metadata.creationTimestamp,.metadata.managedFields,.metadata.ownerReferences,.metadata.annotations,.metadata.labels,.status,.spec.clusterIP,.spec.clusterIPs) | .metadata.name="istiod" | .metadata.annotations={"mcp.local/alias-for": $$rev}' --arg rev "$$rev_svc" | \
 	  $$cli apply -f -; \
 	if $$cli get validatingwebhookconfiguration istiod-default-validator >/dev/null 2>&1; then \
 	  wh_rev="$$( $$cli get validatingwebhookconfiguration -o name | awk -F/ '/istio-validator-default-v/{print $$2; exit}' )"; \
