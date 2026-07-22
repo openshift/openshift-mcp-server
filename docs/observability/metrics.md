@@ -184,24 +184,28 @@ insecure = false
 # Valid values:
 #   "all"   — enable all guardrails (default)
 #   "none"  — disable all guardrails
-#   or a comma-separated subset:
+#   or a comma-separated list of guardrail names to enable, or !name to disable from "all":
 #     "disallow-explicit-name-label" — reject queries that filter by __name__ label directly
 #     "require-label-matcher"        — reject queries with no label matchers (full table scans)
 #     "disallow-blanket-regex"       — reject .* regexes that would match too many series
+#     "max-metric-cardinality"       — reject queries whose metric exceeds max_metric_cardinality
+#     "!tsdb"                        — disable both TSDB-dependent checks (max-metric-cardinality
+#                                      and disallow-blanket-regex); useful for older Thanos Querier
 # Default: "all"
-guardrails = "none"
+# Example for OpenShift Thanos Querier without TSDB status API:
+# guardrails = "!tsdb"
 
 # Maximum number of series allowed per metric before a query is rejected.
-# Guards against accidentally pulling millions of series.
-# Set to 0 to disable this check.
+# Only applies when the "max-metric-cardinality" guardrail is enabled.
+# Do not set to 0 — use guardrails = "!max-metric-cardinality" (or "none") to disable.
 # Default: 20000
-max_metric_cardinality = 0
+# max_metric_cardinality = 10000
 
 # Maximum number of label values allowed before a blanket regex (.*) is rejected.
 # Only applies when the "disallow-blanket-regex" guardrail is active.
 # Set to 0 to always disallow blanket regex regardless of cardinality.
 # Default: 500
-max_label_cardinality = 0
+# max_label_cardinality = 500
 
 # Controls whether range queries return full data points
 #	instead of summary statistics to the model.
@@ -217,8 +221,8 @@ range_query_full_response = false
 | `prometheus_url` | string | `http://localhost:9090` | Prometheus or Thanos Querier endpoint URL |
 | `alertmanager_url` | string | — | Alertmanager endpoint URL (required for alert/silence tools) |
 | `insecure` | bool | `false` | Skip TLS certificate verification |
-| `guardrails` | string | `"all"` | Query safety checks (`"all"`, `"none"`, or comma-separated list) |
-| `max_metric_cardinality` | uint64 | `20000` | Max series per metric (0 = disabled) |
+| `guardrails` | string | `"all"` | Query safety checks (`"all"`, `"none"`, comma-separated names, or `!name` / `!tsdb` to disable from `"all"`) |
+| `max_metric_cardinality` | uint64 | `20000` | Max series per metric (requires `max-metric-cardinality` guardrail; `0` is not supported) |
 | `max_label_cardinality` | uint64 | `500` | Max label values before blanket regex is rejected (0 = always reject) |
 | `range_query_full_response` | bool | `false` | Controls whether range queries return full data points |
 
@@ -285,10 +289,16 @@ They are enabled by default (`guardrails = "all"`).
 | Disallow explicit name label | `disallow-explicit-name-label` | Rejects queries that filter on `__name__` directly instead of using metric name syntax |
 | Require label matcher | `require-label-matcher` | Rejects bare metric name queries with no label filters (prevents full-cardinality scans) |
 | Disallow blanket regex | `disallow-blanket-regex` | Rejects `.*` or equivalently broad regex matchers when the matched series count exceeds `max_label_cardinality` |
+| Max metric cardinality | `max-metric-cardinality` | Rejects queries whose metric series count exceeds `max_metric_cardinality` (uses TSDB status API) |
 
-To disable a specific guardrail while keeping others:
+Use either a positive list of names to enable, or `!name` to disable selected checks from `"all"`. Do not mix the two styles. The `!tsdb` shortcut disables both TSDB-dependent checks (`max-metric-cardinality` and `disallow-blanket-regex`) when the backend does not expose `/api/v1/status/tsdb` (for example older Thanos Querier).
+
+To disable specific guardrails while keeping others:
 
 ```toml
 [toolset_configs."observability/metrics"]
-guardrails = "disallow-explicit-name-label,require-label-matcher"  # omit disallow-blanket-regex
+# Disable TSDB-dependent checks only:
+guardrails = "!tsdb"
+# Or enable an explicit subset (all others off):
+# guardrails = "disallow-explicit-name-label,require-label-matcher"
 ```

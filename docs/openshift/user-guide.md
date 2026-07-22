@@ -102,11 +102,17 @@ toolsets = ["core", "olm", "kubevirt"]
 
 ### Observability
 
-| Tool                     | Description                                                                                                                                                                                                   |
-| :----------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `prometheus_query`       | Executes an instant PromQL query against the cluster's Thanos Querier, returning current metric values at a specified point in time (or the current time if not specified).                                   |
-| `prometheus_query_range` | Executes a range PromQL query against the cluster's Thanos Querier, returning metric values over a time range with a specified resolution step, useful for time-series data, trends, and historical analysis. |
-| `alertmanager_alerts`    | Queries active and pending alerts from the cluster's Alertmanager, with filtering support for active/silenced/inhibited states and Alertmanager filter syntax.                                                |
+Observability query tools are provided by [obs-mcp](https://github.com/rhobs/obs-mcp) toolsets. Enable them explicitly (for example `observability/metrics`). See the [metrics](../observability/metrics.md), [logs](../observability/logs.md), [tracing](../observability/tracing.md), and [otelcol](../observability/otelcol.md) guides for full details.
+
+| Tool                     | Toolset                 | Description                                                                                                                                                                                                   |
+| :----------------------- | :---------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `list_metrics`           | `observability/metrics` | Lists available metric names (regex filter). Call this before writing PromQL queries.                                                                                                                         |
+| `execute_instant_query`  | `observability/metrics` | Executes a PromQL instant query against Prometheus/Thanos Querier, returning current metric values at a point in time.                                                                                        |
+| `execute_range_query`    | `observability/metrics` | Executes a PromQL range query against Prometheus/Thanos Querier, returning time-series data over a window.                                                                                                    |
+| `get_alerts`             | `observability/metrics` | Queries alerts from Alertmanager (requires `alertmanager_url`), with filtering for active/silenced/inhibited states.                                                                                          |
+| `get_silences`           | `observability/metrics` | Queries silences from Alertmanager (requires `alertmanager_url`), with label matcher filtering.                                                                                                               |
+| `loki_query_range`       | `observability/logs`    | Executes a Loki LogQL range query and returns matching log streams and lines.                                                                                                                                 |
+| `tempo_search_traces`    | `observability/traces`  | Searches distributed traces in Tempo using TraceQL.                                                                                                                                                           |
 
 ## Bring Your Own Model
 

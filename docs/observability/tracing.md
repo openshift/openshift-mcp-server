@@ -121,6 +121,11 @@ Optional settings use a **`[toolset_configs."observability/traces"]`** section (
 # Same semantics as the metrics toolset: "header" (default) or "kubeconfig".
 auth_mode = "kubeconfig"
 
+# URL of the Tempo query API endpoint.
+# Optional — if unset, use TempoStack/TempoMonolithic discovery
+# (tempo_list_instances + tempoNamespace/tempoName on each tool call).
+# tempo_url = "https://tempo-query-frontend.observability.svc.cluster.local:3200"
+
 # Skip TLS verification (development only). Default: false
 insecure = false
 
@@ -134,6 +139,7 @@ use_route = false
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `auth_mode` | string | `"header"` | Bearer token source: `"header"` or `"kubeconfig"` |
+| `tempo_url` | string | — | Tempo API endpoint URL (optional; use Tempo discovery if unset) |
 | `insecure` | bool | `false` | Skip TLS certificate verification |
 | `use_route` | bool | `false` | Use OpenShift `Route` resources for Tempo gateway/query URLs |
 
@@ -147,9 +153,9 @@ Bearer token behavior matches the [metrics toolset](./metrics.md) (**Authenticat
 
 ## Instance discovery
 
-The server lists **`TempoStack`** and **`TempoMonolithic`** objects cluster-wide and derives query-frontend or gateway base URLs from each resource. With **`use_route = true`**, it prefers OpenShift `Route` hosts where available.
+When `tempo_url` is not set, the server lists **`TempoStack`** and **`TempoMonolithic`** objects cluster-wide and derives query-frontend or gateway base URLs from each resource. With **`use_route = true`**, each instance's URL is resolved via an OpenShift `Route`; instances whose Route cannot be resolved are silently skipped (there is no fallback to service URLs). Chosen instances are **validated** against this discovery list before any request is sent, so callers cannot point tools at arbitrary URLs.
 
-Chosen instances are **validated** against this discovery list before any request is sent, so callers cannot point tools at arbitrary URLs.
+When `tempo_url` is set, that URL is used directly and Kubernetes discovery is skipped. Tool calls still require `tempoNamespace` and `tempoName` in the input schema (they are unused for URL resolution in that case).
 
 ---
 
