@@ -1,0 +1,27 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "ovn-lflow-list-for-datapath"
+  difficulty: medium
+  category: "OVN Logical Flows"
+  description: "List logical flows for a specific datapath"
+  labels:
+    suite: ovn-kubernetes
+    requires: ovn-kubernetes
+spec:
+  limits:
+    timeout: "5m"
+  setup:
+    - script:
+        file: ./setup.sh
+  prompt:
+    inline: |
+      List logical flows for the join datapath from the OVN Southbound database.
+  verify:
+    - llmJudge:
+        contains: "Shows data from OVN Southbound database. Contains logical flows from both ingress and egress pipeline for the join datapath"
+        reasoning: "Output should show logical flows from both ingress and egress pipelines for the join datapath"
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "ovn_lflow_list"

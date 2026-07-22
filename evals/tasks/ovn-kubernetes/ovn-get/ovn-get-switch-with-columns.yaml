@@ -1,0 +1,27 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "ovn-get-switch-with-columns"
+  difficulty: medium
+  category: "OVN Database Query"
+  description: "Get specific columns from Logical_Switch table"
+  labels:
+    suite: ovn-kubernetes
+    requires: ovn-kubernetes
+spec:
+  limits:
+    timeout: "5m"
+  setup:
+    - script:
+        file: ./setup.sh
+  prompt:
+    inline: |
+      From the Logical_Switch table in the OVN Northbound database, show me only the name and ports columns.
+  verify:
+    - llmJudge:
+        contains: "Shows Logical_Switch table in the OVN Northbound database showing only the name and ports columns indicating switches with their associated ports. Should contain join, transit and node specific switches in the list"
+        reasoning: "Output should show Logical_Switch entries with name and ports columns including join, transit, and node specific switches"
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "ovn_get"

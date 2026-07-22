@@ -1,0 +1,118 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "ovn-trace-with-pattern"
+  difficulty: hard
+  category: "OVN Packet Tracing"
+  description: "Trace packet and filter output using regex pattern"
+  labels:
+    suite: ovn-kubernetes
+    requires: ovn-kubernetes
+spec:
+  requires:
+    - extension: kubernetes
+      as: k8s
+  limits:
+    timeout: "10m"
+    cleanupTimeout: "2m"
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "ovn_trace"
+      - server: kubernetes
+        toolPattern: "ovn_show"
+  setup:
+    - script:
+        file: ./setup.sh
+    - k8s.create:
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: ovn-trace-test
+    - script:
+        inline: |
+          #!/usr/bin/env bash
+          # Label a worker node for pod scheduling
+          oc get nodes -l node-role.kubernetes.io/worker="" --no-headers -o jsonpath='{.items[0].metadata.name}' | xargs -I {} oc label node {} schedule-app=true
+    - k8s.create:
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: source-pod
+          namespace: ovn-trace-test
+          labels:
+            app: ovn-trace
+        spec:
+          nodeSelector:
+            schedule-app: "true"
+          containers:
+          - name: nginx
+            image: quay.io/nginx/nginx-unprivileged:latest
+    - k8s.create:
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: dest-pod
+          namespace: ovn-trace-test
+          labels:
+            app: ovn-trace
+        spec:
+          nodeSelector:
+            schedule-app: "true"
+          containers:
+          - name: nginx
+            image: quay.io/nginx/nginx-unprivileged:latest
+    - script:
+        inline: |
+          #!/usr/bin/env bash
+          # Wait for source pod to be ready
+          if kubectl wait --for=condition=Ready pod/source-pod -n ovn-trace-test --timeout=300s; then
+            exit 0
+          else
+            echo "ERROR: source-pod did not reach Ready state in time"
+            exit 1
+          fi
+    - script:
+        inline: |
+          #!/usr/bin/env bash
+          # Wait for destination pod to be ready
+          if kubectl wait --for=condition=Ready pod/dest-pod -n ovn-trace-test --timeout=300s; then
+            exit 0
+          else
+            echo "ERROR: dest-pod did not reach Ready state in time"
+            exit 1
+          fi
+  prompt:
+    inline: |
+      Trace a TCP packet from source-pod to dest-pod in namespace ovn-trace-test and filter output to show only lines containing "output".
+
+      To construct the microflow, follow these steps:
+      1. Use ovn_show to get the Northbound database configuration
+      2. Find the port "ovn-trace-test_source-pod" in a switch - note the switch name (this is your datapath)
+      3. From that port's addresses field, extract: MAC (first value) and IP (second value) - these are eth.src and ip4.src
+      4. Find the port "ovn-trace-test_dest-pod" in the same switch
+      5. From that port's addresses field, extract: MAC and IP - these are eth.dst and ip4.dst
+      6. Construct the microflow string:
+         inport=="ovn-trace-test_source-pod" && eth.src==<source_mac> && ip4.src==<source_ip> && eth.dst==<dest_mac> && ip4.dst==<dest_ip> && tcp.dst==8080 && ip.ttl==64
+      7. Run ovn_trace with: datapath=<switch_name>, microflow=<constructed_string>, pattern="acl"
+  verify:
+    - llmJudge:
+        contains: "Packet exits to ovn-trace-test_dest-pod"
+        reasoning: "Output should show the packet exits to the destination pod port"
+  cleanup:
+    - k8s.delete:
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: ovn-trace-test
+        ignoreNotFound: true
+    - script:
+        inline: |
+          #!/usr/bin/env bash
+          # Wait for namespace to be fully deleted
+          kubectl wait --for=delete namespace/ovn-trace-test --timeout=120s 2>/dev/null || true
+    - script:
+        inline: |
+          #!/usr/bin/env bash
+          # Remove the label from the worker node
+          oc get nodes -l node-role.kubernetes.io/worker="" --no-headers -o jsonpath='{.items[0].metadata.name}' | xargs -I {} oc label node {} schedule-app-

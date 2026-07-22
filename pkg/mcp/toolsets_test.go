@@ -22,6 +22,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt"
 	mgToolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/mustgather"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/openshift"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/ovnkubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/tekton"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/suite"
@@ -222,6 +223,7 @@ func (s *ToolsetsSuite) TestGranularToolsetsTools() {
 		&helm.Toolset{},
 		&kiali.Toolset{},
 		&kubevirt.Toolset{},
+		&ovnkubernetes.Toolset{},
 		&tekton.Toolset{},
 		&clusterDiagnosticsToolset.Toolset{},
 	}
