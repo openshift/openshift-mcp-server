@@ -48,7 +48,7 @@ func initEtcd() []api.ServerTool {
 }
 
 func mustgatherETCDHealth(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	p, err := GetProvider()
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -83,7 +83,7 @@ func mustgatherETCDHealth(params api.ToolHandlerParams) (*api.ToolCallResult, er
 }
 
 func mustgatherETCDObjectCount(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	p, err := GetProvider()
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}

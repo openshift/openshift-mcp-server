@@ -84,7 +84,7 @@ func initMCPResourceTemplates() []api.ServerResourceTemplate {
 }
 
 func resourceCurrentArchive(_ context.Context) (*api.ResourceContent, error) {
-	p, err := getProvider()
+	p, err := GetProvider()
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func resourceCurrentArchive(_ context.Context) (*api.ResourceContent, error) {
 }
 
 func resourceNamespaces(_ context.Context) (*api.ResourceContent, error) {
-	p, err := getProvider()
+	p, err := GetProvider()
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,7 @@ func resourceNamespaces(_ context.Context) (*api.ResourceContent, error) {
 }
 
 func resourceETCDMembers(_ context.Context) (*api.ResourceContent, error) {
-	p, err := getProvider()
+	p, err := GetProvider()
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,7 @@ func resourceETCDMembers(_ context.Context) (*api.ResourceContent, error) {
 }
 
 func resourceETCDEndpointStatus(_ context.Context) (*api.ResourceContent, error) {
-	p, err := getProvider()
+	p, err := GetProvider()
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +132,7 @@ func resourceETCDEndpointStatus(_ context.Context) (*api.ResourceContent, error)
 }
 
 func resourcePrometheusConfig(_ context.Context) (*api.ResourceContent, error) {
-	p, err := getProvider()
+	p, err := GetProvider()
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func resourcePrometheusConfig(_ context.Context) (*api.ResourceContent, error) {
 }
 
 func resourceAlertManagerStatus(_ context.Context) (*api.ResourceContent, error) {
-	p, err := getProvider()
+	p, err := GetProvider()
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +212,7 @@ func resourceAlertManagerStatus(_ context.Context) (*api.ResourceContent, error)
 }
 
 func resourceGet(_ context.Context, uri string) (*api.ResourceContent, error) {
-	p, err := getProvider()
+	p, err := GetProvider()
 	if err != nil {
 		return nil, err
 	}

@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/mustgather"
 	"github.com/google/jsonschema-go/jsonschema"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -63,20 +65,39 @@ func getServiceEndpoints(params api.ToolHandlerParams) (*api.ToolCallResult, err
 	// EndpointSlices are linked to a service via the "kubernetes.io/service-name" label
 	labelSelector := "kubernetes.io/service-name=" + serviceName
 
-	list, err := params.DynamicClient().Resource(gvr).Namespace(namespace).List(params.Context, metav1.ListOptions{
-		LabelSelector: labelSelector,
-	})
-	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to list EndpointSlices for service %s/%s: %w", namespace, serviceName, err)), nil
+	var items []unstructured.Unstructured
+
+	if p, mgErr := mustgather.GetProvider(); mgErr == nil && p != nil {
+		gvk := schema.GroupVersionKind{Group: "discovery.k8s.io", Version: "v1", Kind: "EndpointSlice"}
+		list, err := p.ListResources(params.Context, gvk, namespace, mg.ListOptions{})
+		if err != nil {
+			return api.NewToolCallResult("", fmt.Errorf("failed to list EndpointSlices for service %s/%s from must-gather: %w", namespace, serviceName, err)), nil
+		}
+
+		// Filter by label selector
+		for _, item := range list.Items {
+			labels := item.GetLabels()
+			if labels != nil && labels["kubernetes.io/service-name"] == serviceName {
+				items = append(items, item)
+			}
+		}
+	} else {
+		list, err := params.DynamicClient().Resource(gvr).Namespace(namespace).List(params.Context, metav1.ListOptions{
+			LabelSelector: labelSelector,
+		})
+		if err != nil {
+			return api.NewToolCallResult("", fmt.Errorf("failed to list EndpointSlices for service %s/%s: %w", namespace, serviceName, err)), nil
+		}
+		items = list.Items
 	}
 
-	if len(list.Items) == 0 {
+	if len(items) == 0 {
 		return api.NewToolCallResult("", fmt.Errorf("no EndpointSlices found for service %s/%s", namespace, serviceName)), nil
 	}
 
 	// Extract KeyFields from EndpointSlices
 	var keyFields []map[string]interface{}
-	for _, eps := range list.Items {
+	for _, eps := range items {
 		kf := map[string]interface{}{
 			"Name":      eps.GetName(),
 			"Namespace": eps.GetNamespace(),
@@ -112,7 +133,7 @@ func getServiceEndpoints(params api.ToolHandlerParams) (*api.ToolCallResult, err
 
 	resultObj := map[string]interface{}{
 		"KeyFields":         keyFields,
-		"RawEndpointSlices": list.Items,
+		"RawEndpointSlices": items,
 	}
 
 	data, err := yaml.Marshal(resultObj)
