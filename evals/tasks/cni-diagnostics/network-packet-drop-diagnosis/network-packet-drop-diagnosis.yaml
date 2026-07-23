@@ -1,0 +1,23 @@
+kind: Task
+metadata:
+  labels:
+    suite: cni-diagnostics
+    category: network-tools
+  name: "network-packet-drop-diagnosis"
+  difficulty: hard
+steps:
+  setup:
+    file: setup.sh
+  verify:
+    contains: "The agent investigated packet drops to a cluster service using iptables or nftables rules, conntrack entries for port 8080, and routing table analysis, identifying a potential cause such as firewall rules, routing issues, or connection tracking"
+  cleanup:
+    file: cleanup.sh
+  prompt:
+    inline: |
+      A pod in namespace 'packet-drop-test' is reporting that packets to the cluster service 'backend-svc' on port 8080 are being dropped.
+      The pod is running on a worker node. Investigate the issue by:
+      1. Checking if packets are being dropped by iptables or nftables rules
+      2. Looking at connection tracking entries for traffic to port 8080
+      3. Examining the routing table to verify service reachability
+
+      Identify what might be causing the packet drops.

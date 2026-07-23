@@ -1,0 +1,16 @@
+kind: Task
+metadata:
+  labels:
+    suite: cni-diagnostics
+    category: kernel
+  name: "kernel-conntrack-list"
+  difficulty: easy
+steps:
+  setup:
+    file: setup.sh
+  verify:
+    contains: "The agent retrieved conntrack entries from a worker node showing TCP or UDP connections with source/destination IPs and connection states, including ESTABLISHED connections"
+  cleanup:
+    file: cleanup.sh
+  prompt:
+    inline: "List all active connection tracking entries on the Kubernetes worker node. Show connections in the ESTABLISHED state. The cluster has OVN-Kubernetes as the CNI."

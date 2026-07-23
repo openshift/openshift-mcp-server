@@ -390,12 +390,17 @@ github.com/opencontainers/image-spec/specs-go/v1
 github.com/os-observability/redhat-opentelemetry-collector/configschemas
 # github.com/ovn-kubernetes/ovn-kubernetes-mcp v0.1.0
 ## explicit; go 1.26.0
+github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/kernel/mcp
+github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/kernel/types
 github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/kubernetes/types
+github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/network-tools/mcp
+github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/network-tools/types
 github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/ovn/mcp
 github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/ovn/types
 github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/ovs/mcp
 github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/ovs/types
 github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/utils
+github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/utils/commandbuilder
 github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/utils/headtail
 github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/utils/ovndb
 github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/utils/pattern

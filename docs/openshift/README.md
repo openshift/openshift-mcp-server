@@ -10,7 +10,8 @@ This directory contains OpenShift-specific documentation for the OpenShift MCP S
 | **[NetEdge Toolset](NETEDGE.md)** | Guide for the Network Ingress & DNS troubleshooting tools |
 | **[ACM Setup](acm_setup.md)**   | Setting up Advanced Cluster Management (ACM) and using the MCP Server with multi-cluster environments |
 | **[ACM with Keycloak Setup](acm_keycloak_setup.md)** | Setting up ACM with Keycloak-based OIDC authentication for secure multi-cluster access |
-| **[OVN-Kubernetes Toolset](ovn-kubernetes.md)** | Guide for OVN-Kubernetes CNI network troubleshooting tools |
+| **[OVN-Kubernetes Toolset](ovn-kubernetes.md)** | Guide for OVN-Kubernetes CNI network troubleshooting tools (use with [CNI Diagnostics](cni-diagnostics.md) for a complete toolkit) |
+| **[CNI Diagnostics Toolset](cni-diagnostics.md)** | Tools for Container Network Interface (CNI) diagnostics and troubleshooting (enable with [OVN-Kubernetes](ovn-kubernetes.md) when troubleshooting OVN-Kubernetes) |
 
 ## Overview
 

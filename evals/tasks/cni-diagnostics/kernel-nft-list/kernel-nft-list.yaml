@@ -1,0 +1,16 @@
+kind: Task
+metadata:
+  labels:
+    suite: cni-diagnostics
+    category: kernel
+  name: "kernel-nft-list"
+  difficulty: medium
+steps:
+  setup:
+    file: setup.sh
+  verify:
+    contains: "The agent retrieved nftables configuration showing tables, chains, and rules for the inet address family"
+  cleanup:
+    file: cleanup.sh
+  prompt:
+    inline: "Check the nftables configuration on a worker node. Show all nftables tables for the inet address family to understand the packet filtering rules."
