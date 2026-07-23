@@ -89,10 +89,12 @@ Add `ovn-kubernetes` to your toolsets configuration:
 
 ```toml
 # config.toml
-toolsets = ["core", "ovn-kubernetes"]
+toolsets = ["core", "ovn-kubernetes", "cni-diagnostics"]
 ```
 
 The `core` toolset is required for discovering ovnkube-node pods via `pods_list`.
+
+For a complete OVN-Kubernetes troubleshooting toolkit, also enable the [`cni-diagnostics`](cni-diagnostics.md) toolset. It provides kernel-level networking tools (conntrack, iptables, nftables, ip) and packet capture/tracing (`tcpdump`, `pwru`) that complement the OVN and OVS layer tools in this toolset.
 
 ## Tools Reference
 
@@ -650,7 +652,7 @@ ovs_appctl: namespace="openshift-ovn-kubernetes", name="<pod>", action="dpctl/du
 
 #### "no record" errors from `ovn_get`
 
-**Symptom**: `ovs-nbctl: no row "..." in table "..."`
+**Symptom**: `ovn-nbctl: no row "..." in table "..."`
 
 **Solution**:
 
@@ -661,3 +663,4 @@ ovs_appctl: namespace="openshift-ovn-kubernetes", name="<pod>", action="dpctl/du
 
 - [Configuration Reference](../configuration.md)
 - [Core Toolset](../README.md) — for `pods_list`, `pods_exec`, and other Kubernetes primitives
+- [CNI Diagnostics Toolset](cni-diagnostics.md) — kernel networking and packet capture/tracing tools to use alongside this toolset for OVN-Kubernetes troubleshooting

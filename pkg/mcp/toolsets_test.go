@@ -14,6 +14,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
 	clusterDiagnosticsToolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/cluster-diagnostics"
+	cniDiagnosticsToolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/cni-diagnostics"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/core"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/helm"
@@ -226,6 +227,7 @@ func (s *ToolsetsSuite) TestGranularToolsetsTools() {
 		&ovnkubernetes.Toolset{},
 		&tekton.Toolset{},
 		&clusterDiagnosticsToolset.Toolset{},
+		&cniDiagnosticsToolset.Toolset{},
 	}
 	for _, testCase := range testCases {
 		s.Run("Toolset "+testCase.GetName(), func() {
