@@ -1,0 +1,22 @@
+kind: Task
+metadata:
+  labels:
+    suite: cni-diagnostics
+    category: network-tools
+  name: "network-pwru-trace"
+  difficulty: hard
+steps:
+  setup:
+    file: setup.sh
+  verify:
+    contains: "The agent used eBPF pwru tracing to show kernel functions processing packets from the pod IP and identified where packets may be dropped in the kernel network stack"
+  cleanup:
+    file: cleanup.sh
+  prompt:
+    inline: |
+      Packets from a pod are being dropped somewhere in the kernel networking stack before reaching their destination.
+      The pod has IP address in the 10.244.0.0/16 range and is trying to reach the API server.
+
+      Use eBPF tracing to show which kernel functions are processing packets from this pod IP
+      and identify where packets might be getting dropped in the kernel network stack.
+      Limit the trace output to avoid overwhelming the system.

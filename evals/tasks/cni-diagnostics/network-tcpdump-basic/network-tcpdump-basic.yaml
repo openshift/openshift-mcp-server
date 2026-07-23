@@ -1,0 +1,16 @@
+kind: Task
+metadata:
+  labels:
+    suite: cni-diagnostics
+    category: network-tools
+  name: "network-tcpdump-basic"
+  difficulty: medium
+steps:
+  setup:
+    file: setup.sh
+  verify:
+    contains: "The agent captured 50 TCP packets using tcpdump with a BPF filter on a worker node"
+  cleanup:
+    file: cleanup.sh
+  prompt:
+    inline: "A pod is experiencing intermittent connection issues. Capture TCP traffic on a worker node for 50 packets to investigate network connectivity. Use a BPF filter to focus on TCP traffic only."
