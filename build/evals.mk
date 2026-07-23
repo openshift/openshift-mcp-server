@@ -11,17 +11,18 @@ CLAUDE_AGENT_ACP = $(shell pwd)/_output/tools/node_modules/.bin/claude-agent-acp
 CLAUDE_AGENT_ACP_VERSION ?= latest
 
 # High-level knobs for local single-suite runs, e.g.:
-#   make run-evals SUITE=kubevirt AGENT=claude-code MODEL=sonnet
-# AGENT selects the eval config, SUITE selects the task suite label, and MODEL
-# sets ANTHROPIC_MODEL for the claude-agent-acp adapter (the openai-agent ignores it).
-AGENT ?= openai-agent
+#   make run-evals SUITE=kubevirt AGENT=acp-anthropic MODEL=sonnet
+# AGENT selects the agent directory under evals/, SUITE selects the task suite
+# label, and MODEL sets ANTHROPIC_MODEL for ACP agents (builtin agents ignore it).
+# Available agents: builtin-openai, builtin-anthropic, builtin-google,
+#                   acp-anthropic (Claude Code via ACP), acp-google (Gemini via ACP)
+AGENT ?= builtin-openai
 SUITE ?= core
 MODEL ?=
 
-# Prefer a per-suite eval config when one exists: those carry no llmJudge, so a
-# local run needs no OpenAI key. Otherwise fall back to the agent's top-level
-# config (the one CI uses; its llmJudge requires an OpenAI key).
-EVAL_CONFIG ?= $(or $(wildcard evals/tasks/$(SUITE)/$(AGENT)/eval.yaml),evals/$(AGENT)/eval.yaml)
+# Prefer a per-suite eval config when one exists, then try the core-eval-testing
+# suite config (what CI uses).
+EVAL_CONFIG ?= $(or $(wildcard evals/tasks/$(SUITE)/$(AGENT)/eval.yaml),evals/core-eval-testing/$(AGENT)/eval-$(SUITE).yaml)
 EVAL_LABEL_SELECTOR ?= suite=$(SUITE)
 EVAL_TASK_FILTER ?=
 EVAL_VERBOSE ?= false
@@ -39,9 +40,9 @@ mcpchecker:
 ##@ Evals
 
 # Install the claude-agent-acp adapter locally under _output/tools, required by
-# the claude-code eval agent (evals/claude-code/agent.yaml runs `claude-agent-acp`).
+# the acp-anthropic eval agent (runs `claude-agent-acp`).
 .PHONY: claude-agent-acp
-claude-agent-acp: ## Install the claude-agent-acp adapter for the claude-code eval agent
+claude-agent-acp: ## Install the claude-agent-acp adapter for the acp-anthropic eval agent
 	@[ -f $(CLAUDE_AGENT_ACP) ] || { \
 		set -e ;\
 		echo "Installing claude-agent-acp@$(CLAUDE_AGENT_ACP_VERSION) to $(CLAUDE_AGENT_ACP)..." ;\
@@ -50,7 +51,7 @@ claude-agent-acp: ## Install the claude-agent-acp adapter for the claude-code ev
 	}
 
 .PHONY: run-evals
-run-evals: mcpchecker $(if $(filter claude-code,$(AGENT)),claude-agent-acp) ## Run mcpchecker evals (knobs: SUITE, AGENT, MODEL; see evals/README.md)
+run-evals: mcpchecker $(if $(filter acp-anthropic,$(AGENT)),claude-agent-acp) ## Run mcpchecker evals (knobs: SUITE, AGENT, MODEL; see evals/README.md)
 	$(if $(MODEL),ANTHROPIC_MODEL=$(MODEL) )PATH="$(shell pwd)/_output/tools/node_modules/.bin:$(PATH)" $(MCPCHECKER) check $(EVAL_CONFIG) \
 		$(if $(EVAL_LABEL_SELECTOR),--label-selector $(EVAL_LABEL_SELECTOR),) \
 		$(if $(EVAL_TASK_FILTER),--run "$(EVAL_TASK_FILTER)",) \

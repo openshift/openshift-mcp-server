@@ -9,7 +9,7 @@ Before relying on these tools, the domain was validated with **baseline evals** 
 Run a baseline locally when changing the toolset:
 
 ```bash
-mcpchecker check evals/openai-agent/eval.yaml --label-selector suite=netobserv \
+mcpchecker check evals/core-eval-testing/builtin-openai/eval-netobserv.yaml --label-selector suite=netobserv \
   # with toolsets = ["core"] only — tasks should fail or produce poor results
 ```
 
@@ -74,7 +74,7 @@ On a cluster with the [NetObserv operator](https://github.com/netobserv-network-
 4. Run evals with the same label selector:
 
    ```bash
-   mcpchecker check evals/openai-agent/eval.yaml --label-selector suite=netobserv
+   mcpchecker check evals/core-eval-testing/builtin-openai/eval-netobserv.yaml --label-selector suite=netobserv
    ```
 
 LLM judge strings in tasks assume the **mock** responses (`netobserv-eval`, `eval-flow-1`, …). On a live cluster, adjust `verify.llmJudge.contains` or rely on tool assertions only.
