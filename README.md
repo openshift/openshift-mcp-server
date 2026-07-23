@@ -287,14 +287,25 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 
 | Toolset               | Description                                                                                                                                                                                                                             | Default |
 |-----------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| config    | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                                                                                 | ✓       |
-| core      | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                                                                                     | ✓       |
-| helm      | Tools for managing Helm charts and releases                                                                                                                                                                                             |         |
-| kcp       | Manage kcp workspaces and multi-tenancy features                                                                                                                                                                                        |         |
-| kiali     | Most common tools for managing Kiali, check the [Kiali documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/KIALI.md) for more details.                                                                    |         |
-| kubevirt  | KubeVirt virtual machine management tools, check the [KubeVirt documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/kubevirt.md) for more details.                                                         |         |
-| netobserv | Network observability tools backed by the NetObserv console plugin API (flows, metrics, export). Check the [NetObserv documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/NETOBSERV.md) for more details. |         |
-| tekton    | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, TaskRuns, and troubleshooting.                                                                                                                                     |         |
+| cluster-diagnostics   | Tools for cluster diagnostics and troubleshooting                                                                                                                                                                                       |         |
+| cni-diagnostics       | Tools for Container Network Interface (CNI) diagnostics and troubleshooting                                                                                                                                                             |         |
+| config                | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                                                                                 | ✓       |
+| core                  | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                                                                                     | ✓       |
+| helm                  | Tools for managing Helm charts and releases                                                                                                                                                                                             |         |
+| kcp                   | Manage kcp workspaces and multi-tenancy features                                                                                                                                                                                        |         |
+| kubevirt              | OpenShift Virtualization tools for managing virtual machines, check the [OpenShift Virtualization documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/kubevirt.md) for more details.                        |         |
+| netedge               | NetEdge troubleshooting tools for OpenShift                                                                                                                                                                                             |         |
+| netobserv             | Network observability tools backed by the NetObserv console plugin API (flows, metrics, export). Check the [NetObserv documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/NETOBSERV.md) for more details. |         |
+| oadp                  | OADP (OpenShift API for Data Protection) tools for managing Velero backups, restores, and schedules                                                                                                                                     |         |
+| observability/logs    | Toolset for querying Loki logs                                                                                                                                                                                                          |         |
+| observability/metrics | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                                                                           |         |
+| observability/otelcol | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                                                                              |         |
+| observability/traces  | Distributed tracing tools for discovering Tempo instances, searching and retrieving traces, and exploring trace attributes.                                                                                                             |         |
+| openshift             | OpenShift-specific tools for cluster management and troubleshooting                                                                                                                                                                     |         |
+| openshift/mustgather  | Analyze OpenShift must-gather archives offline without a live cluster connection                                                                                                                                                        |         |
+| ossm                  | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                                                                         |         |
+| ovn-kubernetes        | OVN-Kubernetes CNI network troubleshooting tools                                                                                                                                                                                        |         |
+| tekton                | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, TaskRuns, and troubleshooting.                                                                                                                                     |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -314,6 +325,123 @@ In case multi-cluster support is enabled (default) and you have access to multip
   - `namespace` (`string`) - Namespace to create the temporary debug pod in (optional, defaults to the current namespace or 'default').
   - `node` (`string`) **(required)** - Name of the node to debug (e.g. worker-0).
   - `timeout_seconds` (`integer`) - Maximum time to wait for the command to complete before timing out (optional, defaults to 60 seconds).
+
+</details>
+
+<details>
+
+<summary>cni-diagnostics</summary>
+
+- **get-conntrack** - Interact with the connection tracking system on a Kubernetes node. Lists, counts, or shows statistics for tracked connections. Connection tracking shows active network connections and their state (ESTABLISHED, TIME_WAIT, etc.).
+  - `apply_tail_first` (`boolean`) - If both head and tail are set and apply_tail_first is true, apply tail before head. Default: false
+  - `command` (`string`) - These options specify the particular operation to perform. These options can only be used if configured image has 'conntrack' utility available.
+							-L, --dump : List connection tracking table.
+							-C, --count: Show the table counter.
+							-S, --stats: Show the in-kernel connection tracking system statistics.
+  - `filter_parameters` (`string`) - These parameters are useful to filter certain entries from the whole table:
+							-s, --src, --orig-src IP_ADDRESS : Match only entries whose source address in the original direction equals to mentioned IP.
+							-d, --dst, --orig-dst IP_ADDRESS : Match only entries whose destination address in the original direction equals to mentioned IP.
+							-p, --proto PROTO                : Specify layer four (TCP, UDP, ...) protocol.
+							--sport, --orig-port-src PORT    : Source port in original direction.
+							--dport, --orig-port-dst PORT    : Destination port in original direction.
+  - `head` (`integer`) - Return only first N lines. Default: 100 lines if tail is not specified
+  - `namespace` (`string`) - Namespace of the debug pod from where conntrack entries are expected to be extracted (optional, defaults to 'default')
+  - `node` (`string`) **(required)** - Name of the node from where conntrack entries are expected to be extracted
+  - `tail` (`integer`) - Return only last N lines
+  - `timeout_seconds` (`integer`) - Timeout in seconds for the command execution. If not specified, server default timeout is used. The maximum value is 300 seconds.
+
+- **get-iptables** - List packet filter rules using iptables or ip6tables on a Kubernetes node. Shows rules for specific tables (filter, nat, mangle, raw, security). Use this to inspect firewall rules, NAT configuration, and packet filtering on nodes.
+  - `apply_tail_first` (`boolean`) - If both head and tail are set and apply_tail_first is true, apply tail before head. Default: false
+  - `command` (`string`) - These options specify the desired action to perform. Only one of them can be specified on the command line unless otherwise stated below.
+							-L, --list [chain]       : List all rules in the selected chain. If no chain is selected, all chains are listed.
+							-S, --list-rules [chain] : Print all rules in the selected chain. If no chain is selected, all chains are printed like iptables-save.
+  - `filter_parameters` (`string`) - These parameters are useful to filter certain entries from the whole table:
+							-s, --source address[/mask]      : Source specification. Address can be either a network name, a hostname, a network IP address (with /mask), or a  plain  IP  address.
+							-d, --destination address[/mask] : Destination  specification.
+							-v, --verbose					 : Verbose output.
+							-n, --numeric                    : Numeric  output.   IP  addresses  and port numbers will be printed in numeric format.
+							-p, --protocol protocol          : The protocol of the rule or of the packet to check.
+							-4, --ipv4                       : IPv4
+							-6, --ipv6                       : IPv6
+  - `head` (`integer`) - Return only first N lines. Default: 100 lines if tail is not specified
+  - `namespace` (`string`) - Namespace of the debug pod from where packet filter rules are expected to be extracted (optional, defaults to 'default')
+  - `node` (`string`) **(required)** - Name of the node from where packet filter rules are expected to be extracted
+  - `table` (`string`) - There are currently five independent tables (which tables are present at any time depends on the kernel configuration options and which modules are present).
+							filter	: This is the default table
+							nat   	: This  table is consulted when a packet that creates a new connection is encountered.
+							mangle	: This table is used for specialized packet alteration.
+							raw   	: This table is used mainly for configuring exemptions from connection tracking in combination with the NOTRACK target.
+							security: This table is used for Mandatory Access Control (MAC) networking rules.
+  - `tail` (`integer`) - Return only last N lines
+  - `timeout_seconds` (`integer`) - Timeout in seconds for the command execution. If not specified, server default timeout is used. The maximum value is 300 seconds.
+
+- **get-nft** - List nftables packet filtering and classification rules on a Kubernetes node. nftables is the modern replacement for iptables. Use this to inspect firewall rules, packet filtering, and network address translation.
+  - `address_families` (`string`) - Address families determine the type of packets which are processed. For each address family, the kernel contains so called hooks at specific stages of
+       						   the packet processing paths, which invoke nftables if rules for these hooks exist.
+							   - ip       IPv4 address family.
+                               - ip6      IPv6 address family.
+                               - inet     Internet (IPv4/IPv6) address family.
+                               - arp      ARP address family, handling IPv4 ARP packets.
+                               - bridge   Bridge address family, handling packets which traverse a bridge device.
+                               - netdev   Netdev address family, handling packets on ingress and egress.
+  - `apply_tail_first` (`boolean`) - If both head and tail are set and apply_tail_first is true, apply tail before head. Default: false
+  - `command` (`string`) **(required)** - These options specify the desired action to perform. Only one of them can be specified on the command line unless otherwise stated below.
+                    					- list ruleset   : The ruleset keyword is used to identify the whole set of tables, chains, etc. Print the ruleset in human-readable format.
+										- list tables    : List all chains and rules of the specified table.
+										- list chains    : List all rules of the specified chain.
+										- list sets      : Display the elements in the specified set.
+										- list maps      : Display the elements in the specified map.
+										- list flowtables: List all flowtables.
+  - `head` (`integer`) - Return only first N lines. Default: 100 lines if tail is not specified
+  - `namespace` (`string`) - Namespace of the debug pod from where packet filtering and classification rules are expected to be extracted (optional, defaults to 'default')
+  - `node` (`string`) **(required)** - Name of the node from where packet filtering and classification rules are expected to be extracted
+  - `tail` (`integer`) - Return only last N lines
+  - `timeout_seconds` (`integer`) - Timeout in seconds for the command execution. If not specified, server default timeout is used. The maximum value is 300 seconds.
+
+- **get-ip** - Execute ip commands on a Kubernetes node to show routing, network devices, interfaces, and network namespaces. Part of the iproute2 suite for network configuration inspection.
+  - `apply_tail_first` (`boolean`) - If both head and tail are set and apply_tail_first is true, apply tail before head. Default: false
+  - `command` (`string`) **(required)** - These options specify the desired action to perform. Only one of them can be specified on the command line unless otherwise stated below.
+                      - address show     : protocol (IP or IPv6) address on a device.
+					  - link show        : network device.
+					  - neighbour show   : manage ARP or NDISC cache entries.
+					  - netns show       : manage network namespaces.
+					  - route show       : routing table entry.
+					  - rule show        : rule in routing policy database.
+					  - vrf show         : manage virtual routing and forwarding devices. 
+					  - xfrm state list  : show Security Association Database.
+					  - xfrm policy list : show Security Policy Database.
+  - `filter_parameters` (`string`) - This allows to mention sub command to get more filtered data. Available sub command varies and supportability depends on what is 
+                          already supported with 'ip' utility.
+  - `head` (`integer`) - Return only first N lines. Default: 100 lines if tail is not specified
+  - `namespace` (`string`) - Namespace of the debug pod on which ip command is expected to be executed (optional, defaults to 'default')
+  - `node` (`string`) **(required)** - Name of the node on which ip command is expected to be executed
+  - `options` (`string`) - These options helps in providing more details or formattig output data.
+                      					-d, -details        : Output more detailed information.
+					  					-4                  : shortcut for -family inet.
+					  					-6                  : shortcut for -family inet6.
+					  					-r, -resolve        : use the system's name resolver to print DNS names instead of host addresses.
+					  					-n, -netns <NETNS>  : switches ip to the specified network namespace NETNS.
+					  -a, -all            : executes specified command over all objects, it depends if command supports this option.
+  - `tail` (`integer`) - Return only last N lines
+  - `timeout_seconds` (`integer`) - Timeout in seconds for the command execution. If not specified, server default timeout is used. The maximum value is 300 seconds.
+
+- **tcpdump** - Capture network packets on a node or inside a pod with BPF filtering. Creates a specialized debug pod for node-level captures. IMPORTANT: Use restrictive BPF filters and low packet counts to avoid performance impact. Maximum 1000 packets.
+  - `bpf_filter` (`string`) - BPF filter expression (optional, e.g., 'tcp and dst port 8080', 'host 10.0.0.1')
+  - `container_name` (`string`) - Name of the container in the pod when target_type is 'pod' (optional, uses default container if not specified)
+  - `interface` (`string`) - Network interface name or 'any' (optional, captures on all interfaces if not specified)
+  - `name` (`string`) **(required)** - Name of the target (node or pod)
+  - `namespace` (`string`) - Namespace of the target (node or pod). Required when target_type is 'pod'. Optional when target_type is 'node' and defaults to 'default'.
+  - `packet_count` (`integer`) - Number of packets to capture (default: 100, max: 1000)
+  - `snaplen` (`integer`) - Snapshot length in bytes (default: 96, max: 1500). Use 96 for headers only, 1500 for full packets.
+  - `target_type` (`string`) **(required)** - Capture target: 'node' (node-level) or 'pod' (pod network namespace)
+  - `timeout_seconds` (`integer`) - Timeout in seconds for the command execution. If not specified, server default timeout is used. The maximum value is 300 seconds.
+
+- **pwru** - Trace packets through the Linux kernel networking stack using eBPF. pwru (packet, where are you?) shows which kernel functions process a packet, helping debug packet drops and routing issues. Creates a specialized debug pod with eBPF capabilities.
+  - `bpf_filter` (`string`) - BPF filter expression to match packets (optional, e.g., 'tcp and dst port 8080', 'host 10.0.0.1')
+  - `node_name` (`string`) **(required)** - Name of the node to run pwru on
+  - `node_pod_namespace` (`string`) - Namespace of the debug pod on which the command is expected to be executed (optional, defaults to 'default')
+  - `output_limit_lines` (`integer`) - Maximum number of trace events to capture (default: 100, max: 1000)
+  - `timeout_seconds` (`integer`) - Timeout in seconds for the command execution. If not specified, server default timeout is used. The maximum value is 300 seconds.
 
 </details>
 
@@ -466,98 +594,14 @@ In case multi-cluster support is enabled (default) and you have access to multip
 
 <details>
 
-<summary>kiali</summary>
-
-- **kiali_get_mesh_traffic_graph** - Returns service-to-service traffic topology, dependencies, and network metrics (throughput, response time, mTLS) for the specified namespaces. Use this to diagnose routing issues, latency, or find upstream/downstream dependencies.
-  - `graphType` (`string`) - Granularity of the graph. 'app' aggregates by app name, 'versionedApp' separates by versions, 'workload' maps specific pods/deployments. Default: versionedApp.
-  - `meshCluster` (`string`) - Optional Istio mesh cluster name from kiali_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
-  - `namespaces` (`string`) **(required)** - Comma-separated list of namespaces to map
-
-- **kiali_get_mesh_status** - Retrieves the high-level health, topology, and environment details of the Istio service mesh. Returns multi-cluster control plane status (istiod), data plane namespace health (including ambient mesh status), observability stack health (Prometheus, Grafana...), and component connectivity. Use this tool as the first step to diagnose mesh-wide issues, verify Istio/Kiali versions, or check overall health before drilling into specific workloads.
-
-- **kiali_manage_istio_config_read** - Read Istio, Gateway API, and Inference API config. 'list' groups by namespace→'group/version/kind'→{valid:[...],invalid:[...]} where valid/invalid arrays contain resource names; omit group/kind to retrieve ALL config types in a single call. Supports Istio (networking.istio.io, security.istio.io), Gateway API (gateway.networking.k8s.io), and Inference API (inference.networking.k8s.io) when installed. 'get' returns full YAML. For writes use manage_istio_config.
-  - `action` (`string`) **(required)** - Action to perform (read-only)
-  - `group` (`string`) - API group of the Istio object. Required ONLY for 'get' action. For 'list', OMIT group and kind to retrieve ALL config types in a single call. Use 'gateway.networking.k8s.io' for Gateway API resources. Use 'inference.networking.k8s.io' for Inference API resources.
-  - `kind` (`string`) - Kind of the Istio object. Required ONLY for 'get' action. For 'list', OMIT to return all kinds at once — do NOT call separately for each kind.
-  - `meshCluster` (`string`) - Optional Istio mesh cluster name from kiali_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
-  - `namespace` (`string`) - Namespace containing the Istio object. For 'list', if not provided, returns objects across all namespaces. For 'get', required.
-  - `object` (`string`) - Name of the Istio object. Required for 'get' action.
-  - `serviceName` (`string`) - Filter Istio configurations (VirtualServices, DestinationRules, and their referenced Gateways) that affect a specific service. Only applicable for 'list' action
-  - `version` (`string`) - API version. Use 'v1' for all resource types. Required for 'get' action.
-
-- **kiali_manage_istio_config** - Create, patch, or delete Istio, Gateway API, and Inference API config. Supports Istio resources (networking.istio.io, security.istio.io), Gateway API resources (gateway.networking.k8s.io), and Inference API resources (inference.networking.k8s.io) when installed on the cluster. For list and get (read-only) use manage_istio_config_read.
-  - `action` (`string`) **(required)** - Action to perform (write)
-  - `data` (`string`) - JSON or YAML data for the resource. Required for create and patch actions. For create, you can provide partial content (e.g. only spec) and it will be merged onto a valid template with defaults. Arrays (like servers, http, etc.) are REPLACED entirely, so include ALL elements you want.
-  - `group` (`string`) **(required)** - API group of the Istio object. Use 'gateway.networking.k8s.io' for Gateway API resources. Use 'inference.networking.k8s.io' for Inference API resources.
-  - `kind` (`string`) **(required)** - Kind of the Istio object (e.g., 'VirtualService', 'DestinationRule').
-  - `meshCluster` (`string`) - Optional Istio mesh cluster name from kiali_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
-  - `namespace` (`string`) **(required)** - Namespace containing the Istio object.
-  - `object` (`string`) **(required)** - Name of the Istio object.
-  - `version` (`string`) **(required)** - API version. Use 'v1' for all resource types.
-
-- **kiali_list_mesh_clusters** - Returns the list of Istio mesh clusters that Kiali can access. Each entry includes its name and whether it is the home cluster (where Kiali is deployed). Call this tool before using meshCluster on other Kiali tools when the target cluster is unknown.
-
-- **kiali_get_resource_details** - Fetches a list of resources OR retrieves detailed data for a specific resource. If 'resourceName' is omitted, it returns a list. If 'resourceName' is provided, it returns details for that specific resource.
-  - `meshCluster` (`string`) - Optional Istio mesh cluster name from kiali_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
-  - `namespaces` (`string`) - Comma-separated list of namespaces to query (e.g., 'bookinfo' or 'bookinfo,default'). If not provided, it will query across all accessible namespaces.
-  - `resourceName` (`string`) - Optional. The specific name of the resource. If left empty, the tool returns a list of all resources of the specified type. If provided, the tool returns deep details for this specific resource.
-  - `resourceType` (`string`) **(required)** - The type of resource to query. Use 'app' for Kiali applications (grouped by the Kubernetes 'app' label). Use 'argoapp' for ArgoCD Application CRDs (requires ArgoCD installed and the Kiali service account must have read permissions on applications.argoproj.io).
-
-- **kiali_list_traces** - Lists distributed traces for a service in a namespace. Returns a summary (namespace, service, total_found, avg_duration_ms) and a list of traces with id, duration_ms, spans_count, root_op, slowest_service, has_errors. Use get_trace_details with a trace id to get full hierarchy.
-  - `errorOnly` (`boolean`) - If true, only consider traces that contain errors. Default false.
-  - `limit` (`integer`) - Maximum number of traces to return. Default 10.
-  - `lookbackSeconds` (`integer`) - How far back to search. Default 600 (10m).
-  - `meshCluster` (`string`) - Optional Istio mesh cluster name from kiali_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
-  - `namespace` (`string`) **(required)** - Kubernetes namespace of the service.
-  - `serviceName` (`string`) **(required)** - Service name to search traces for (required). Returns multiple traces up to limit.
-
-- **kiali_get_trace_details** - Fetches a single distributed trace by trace_id and returns its call hierarchy (service tree with duration, status, and nested calls). Use this after list_traces to drill into a specific trace.
-  - `traceId` (`string`) **(required)** - Trace ID to fetch and summarize. If provided, namespace/service_name are ignored.
-
-- **kiali_get_pod_performance** - Returns a human-readable text summary with current Pod CPU/memory usage (from Prometheus) compared to Kubernetes requests/limits (from the Pod spec). Useful to answer questions like 'Is this workload using too much memory?'
-  - `meshCluster` (`string`) - Optional Istio mesh cluster name from kiali_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
-  - `namespace` (`string`) **(required)** - Kubernetes namespace of the Pod.
-  - `podName` (`string`) - Kubernetes Pod name. If workloadName is provided, the tool will attempt to resolve a Pod from that workload first.
-  - `queryTime` (`string`) - Optional end timestamp (RFC3339) for the query. Defaults to now.
-  - `timeRange` (`string`) - Time window used to compute CPU rate (Prometheus duration like '5m', '10m', '1h', '1d'). Defaults to '10m'.
-  - `workloadName` (`string`) - Kubernetes Workload name (e.g. Deployment/StatefulSet/etc). Tool will look up the workload and pick one of its Pods. If not found, it will fall back to treating this value as a podName.
-
-- **kiali_get_logs** - Get the logs of a Kubernetes Pod (or workload name that will be resolved to a pod) in a namespace. Output is plain text, matching kubernetes-mcp-server pods_log. The line_count field tells you the total number of log lines returned. Analyze ALL of them, but summarize the results unless the user explicitly asks for the raw output. Do not omit any error or warning lines.
-  - `container` (`string`) - Optional. Name of the Pod container to get the logs from.
-  - `format` (`string`) - Output formatting for chat. 'codeblock' wraps logs in ~~~ fences (recommended). 'plain' returns raw text like kubernetes-mcp-server pods_log.
-  - `meshCluster` (`string`) - Optional Istio mesh cluster name from kiali_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
-  - `name` (`string`) **(required)** - Name of the Pod to get the logs from. If it does not exist, it will be treated as a workload name and a running pod will be selected.
-  - `namespace` (`string`) **(required)** - Namespace to get the Pod logs from
-  - `previous` (`boolean`) - Optional. Return previous terminated container logs
-  - `severity` (`string`) - Optional severity filter applied client-side. Accepts 'ERROR', 'WARN' or combinations like 'ERROR,WARN'.
-  - `tail` (`integer`) - Number of lines to retrieve from the end of the logs (Optional, defaults to 50). Cannot exceed 200 lines.
-  - `workload` (`string`) - Optional. Workload name override (used when name lookup fails).
-
-- **kiali_get_metrics** - Returns a compact JSON summary of Istio metrics (latency quantiles, traffic trends, throughput, payload sizes) for the given resource.
-  - `byLabels` (`string`) - Comma-separated list of labels to group metrics by (e.g., 'source_workload,destination_service'). Optional
-  - `direction` (`string`) - Traffic direction. Optional, defaults to 'outbound'
-  - `meshCluster` (`string`) - Optional Istio mesh cluster name from kiali_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
-  - `namespace` (`string`) **(required)** - Namespace to get metrics from
-  - `quantiles` (`string`) - Comma-separated list of quantiles for histogram metrics (e.g., '0.5,0.95,0.99'). Optional
-  - `rateInterval` (`string`) - Rate interval for metrics (e.g., '1m', '5m'). Optional, defaults to '10m'
-  - `reporter` (`string`) - Metrics reporter(s). Comma-separated list of: 'source', 'destination', 'waypoint', or the special value 'both' (no reporter filter). Optional, defaults to 'source'. Example: 'source,waypoint'
-  - `requestProtocol` (`string`) - Filter by request protocol (e.g., 'http', 'grpc', 'tcp'). Optional
-  - `resourceName` (`string`) **(required)** - Name of the resource to get metrics for
-  - `resourceType` (`string`) **(required)** - Type of resource to get metrics
-  - `step` (`string`) - Step between data points in seconds (e.g., '15'). Optional, defaults to 15 seconds
-
-</details>
-
-<details>
-
 <summary>kubevirt</summary>
 
-- **vm_clone** - Clone a VirtualMachine on KubeVirt by creating a VirtualMachineClone resource. This creates a copy of the source VM with a new name using the KubeVirt Clone API
+- **vm_clone** - Clone a VirtualMachine on OpenShift Virtualization by creating a VirtualMachineClone resource. This creates a copy of the source VM with a new name using the OpenShift Virtualization Clone API
   - `name` (`string`) **(required)** - The name of the source virtual machine to clone
   - `namespace` (`string`) **(required)** - The namespace of the source virtual machine
   - `targetName` (`string`) **(required)** - The name for the new cloned virtual machine
 
-- **vm_create** - Create a VirtualMachine on KubeVirt with the specified configuration, automatically resolving instance types, preferences, and container disk images. VM will be created in Halted state by default; use autostart parameter to start it immediately.
+- **vm_create** - Create a VirtualMachine on OpenShift Virtualization with the specified configuration, automatically resolving instance types, preferences, and container disk images. VM will be created in Halted state by default; use autostart parameter to start it immediately.
   - `autostart` (`boolean`) - Optional flag to automatically start the VM after creation (sets runStrategy to Always instead of Halted). Defaults to false.
   - `instancetype` (`string`) - Optional instance type name for the VM (e.g., 'u1.small', 'u1.medium', 'u1.large')
   - `name` (`string`) **(required)** - The name of the virtual machine
@@ -578,6 +622,55 @@ In case multi-cluster support is enabled (default) and you have access to multip
   - `action` (`string`) **(required)** - The lifecycle action to perform: 'start' (changes runStrategy to Always), 'stop' (changes runStrategy to Halted), or 'restart' (stops then starts the VM)
   - `name` (`string`) **(required)** - The name of the virtual machine
   - `namespace` (`string`) **(required)** - The namespace of the virtual machine
+
+</details>
+
+<details>
+
+<summary>netedge</summary>
+
+- **netedge_query_prometheus** - Executes specialized diagnostic queries for specific NetEdge components (ingress, dns).
+  - `diagnostic_target` (`string`) **(required)** - Run specialized diagnostics for a specific component.
+
+- **get_coredns_config** - Retrieve the current CoreDNS configuration (Corefile) from the cluster.
+
+- **get_service_endpoints** - Return EndpointSlice objects for a Service to verify backend pod availability.
+  - `namespace` (`string`) **(required)** - Service namespace
+  - `service` (`string`) **(required)** - Service name
+
+- **probe_dns_local** - Run a DNS query using local libraries on the MCP server host to verify connectivity and resolution.
+  - `name` (`string`) **(required)** - FQDN to query
+  - `server` (`string`) **(required)** - DNS server IP (e.g. 8.8.8.8, 10.0.0.10)
+  - `type` (`string`) - Record type (A, AAAA, CNAME, TXT, SRV, etc.). Defaults to A.
+
+- **probe_http** - Send an HTTP(S) request from the MCP server host to verify reachability and inspect the response status code and headers.
+  - `method` (`string`) - HTTP method to use. Defaults to GET.
+  - `timeout_seconds` (`integer`) - Request timeout in seconds. Defaults to 5.
+  - `url` (`string`) **(required)** - The URL to probe (e.g. https://example.com/path).
+
+- **inspect_route** - Inspect an OpenShift Route to view its full configuration and status.
+  - `namespace` (`string`) **(required)** - Route namespace
+  - `route` (`string`) **(required)** - Route name
+
+- **exec_dns_in_pod** - Spin up a temporary pod in the cluster to execute a DNS lookup using dig, verifying internal cluster networking and DNS path.
+  - `namespace` (`string`) **(required)** - Namespace to run the ephemeral pod in.
+  - `record_type` (`string`) - DNS record type (A, AAAA, etc.). Defaults to A.
+  - `target_name` (`string`) **(required)** - DNS name to query (e.g. kubernetes.default.svc.cluster.local).
+  - `target_server` (`string`) **(required)** - DNS server IP to query (e.g. 172.30.0.10).
+
+- **get_router_config** - Retrieve the current router's HAProxy configuration from the cluster. Supports filtering by section type (global/defaults/frontend/backend), substring filter on section headers, and line-count limiting via tail_lines.
+  - `filter` (`string`) - Substring filter applied to section headers (e.g. a route or backend name). Only sections whose header contains this string are returned.
+  - `pod` (`string`) - Router pod name (optional, chooses any existing if not provided)
+  - `section` (`string`) - Filter to a specific HAProxy config section type
+  - `tail_lines` (`integer`) - Maximum number of lines to return from the end of the config output (default: 200)
+
+- **get_router_info** - Retrieve HAProxy runtime information from the router.
+  - `pod` (`string`) - Router pod name (optional, chooses any existing if not provided)
+
+- **get_router_sessions** - Retrieve active sessions from the router. Supports limiting the number of sessions returned and filtering by substring (e.g. backend name or source IP).
+  - `filter` (`string`) - Substring filter applied to each session block. Only sessions containing this string are returned (e.g. a backend name or source IP).
+  - `limit` (`integer`) - Maximum number of session blocks to return (default: 50)
+  - `pod` (`string`) - Router pod name (optional, chooses any existing if not provided)
 
 </details>
 
@@ -780,6 +873,12 @@ Examples:
   - `recordType` (`string`) - Flow record type filter.
   - `startTime` (`integer`) - Start of time range as Unix epoch seconds. Overrides timeRange when set.
   - `timeRange` (`integer`) - Lookback window in seconds when startTime is omitted. Default 300.
+
+</details>
+
+<details>
+
+<summary>oadp</summary>
 
 </details>
 
@@ -1135,6 +1234,465 @@ Use tempo_search_tags to discover available tag names.
 
 <details>
 
+<summary>openshift</summary>
+
+</details>
+
+<details>
+
+<summary>openshift/mustgather</summary>
+
+- **mustgather_use** - Load a must-gather archive from a given filesystem path for analysis. Must be called before any other mustgather_* tools.
+  - `path` (`string`) **(required)** - Absolute path to the must-gather archive directory
+
+- **mustgather_resources_list** - List Kubernetes resources from the must-gather archive with optional filtering by namespace, labels, and fields
+  - `apiVersion` (`string`) - API version (default: v1)
+  - `fieldSelector` (`string`) - Field selector (e.g., metadata.name=foo)
+  - `kind` (`string`) **(required)** - Resource kind (e.g., Pod, Deployment, Service)
+  - `labelSelector` (`string`) - Label selector (e.g., app=nginx,tier=frontend)
+  - `limit` (`integer`) - Maximum number of resources to return (0 for all)
+  - `namespace` (`string`) - Filter by namespace
+
+- **mustgather_events_list** - List Kubernetes events from the must-gather archive with optional filtering by type, namespace, resource, and reason
+  - `limit` (`integer`) - Maximum number of events to return (default: 100)
+  - `namespace` (`string`) - Filter by namespace
+  - `reason` (`string`) - Filter by event reason (partial match)
+  - `resource` (`string`) - Filter by involved resource name (partial match)
+  - `type` (`string`) - Event type filter: all, Warning, Normal
+
+- **mustgather_events_by_resource** - Get all events related to a specific Kubernetes resource from the must-gather archive
+  - `kind` (`string`) - Resource kind (optional, narrows search)
+  - `name` (`string`) **(required)** - Resource name
+  - `namespace` (`string`) - Resource namespace
+
+- **mustgather_events_by_time** - List Kubernetes events from the must-gather archive within a specific time range, sorted chronologically
+  - `limit` (`integer`) - Maximum number of events to return (default: 200)
+  - `namespace` (`string`) - Filter by namespace
+  - `since` (`string`) **(required)** - Start time in RFC3339 format (e.g. 2026-01-15T10:00:00Z)
+  - `type` (`string`) - Event type filter: all, Warning, Normal
+  - `until` (`string`) - End time in RFC3339 format (e.g. 2026-01-15T12:00:00Z)
+
+- **mustgather_pod_logs_get** - Get container logs for a specific pod from the must-gather archive. Returns current or previous logs.
+  - `container` (`string`) - Container name (uses first container if not specified)
+  - `namespace` (`string`) **(required)** - Pod namespace
+  - `pod` (`string`) **(required)** - Pod name
+  - `previous` (`boolean`) - Get previous container logs (from crash/restart)
+  - `tail` (`integer`) - Number of lines from end of logs (0 for all)
+
+- **mustgather_pod_logs_grep** - Filter pod container logs by a search string. Returns only matching lines from the must-gather archive.
+  - `caseInsensitive` (`boolean`) - Perform case-insensitive search (default: false)
+  - `container` (`string`) - Container name (uses first container if not specified)
+  - `filter` (`string`) **(required)** - String to search for in log lines
+  - `namespace` (`string`) **(required)** - Pod namespace
+  - `pod` (`string`) **(required)** - Pod name
+  - `previous` (`boolean`) - Search previous container logs (from crash/restart)
+  - `tail` (`integer`) - Maximum number of matching lines to return (0 for all)
+
+- **mustgather_pod_logs_by_time** - Get pod container logs within a specific time range. Each log line is expected to have an RFC3339Nano timestamp prefix (from kubectl logs --timestamps).
+  - `container` (`string`) - Container name (uses first container if not specified)
+  - `limit` (`integer`) - Maximum number of lines to return (default: 500)
+  - `namespace` (`string`) **(required)** - Pod namespace
+  - `pod` (`string`) **(required)** - Pod name
+  - `previous` (`boolean`) - Search previous container logs (from crash/restart)
+  - `since` (`string`) **(required)** - Start time in RFC3339 format (e.g. 2026-01-15T10:00:00Z)
+  - `until` (`string`) - End time in RFC3339 format (e.g. 2026-01-15T12:00:00Z)
+
+- **mustgather_node_diagnostics_get** - Get comprehensive diagnostic information for a specific node including kubelet logs, system info, CPU/IRQ affinities, and hardware details
+  - `include` (`string`) - Comma-separated diagnostics to include: kubelet,sysinfo,cpu,irq,pods,podresources,lscpu,lspci,dmesg,cmdline (default: all)
+  - `kubeletTail` (`integer`) - Number of lines from end of kubelet log (0 for all, default: 100)
+  - `node` (`string`) **(required)** - Node name
+
+- **mustgather_node_kubelet_logs** - Get kubelet logs for a specific node (decompressed from .gz file)
+  - `node` (`string`) **(required)** - Node name
+  - `tail` (`integer`) - Number of lines from end (0 for all)
+
+- **mustgather_node_kubelet_logs_grep** - Filter kubelet logs for a specific node by a search string. Returns only matching lines.
+  - `caseInsensitive` (`boolean`) - Perform case-insensitive search (default: false)
+  - `filter` (`string`) **(required)** - String to search for in log lines
+  - `node` (`string`) **(required)** - Node name
+  - `tail` (`integer`) - Maximum number of matching lines to return (0 for all)
+
+- **mustgather_etcd_health** - Get ETCD cluster health status including endpoint health and active alarms from the must-gather archive
+
+- **mustgather_etcd_object_count** - Get ETCD object counts by resource type from the must-gather archive
+  - `limit` (`integer`) - Maximum number of resource types to show (default: 50, sorted by count descending)
+
+- **mustgather_monitoring_prometheus_status** - Get Prometheus TSDB and runtime status from the must-gather archive
+  - `replica` (`string`) - Prometheus replica (0, 1, or all). Default: all
+
+- **mustgather_monitoring_prometheus_targets** - Get Prometheus scrape targets and their health status from the must-gather archive
+  - `health` (`string`) - Filter by health status: up, down, unknown (default: all)
+  - `replica` (`string`) - Prometheus replica (0, 1, or all). Default: 0
+
+- **mustgather_monitoring_prometheus_tsdb** - Get detailed Prometheus TSDB statistics including top metrics by series count and label cardinality
+  - `limit` (`integer`) - Number of top entries to show per category (default: 10)
+  - `replica` (`string`) - Prometheus replica (0, 1, or all). Default: 0
+
+- **mustgather_monitoring_prometheus_alerts** - Get active Prometheus alerts from the must-gather archive
+  - `state` (`string`) - Filter by alert state: firing, pending (default: all)
+
+- **mustgather_monitoring_prometheus_rules** - Get Prometheus alerting and recording rules from the must-gather archive
+  - `type` (`string`) - Filter by rule type: alerting, recording (default: all)
+
+</details>
+
+<details>
+
+<summary>ossm</summary>
+
+- **ossm_get_mesh_traffic_graph** - Returns service-to-service traffic topology, dependencies, and network metrics (throughput, response time, mTLS) for the specified namespaces. Use this to diagnose routing issues, latency, or find upstream/downstream dependencies.
+  - `graphType` (`string`) - Granularity of the graph. 'app' aggregates by app name, 'versionedApp' separates by versions, 'workload' maps specific pods/deployments. Default: versionedApp.
+  - `meshCluster` (`string`) - Optional Istio mesh cluster name from ossm_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
+  - `namespaces` (`string`) **(required)** - Comma-separated list of namespaces to map
+
+- **ossm_get_mesh_status** - Retrieves the high-level health, topology, and environment details of the Istio service mesh. Returns multi-cluster control plane status (istiod), data plane namespace health (including ambient mesh status), observability stack health (Prometheus, Grafana...), and component connectivity. Use this tool as the first step to diagnose mesh-wide issues, verify Istio/Kiali versions, or check overall health before drilling into specific workloads.
+
+- **ossm_manage_istio_config_read** - Read Istio, Gateway API, and Inference API config. 'list' groups by namespace→'group/version/kind'→{valid:[...],invalid:[...]} where valid/invalid arrays contain resource names; omit group/kind to retrieve ALL config types in a single call. Supports Istio (networking.istio.io, security.istio.io), Gateway API (gateway.networking.k8s.io), and Inference API (inference.networking.k8s.io) when installed. 'get' returns full YAML. For writes use manage_istio_config.
+  - `action` (`string`) **(required)** - Action to perform (read-only)
+  - `group` (`string`) - API group of the Istio object. Required ONLY for 'get' action. For 'list', OMIT group and kind to retrieve ALL config types in a single call. Use 'gateway.networking.k8s.io' for Gateway API resources. Use 'inference.networking.k8s.io' for Inference API resources.
+  - `kind` (`string`) - Kind of the Istio object. Required ONLY for 'get' action. For 'list', OMIT to return all kinds at once — do NOT call separately for each kind.
+  - `meshCluster` (`string`) - Optional Istio mesh cluster name from ossm_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
+  - `namespace` (`string`) - Namespace containing the Istio object. For 'list', if not provided, returns objects across all namespaces. For 'get', required.
+  - `object` (`string`) - Name of the Istio object. Required for 'get' action.
+  - `serviceName` (`string`) - Filter Istio configurations (VirtualServices, DestinationRules, and their referenced Gateways) that affect a specific service. Only applicable for 'list' action
+  - `version` (`string`) - API version. Use 'v1' for all resource types. Required for 'get' action.
+
+- **ossm_manage_istio_config** - Create, patch, or delete Istio, Gateway API, and Inference API config. Supports Istio resources (networking.istio.io, security.istio.io), Gateway API resources (gateway.networking.k8s.io), and Inference API resources (inference.networking.k8s.io) when installed on the cluster. For list and get (read-only) use manage_istio_config_read.
+  - `action` (`string`) **(required)** - Action to perform (write)
+  - `data` (`string`) - JSON or YAML data for the resource. Required for create and patch actions. For create, you can provide partial content (e.g. only spec) and it will be merged onto a valid template with defaults. Arrays (like servers, http, etc.) are REPLACED entirely, so include ALL elements you want.
+  - `group` (`string`) **(required)** - API group of the Istio object. Use 'gateway.networking.k8s.io' for Gateway API resources. Use 'inference.networking.k8s.io' for Inference API resources.
+  - `kind` (`string`) **(required)** - Kind of the Istio object (e.g., 'VirtualService', 'DestinationRule').
+  - `meshCluster` (`string`) - Optional Istio mesh cluster name from ossm_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
+  - `namespace` (`string`) **(required)** - Namespace containing the Istio object.
+  - `object` (`string`) **(required)** - Name of the Istio object.
+  - `version` (`string`) **(required)** - API version. Use 'v1' for all resource types.
+
+- **ossm_list_mesh_clusters** - Returns the list of Istio mesh clusters that Kiali can access. Each entry includes its name and whether it is the home cluster (where Kiali is deployed). Call this tool before using meshCluster on other Kiali tools when the target cluster is unknown.
+
+- **ossm_get_resource_details** - Fetches a list of resources OR retrieves detailed data for a specific resource. If 'resourceName' is omitted, it returns a list. If 'resourceName' is provided, it returns details for that specific resource.
+  - `meshCluster` (`string`) - Optional Istio mesh cluster name from ossm_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
+  - `namespaces` (`string`) - Comma-separated list of namespaces to query (e.g., 'bookinfo' or 'bookinfo,default'). If not provided, it will query across all accessible namespaces.
+  - `resourceName` (`string`) - Optional. The specific name of the resource. If left empty, the tool returns a list of all resources of the specified type. If provided, the tool returns deep details for this specific resource.
+  - `resourceType` (`string`) **(required)** - The type of resource to query. Use 'app' for Kiali applications (grouped by the Kubernetes 'app' label). Use 'argoapp' for ArgoCD Application CRDs (requires ArgoCD installed and the Kiali service account must have read permissions on applications.argoproj.io).
+
+- **ossm_list_traces** - Lists distributed traces for a service in a namespace. Returns a summary (namespace, service, total_found, avg_duration_ms) and a list of traces with id, duration_ms, spans_count, root_op, slowest_service, has_errors. Use get_trace_details with a trace id to get full hierarchy.
+  - `errorOnly` (`boolean`) - If true, only consider traces that contain errors. Default false.
+  - `limit` (`integer`) - Maximum number of traces to return. Default 10.
+  - `lookbackSeconds` (`integer`) - How far back to search. Default 600 (10m).
+  - `meshCluster` (`string`) - Optional Istio mesh cluster name from ossm_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
+  - `namespace` (`string`) **(required)** - Kubernetes namespace of the service.
+  - `serviceName` (`string`) **(required)** - Service name to search traces for (required). Returns multiple traces up to limit.
+
+- **ossm_get_trace_details** - Fetches a single distributed trace by trace_id and returns its call hierarchy (service tree with duration, status, and nested calls). Use this after list_traces to drill into a specific trace.
+  - `traceId` (`string`) **(required)** - Trace ID to fetch and summarize. If provided, namespace/service_name are ignored.
+
+- **ossm_get_pod_performance** - Returns a human-readable text summary with current Pod CPU/memory usage (from Prometheus) compared to Kubernetes requests/limits (from the Pod spec). Useful to answer questions like 'Is this workload using too much memory?'
+  - `meshCluster` (`string`) - Optional Istio mesh cluster name from ossm_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
+  - `namespace` (`string`) **(required)** - Kubernetes namespace of the Pod.
+  - `podName` (`string`) - Kubernetes Pod name. If workloadName is provided, the tool will attempt to resolve a Pod from that workload first.
+  - `queryTime` (`string`) - Optional end timestamp (RFC3339) for the query. Defaults to now.
+  - `timeRange` (`string`) - Time window used to compute CPU rate (Prometheus duration like '5m', '10m', '1h', '1d'). Defaults to '10m'.
+  - `workloadName` (`string`) - Kubernetes Workload name (e.g. Deployment/StatefulSet/etc). Tool will look up the workload and pick one of its Pods. If not found, it will fall back to treating this value as a podName.
+
+- **ossm_get_logs** - Get the logs of a Kubernetes Pod (or workload name that will be resolved to a pod) in a namespace. Output is plain text, matching kubernetes-mcp-server pods_log. The line_count field tells you the total number of log lines returned. Analyze ALL of them, but summarize the results unless the user explicitly asks for the raw output. Do not omit any error or warning lines.
+  - `container` (`string`) - Optional. Name of the Pod container to get the logs from.
+  - `format` (`string`) - Output formatting for chat. 'codeblock' wraps logs in ~~~ fences (recommended). 'plain' returns raw text like kubernetes-mcp-server pods_log.
+  - `meshCluster` (`string`) - Optional Istio mesh cluster name from ossm_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
+  - `name` (`string`) **(required)** - Name of the Pod to get the logs from. If it does not exist, it will be treated as a workload name and a running pod will be selected.
+  - `namespace` (`string`) **(required)** - Namespace to get the Pod logs from
+  - `previous` (`boolean`) - Optional. Return previous terminated container logs
+  - `severity` (`string`) - Optional severity filter applied client-side. Accepts 'ERROR', 'WARN' or combinations like 'ERROR,WARN'.
+  - `tail` (`integer`) - Number of lines to retrieve from the end of the logs (Optional, defaults to 50). Cannot exceed 200 lines.
+  - `workload` (`string`) - Optional. Workload name override (used when name lookup fails).
+
+- **ossm_get_metrics** - Returns a compact JSON summary of Istio metrics (latency quantiles, traffic trends, throughput, payload sizes) for the given resource.
+  - `byLabels` (`string`) - Comma-separated list of labels to group metrics by (e.g., 'source_workload,destination_service'). Optional
+  - `direction` (`string`) - Traffic direction. Optional, defaults to 'outbound'
+  - `meshCluster` (`string`) - Optional Istio mesh cluster name from ossm_list_mesh_clusters (e.g. west). When omitted, Kiali defaults to its home cluster.
+  - `namespace` (`string`) **(required)** - Namespace to get metrics from
+  - `quantiles` (`string`) - Comma-separated list of quantiles for histogram metrics (e.g., '0.5,0.95,0.99'). Optional
+  - `rateInterval` (`string`) - Rate interval for metrics (e.g., '1m', '5m'). Optional, defaults to '10m'
+  - `reporter` (`string`) - Metrics reporter(s). Comma-separated list of: 'source', 'destination', 'waypoint', or the special value 'both' (no reporter filter). Optional, defaults to 'source'. Example: 'source,waypoint'
+  - `requestProtocol` (`string`) - Filter by request protocol (e.g., 'http', 'grpc', 'tcp'). Optional
+  - `resourceName` (`string`) **(required)** - Name of the resource to get metrics for
+  - `resourceType` (`string`) **(required)** - Type of resource to get metrics
+  - `step` (`string`) - Step between data points in seconds (e.g., '15'). Optional, defaults to 15 seconds
+
+</details>
+
+<details>
+
+<summary>ovn-kubernetes</summary>
+
+- **ovn_show** - Display a comprehensive overview of OVN configuration from either the Northbound or Southbound database.
+
+For Northbound (nbdb): Runs 'ovn-nbctl show' and displays logical switches, logical routers,
+their ports, and connections between them.
+
+For Southbound (sbdb): Runs 'ovn-sbctl show' and displays chassis information, port bindings,
+and their relationships. Returns 100 lines by default; use head/tail to adjust.
+
+Example output for nbdb:
+{
+  "database": "nbdb",
+  "output": "switch 1234-5678 (node1)\n    port node1-k8s\n        addresses: [\"00:00:00:00:00:01\"]\n..."
+}
+  - `apply_tail_first` (`boolean`) - If both head and tail are set and apply_tail_first is true, apply tail before head. Default: false
+  - `database` (`string`) **(required)** - OVN database to query - "nbdb" for Northbound or "sbdb" for Southbound
+  - `head` (`integer`) - Return only first N lines. Default: 100 lines if tail is not specified
+  - `name` (`string`) **(required)** - Name of the pod running OVN (e.g., "ovnkube-node-xxxxx")
+  - `namespace` (`string`) - Kubernetes namespace of the OVN pod (e.g., "openshift-ovn-kubernetes")
+  - `tail` (`integer`) - Return only last N lines
+
+- **ovn_get** - Query records from an OVN database table with flexible filtering.
+
+This is a versatile command that can:
+1. List all records in a table (when no record specified)
+2. Get a specific record (when record specified)
+
+Common Northbound tables: Logical_Switch, Logical_Router, Logical_Switch_Port, 
+Logical_Router_Port, ACL, Address_Set, Port_Group, Load_Balancer, NAT
+
+Common Southbound tables: Chassis, Port_Binding, Datapath_Binding, Logical_Flow,
+MAC_Binding, Multicast_Group, SB_Global
+
+Returns 100 lines by default; use head/tail to adjust.
+
+Example listing all records:
+{
+  "database": "nbdb",
+  "table": "Port_Group",
+  "output": "_uuid: 1234-5678\nname: \"pg_default\"\nports: [...]\n\n_uuid: abcd-efgh\n..."
+}
+
+Example getting a specific record:
+{
+  "database": "nbdb",
+  "table": "Logical_Router",
+  "record": "ovn_cluster_router",
+  "output": "_uuid: 4c4a0a35-348c-41cc-8417-53a618e0c383\nname: ovn_cluster_router\nports: [...]"
+}
+
+Example getting specific columns:
+{
+  "database": "nbdb",
+  "table": "Logical_Switch",
+  "columns": "name,ports",
+  "output": "name: ovn-worker\nports: [uuid1, uuid2]\n\nname: join\nports: [uuid3]"
+}
+  - `apply_tail_first` (`boolean`) - If both head and tail are set and apply_tail_first is true, apply tail before head. Default: false
+  - `columns` (`string`) - Comma-separated list of columns to display (e.g., "name,_uuid,ports")
+  - `database` (`string`) **(required)** - OVN database to query - "nbdb" for Northbound or "sbdb" for Southbound
+  - `head` (`integer`) - Return only first N lines. Default: 100 lines if tail is not specified
+  - `name` (`string`) **(required)** - Name of the pod running OVN
+  - `namespace` (`string`) - Kubernetes namespace of the OVN pod
+  - `pattern` (`string`) - Regex pattern to filter results. Only applies when listing all records.
+  - `record` (`string`) - Record identifier (UUID or name). If not specified, lists all records
+  - `table` (`string`) **(required)** - Name of the table (e.g., "Logical_Switch", "Port_Binding")
+  - `tail` (`integer`) - Return only last N lines
+
+- **ovn_lflow_list** - List logical flows from the OVN Southbound database.
+
+Runs 'ovn-sbctl lflow-list' to retrieve logical flows which represent the compiled
+logical network pipeline. This is essential for debugging packet forwarding.
+Returns 100 lines by default; use head/tail to adjust.
+
+Example output:
+{
+  "datapath": "node1",
+  "flows": [
+    "table=0 (ls_in_port_sec_l2), priority=100, match=(inport == \"pod1\"), action=(next;)",
+    "table=1 (ls_in_port_sec_ip), priority=90, match=(ip4), action=(next;)"
+  ]
+}
+  - `apply_tail_first` (`boolean`) - If both head and tail are set and apply_tail_first is true, apply tail before head. Default: false
+  - `datapath` (`string`) - Datapath name or UUID to filter flows for a specific logical switch/router
+  - `head` (`integer`) - Return only first N lines. Default: 100 lines if tail is not specified
+  - `name` (`string`) **(required)** - Name of the pod running OVN
+  - `namespace` (`string`) - Kubernetes namespace of the OVN pod
+  - `pattern` (`string`) - Regex pattern to filter flows
+  - `tail` (`integer`) - Return only last N lines
+
+- **ovn_trace** - Trace a packet through the OVN logical network.
+
+Runs 'ovn-trace' to simulate packet processing through the logical network pipeline.
+This shows which logical flows match, what actions are taken, and the final disposition.
+
+The trace is essential for debugging connectivity issues and understanding how traffic
+flows through the OVN logical network. Returns 100 lines by default; use head/tail to adjust.
+
+Microflow specification examples:
+- inport=="pod1" && eth.src==00:00:00:00:00:01 && ip4.src==10.244.0.5 && ip4.dst==10.244.1.5
+- inport=="pod1" && eth.src==00:00:00:00:00:01 && icmp && ip4.src==10.244.0.5 && ip4.dst==8.8.8.8
+
+Example output:
+{
+  "datapath": "node1",
+  "microflow": "inport==\"pod1\" && ...",
+  "output": "ingress(dp=\"node1\", inport=\"pod1\")\n  0. ls_in_port_sec_l2: inport == \"pod1\", priority 50, uuid 1234\n     next;\n..."
+}
+  - `apply_tail_first` (`boolean`) - If both head and tail are set and apply_tail_first is true, apply tail before head. Default: false
+  - `datapath` (`string`) **(required)** - Name of the logical switch or router to start the trace
+  - `head` (`integer`) - Return only first N lines. Default: 100 lines if tail is not specified
+  - `microflow` (`string`) **(required)** - Microflow specification describing the packet (e.g., "inport==\"pod1\" && eth.src==00:00:00:00:00:01 && ip4.src==10.244.0.5 && ip4.dst==10.244.1.5")
+  - `mode` (`string`) - Output verbosity mode - "detailed" (default), "summary", or "minimal"
+  - `name` (`string`) **(required)** - Name of the pod running OVN
+  - `namespace` (`string`) - Kubernetes namespace of the OVN pod
+  - `pattern` (`string`) - Regex pattern to filter trace output
+  - `tail` (`integer`) - Return only last N lines
+
+- **ovs_vsctl** - Run an ovs-vsctl command against an ovnkube-node pod.
+
+The 'action' parameter selects the ovs-vsctl subcommand to run.
+
+--- action: "show" ---
+Display a comprehensive overview of OVS configuration.
+
+Runs 'ovs-vsctl show' command and returns detailed information about bridges, ports, interfaces,
+controllers, and their configurations in a hierarchical format.
+
+This command is useful for getting a complete view of the OVS switch configuration including:
+- All bridges and their configurations
+- Ports and interfaces attached to each bridge
+- Controller connections and status
+- Interface types and options
+- Port configurations and tags
+
+Example output:
+{
+  "output": "a1b2c3d4-5678-90ab-cdef-1234567890ab\n    Bridge br-int\n        Port ovn-k8s-mp0\n            Interface ovn-k8s-mp0\n                type: internal\n        Port br-int\n            Interface br-int\n                type: internal\n    ovs_version: \"2.17.0\""
+}
+
+--- action: "list-br" ---
+List all OVS bridges on a specific pod.
+
+Runs 'ovs-vsctl list-br' command and returns the names of all configured bridges.
+
+Example output:
+{
+  "bridges": [
+    "br-int",
+    "br-ex",
+    "br-local"
+  ]
+}
+
+--- action: "list-ports" ---
+List all ports on a specific OVS bridge.
+
+Runs 'ovs-vsctl list-ports' command and returns the names of all ports attached to the specified bridge.
+
+Example output:
+{
+  "ports": [
+    "patch-br-int-to-br-ex",
+    "veth1234",
+    "ovn-k8s-mp0"
+  ]
+}
+
+--- action: "list-ifaces" ---
+List all interfaces on a specific OVS bridge.
+
+Runs 'ovs-vsctl list-ifaces' command and returns the names of all interfaces attached to the specified bridge.
+
+Example output:
+{
+  "interfaces": [
+    "patch-br-int-to-br-ex",
+    "veth1234",
+    "ovn-k8s-mp0"
+  ]
+}
+  - `action` (`string`) **(required)** - The ovs-vsctl subcommand to run: "show", "list-br", "list-ports", or "list-ifaces"
+  - `apply_tail_first` (`boolean`) - If both head and tail are set and apply_tail_first is true, apply tail before head (only used when action is "show"). Default: false
+  - `bridge` (`string`) - Name of the OVS bridge (required for "list-ports" and "list-ifaces"; e.g., "br-int")
+  - `head` (`integer`) - Return only first N lines (only used when action is "show"). Default: 100 lines if tail is not specified
+  - `name` (`string`) **(required)** - Name of the ovnkube-node pod (e.g., "ovnkube-node-xxxxx")
+  - `namespace` (`string`) **(required)** - Kubernetes namespace of the ovnkube-node pod (e.g., "openshift-ovn-kubernetes")
+  - `tail` (`integer`) - Return only last N lines (only used when action is "show")
+
+- **ovs_ofctl** - Run an ovs-ofctl command against an ovnkube-node pod.
+
+The 'action' parameter selects the ovs-ofctl subcommand to run.
+
+--- action: "dump-flows" ---
+Dump OpenFlow flows from a specific OVS bridge.
+
+Runs 'ovs-ofctl dump-flows' command on the specified bridge and returns the flow entries.
+
+Example output:
+{
+  "bridge": "br-int",
+  "flows": [
+    "cookie=0x0, duration=123.456s, table=0, n_packets=100, n_bytes=10000, priority=100,in_port=1 actions=output:2",
+    "cookie=0x0, duration=123.456s, table=0, n_packets=50, n_bytes=5000, priority=90,in_port=2 actions=output:1"
+  ]
+}
+  - `action` (`string`) **(required)** - The ovs-ofctl subcommand to run: "dump-flows"
+  - `apply_tail_first` (`boolean`) - If both head and tail are set and apply_tail_first is true, apply tail before head. Default: false
+  - `bridge` (`string`) **(required)** - Name of the OVS bridge (e.g., "br-int")
+  - `head` (`integer`) - Return only first N lines. Default: 100 lines if tail is not specified
+  - `name` (`string`) **(required)** - Name of the ovnkube-node pod (e.g., "ovnkube-node-xxxxx")
+  - `namespace` (`string`) **(required)** - Kubernetes namespace of the ovnkube-node pod (e.g., "openshift-ovn-kubernetes")
+  - `pattern` (`string`) - Regex pattern to filter output lines
+  - `tail` (`integer`) - Return only last N lines
+
+- **ovs_appctl** - Run an ovs-appctl command against an ovnkube-node pod.
+
+The 'action' parameter selects the ovs-appctl subcommand to run.
+
+--- action: "dpctl/dump-conntrack" ---
+Dump connection tracking entries from OVS datapath.
+
+Runs 'ovs-appctl dpctl/dump-conntrack' command and returns the conntrack entries.
+
+Connection tracking (conntrack) maintains state for stateful firewall rules and NAT.
+Each entry shows source/destination IPs, ports, protocol, connection state, and more.
+
+Example output:
+{
+  "entries": [
+    "tcp,orig=(src=10.244.0.5,dst=10.96.0.1,sport=45678,dport=443),reply=(src=10.96.0.1,dst=10.244.0.5,sport=443,dport=45678)",
+    "udp,orig=(src=10.244.0.3,dst=8.8.8.8,sport=53214,dport=53),reply=(src=8.8.8.8,dst=10.244.0.3,sport=53,dport=53214)"
+  ]
+}
+
+--- action: "ofproto/trace" ---
+Trace a packet through the OpenFlow pipeline.
+
+Runs 'ovs-appctl ofproto/trace' command to simulate packet processing through OpenFlow tables.
+This shows which flows match, what actions are taken, and the final disposition of the packet.
+
+The trace output is essential for debugging flow rules, understanding packet forwarding decisions,
+and troubleshooting connectivity issues.
+
+Flow specification examples:
+- "in_port=1,icmp"
+- "in_port=2,ip,nw_src=192.168.1.10,nw_dst=192.168.1.20"
+- "in_port=3,tcp,nw_src=10.0.0.1,nw_dst=10.0.0.2,tp_src=12345,tp_dst=80"
+
+Example output:
+{
+  "bridge": "br-int",
+  "flow": "in_port=1,ip,nw_src=10.244.0.5,nw_dst=10.96.0.1",
+  "output": "Flow: ip,in_port=1,nw_src=10.244.0.5,nw_dst=10.96.0.1\n\nbridge(\"br-int\")\n-------------\n 0. priority 100\n    resubmit(,10)\n10. ip,nw_dst=10.96.0.1, priority 200\n    load:0x1->NXM_NX_REG0[]\n    resubmit(,20)\n...\nFinal flow: ...\nDatapath actions: ..."
+}
+  - `action` (`string`) **(required)** - The ovs-appctl subcommand to run: "dpctl/dump-conntrack" or "ofproto/trace"
+  - `additional_params` (`array`) - Additional CLI arguments (only used when action is "dpctl/dump-conntrack"; e.g., ["zone=5"])
+  - `apply_tail_first` (`boolean`) - If both head and tail are set and apply_tail_first is true, apply tail before head. Default: false
+  - `bridge` (`string`) - Name of the OVS bridge (required for "ofproto/trace"; e.g., "br-int")
+  - `flow` (`string`) - Flow specification (required for "ofproto/trace"; e.g., "in_port=1,ip,nw_src=10.244.0.5,nw_dst=10.96.0.1")
+  - `head` (`integer`) - Return only first N lines. Default: 100 lines if tail is not specified
+  - `name` (`string`) **(required)** - Name of the ovnkube-node pod (e.g., "ovnkube-node-xxxxx")
+  - `namespace` (`string`) **(required)** - Kubernetes namespace of the ovnkube-node pod (e.g., "openshift-ovn-kubernetes")
+  - `pattern` (`string`) - Regex pattern to filter output lines
+  - `tail` (`integer`) - Return only last N lines
+
+</details>
+
+<details>
+
 <summary>tekton</summary>
 
 - **tekton_pipeline_start** - Start a Tekton Pipeline by creating a PipelineRun that references it
@@ -1273,22 +1831,6 @@ Use tempo_search_tags to discover available tag names.
 
 <details>
 
-<summary>kubevirt</summary>
-
-- **vm-troubleshoot** - Generate a step-by-step troubleshooting guide for diagnosing KubeVirt VirtualMachine issues
-  - `namespace` (`string`) **(required)** - The namespace of the VirtualMachine to troubleshoot
-  - `name` (`string`) **(required)** - The name of the VirtualMachine to troubleshoot
-
-- **windows-golden-image** - Guides creation of a Windows golden image via the KubeVirt windows-efi-installer Tekton pipeline
-  - `winImageDownloadURL` (`string`) **(required)** - Microsoft Windows ISO download URL (must be https://)
-  - `namespace` (`string`) - Target namespace for the PipelineRun
-  - `windowsVersion` (`string`) - Windows version: 10, 11, 2k22 (default), or 2k25
-  - `pipelineVersion` (`string`) - Pipeline version (default: latest). Use specific version like 0.25.0 if needed
-
-</details>
-
-<details>
-
 <summary>tekton</summary>
 
 - **pipeline-troubleshoot** - Gather PipelineRun status, TaskRuns, logs, events, Pipeline-as-Code Repository, and TektonConfig context for Tekton troubleshooting
@@ -1304,12 +1846,45 @@ Use tempo_search_tags to discover available tag names.
 
 <!-- AVAILABLE-TOOLSETS-RESOURCES-START -->
 
+<details>
+
+<summary>openshift/mustgather</summary>
+
+- **must-gather** - Loaded must-gather archive metadata
+  - URI: `must-gather://current`
+  - MIME Type: `text/plain`
+- **must-gather-namespaces** - List of all namespaces in the must-gather archive
+  - URI: `must-gather://current/namespaces`
+  - MIME Type: `text/plain`
+- **must-gather-etcd-members** - ETCD cluster member list from the must-gather archive
+  - URI: `must-gather://current/etcd/members`
+  - MIME Type: `application/json`
+- **must-gather-etcd-endpoint-status** - ETCD endpoint status from the must-gather archive
+  - URI: `must-gather://current/etcd/endpoint-status`
+  - MIME Type: `application/json`
+- **must-gather-prometheus-config** - Prometheus configuration summary from the must-gather archive
+  - URI: `must-gather://current/prometheus/config`
+  - MIME Type: `text/plain`
+- **must-gather-alertmanager-status** - AlertManager status from the must-gather archive
+  - URI: `must-gather://current/alertmanager/status`
+  - MIME Type: `text/plain`
+</details>
+
 
 <!-- AVAILABLE-TOOLSETS-RESOURCES-END -->
 
 ### Resource Templates
 
 <!-- AVAILABLE-TOOLSETS-RESOURCES-TEMPLATES-START -->
+
+<details>
+
+<summary>openshift/mustgather</summary>
+
+- **must-gather-resource** - A specific Kubernetes resource from the must-gather archive as YAML. Use '-' for empty group (core API) or cluster-scoped namespace.
+  - URI Template: `must-gather://current/resources/{group}/{version}/{kind}/{namespace}/{name}`
+  - MIME Type: `text/yaml`
+</details>
 
 
 <!-- AVAILABLE-TOOLSETS-RESOURCES-TEMPLATES-END -->
