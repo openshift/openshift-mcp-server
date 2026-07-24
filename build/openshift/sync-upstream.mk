@@ -77,6 +77,20 @@ sync-upstream-pr: ## Create/update PR to sync with upstream (requires gh CLI)
 		git add go.mod go.sum vendor/; \
 		git commit -m "chore: update dependencies and vendor"; \
 	fi
+	@echo "Updating toolset documentation..."
+	@$(MAKE) update-readme-tools
+	@if [ -n "$$(git status --porcelain README.md docs/configuration.md)" ]; then \
+		echo "Changes detected in toolset documentation. Committing..."; \
+		git add README.md docs/configuration.md; \
+		git commit -m "chore: update toolset documentation"; \
+	fi
+	@echo "Updating test snapshots..."
+	@$(MAKE) test-update-snapshots
+	@if [ -n "$$(git status --porcelain pkg/mcp/testdata/)" ]; then \
+		echo "Changes detected in test snapshots. Committing..."; \
+		git add pkg/mcp/testdata; \
+		git commit -m "chore: update test snapshots"; \
+	fi
 	@echo "📤 Pushing sync branch..."
 	@PUSHED_SHA=$$(git rev-parse $(SYNC_BRANCH_NAME)); \
 	git push -f $(ORIGIN_REMOTE) $(SYNC_BRANCH_NAME); \
