@@ -16,10 +16,28 @@ config:
   taskSets:
     - glob: ../../tasks/*/*/*.yaml
       labelSelector:
-        suite: helm
+        suite: core
       assertions:
         toolsUsed:
           - server: kubernetes
             toolPattern: ".*"
+        minToolCalls: 1
+        maxToolCalls: 20
+    - glob: ../../tasks/*/*/*.yaml
+      labelSelector:
+        suite: config
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            toolPattern: "configuration_.*"
+        minToolCalls: 1
+        maxToolCalls: 10
+    - glob: ../../tasks/*/*/*.yaml
+      labelSelector:
+        suite: helm
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            toolPattern: "helm_.*"
         minToolCalls: 1
         maxToolCalls: 10
