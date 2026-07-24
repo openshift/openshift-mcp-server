@@ -76,8 +76,7 @@ jobs:
         github.event.workflow_run.conclusion == 'success'))
     outputs:
       should-run: ${{ steps.check.outputs.should-run }}
-      toolsets: ${{ steps.suite.outputs.toolsets }}
-      label-selector: ${{ steps.suite.outputs.label-selector }}
+      matrix: ${{ steps.suite.outputs.matrix }}
       pr-number: ${{ steps.check.outputs.pr-number }}
       pr-sha: ${{ steps.check.outputs.pr-sha }}
       is-pr: ${{ steps.check.outputs.is-pr }}
@@ -206,54 +205,75 @@ jobs:
           INPUT_SUITE: ${{ github.event.inputs.suite }}
         run: |
           # Suite selection: for workflow_run use the suite parsed from the review
-          # body (verified via API), for workflow_dispatch use the input, otherwise
-          # default to 'core'.
+          # body (verified via API), for workflow_dispatch use the input, for
+          # schedule run all suites in parallel, otherwise default to 'core'.
           if [[ "$EVENT_NAME" == "workflow_run" && -n "$VERIFIED_SUITE" ]]; then
             SUITE="$VERIFIED_SUITE"
+          elif [[ "$EVENT_NAME" == "schedule" ]]; then
+            SUITE="schedule-matrix"
           else
             SUITE="${INPUT_SUITE:-core}"
           fi
 
-          # Select label-selector and infrastructure based on suite.
-          # All suites use the same eval.yaml file; suite controls label-selector + infra.
+          # Build a JSON matrix consumed by run-evaluation via fromJSON().
+          # Each entry carries suite name, eval config path, and required toolsets.
+          EVAL_DIR="evals/core-eval-testing/builtin-openai"
+
+          # Helper: emit a single-entry matrix for the given suite/config/toolsets.
+          single_matrix() {
+            printf '{"include":[{"suite":"%s","eval-config":"%s","toolsets":"%s"}]}' "$1" "$2" "$3"
+          }
+
           case "$SUITE" in
+            schedule-matrix)
+              # Weekly schedule: run all individual suites in parallel.
+              MATRIX=$(cat <<'EOFM'
+          {"include":[
+            {"suite":"core","eval-config":"evals/core-eval-testing/builtin-openai/eval-core.yaml","toolsets":"core,config"},
+            {"suite":"helm","eval-config":"evals/core-eval-testing/builtin-openai/eval-helm.yaml","toolsets":"core,config,helm"},
+            {"suite":"kubevirt","eval-config":"evals/core-eval-testing/builtin-openai/eval-kubevirt.yaml","toolsets":"core,config,kubevirt,tekton"},
+            {"suite":"kiali","eval-config":"evals/core-eval-testing/builtin-openai/eval-kiali.yaml","toolsets":"core,config,kiali"},
+            {"suite":"tekton","eval-config":"evals/core-eval-testing/builtin-openai/eval-tekton.yaml","toolsets":"core,config,tekton"},
+            {"suite":"netobserv","eval-config":"evals/core-eval-testing/builtin-openai/eval-netobserv.yaml","toolsets":"core,config,netobserv"}
+          ]}
+          EOFM
+          )
+              ;;
             helm)
-              echo "label-selector=suite=helm" >> "$GITHUB_OUTPUT"
-              echo "toolsets=core,config,helm" >> "$GITHUB_OUTPUT"
+              MATRIX=$(single_matrix helm "${EVAL_DIR}/eval-helm.yaml" "core,config,helm")
               ;;
             kubevirt)
-              echo "label-selector=suite=kubevirt" >> "$GITHUB_OUTPUT"
-              echo "toolsets=core,config,kubevirt,tekton" >> "$GITHUB_OUTPUT"
+              MATRIX=$(single_matrix kubevirt "${EVAL_DIR}/eval-kubevirt.yaml" "core,config,kubevirt,tekton")
               ;;
             kiali)
-              echo "label-selector=suite=kiali" >> "$GITHUB_OUTPUT"
-              echo "toolsets=core,config,kiali" >> "$GITHUB_OUTPUT"
+              MATRIX=$(single_matrix kiali "${EVAL_DIR}/eval-kiali.yaml" "core,config,kiali")
               ;;
             tekton)
-              echo "label-selector=suite=tekton" >> "$GITHUB_OUTPUT"
-              echo "toolsets=core,tekton" >> "$GITHUB_OUTPUT"
+              MATRIX=$(single_matrix tekton "${EVAL_DIR}/eval-tekton.yaml" "core,config,tekton")
               ;;
             netobserv)
-              echo "label-selector=suite=netobserv" >> "$GITHUB_OUTPUT"
-              echo "toolsets=core,netobserv" >> "$GITHUB_OUTPUT"
+              MATRIX=$(single_matrix netobserv "${EVAL_DIR}/eval-netobserv.yaml" "core,config,netobserv")
               ;;
             all)
-              echo "label-selector=" >> "$GITHUB_OUTPUT"  # No filter: run all taskSets
-              echo "toolsets=core,config,helm,kiali,kubevirt,tekton,netobserv" >> "$GITHUB_OUTPUT"
+              MATRIX=$(single_matrix all "${EVAL_DIR}/eval-all.yaml" "core,config,helm,kiali,kubevirt,tekton,netobserv")
               ;;
             *)
               # Default to core suite (matches 'core' or any unrecognized suite)
-              echo "label-selector=suite=core" >> "$GITHUB_OUTPUT"
-              echo "toolsets=core,config" >> "$GITHUB_OUTPUT"
+              MATRIX=$(single_matrix core "${EVAL_DIR}/eval-core.yaml" "core,config")
               ;;
           esac
 
+          echo "matrix=$(echo "$MATRIX" | jq -c .)" >> "$GITHUB_OUTPUT"
+
   # Run mcpchecker evaluation with Kind cluster
   run-evaluation:
-    name: Run MCP Evaluation
+    name: 'Run MCP Evaluation (${{ matrix.suite }})'
     needs: check-trigger
     if: needs.check-trigger.outputs.should-run == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.check-trigger.outputs.matrix) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
@@ -277,46 +297,44 @@ jobs:
       - name: Setup Kind cluster
         run: make kind-create-cluster KIND_CLUSTER_NAME="$KIND_CLUSTER_NAME"
 
-      # Only the core suite needs a resize-capable StorageClass (for resize-pvc).
-      # Runs for suite=core and for the "all" run (empty label-selector).
+      # Core tasks always run (every eval includes them) and the resize-pvc
+      # task needs a resize-capable StorageClass, so always install the CSI driver.
       - name: Install CSI hostPath driver (resize-capable StorageClass)
-        if: needs.check-trigger.outputs.label-selector == 'suite=core' || needs.check-trigger.outputs.label-selector == ''
         run: make csi-hostpath-install
 
       - name: Install Istio/Kiali and bookinfo demo
-        if: contains(needs.check-trigger.outputs.toolsets, 'kiali')
+        if: contains(matrix.toolsets, 'kiali')
         run: make setup-kiali
 
       - name: Install KubeVirt
-        if: contains(needs.check-trigger.outputs.toolsets, 'kubevirt')
+        if: contains(matrix.toolsets, 'kubevirt')
         run: make kubevirt-install
 
       - name: Install Tekton
-        if: contains(needs.check-trigger.outputs.toolsets, 'tekton')
+        if: contains(matrix.toolsets, 'tekton')
         run: make tekton-install
 
       - name: Install NetObserv mock plugin
-        if: contains(needs.check-trigger.outputs.toolsets, 'netobserv')
+        if: contains(matrix.toolsets, 'netobserv')
         run: make setup-netobserv
 
       - name: Start MCP server
         run: make run-server
         env:
-          TOOLSETS: ${{ needs.check-trigger.outputs.toolsets }}
+          TOOLSETS: ${{ matrix.toolsets }}
           MCP_CONFIG_DIR: 'dev/config/mcp-configs'
 
       - name: Run mcpchecker evaluation
         id: mcpchecker
         uses: mcpchecker/mcpchecker/.github/actions/mcpchecker-action@v0.0.19
         with:
-          eval-config: 'evals/openai-agent/eval.yaml'
+          eval-config: ${{ matrix.eval-config }}
           mcpchecker-version: 'latest'
-          label-selector: ${{ needs.check-trigger.outputs.label-selector }}
           task-filter: ${{ github.event.inputs.task-filter || '' }}
           output-format: 'json'
           verbose: ${{ github.event.inputs.verbose || 'false' }}
           upload-artifacts: 'true'
-          artifact-name: 'mcpchecker-results'
+          artifact-name: 'mcpchecker-results-${{ matrix.suite }}'
           fail-on-error: 'false'
           task-pass-threshold: '0.8'
           assertion-pass-threshold: '0.8'
@@ -342,12 +360,13 @@ jobs:
       - name: Fetch baseline results from main
         if: needs.check-trigger.outputs.is-pr == 'true'
         env:
-          EVAL_CONFIG: 'evals/openai-agent/eval.yaml'
+          EVAL_CONFIG: ${{ matrix.eval-config }}
         run: |
-          # Derive agent name from eval-config path (same logic as commit-results job)
-          AGENT_NAME=$(echo "$EVAL_CONFIG" | sed 's|evals/||; s|/eval\.yaml||')
+          # Derive result name from eval-config path: eval-core.yaml -> builtin-openai-core
+          SUITE=$(basename "$EVAL_CONFIG" .yaml | sed 's/^eval-//')
+          RESULT_NAME="builtin-openai-${SUITE}"
           git fetch origin main --depth=1
-          git show "origin/main:evals/results/${AGENT_NAME}-latest.json" > /tmp/baseline-results.json 2>/dev/null || true
+          git show "origin/main:evals/results/${RESULT_NAME}-latest.json" > /tmp/baseline-results.json 2>/dev/null || true
 
       - name: Check diff prerequisites
         id: diff-check
@@ -413,7 +432,7 @@ jobs:
         if: always() && needs.check-trigger.outputs.is-pr == 'true'
         uses: actions/upload-artifact@v7
         with:
-          name: eval-context
+          name: eval-context-${{ matrix.suite }}
           path: eval-context/
           retention-days: 1
 
@@ -421,8 +440,9 @@ jobs:
   commit-results:
     name: Commit Evaluation Results
     needs: [check-trigger, run-evaluation]
-    # Only commit results on scheduled runs, not manual dispatch or PR comments
-    if: always() && github.event_name == 'schedule' && needs.run-evaluation.result == 'success'
+    # Only commit results on scheduled runs. Use != 'cancelled' so partial
+    # results from passing suites are still committed when some matrix jobs fail.
+    if: always() && github.event_name == 'schedule' && needs.run-evaluation.result != 'cancelled'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -436,24 +456,31 @@ jobs:
       - name: Download mcpchecker results
         uses: actions/download-artifact@v8
         with:
-          name: mcpchecker-results
+          pattern: mcpchecker-results-*
           path: mcpchecker-results/
 
       - name: Copy results to evals/results
-        env:
-          EVAL_CONFIG: 'evals/openai-agent/eval.yaml'
         run: |
-          # Extract agent name from eval-config path
-          AGENT_NAME=$(echo "$EVAL_CONFIG" | sed 's|evals/||; s|/eval\.yaml||')
-
           mkdir -p evals/results
-          # Copy the most recent mcpchecker results file with agent-specific name
-          RESULTS_FILE=$(ls -t mcpchecker-results/mcpchecker-*-out.json 2>/dev/null | head -1)
-          if [ -z "$RESULTS_FILE" ]; then
-            echo "Error: No mcpchecker results file found"
-            exit 1
-          fi
-          cp "$RESULTS_FILE" "evals/results/${AGENT_NAME}-latest.json"
+
+          # Each matrix job uploaded its own artifact (e.g. mcpchecker-results-core).
+          # Without merge-multiple, each lands in its own subdirectory.
+          for SUITE_DIR in mcpchecker-results/mcpchecker-results-*; do
+            [ -d "$SUITE_DIR" ] || continue
+
+            # Extract suite name: mcpchecker-results-core -> core
+            SUITE=$(basename "$SUITE_DIR" | sed 's/^mcpchecker-results-//')
+            RESULT_NAME="builtin-openai-${SUITE}"
+
+            RESULTS_FILE=$(ls -t "${SUITE_DIR}"/mcpchecker-*-out.json 2>/dev/null | head -1)
+            if [ -z "$RESULTS_FILE" ]; then
+              echo "Warning: No results file found for suite ${SUITE}, skipping"
+              continue
+            fi
+
+            cp "$RESULTS_FILE" "evals/results/${RESULT_NAME}-latest.json"
+            echo "Copied ${SUITE} results to evals/results/${RESULT_NAME}-latest.json"
+          done
 
       - name: Create Pull Request
         env:

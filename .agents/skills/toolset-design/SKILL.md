@@ -64,7 +64,7 @@ prompt:
 
 ```bash
 # Run evals with only core+config toolsets to establish baseline
-mcpchecker check evals/claude-code/eval.yaml --label-selector suite=<your-domain>
+mcpchecker check evals/core-eval-testing/<agent>/eval-core.yaml --label-selector suite=<your-domain>
 ```
 
 **What to look for in baseline results:**
@@ -252,7 +252,10 @@ Then run the evals again. Compare against the baseline:
 - Does the LLM use the new tools correctly, or does it still fall back to `pods_exec`?
 - Are there tools you added that the LLM never uses? Those might not be needed.
 
-Add eval task entries to the agent config in `evals/claude-code/eval.yaml` and `evals/openai-agent/eval.yaml`
+Each toolset gets its own suite (e.g. `suite: my-domain`) and a corresponding
+`eval-<suite>.yaml` per agent. Create `evals/core-eval-testing/<agent>/eval-my-domain.yaml`
+for each agent that has eval configs. The eval file should include the `core` and
+`config` task sets alongside the new suite's tasks (see existing files for the pattern).
 
 ---
 
@@ -267,7 +270,7 @@ See `CLAUDE.md` for full details on each step. The key files to touch:
 4. **Snapshot test**: `pkg/mcp/toolsets_test.go` -- add to `TestGranularToolsetsTools`
 5. **Generate snapshots**: `UPDATE_TOOLSETS_JSON=1 go test -count=1 -v ./pkg/mcp`
 6. **Update docs**: `make update-readme-tools`
-7. **Eval configs**: `evals/claude-code/eval.yaml`, `evals/openai-agent/eval.yaml`
+7. **Eval configs**: `evals/core-eval-testing/<agent>/eval-<suite>.yaml` (one per toolset per agent)
 8. **Eval tasks**: `evals/tasks/<domain>/*/task.yaml`
 
 ---
@@ -285,4 +288,4 @@ When reviewing a toolset PR, verify:
 - [ ] **Results use NewToolCallResultStructured**: Not manual `json.Marshal` + `NewToolCallResult`
 - [ ] **Container targeting**: If exec-ing into multi-container pods, is the correct container selected?
 - [ ] **Snapshot tests added**: Is the toolset in `TestGranularToolsetsTools` with a snapshot file?
-- [ ] **All eval configs updated**: claude-code, openai-agent
+- [ ] **All eval configs updated**: `evals/core-eval-testing/<agent>/eval-<suite>.yaml` (one per toolset per agent)
