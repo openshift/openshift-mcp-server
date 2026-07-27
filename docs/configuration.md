@@ -349,14 +349,25 @@ Toolsets group related tools together. Enable only the toolsets you need to redu
 
 | Toolset               | Description                                                                                                                                                                                                                             | Default |
 |-----------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| config    | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                                                                                 | ✓       |
-| core      | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                                                                                     | ✓       |
-| helm      | Tools for managing Helm charts and releases                                                                                                                                                                                             |         |
-| kcp       | Manage kcp workspaces and multi-tenancy features                                                                                                                                                                                        |         |
-| kiali     | Most common tools for managing Kiali, check the [Kiali documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/KIALI.md) for more details.                                                                    |         |
-| kubevirt  | KubeVirt virtual machine management tools, check the [KubeVirt documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/kubevirt.md) for more details.                                                         |         |
-| netobserv | Network observability tools backed by the NetObserv console plugin API (flows, metrics, export). Check the [NetObserv documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/NETOBSERV.md) for more details. |         |
-| tekton    | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, TaskRuns, and troubleshooting.                                                                                                                                     |         |
+| cluster-diagnostics   | Tools for cluster diagnostics and troubleshooting                                                                                                                                                                                       |         |
+| cni-diagnostics       | Tools for Container Network Interface (CNI) diagnostics and troubleshooting                                                                                                                                                             |         |
+| config                | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                                                                                 | ✓       |
+| core                  | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                                                                                     | ✓       |
+| helm                  | Tools for managing Helm charts and releases                                                                                                                                                                                             |         |
+| kcp                   | Manage kcp workspaces and multi-tenancy features                                                                                                                                                                                        |         |
+| kubevirt              | OpenShift Virtualization tools for managing virtual machines, check the [OpenShift Virtualization documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/kubevirt.md) for more details.                        |         |
+| netedge               | NetEdge troubleshooting tools for OpenShift                                                                                                                                                                                             |         |
+| netobserv             | Network observability tools backed by the NetObserv console plugin API (flows, metrics, export). Check the [NetObserv documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/NETOBSERV.md) for more details. |         |
+| oadp                  | OADP (OpenShift API for Data Protection) tools for managing Velero backups, restores, and schedules                                                                                                                                     |         |
+| observability/logs    | Toolset for querying Loki logs                                                                                                                                                                                                          |         |
+| observability/metrics | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                                                                           |         |
+| observability/otelcol | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                                                                              |         |
+| observability/traces  | Distributed tracing tools for discovering Tempo instances, searching and retrieving traces, and exploring trace attributes.                                                                                                             |         |
+| openshift             | OpenShift-specific tools for cluster management and troubleshooting                                                                                                                                                                     |         |
+| openshift/mustgather  | Analyze OpenShift must-gather archives offline without a live cluster connection                                                                                                                                                        |         |
+| ossm                  | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                                                                         |         |
+| ovn-kubernetes        | OVN-Kubernetes CNI network troubleshooting tools                                                                                                                                                                                        |         |
+| tekton                | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, TaskRuns, and troubleshooting.                                                                                                                                     |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -370,12 +381,45 @@ toolsets = ["core", "config", "helm", "kubevirt"]
 
 <!-- AVAILABLE-TOOLSETS-RESOURCES-START -->
 
+<details>
+
+<summary>openshift/mustgather</summary>
+
+- **must-gather** - Loaded must-gather archive metadata
+  - URI: `must-gather://current`
+  - MIME Type: `text/plain`
+- **must-gather-namespaces** - List of all namespaces in the must-gather archive
+  - URI: `must-gather://current/namespaces`
+  - MIME Type: `text/plain`
+- **must-gather-etcd-members** - ETCD cluster member list from the must-gather archive
+  - URI: `must-gather://current/etcd/members`
+  - MIME Type: `application/json`
+- **must-gather-etcd-endpoint-status** - ETCD endpoint status from the must-gather archive
+  - URI: `must-gather://current/etcd/endpoint-status`
+  - MIME Type: `application/json`
+- **must-gather-prometheus-config** - Prometheus configuration summary from the must-gather archive
+  - URI: `must-gather://current/prometheus/config`
+  - MIME Type: `text/plain`
+- **must-gather-alertmanager-status** - AlertManager status from the must-gather archive
+  - URI: `must-gather://current/alertmanager/status`
+  - MIME Type: `text/plain`
+</details>
+
 
 <!-- AVAILABLE-TOOLSETS-RESOURCES-END -->
 
 **Available Resource Templates:**
 
 <!-- AVAILABLE-TOOLSETS-RESOURCES-TEMPLATES-START -->
+
+<details>
+
+<summary>openshift/mustgather</summary>
+
+- **must-gather-resource** - A specific Kubernetes resource from the must-gather archive as YAML. Use '-' for empty group (core API) or cluster-scoped namespace.
+  - URI Template: `must-gather://current/resources/{group}/{version}/{kind}/{namespace}/{name}`
+  - MIME Type: `text/yaml`
+</details>
 
 
 <!-- AVAILABLE-TOOLSETS-RESOURCES-TEMPLATES-END -->

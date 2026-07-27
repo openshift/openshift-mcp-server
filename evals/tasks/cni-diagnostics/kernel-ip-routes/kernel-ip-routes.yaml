@@ -1,0 +1,16 @@
+kind: Task
+metadata:
+  labels:
+    suite: cni-diagnostics
+    category: kernel
+  name: "kernel-ip-routes"
+  difficulty: easy
+steps:
+  setup:
+    file: setup.sh
+  verify:
+    contains: "The agent retrieved routes from all routing tables on a worker node, not only the main table, including table names or numbers and default routes"
+  cleanup:
+    file: cleanup.sh
+  prompt:
+    inline: "Display the routing table on a Kubernetes worker node. Show all routing tables, not just the main table."

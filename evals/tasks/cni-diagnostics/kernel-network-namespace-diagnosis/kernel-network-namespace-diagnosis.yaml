@@ -1,0 +1,25 @@
+kind: Task
+metadata:
+  labels:
+    suite: cni-diagnostics
+    category: kernel
+  name: "kernel-network-namespace-diagnosis"
+  difficulty: hard
+steps:
+  setup:
+    file: setup.sh
+  verify:
+    contains: "The agent diagnosed the external connectivity issue by analyzing routing tables, iptables POSTROUTING NAT rules, and nftables configuration, identifying a likely cause such as default gateway, MASQUERADE rules, or egress filtering"
+  cleanup:
+    file: cleanup.sh
+  prompt:
+    inline: |
+      A pod in namespace 'netns-test' on a worker node can't reach external networks.
+      Internal cluster networking works fine, but external DNS and internet connectivity fails.
+
+      Diagnose the issue by checking:
+      1. The routing table on the node (especially default gateway and external routes)
+      2. NAT rules in iptables that handle outbound traffic (POSTROUTING chain)
+      3. Any nftables configuration that might affect egress traffic
+
+      Identify what's preventing external connectivity.
