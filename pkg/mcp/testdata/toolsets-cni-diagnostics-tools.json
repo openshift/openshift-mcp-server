@@ -1,0 +1,387 @@
+[
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "CNI-Diagnostics: Kernel Connection Tracking"
+    },
+    "description": "Interact with the connection tracking system on a Kubernetes node. Lists, counts, or shows statistics for tracked connections. Connection tracking shows active network connections and their state (ESTABLISHED, TIME_WAIT, etc.).",
+    "inputSchema": {
+      "properties": {
+        "apply_tail_first": {
+          "description": "If both head and tail are set and apply_tail_first is true, apply tail before head. Default: false",
+          "type": "boolean"
+        },
+        "command": {
+          "description": "These options specify the particular operation to perform. These options can only be used if configured image has 'conntrack' utility available.\n\t\t\t\t\t\t\t-L, --dump : List connection tracking table.\n\t\t\t\t\t\t\t-C, --count: Show the table counter.\n\t\t\t\t\t\t\t-S, --stats: Show the in-kernel connection tracking system statistics.",
+          "enum": [
+            "-L",
+            "--dump",
+            "-C",
+            "--count",
+            "-S",
+            "--stats"
+          ],
+          "type": "string"
+        },
+        "filter_parameters": {
+          "description": "These parameters are useful to filter certain entries from the whole table:\n\t\t\t\t\t\t\t-s, --src, --orig-src IP_ADDRESS : Match only entries whose source address in the original direction equals to mentioned IP.\n\t\t\t\t\t\t\t-d, --dst, --orig-dst IP_ADDRESS : Match only entries whose destination address in the original direction equals to mentioned IP.\n\t\t\t\t\t\t\t-p, --proto PROTO                : Specify layer four (TCP, UDP, ...) protocol.\n\t\t\t\t\t\t\t--sport, --orig-port-src PORT    : Source port in original direction.\n\t\t\t\t\t\t\t--dport, --orig-port-dst PORT    : Destination port in original direction.",
+          "type": "string"
+        },
+        "head": {
+          "description": "Return only first N lines. Default: 100 lines if tail is not specified",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "namespace": {
+          "description": "Namespace of the debug pod from where conntrack entries are expected to be extracted (optional, defaults to 'default')",
+          "type": "string"
+        },
+        "node": {
+          "description": "Name of the node from where conntrack entries are expected to be extracted",
+          "type": "string"
+        },
+        "tail": {
+          "description": "Return only last N lines",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "description": "Timeout in seconds for the command execution. If not specified, server default timeout is used. The maximum value is 300 seconds.",
+          "maximum": 300,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "node"
+      ],
+      "type": "object"
+    },
+    "name": "get-conntrack",
+    "title": "CNI-Diagnostics: Kernel Connection Tracking"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "CNI-Diagnostics: Kernel IP Command"
+    },
+    "description": "Execute ip commands on a Kubernetes node to show routing, network devices, interfaces, and network namespaces. Part of the iproute2 suite for network configuration inspection.",
+    "inputSchema": {
+      "properties": {
+        "apply_tail_first": {
+          "description": "If both head and tail are set and apply_tail_first is true, apply tail before head. Default: false",
+          "type": "boolean"
+        },
+        "command": {
+          "description": "These options specify the desired action to perform. Only one of them can be specified on the command line unless otherwise stated below.\n                      - address show     : protocol (IP or IPv6) address on a device.\n\t\t\t\t\t  - link show        : network device.\n\t\t\t\t\t  - neighbour show   : manage ARP or NDISC cache entries.\n\t\t\t\t\t  - netns show       : manage network namespaces.\n\t\t\t\t\t  - route show       : routing table entry.\n\t\t\t\t\t  - rule show        : rule in routing policy database.\n\t\t\t\t\t  - vrf show         : manage virtual routing and forwarding devices. \n\t\t\t\t\t  - xfrm state list  : show Security Association Database.\n\t\t\t\t\t  - xfrm policy list : show Security Policy Database.",
+          "enum": [
+            "address show",
+            "link show",
+            "neighbour show",
+            "netns show",
+            "route show",
+            "rule show",
+            "vrf show",
+            "xfrm state list",
+            "xfrm policy list"
+          ],
+          "type": "string"
+        },
+        "filter_parameters": {
+          "description": "This allows to mention sub command to get more filtered data. Available sub command varies and supportability depends on what is \n                          already supported with 'ip' utility.",
+          "type": "string"
+        },
+        "head": {
+          "description": "Return only first N lines. Default: 100 lines if tail is not specified",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "namespace": {
+          "description": "Namespace of the debug pod on which ip command is expected to be executed (optional, defaults to 'default')",
+          "type": "string"
+        },
+        "node": {
+          "description": "Name of the node on which ip command is expected to be executed",
+          "type": "string"
+        },
+        "options": {
+          "description": "These options helps in providing more details or formattig output data.\n                      \t\t\t\t\t-d, -details        : Output more detailed information.\n\t\t\t\t\t  \t\t\t\t\t-4                  : shortcut for -family inet.\n\t\t\t\t\t  \t\t\t\t\t-6                  : shortcut for -family inet6.\n\t\t\t\t\t  \t\t\t\t\t-r, -resolve        : use the system's name resolver to print DNS names instead of host addresses.\n\t\t\t\t\t  \t\t\t\t\t-n, -netns \u003cNETNS\u003e  : switches ip to the specified network namespace NETNS.\n\t\t\t\t\t  -a, -all            : executes specified command over all objects, it depends if command supports this option.",
+          "type": "string"
+        },
+        "tail": {
+          "description": "Return only last N lines",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "description": "Timeout in seconds for the command execution. If not specified, server default timeout is used. The maximum value is 300 seconds.",
+          "maximum": 300,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "node",
+        "command"
+      ],
+      "type": "object"
+    },
+    "name": "get-ip",
+    "title": "CNI-Diagnostics: Kernel IP Command"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "CNI-Diagnostics: Kernel IPtables"
+    },
+    "description": "List packet filter rules using iptables or ip6tables on a Kubernetes node. Shows rules for specific tables (filter, nat, mangle, raw, security). Use this to inspect firewall rules, NAT configuration, and packet filtering on nodes.",
+    "inputSchema": {
+      "properties": {
+        "apply_tail_first": {
+          "description": "If both head and tail are set and apply_tail_first is true, apply tail before head. Default: false",
+          "type": "boolean"
+        },
+        "command": {
+          "description": "These options specify the desired action to perform. Only one of them can be specified on the command line unless otherwise stated below.\n\t\t\t\t\t\t\t-L, --list [chain]       : List all rules in the selected chain. If no chain is selected, all chains are listed.\n\t\t\t\t\t\t\t-S, --list-rules [chain] : Print all rules in the selected chain. If no chain is selected, all chains are printed like iptables-save.",
+          "type": "string"
+        },
+        "filter_parameters": {
+          "description": "These parameters are useful to filter certain entries from the whole table:\n\t\t\t\t\t\t\t-s, --source address[/mask]      : Source specification. Address can be either a network name, a hostname, a network IP address (with /mask), or a  plain  IP  address.\n\t\t\t\t\t\t\t-d, --destination address[/mask] : Destination  specification.\n\t\t\t\t\t\t\t-v, --verbose\t\t\t\t\t : Verbose output.\n\t\t\t\t\t\t\t-n, --numeric                    : Numeric  output.   IP  addresses  and port numbers will be printed in numeric format.\n\t\t\t\t\t\t\t-p, --protocol protocol          : The protocol of the rule or of the packet to check.\n\t\t\t\t\t\t\t-4, --ipv4                       : IPv4\n\t\t\t\t\t\t\t-6, --ipv6                       : IPv6",
+          "type": "string"
+        },
+        "head": {
+          "description": "Return only first N lines. Default: 100 lines if tail is not specified",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "namespace": {
+          "description": "Namespace of the debug pod from where packet filter rules are expected to be extracted (optional, defaults to 'default')",
+          "type": "string"
+        },
+        "node": {
+          "description": "Name of the node from where packet filter rules are expected to be extracted",
+          "type": "string"
+        },
+        "table": {
+          "description": "There are currently five independent tables (which tables are present at any time depends on the kernel configuration options and which modules are present).\n\t\t\t\t\t\t\tfilter\t: This is the default table\n\t\t\t\t\t\t\tnat   \t: This  table is consulted when a packet that creates a new connection is encountered.\n\t\t\t\t\t\t\tmangle\t: This table is used for specialized packet alteration.\n\t\t\t\t\t\t\traw   \t: This table is used mainly for configuring exemptions from connection tracking in combination with the NOTRACK target.\n\t\t\t\t\t\t\tsecurity: This table is used for Mandatory Access Control (MAC) networking rules.",
+          "enum": [
+            "filter",
+            "nat",
+            "mangle",
+            "raw",
+            "security"
+          ],
+          "type": "string"
+        },
+        "tail": {
+          "description": "Return only last N lines",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "description": "Timeout in seconds for the command execution. If not specified, server default timeout is used. The maximum value is 300 seconds.",
+          "maximum": 300,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "node"
+      ],
+      "type": "object"
+    },
+    "name": "get-iptables",
+    "title": "CNI-Diagnostics: Kernel IPtables"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "CNI-Diagnostics: Kernel NFtables"
+    },
+    "description": "List nftables packet filtering and classification rules on a Kubernetes node. nftables is the modern replacement for iptables. Use this to inspect firewall rules, packet filtering, and network address translation.",
+    "inputSchema": {
+      "properties": {
+        "address_families": {
+          "description": "Address families determine the type of packets which are processed. For each address family, the kernel contains so called hooks at specific stages of\n       \t\t\t\t\t\t   the packet processing paths, which invoke nftables if rules for these hooks exist.\n\t\t\t\t\t\t\t   - ip       IPv4 address family.\n                               - ip6      IPv6 address family.\n                               - inet     Internet (IPv4/IPv6) address family.\n                               - arp      ARP address family, handling IPv4 ARP packets.\n                               - bridge   Bridge address family, handling packets which traverse a bridge device.\n                               - netdev   Netdev address family, handling packets on ingress and egress.",
+          "enum": [
+            "ip",
+            "ip6",
+            "inet",
+            "arp",
+            "bridge",
+            "netdev"
+          ],
+          "type": "string"
+        },
+        "apply_tail_first": {
+          "description": "If both head and tail are set and apply_tail_first is true, apply tail before head. Default: false",
+          "type": "boolean"
+        },
+        "command": {
+          "description": "These options specify the desired action to perform. Only one of them can be specified on the command line unless otherwise stated below.\n                    \t\t\t\t\t- list ruleset   : The ruleset keyword is used to identify the whole set of tables, chains, etc. Print the ruleset in human-readable format.\n\t\t\t\t\t\t\t\t\t\t- list tables    : List all chains and rules of the specified table.\n\t\t\t\t\t\t\t\t\t\t- list chains    : List all rules of the specified chain.\n\t\t\t\t\t\t\t\t\t\t- list sets      : Display the elements in the specified set.\n\t\t\t\t\t\t\t\t\t\t- list maps      : Display the elements in the specified map.\n\t\t\t\t\t\t\t\t\t\t- list flowtables: List all flowtables.",
+          "enum": [
+            "list ruleset",
+            "list tables",
+            "list chains",
+            "list sets",
+            "list maps",
+            "list flowtables"
+          ],
+          "type": "string"
+        },
+        "head": {
+          "description": "Return only first N lines. Default: 100 lines if tail is not specified",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "namespace": {
+          "description": "Namespace of the debug pod from where packet filtering and classification rules are expected to be extracted (optional, defaults to 'default')",
+          "type": "string"
+        },
+        "node": {
+          "description": "Name of the node from where packet filtering and classification rules are expected to be extracted",
+          "type": "string"
+        },
+        "tail": {
+          "description": "Return only last N lines",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "description": "Timeout in seconds for the command execution. If not specified, server default timeout is used. The maximum value is 300 seconds.",
+          "maximum": 300,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "node",
+        "command"
+      ],
+      "type": "object"
+    },
+    "name": "get-nft",
+    "title": "CNI-Diagnostics: Kernel NFtables"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "CNI-Diagnostics: Network eBPF Packet Tracing"
+    },
+    "description": "Trace packets through the Linux kernel networking stack using eBPF. pwru (packet, where are you?) shows which kernel functions process a packet, helping debug packet drops and routing issues. Creates a specialized debug pod with eBPF capabilities.",
+    "inputSchema": {
+      "properties": {
+        "bpf_filter": {
+          "description": "BPF filter expression to match packets (optional, e.g., 'tcp and dst port 8080', 'host 10.0.0.1')",
+          "type": "string"
+        },
+        "node_name": {
+          "description": "Name of the node to run pwru on",
+          "type": "string"
+        },
+        "node_pod_namespace": {
+          "description": "Namespace of the debug pod on which the command is expected to be executed (optional, defaults to 'default')",
+          "type": "string"
+        },
+        "output_limit_lines": {
+          "description": "Maximum number of trace events to capture (default: 100, max: 1000)",
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "description": "Timeout in seconds for the command execution. If not specified, server default timeout is used. The maximum value is 300 seconds.",
+          "maximum": 300,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "node_name"
+      ],
+      "type": "object"
+    },
+    "name": "pwru",
+    "title": "CNI-Diagnostics: Network eBPF Packet Tracing"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "CNI-Diagnostics: Network Packet Capture"
+    },
+    "description": "Capture network packets on a node or inside a pod with BPF filtering. Creates a specialized debug pod for node-level captures. IMPORTANT: Use restrictive BPF filters and low packet counts to avoid performance impact. Maximum 1000 packets.",
+    "inputSchema": {
+      "properties": {
+        "bpf_filter": {
+          "description": "BPF filter expression (optional, e.g., 'tcp and dst port 8080', 'host 10.0.0.1')",
+          "type": "string"
+        },
+        "container_name": {
+          "description": "Name of the container in the pod when target_type is 'pod' (optional, uses default container if not specified)",
+          "type": "string"
+        },
+        "interface": {
+          "description": "Network interface name or 'any' (optional, captures on all interfaces if not specified)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name of the target (node or pod)",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Namespace of the target (node or pod). Required when target_type is 'pod'. Optional when target_type is 'node' and defaults to 'default'.",
+          "type": "string"
+        },
+        "packet_count": {
+          "description": "Number of packets to capture (default: 100, max: 1000)",
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "snaplen": {
+          "description": "Snapshot length in bytes (default: 96, max: 1500). Use 96 for headers only, 1500 for full packets.",
+          "maximum": 1500,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "target_type": {
+          "description": "Capture target: 'node' (node-level) or 'pod' (pod network namespace)",
+          "enum": [
+            "node",
+            "pod"
+          ],
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "description": "Timeout in seconds for the command execution. If not specified, server default timeout is used. The maximum value is 300 seconds.",
+          "maximum": 300,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "target_type",
+        "name"
+      ],
+      "type": "object"
+    },
+    "name": "tcpdump",
+    "title": "CNI-Diagnostics: Network Packet Capture"
+  }
+]
