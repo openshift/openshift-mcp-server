@@ -1,0 +1,27 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "ovs-vsctl-list-br"
+  difficulty: easy
+  category: "OVS Configuration"
+  description: "List OVS bridges on an ovnkube-node pod"
+  labels:
+    suite: ovn-kubernetes
+    requires: ovn-kubernetes
+spec:
+  limits:
+    timeout: "5m"
+  setup:
+    - script:
+        file: ./setup.sh
+  prompt:
+    inline: |
+      List all the OVS bridges on one of the ovnkube-node pods.
+  verify:
+    - llmJudge:
+        contains: "Lists the OVS bridges on the pod including br-int, the OVN-Kubernetes integration bridge"
+        reasoning: "br-int is a structural invariant on every OVN-Kubernetes node and must appear in the output as the integration bridge"
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "ovs_vsctl"
