@@ -5,5 +5,5 @@ package cmd
 // varOverrides is invoked early in the command bootstrapping process, allowing
 // downstreams to rename things like env var keys.
 func varOverrides() {
-	// Intentionally left blank upstream.
+	config_path_env_var = "OCP_MCP_CONFIG_PATH"
 }
