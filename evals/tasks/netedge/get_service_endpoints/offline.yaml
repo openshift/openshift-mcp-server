@@ -2,7 +2,7 @@ kind: Task
 metadata:
   name: get-service-endpoints-offline
   labels:
-    suite: kubernetes
+    suite: netedge
 steps:
   verify:
     contains: "Addresses"

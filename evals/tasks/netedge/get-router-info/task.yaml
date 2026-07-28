@@ -1,6 +1,8 @@
 kind: Task
 metadata:
   name: get-router-info
+  labels:
+    suite: netedge
 steps:
   verify:
     contains: "Name: HAProxy"

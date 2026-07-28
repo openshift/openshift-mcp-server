@@ -1,6 +1,8 @@
 kind: Task
 metadata:
   name: get-router-sessions
+  labels:
+    suite: netedge
 steps:
   verify:
     contains: "frontend=GLOBAL"

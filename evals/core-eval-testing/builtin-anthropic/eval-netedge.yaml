@@ -1,0 +1,44 @@
+kind: Eval
+metadata:
+  name: "netedge-e2e"
+config:
+  agent:
+    type: "file"
+    path: agent.yaml
+  mcpConfigFile: ../../mcp-config.yaml
+  extensions:
+    kubernetes:
+      package: https://github.com/mcpchecker/kubernetes-extension@v0.0.3
+  llmJudge:
+    env:
+      baseUrlKey: JUDGE_BASE_URL
+      apiKeyKey: JUDGE_API_KEY
+      modelNameKey: JUDGE_MODEL_NAME
+  taskSets:
+    - glob: ../../tasks/*/*/*.yaml
+      labelSelector:
+        suite: core
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            toolPattern: ".*"
+        minToolCalls: 1
+        maxToolCalls: 20
+    - glob: ../../tasks/*/*/*.yaml
+      labelSelector:
+        suite: config
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            toolPattern: "configuration_.*"
+        minToolCalls: 1
+        maxToolCalls: 10
+    - glob: ../../tasks/netedge/*/*.yaml
+      labelSelector:
+        suite: netedge
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            toolPattern: ".*"
+        minToolCalls: 1
+        maxToolCalls: 20

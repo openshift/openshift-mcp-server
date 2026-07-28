@@ -2,7 +2,7 @@ kind: Task
 metadata:
   name: get-coredns-config-offline
   labels:
-    suite: kubernetes
+    suite: netedge
 steps:
   verify:
     contains: "prometheus :9153"

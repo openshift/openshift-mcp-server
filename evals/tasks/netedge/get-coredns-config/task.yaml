@@ -1,6 +1,8 @@
 kind: Task
 metadata:
   name: get-coredns-config
+  labels:
+    suite: netedge
 steps:
   verify:
     contains: "5353"

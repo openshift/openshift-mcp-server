@@ -1,6 +1,8 @@
 kind: Task
 metadata:
   name: query-prometheus-ingress
+  labels:
+    suite: netedge
 steps:
   verify:
     contains: "ingress_error_rate"

@@ -2,7 +2,7 @@ kind: Task
 metadata:
   name: inspect-route-offline
   labels:
-    suite: kubernetes
+    suite: netedge
 steps:
   verify:
     contains: "console-openshift-console.apps.example.com"

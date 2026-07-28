@@ -1,6 +1,8 @@
 kind: Task
 metadata:
   name: get-router-config
+  labels:
+    suite: netedge
 steps:
   verify:
     contains: "frontend public"
