@@ -440,7 +440,7 @@ func TestStdioLogging(t *testing.T) {
 	t.Run("stdio disables klog", func(t *testing.T) {
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
-		rootCmd.SetArgs([]string{"--version", "--log-level=1"})
+		rootCmd.SetArgs([]string{"--version", "--log-level=1", "--port="}) // use --port= to manually force no port (=stdio)
 		err := rootCmd.Execute()
 		require.NoErrorf(t, err, "Expected no error executing command, got %v", err)
 		assert.Equalf(t, "0.0.0\n", out.String(), "Expected only version output, got %s", out.String())
@@ -566,7 +566,7 @@ func TestRequireTLSValidation(t *testing.T) {
 	t.Run("require-tls in STDIO mode does not require TLS certs", func(t *testing.T) {
 		ioStreams, _ := testStream()
 		rootCmd := NewMCPServer(ioStreams)
-		rootCmd.SetArgs([]string{"--version", "--require-tls"})
+		rootCmd.SetArgs([]string{"--version", "--require-tls", "--port="}) // use --port= to manually force no port (=stdio)
 		err := rootCmd.Execute()
 		require.NoError(t, err)
 	})
@@ -833,7 +833,7 @@ func TestTLSValidation(t *testing.T) {
 
 		ioStreams, _ := testStream()
 		rootCmd := NewMCPServer(ioStreams)
-		rootCmd.SetArgs([]string{"--version", "--tls-cert", certPath, "--tls-key", keyPath})
+		rootCmd.SetArgs([]string{"--version", "--port=", "--tls-cert", certPath, "--tls-key", keyPath}) // use --port= to manually force no port (=stdio)
 		err := rootCmd.Execute()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "--tls-cert and --tls-key require --port to be set")
