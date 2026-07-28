@@ -22,8 +22,6 @@ RUN mkdir /licenses
 COPY --from=builder /workspace/LICENSE /licenses/.
 USER 65532:65532
 
-COPY mcp_config.toml /mcp_config.toml
-
 # Labels for enterprise contract
 LABEL com.redhat.component=openshift-mcp-server
 LABEL description="Red Hat OpenShift MCP Server"
@@ -37,4 +35,4 @@ LABEL vendor="Red Hat, Inc."
 LABEL version=0.0.1
 LABEL summary="Red Hat OpenShift MCP Server"
 
-ENTRYPOINT ["/openshift-mcp-server", "--config", "/mcp_config.toml"]
+ENTRYPOINT ["/openshift-mcp-server"]
