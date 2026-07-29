@@ -1,0 +1,20 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: ReleasePlan
+metadata:
+  name: openshift-mcp-server-releaseplan-040-stage
+  namespace: ocp-mcp-server-tenant
+  labels:
+    release.appstudio.openshift.io/auto-release: "false"
+    release.appstudio.openshift.io/releasePlanAdmission: openshift-mcp-server-040-stage
+    release.appstudio.openshift.io/standing-attribution: "true"
+spec:
+  application: mcp-server-04
+  target: rhtap-releng-tenant
+  data:
+    releaseNotes:
+      solution: |
+        The Model Context Protocol server for Red Hat OpenShift helps manage MCP workloads on OpenShift.
+      description: "The Tech Preview 0.4.0 (TP) release of Model Context Protocol server for Red Hat OpenShift."
+      topic: |
+        The 0.4.0 Tech Preview (TP) release of Model Context Protocol server for Red Hat OpenShift. This release introduces early access to MCP server capabilities on OpenShift
+      synopsis: "Model Context Protocol server for Red Hat OpenShift Tech Preview 0.4.0"
