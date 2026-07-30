@@ -1,14 +1,21 @@
-package mustgather_test
+package mcp
 
 import (
 	"context"
-	"fmt"
+	"path/filepath"
+	"runtime"
 	"testing"
+
+	"github.com/stretchr/testify/suite"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/mustgather"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/netedge"
 )
+
+type MustGatherOfflineSuite struct {
+	suite.Suite
+}
 
 type mockRequest struct {
 	args map[string]any
@@ -18,7 +25,7 @@ func (r mockRequest) GetArguments() map[string]any {
 	return r.args
 }
 
-func TestEvalOffline(t *testing.T) {
+func (s *MustGatherOfflineSuite) TestOfflineMustGather() {
 	// 1. Load the must-gather provider via mustgather_use tool
 	mustgatherToolset := &mustgather.Toolset{}
 	mustgatherTools := mustgatherToolset.GetTools(nil)
@@ -29,27 +36,24 @@ func TestEvalOffline(t *testing.T) {
 			break
 		}
 	}
-	if useTool == nil {
-		t.Fatalf("mustgather_use tool not found")
-	}
+	s.Require().NotNil(useTool, "mustgather_use tool not found")
+
+	_, thisFile, _, _ := runtime.Caller(0)
+	archivePath := filepath.Join(filepath.Dir(thisFile), "..", "..", "evals", "testdata", "must-gather")
 
 	useParams := api.ToolHandlerParams{
 		Context: context.Background(),
 		ToolCallRequest: mockRequest{
 			args: map[string]any{
-				"path": "../../../evals/testdata/must-gather",
+				"path": archivePath,
 			},
 		},
 	}
 
 	useRes, err := useTool.Handler(useParams)
-	if err != nil {
-		t.Fatalf("mustgather_use returned error: %v", err)
-	}
-	if useRes.Error != nil {
-		t.Fatalf("mustgather_use execution error: %v", useRes.Error)
-	}
-	fmt.Println("Loaded must-gather archive successfully via tool")
+	s.Require().NoError(err, "mustgather_use returned error")
+	s.Require().Nil(useRes.Error, "mustgather_use execution error")
+	s.T().Log("Loaded must-gather archive successfully via tool")
 
 	// 2. Get the "get_service_endpoints" tool from netedge toolset
 	netedgeToolset := &netedge.Toolset{}
@@ -61,9 +65,7 @@ func TestEvalOffline(t *testing.T) {
 			break
 		}
 	}
-	if endpointsTool == nil {
-		t.Fatalf("get_service_endpoints tool not found in netedge toolset")
-	}
+	s.Require().NotNil(endpointsTool, "get_service_endpoints tool not found in netedge toolset")
 
 	// 3. Call get_service_endpoints
 	params := api.ToolHandlerParams{
@@ -77,14 +79,14 @@ func TestEvalOffline(t *testing.T) {
 	}
 
 	res, err := endpointsTool.Handler(params)
-	if err != nil {
-		t.Fatalf("handler returned error: %v", err)
-	}
-	if res.Error != nil {
-		t.Fatalf("tool execution error: %v", res.Error)
-	}
+	s.Require().NoError(err, "handler returned error")
+	s.Require().Nil(res.Error, "tool execution error")
 
-	fmt.Println("--- RESULT START ---")
-	fmt.Println(res.Content)
-	fmt.Println("--- RESULT END ---")
+	s.T().Log("--- RESULT START ---")
+	s.T().Log(res.Content)
+	s.T().Log("--- RESULT END ---")
+}
+
+func TestMustGatherOffline(t *testing.T) {
+	suite.Run(t, new(MustGatherOfflineSuite))
 }

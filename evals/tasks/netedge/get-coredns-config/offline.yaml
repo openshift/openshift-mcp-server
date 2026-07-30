@@ -3,6 +3,10 @@ metadata:
   name: get-coredns-config-offline
   labels:
     suite: netedge
+    project: coredns
+  annotations:
+    project-name: "CoreDNS"
+    project-url: "https://coredns.io/"
 steps:
   verify:
     contains: "prometheus :9153"
