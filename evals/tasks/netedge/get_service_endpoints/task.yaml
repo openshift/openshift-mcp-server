@@ -1,6 +1,8 @@
 kind: Task
 metadata:
   name: get-service-endpoints
+  labels:
+    suite: netedge
 steps:
   verify:
     contains: "Addresses"

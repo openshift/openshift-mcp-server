@@ -1,6 +1,8 @@
 kind: Task
 metadata:
   name: probe-http
+  labels:
+    suite: netedge
 steps:
   verify:
     contains: "status_code"

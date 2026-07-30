@@ -1,6 +1,12 @@
 kind: Task
 metadata:
   name: get-router-sessions
+  labels:
+    suite: netedge
+    project: haproxy
+  annotations:
+    project-name: "HAProxy"
+    project-url: "https://www.haproxy.org/"
 steps:
   verify:
     contains: "frontend=GLOBAL"

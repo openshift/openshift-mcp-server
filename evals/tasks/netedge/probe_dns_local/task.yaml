@@ -1,6 +1,8 @@
 kind: Task
 metadata:
   name: probe-dns-local
+  labels:
+    suite: netedge
 steps:
   verify:
     contains: "NOERROR"
