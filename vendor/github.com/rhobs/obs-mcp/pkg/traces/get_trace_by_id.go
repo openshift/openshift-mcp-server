@@ -7,6 +7,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/google/jsonschema-go/jsonschema"
 
+	"github.com/rhobs/obs-mcp/pkg/tools"
 	tempoclient "github.com/rhobs/obs-mcp/pkg/traces/tempo"
 )
 
@@ -15,9 +16,9 @@ type getTraceByIDOutput struct {
 	Trace any `json:"trace" jsonschema:"The trace data with services, scopes and spans"`
 }
 
-var getTraceByIDOutputSchema = mustSchema[getTraceByIDOutput]()
+var getTraceByIDOutputSchema = tools.MustSchema[getTraceByIDOutput]()
 
-func initGetTraceByID() api.ServerTool {
+func initGetTraceByID(p api.FilteringProvider) api.ServerTool {
 	return api.ServerTool{
 		Tool: api.Tool{
 			Name: "tempo_get_trace_by_id",
@@ -57,6 +58,9 @@ Narrows the time range to improve query performance.`,
 			},
 		},
 		Handler: getTraceByIDHandler,
+		TargetCompatibilityFilters: []func() bool{
+			hasTempoStackCRD(p),
+		},
 	}
 }
 
