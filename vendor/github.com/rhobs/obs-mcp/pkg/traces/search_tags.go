@@ -7,6 +7,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/google/jsonschema-go/jsonschema"
 
+	"github.com/rhobs/obs-mcp/pkg/tools"
 	tempoclient "github.com/rhobs/obs-mcp/pkg/traces/tempo"
 )
 
@@ -15,9 +16,9 @@ type searchTagsOutput struct {
 	Scopes []any `json:"scopes" jsonschema:"List of tag scopes with their tag names"`
 }
 
-var searchTagsOutputSchema = mustSchema[searchTagsOutput]()
+var searchTagsOutputSchema = tools.MustSchema[searchTagsOutput]()
 
-func initSearchTags() api.ServerTool {
+func initSearchTags(p api.FilteringProvider) api.ServerTool {
 	return api.ServerTool{
 		Tool: api.Tool{
 			Name: "tempo_search_tags",
@@ -73,6 +74,9 @@ e.g. '{ resource.service.name="payment-service" }' to only show tags present in 
 			},
 		},
 		Handler: searchTagsHandler,
+		TargetCompatibilityFilters: []func() bool{
+			hasTempoStackCRD(p),
+		},
 	}
 }
 

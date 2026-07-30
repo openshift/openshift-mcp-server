@@ -7,6 +7,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/google/jsonschema-go/jsonschema"
 
+	"github.com/rhobs/obs-mcp/pkg/tools"
 	tempoclient "github.com/rhobs/obs-mcp/pkg/traces/tempo"
 )
 
@@ -16,9 +17,9 @@ type searchTracesOutput struct {
 	Metrics any   `json:"metrics,omitempty" jsonschema:"Query performance metrics"`
 }
 
-var searchTracesOutputSchema = mustSchema[searchTracesOutput]()
+var searchTracesOutputSchema = tools.MustSchema[searchTracesOutput]()
 
-func initSearchTraces() api.ServerTool {
+func initSearchTraces(p api.FilteringProvider) api.ServerTool {
 	return api.ServerTool{
 		Tool: api.Tool{
 			Name: "tempo_search_traces",
@@ -121,6 +122,9 @@ Both start and end should be provided to search the full time range; if omitted,
 			},
 		},
 		Handler: searchTracesHandler,
+		TargetCompatibilityFilters: []func() bool{
+			hasTempoStackCRD(p),
+		},
 	}
 }
 
