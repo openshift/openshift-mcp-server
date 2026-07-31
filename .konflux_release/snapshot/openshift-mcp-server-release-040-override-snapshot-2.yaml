@@ -1,7 +1,7 @@
 apiVersion: appstudio.redhat.com/v1alpha1
 kind: Snapshot
 metadata:
-  name: openshift-mcp-server-040-override-snapshot-1
+  name: openshift-mcp-server-040-override-snapshot-2
   namespace: ocp-mcp-server-tenant
   labels:
     test.appstudio.openshift.io/type: override
@@ -12,9 +12,9 @@ spec:
   components:
     - name: openshift-mcp-server-release-04
       # Use the digest from a successful Konflux build, not a mutable tag.
-      containerImage: "quay.io/redhat-user-workloads/ocp-mcp-server-tenant/openshift-mcp-server-release-04@sha256:6335b58e7ac74683eebd94bc8eac00704617bc17c5ceb39b3615856691fe6f1a"
+      containerImage: "quay.io/redhat-user-workloads/ocp-mcp-server-tenant/openshift-mcp-server-release-04@sha256:efa0d55626466c588932c0320bee73dd221b1979aafbbaf4b3ad4685aa9f317d"
       source:
         git:
           url: "https://github.com/openshift/openshift-mcp-server"
-          revision: "000217cb4d5450b563294abc20689c81f4797111"
+          revision: "3d3d433efbc6a80b2e2a311afa294fbb48d2cd33"
           dockerfileUrl: "Dockerfile.ocp"
