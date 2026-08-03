@@ -1,0 +1,46 @@
+kind: Task
+metadata:
+  labels:
+    suite: openshift
+  name: plan-mustgather-node-selector
+  difficulty: medium
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # Cleanup any existing must-gather resources from previous runs
+      kubectl get ns -o name 2>/dev/null | grep openshift-must-gather | xargs -r kubectl delete --wait=false 2>/dev/null || true
+      kubectl get clusterrolebinding -o name 2>/dev/null | grep must-gather-collector | xargs -r kubectl delete 2>/dev/null || true
+  verify:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # Find must-gather pod and verify it has the correct nodeSelector
+      POD_JSON=$(kubectl get pods -A -o json | jq -r '.items[] | select(.metadata.namespace | startswith("openshift-must-gather"))')
+      if [ -z "$POD_JSON" ]; then
+        echo "No must-gather pod found"
+        exit 1
+      fi
+      NS=$(echo "$POD_JSON" | jq -r '.metadata.namespace' | head -1)
+      POD=$(echo "$POD_JSON" | jq -r '.metadata.name' | head -1)
+      # Verify pod has worker node selector
+      kubectl get pod "$POD" -n "$NS" -o yaml | grep -q "node-role.kubernetes.io/worker"
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # Delete all must-gather namespaces and clusterrolebindings
+      kubectl get ns -o name 2>/dev/null | grep openshift-must-gather | xargs -r kubectl delete --wait=false 2>/dev/null || true
+      kubectl get clusterrolebinding -o name 2>/dev/null | grep must-gather-collector | xargs -r kubectl delete 2>/dev/null || true
+  prompt:
+    inline: I need to collect diagnostics but only want the must-gather pod to run on worker nodes, not on control plane nodes. The node selector should be node-role.kubernetes.io/worker. Can you set this up and apply it?
+  assertions:
+    promptsUsed:
+      - server: kubernetes
+        prompt: plan_mustgather
+    toolsUsed:
+      - server: kubernetes
+        tool: resource_create_or_update
+    minToolCalls: 1
+    maxToolCalls: 15
