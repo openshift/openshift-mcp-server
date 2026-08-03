@@ -14,8 +14,9 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	"github.com/containers/kubernetes-mcp-server/pkg/oauth"
-	"k8s.io/klog/v2"
+	"github.com/containers/kubernetes-mcp-server/pkg/tlsutil"
 )
 
 const maxWellKnownResponseSize = 1 << 20 // 1 MB
@@ -84,7 +85,7 @@ func (g *DefaultMetadataGenerator) GenerateProtectedResourceMetadata(oidcConfig 
 
 type WellKnown struct {
 	oauthState        *oauth.State
-	staticConfig      *config.StaticConfig
+	cfgState          *config.StaticConfigState
 	metadataGenerator WellKnownMetadataGenerator
 	// Cache for openid-configuration to avoid repeated fetches (TTL: oidcConfigCacheTTL)
 	oidcConfigCache     map[string]interface{}
@@ -96,19 +97,19 @@ type WellKnown struct {
 
 var _ http.Handler = &WellKnown{}
 
-func WellKnownHandler(staticConfig *config.StaticConfig, oauthState *oauth.State) http.Handler {
-	return WellKnownHandlerWithGenerator(staticConfig, oauthState, &DefaultMetadataGenerator{})
+func WellKnownHandler(cfgState *config.StaticConfigState, oauthState *oauth.State) http.Handler {
+	return WellKnownHandlerWithGenerator(cfgState, oauthState, &DefaultMetadataGenerator{})
 }
 
 // WellKnownHandlerWithGenerator creates a WellKnown handler with a custom metadata generator.
 // This allows customizing how metadata is generated for different OIDC providers.
-func WellKnownHandlerWithGenerator(staticConfig *config.StaticConfig, oauthState *oauth.State, generator WellKnownMetadataGenerator) http.Handler {
+func WellKnownHandlerWithGenerator(cfgState *config.StaticConfigState, oauthState *oauth.State, generator WellKnownMetadataGenerator) http.Handler {
 	if generator == nil {
 		generator = &DefaultMetadataGenerator{}
 	}
 	return &WellKnown{
 		oauthState:        oauthState,
-		staticConfig:      staticConfig,
+		cfgState:          cfgState,
 		metadataGenerator: generator,
 	}
 }
@@ -123,13 +124,26 @@ func (w *WellKnown) authorizationURL() string {
 }
 
 // wellKnownHTTPClient returns the current HTTP client from the oauth snapshot,
-// falling back to a TLS-enforcing client if none is available.
-func (w *WellKnown) wellKnownHTTPClient() *http.Client {
+// falling back to a TLS-enforcing client with operator TLS settings if none is available.
+func (w *WellKnown) wellKnownHTTPClient() (*http.Client, error) {
 	snap := w.oauthState.Load()
 	if snap != nil && snap.HTTPClient != nil {
-		return snap.HTTPClient
+		return snap.HTTPClient, nil
 	}
-	return config.NewTLSEnforcingClient(nil, w.staticConfig.IsRequireTLS)
+
+	cfg := w.cfgState.Load()
+	tlsConfig, err := tlsutil.BuildTLSConfig(
+		cfg.GetTLSMinVersionConfig(),
+		cfg.GetTLSCipherSuitesConfig(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build TLS config: %w", err)
+	}
+
+	transport := config.NewTLSEnforcingTransport(&http.Transport{
+		TLSClientConfig: tlsConfig,
+	}, cfg.IsRequireTLS)
+	return &http.Client{Transport: transport}, nil
 }
 
 func (w *WellKnown) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
@@ -139,40 +153,55 @@ func (w *WellKnown) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		return
 	}
 
-	requestPath := request.URL.EscapedPath()
+	// Resolve the request path to a hardcoded well-known endpoint constant.
+	// Using the constant (not the user-supplied path) to build the upstream URL
+	// breaks the taint chain from user input to outbound HTTP request (SSRF).
+	matchedEndpoint := matchWellKnownEndpoint(request.URL.EscapedPath())
+	if matchedEndpoint == "" {
+		http.Error(writer, "Not a well-known endpoint", http.StatusNotFound)
+		return
+	}
 
-	// Validate the URL path to prevent path traversal
-	upstreamURL, err := url.JoinPath(authURL, requestPath)
+	// Build the upstream URL from the hardcoded endpoint constant only.
+	upstreamURL, err := url.JoinPath(authURL, matchedEndpoint)
 	if err != nil || !strings.HasPrefix(upstreamURL, authURL+"/") {
 		http.Error(writer, "Invalid well-known path", http.StatusBadRequest)
 		return
 	}
 
+	logger := klogutil.FromContext(request.Context())
+
 	// Try direct proxy first (works for Keycloak and other providers that support all endpoints)
 	resourceMetadata, respHeaders, err := w.fetchWellKnownEndpoint(request, upstreamURL)
 	if err != nil {
-		klog.V(1).Infof("Well-known proxy failed to fetch %s: %v", requestPath, err)
+		klogutil.LogInfo(logger.V(1), "Well-known proxy failed to fetch endpoint",
+			klogutil.Field("url.path", matchedEndpoint),
+			klogutil.Err(err),
+		)
 		http.Error(writer, "Failed to fetch well-known metadata", http.StatusInternalServerError)
 		return
 	}
 
 	// If direct fetch returned nil (404), generate metadata using the configured generator.
 	// This provides fallback support for OIDC providers that only implement openid-configuration.
-	// Use prefix matching to handle paths like /.well-known/oauth-protected-resource/sse
 	if resourceMetadata == nil {
-		switch {
-		case strings.HasPrefix(requestPath, oauthAuthorizationServerEndpoint):
+		switch matchedEndpoint {
+		case oauthAuthorizationServerEndpoint:
 			resourceMetadata, err = w.generateAuthorizationServerMetadata(request)
 			if err != nil {
-				klog.V(1).Infof("Well-known proxy failed to generate authorization server metadata: %v", err)
+				klogutil.LogInfo(logger.V(1), "Well-known proxy failed to generate authorization server metadata",
+					klogutil.Err(err),
+				)
 				http.Error(writer, "Failed to generate well-known metadata", http.StatusInternalServerError)
 				return
 			}
 			respHeaders = nil
-		case strings.HasPrefix(requestPath, oauthProtectedResourceEndpoint):
+		case oauthProtectedResourceEndpoint:
 			resourceMetadata, err = w.generateProtectedResourceMetadata(request)
 			if err != nil {
-				klog.V(1).Infof("Well-known proxy failed to generate protected resource metadata: %v", err)
+				klogutil.LogInfo(logger.V(1), "Well-known proxy failed to generate protected resource metadata",
+					klogutil.Err(err),
+				)
 				http.Error(writer, "Failed to generate well-known metadata", http.StatusInternalServerError)
 				return
 			}
@@ -188,7 +217,10 @@ func (w *WellKnown) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 
 	body, err := json.Marshal(resourceMetadata)
 	if err != nil {
-		klog.V(1).Infof("Well-known proxy failed to marshal response for %s: %v", request.URL.Path, err)
+		klogutil.LogInfo(logger.V(1), "Well-known proxy failed to marshal response",
+			klogutil.Field("url.path", request.URL.Path),
+			klogutil.Err(err),
+		)
 		http.Error(writer, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -210,7 +242,7 @@ func (w *WellKnown) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 }
 
 // fetchWellKnownEndpoint creates a new request from the incoming request's method and context,
-// then fetches the well-known endpoint. Returns nil metadata if the endpoint returns 404.
+// then fetches the well-known endpoint. Returns nil metadata if the endpoint returns 404 or an empty body (to allow fallback).
 func (w *WellKnown) fetchWellKnownEndpoint(request *http.Request, url string) (map[string]interface{}, http.Header, error) {
 	req, err := http.NewRequestWithContext(request.Context(), request.Method, url, nil)
 	if err != nil {
@@ -220,9 +252,13 @@ func (w *WellKnown) fetchWellKnownEndpoint(request *http.Request, url string) (m
 }
 
 // fetchWellKnownEndpointFromRequest performs the HTTP fetch using a pre-built request.
-// Returns nil metadata if the endpoint returns 404 (to allow fallback).
+// Returns nil metadata if the endpoint returns 404 or an empty body (to allow fallback).
 func (w *WellKnown) fetchWellKnownEndpointFromRequest(req *http.Request) (map[string]interface{}, http.Header, error) {
-	resp, err := w.wellKnownHTTPClient().Do(req)
+	client, err := w.wellKnownHTTPClient()
+	if err != nil {
+		return nil, nil, err
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to perform request: %w", err)
 	}
@@ -239,6 +275,11 @@ func (w *WellKnown) fetchWellKnownEndpointFromRequest(req *http.Request) (map[st
 
 	var resourceMetadata map[string]interface{}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, maxWellKnownResponseSize)).Decode(&resourceMetadata); err != nil {
+		// Treat empty body (io.EOF) as equivalent to 404 — some providers (e.g., Entra ID)
+		// return HTTP 200 with content-length: 0 for unsupported well-known paths.
+		if err == io.EOF {
+			return nil, nil, nil
+		}
 		return nil, nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
@@ -330,12 +371,13 @@ func (w *WellKnown) generateProtectedResourceMetadata(request *http.Request) (ma
 // Uses server_url from config when set. Falls back to X-Forwarded-* headers only
 // when trust_proxy_headers is explicitly enabled. Otherwise uses request.Host directly.
 func (w *WellKnown) buildResourceURL(request *http.Request) string {
-	if w.staticConfig != nil && w.staticConfig.ServerURL != "" {
-		return strings.TrimSuffix(w.staticConfig.ServerURL, "/")
+	cfg := w.cfgState.Load()
+	if cfg.ServerURL != "" {
+		return strings.TrimSuffix(cfg.ServerURL, "/")
 	}
 	scheme := "https"
 	host := request.Host
-	if w.staticConfig != nil && w.staticConfig.TrustProxyHeaders {
+	if cfg.TrustProxyHeaders {
 		if request.TLS == nil && !strings.HasPrefix(request.Header.Get("X-Forwarded-Proto"), "https") {
 			scheme = "http"
 		}
@@ -370,6 +412,28 @@ func copyMap(src map[string]interface{}) map[string]interface{} {
 		dst[k] = v
 	}
 	return dst
+}
+
+// matchWellKnownEndpoint returns the hardcoded well-known endpoint constant
+// that matches path (exact or sub-path, e.g. /sse suffix), or "" if none match.
+// Paths containing ".." are rejected to prevent path traversal bypasses.
+// Returning the constant (not the user-supplied path) breaks the taint chain
+// for SSRF analysis.
+func matchWellKnownEndpoint(path string) string {
+	if strings.Contains(path, "..") {
+		return ""
+	}
+	for _, ep := range WellKnownEndpoints {
+		if path == ep || strings.HasPrefix(path, ep+"/") {
+			return ep
+		}
+	}
+	return ""
+}
+
+// isWellKnownPath reports whether path matches one of the known well-known endpoints.
+func isWellKnownPath(path string) bool {
+	return matchWellKnownEndpoint(path) != ""
 }
 
 func withCORSHeaders(writer http.ResponseWriter) {

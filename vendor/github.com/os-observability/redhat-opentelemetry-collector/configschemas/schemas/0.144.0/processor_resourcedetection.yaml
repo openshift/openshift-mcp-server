@@ -1,0 +1,1707 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: resourcedetection processor configuration
+type: object
+properties:
+    akamai:
+        description: AkamaiConfig contains user-specified configurations for the akamai detector
+        type: object
+        properties:
+            resource_attributes:
+                type: object
+                properties:
+                    cloud.account.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.platform:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.provider:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.region:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.image.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.image.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.type:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    aks:
+        description: Aks contains user-specified configurations for the aks detector
+        type: object
+        properties:
+            resource_attributes:
+                type: object
+                properties:
+                    cloud.platform:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.provider:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    k8s.cluster.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    auth:
+        description: Auth configuration for outgoing HTTP calls.
+        type: object
+        properties:
+            authenticator:
+                description: AuthenticatorID specifies the name of the extension to use in order to authenticate the incoming data point.
+                type: string
+        additionalProperties: false
+    azure:
+        description: Azure contains user-specified configurations for the azure detector
+        type: object
+        properties:
+            resource_attributes:
+                type: object
+                properties:
+                    azure.resourcegroup.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    azure.vm.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    azure.vm.scaleset.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    azure.vm.size:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.account.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.availability_zone:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.platform:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.provider:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.region:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+            tags:
+                description: |-
+                    Tags is a list of regex's to match azure instance tag keys that users want
+                    to add as resource attributes to processed data
+                type: array
+                items:
+                    type: string
+        additionalProperties: false
+    compression:
+        description: The compression key for supported compression types within collector.
+        type: string
+    compression_params:
+        description: Advanced configuration options for the Compression
+        type: object
+        properties:
+            level:
+                type: integer
+        additionalProperties: false
+    consul:
+        description: ConsulConfig contains user-specified configurations for the Consul detector
+        type: object
+        properties:
+            address:
+                description: Address is the address of the Consul server
+                type: string
+            datacenter:
+                description: Datacenter to use. If not provided, the default agent datacenter is used.
+                type: string
+            meta:
+                description: |-
+                    Allowlist of [Consul
+                    Metadata](https://www.consul.io/docs/agent/options#node_meta) keys to use as
+                    resource attributes.
+                type: object
+                additionalProperties: {}
+            namespace:
+                description: |-
+                    Namespace is the name of the namespace to send along for the request
+                    when no other Namespace is present in the QueryOptions
+                type: string
+            resource_attributes:
+                description: ResourceAttributes configuration for Consul detector
+                type: object
+                properties:
+                    cloud.region:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+            token:
+                description: |-
+                    Token is used to provide a per-request ACL token
+                    which overrides the agent's default (empty) token.
+                    Token or Tokenfile are only required if [Consul's ACL
+                    System](https://www.consul.io/docs/security/acl/acl-system) is enabled.
+                type: string
+            token_file:
+                description: |-
+                    TokenFile is a file containing the current token to use for this client.
+                    If provided it is read once at startup and never again.
+                    Token or Tokenfile are only required if [Consul's ACL
+                    System](https://www.consul.io/docs/security/acl/acl-system) is enabled.
+                type: string
+        additionalProperties: false
+    cookies:
+        description: Cookies configures the cookie management of the HTTP client.
+        type: object
+    detectors:
+        description: |-
+            Detectors is an ordered list of named detectors that should be
+            run to attempt to detect resource information.
+        type: array
+        items:
+            type: string
+    digitalocean:
+        description: DigitalOceanConfig contains user-specified configurations for the docker detector
+        type: object
+        properties:
+            resource_attributes:
+                type: object
+                properties:
+                    cloud.provider:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.region:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    disable_keep_alives:
+        description: |-
+            DisableKeepAlives, if true, disables HTTP keep-alives and will only use the connection to the server
+            for a single HTTP request.
+
+            WARNING: enabling this option can result in significant overhead establishing a new HTTP(S)
+            connection for every request. Before enabling this option please consider whether changes
+            to idle connection settings can achieve your goal.
+        type: boolean
+    docker:
+        description: DockerConfig contains user-specified configurations for the docker detector
+        type: object
+        properties:
+            resource_attributes:
+                type: object
+                properties:
+                    container.image.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    container.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    os.type:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    ec2:
+        description: EC2Config contains user-specified configurations for the EC2 detector
+        type: object
+        properties:
+            fail_on_missing_metadata:
+                type: boolean
+            max_attempts:
+                type: integer
+            max_backoff:
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+            resource_attributes:
+                type: object
+                properties:
+                    cloud.account.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.availability_zone:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.platform:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.provider:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.region:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.image.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.type:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+            tags:
+                description: |-
+                    Tags is a list of regex's to match ec2 instance tag keys that users want
+                    to add as resource attributes to processed data
+                type: array
+                items:
+                    type: string
+        additionalProperties: false
+    ecs:
+        description: ECSConfig contains user-specified configurations for the ECS detector
+        type: object
+        properties:
+            resource_attributes:
+                type: object
+                properties:
+                    aws.ecs.cluster.arn:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    aws.ecs.launchtype:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    aws.ecs.task.arn:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    aws.ecs.task.family:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    aws.ecs.task.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    aws.ecs.task.revision:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    aws.log.group.arns:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    aws.log.group.names:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    aws.log.stream.arns:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    aws.log.stream.names:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.account.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.availability_zone:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.platform:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.provider:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.region:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    eks:
+        description: EKSConfig contains user-specified configurations for the EKS detector
+        type: object
+        properties:
+            node_from_env_var:
+                type: string
+            resource_attributes:
+                type: object
+                properties:
+                    cloud.account.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.availability_zone:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.platform:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.provider:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.region:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.image.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.type:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    k8s.cluster.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    elasticbeanstalk:
+        description: Elasticbeanstalk contains user-specified configurations for the elasticbeanstalk detector
+        type: object
+        properties:
+            resource_attributes:
+                type: object
+                properties:
+                    cloud.platform:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.provider:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    deployment.environment:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    service.instance.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    service.version:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    endpoint:
+        description: 'The target URL to send data to (e.g.: http://some.url:9411/v1/traces).'
+        type: string
+    force_attempt_http2:
+        description: |-
+            Enabling ForceAttemptHTTP2 forces the HTTP transport to use the HTTP/2 protocol.
+            By default, this is set to true.
+            NOTE: HTTP/2 does not support settings such as MaxConnsPerHost, MaxIdleConnsPerHost and MaxIdleConns.
+        type: boolean
+    gcp:
+        description: GcpConfig contains user-specified configurations for the gcp detector
+        type: object
+        properties:
+            resource_attributes:
+                type: object
+                properties:
+                    cloud.account.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.availability_zone:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.platform:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.provider:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.region:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    faas.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    faas.instance:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    faas.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    faas.version:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    gcp.cloud_run.job.execution:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    gcp.cloud_run.job.task_index:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    gcp.gce.instance.hostname:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    gcp.gce.instance.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    gcp.gce.instance_group_manager.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    gcp.gce.instance_group_manager.region:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    gcp.gce.instance_group_manager.zone:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.type:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    k8s.cluster.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    headers:
+        description: |-
+            Additional headers attached to each HTTP request sent by the client.
+            Existing header values are overwritten if collision happens.
+            Header values are opaque since they may be sensitive.
+        type: object
+    heroku:
+        description: HerokuConfig contains user-specified configurations for the heroku detector
+        type: object
+        properties:
+            resource_attributes:
+                type: object
+                properties:
+                    cloud.provider:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    heroku.app.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    heroku.dyno.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    heroku.release.commit:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    heroku.release.creation_timestamp:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    service.instance.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    service.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    service.version:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    hetzner:
+        description: HetznerConfig contains user-specified configurations for the hetzner detector
+        type: object
+        properties:
+            resource_attributes:
+                type: object
+                properties:
+                    cloud.availability_zone:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.provider:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.region:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    http2_ping_timeout:
+        description: |-
+            HTTP2PingTimeout if there's no response to the ping within the configured value, the connection will be closed.
+            If not set or set to 0, it defaults to 15s.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    http2_read_idle_timeout:
+        description: |-
+            This is needed in case you run into
+            https://github.com/golang/go/issues/59690
+            https://github.com/golang/go/issues/36026
+            HTTP2ReadIdleTimeout if the connection has been idle for the configured value send a ping frame for health check
+            0s means no health check will be performed.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    idle_conn_timeout:
+        description: |-
+            IdleConnTimeout is the maximum amount of time a connection will remain open before closing itself.
+            By default, it is set to 90 seconds.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    k8snode:
+        description: K8SNode contains user-specified configurations for the K8SNode detector
+        type: object
+        properties:
+            auth_type:
+                description: |-
+                    How to authenticate to the K8s API server.  This can be one of `none`
+                    (for no auth), `serviceAccount` (to use the standard service account
+                    token provided to the agent pod), or `kubeConfig` to use credentials
+                    from `~/.kube/config`.
+                type: string
+            context:
+                description: When using auth_type `kubeConfig`, override the current context.
+                type: string
+            node_from_env_var:
+                description: |-
+                    NodeFromEnv can be used to extract the node name from an environment
+                    variable. The value must be the name of the environment variable.
+                    This is useful when the node a Otel agent will run on cannot be
+                    predicted. In such cases, the Kubernetes downward API can be used to
+                    add the node name to each pod as an environment variable. K8s tagger
+                    can then read this value and filter pods by it.
+                    NodeFromEnv defaults to K8S_NODE_NAME
+
+                    For example, node name can be passed to each agent with the downward API as follows
+
+                    env:
+                      - name: K8S_NODE_NAME
+                        valueFrom:
+                          fieldRef:
+                            fieldPath: spec.nodeName
+
+                    Then the NodeFromEnv field can be set to `K8S_NODE_NAME` to filter all pods by the node that
+                    the agent is running on.
+
+                    More on downward API here: https://kubernetes.io/docs/tasks/inject-data-application/environment-variable-expose-pod-information/
+                type: string
+            resource_attributes:
+                type: object
+                properties:
+                    k8s.node.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    k8s.node.uid:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    kubeadm:
+        description: Kubeadm contains user-specified configurations for the Kubeadm detector
+        type: object
+        properties:
+            auth_type:
+                description: |-
+                    How to authenticate to the K8s API server.  This can be one of `none`
+                    (for no auth), `serviceAccount` (to use the standard service account
+                    token provided to the agent pod), or `kubeConfig` to use credentials
+                    from `~/.kube/config`.
+                type: string
+            context:
+                description: When using auth_type `kubeConfig`, override the current context.
+                type: string
+            resource_attributes:
+                type: object
+                properties:
+                    k8s.cluster.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    k8s.cluster.uid:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    lambda:
+        description: Lambda contains user-specified configurations for the lambda detector
+        type: object
+        properties:
+            resource_attributes:
+                type: object
+                properties:
+                    aws.log.group.names:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    aws.log.stream.names:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.platform:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.provider:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.region:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    faas.instance:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    faas.max_memory:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    faas.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    faas.version:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    max_conns_per_host:
+        description: |-
+            MaxConnsPerHost limits the total number of connections per host, including connections in the dialing,
+            active, and idle states. Default is 0 (unlimited).
+        type: integer
+    max_idle_conns:
+        description: |-
+            MaxIdleConns is used to set a limit to the maximum idle HTTP connections the client can keep open.
+            By default, it is set to 100. Zero means no limit.
+        type: integer
+    max_idle_conns_per_host:
+        description: |-
+            MaxIdleConnsPerHost is used to set a limit to the maximum idle HTTP connections the host can keep open.
+            If zero, [net/http.DefaultMaxIdleConnsPerHost] is used.
+        type: integer
+    middlewares:
+        description: |-
+            Middlewares are used to add custom functionality to the HTTP client.
+            Middleware handlers are called in the order they appear in this list,
+            with the first middleware becoming the outermost handler.
+        type: array
+        items:
+            type: object
+            properties:
+                id:
+                    description: ID specifies the name of the extension to use.
+                    type: string
+            additionalProperties: false
+    nova:
+        description: OpenStackNovaConfig contains user-specified configurations for the OpenStackNova detector
+        type: object
+        properties:
+            fail_on_missing_metadata:
+                description: |-
+                    FailOnMissingMetadata, if true, causes the detector to return an error
+                    when the Nova metadata service is unavailable or required fields are missing.
+                    If false (default), the detector does best-effort population.
+                type: boolean
+            labels:
+                description: |-
+                    Labels is a list of regex patterns to match Nova instance metadata keys
+                    (from the "meta" map) that should be added as resource attributes.
+                    Matched keys are emitted as "openstack.nova.meta.<key>: <value>".
+                type: array
+                items:
+                    type: string
+            resource_attributes:
+                description: |-
+                    ResourceAttributes controls which standard resource attributes are enabled
+                    (e.g., host.id, host.name, cloud.provider, etc.).
+                type: object
+                properties:
+                    cloud.account.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.availability_zone:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.platform:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.provider:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.type:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    openshift:
+        description: OpenShift contains user-specified configurations for the OpenShift detector
+        type: object
+        properties:
+            address:
+                description: Address is the address of the openshift api server
+                type: string
+            resource_attributes:
+                type: object
+                properties:
+                    cloud.platform:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.provider:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.region:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    k8s.cluster.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+            tls:
+                description: |-
+                    TLSs contains TLS configurations that are specific to client
+                    connection used to communicate with the OpenShift API.
+                type: object
+                properties:
+                    ca_file:
+                        description: |-
+                            Path to the CA cert. For a client this verifies the server certificate.
+                            For a server this verifies client certificates. If empty uses system root CA.
+                            (optional)
+                        type: string
+                    ca_pem:
+                        description: In memory PEM encoded cert. (optional)
+                        type: string
+                    cert_file:
+                        description: Path to the TLS cert to use for TLS required connections. (optional)
+                        type: string
+                    cert_pem:
+                        description: In memory PEM encoded TLS cert to use for TLS required connections. (optional)
+                        type: string
+                    cipher_suites:
+                        description: |-
+                            CipherSuites is a list of TLS cipher suites that the TLS transport can use.
+                            If left blank, a safe default list is used.
+                            See https://go.dev/src/crypto/tls/cipher_suites.go for a list of supported cipher suites.
+                        type: array
+                        items:
+                            type: string
+                    curve_preferences:
+                        description: |-
+                            contains the elliptic curves that will be used in
+                            an ECDHE handshake, in preference order
+                            Defaults to empty list and "crypto/tls" defaults are used, internally.
+                        type: array
+                        items:
+                            type: string
+                    include_system_ca_certs_pool:
+                        description: |-
+                            If true, load system CA certificates pool in addition to the certificates
+                            configured in this struct.
+                        type: boolean
+                    insecure:
+                        description: |-
+                            In gRPC and HTTP when set to true, this is used to disable the client transport security.
+                            See https://godoc.org/google.golang.org/grpc#WithInsecure for gRPC.
+                            Please refer to https://godoc.org/crypto/tls#Config for more information.
+                            (optional, default false)
+                        type: boolean
+                    insecure_skip_verify:
+                        description: InsecureSkipVerify will enable TLS but not verify the certificate.
+                        type: boolean
+                    key_file:
+                        description: Path to the TLS key to use for TLS required connections. (optional)
+                        type: string
+                    key_pem:
+                        description: In memory PEM encoded TLS key to use for TLS required connections. (optional)
+                        type: string
+                    max_version:
+                        description: |-
+                            MaxVersion sets the maximum TLS version that is acceptable.
+                            If not set, refer to crypto/tls for defaults. (optional)
+                        type: string
+                    min_version:
+                        description: |-
+                            MinVersion sets the minimum TLS version that is acceptable.
+                            If not set, TLS 1.2 will be used. (optional)
+                        type: string
+                    reload_interval:
+                        description: |-
+                            ReloadInterval specifies the duration after which the certificate will be reloaded
+                            If not set, it will never be reloaded (optional)
+                        type: string
+                        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+                    server_name_override:
+                        description: |-
+                            ServerName requested by client for virtual hosting.
+                            This sets the ServerName in the TLSConfig. Please refer to
+                            https://godoc.org/crypto/tls#Config for more information. (optional)
+                        type: string
+                    tpm:
+                        description: Trusted platform module configuration
+                        type: object
+                        properties:
+                            auth:
+                                type: string
+                            enabled:
+                                type: boolean
+                            owner_auth:
+                                type: string
+                            path:
+                                description: |-
+                                    The path to the TPM device or Unix domain socket.
+                                    For instance /dev/tpm0 or /dev/tpmrm0.
+                                type: string
+                        additionalProperties: false
+                additionalProperties: false
+            token:
+                description: Token is used to identify against the openshift api server
+                type: string
+        additionalProperties: false
+    oraclecloud:
+        description: OracleCloud contains user-specified configurations for the OracleCloud detector
+        type: object
+        properties:
+            resource_attributes:
+                type: object
+                properties:
+                    cloud.availability_zone:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.platform:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.provider:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.region:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.type:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    k8s.cluster.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    override:
+        description: |-
+            Override indicates whether any existing resource attributes
+            should be overridden or preserved. Defaults to true.
+        type: boolean
+    proxy_url:
+        description: ProxyURL setting for the collector
+        type: string
+    read_buffer_size:
+        description: |-
+            ReadBufferSize for HTTP client. See http.Transport.ReadBufferSize.
+            Default is 0.
+        type: integer
+    refresh_interval:
+        description: |-
+            If > 0, periodically re-run detection for all configured detectors.
+            When 0 (default), no periodic refresh occurs.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    scaleway:
+        description: ScalewayConfig contains user-specified configurations for the scaleway detector
+        type: object
+        properties:
+            resource_attributes:
+                type: object
+                properties:
+                    cloud.account.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.availability_zone:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.platform:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.provider:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.region:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.image.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.image.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.type:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    system:
+        description: SystemConfig contains user-specified configurations for the System detector
+        type: object
+        properties:
+            hostname_sources:
+                description: |-
+                    The HostnameSources is a priority list of sources from which hostname will be fetched.
+                    In case of the error in fetching hostname from source,
+                    the next source from the list will be considered.(**default**: `["dns", "os"]`)
+                type: array
+                items:
+                    type: string
+            resource_attributes:
+                type: object
+                properties:
+                    host.arch:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.cpu.cache.l2.size:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.cpu.family:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.cpu.model.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.cpu.model.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.cpu.stepping:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.cpu.vendor.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.interface:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.ip:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.mac:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    os.build.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    os.description:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    os.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    os.type:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    os.version:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    timeout:
+        description: |-
+            Timeout parameter configures `http.Client.Timeout`.
+            Default is 0 (unlimited).
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    tls:
+        description: TLS struct exposes TLS client configuration.
+        type: object
+        properties:
+            ca_file:
+                description: |-
+                    Path to the CA cert. For a client this verifies the server certificate.
+                    For a server this verifies client certificates. If empty uses system root CA.
+                    (optional)
+                type: string
+            ca_pem:
+                description: In memory PEM encoded cert. (optional)
+                type: string
+            cert_file:
+                description: Path to the TLS cert to use for TLS required connections. (optional)
+                type: string
+            cert_pem:
+                description: In memory PEM encoded TLS cert to use for TLS required connections. (optional)
+                type: string
+            cipher_suites:
+                description: |-
+                    CipherSuites is a list of TLS cipher suites that the TLS transport can use.
+                    If left blank, a safe default list is used.
+                    See https://go.dev/src/crypto/tls/cipher_suites.go for a list of supported cipher suites.
+                type: array
+                items:
+                    type: string
+            curve_preferences:
+                description: |-
+                    contains the elliptic curves that will be used in
+                    an ECDHE handshake, in preference order
+                    Defaults to empty list and "crypto/tls" defaults are used, internally.
+                type: array
+                items:
+                    type: string
+            include_system_ca_certs_pool:
+                description: |-
+                    If true, load system CA certificates pool in addition to the certificates
+                    configured in this struct.
+                type: boolean
+            insecure:
+                description: |-
+                    In gRPC and HTTP when set to true, this is used to disable the client transport security.
+                    See https://godoc.org/google.golang.org/grpc#WithInsecure for gRPC.
+                    Please refer to https://godoc.org/crypto/tls#Config for more information.
+                    (optional, default false)
+                type: boolean
+            insecure_skip_verify:
+                description: InsecureSkipVerify will enable TLS but not verify the certificate.
+                type: boolean
+            key_file:
+                description: Path to the TLS key to use for TLS required connections. (optional)
+                type: string
+            key_pem:
+                description: In memory PEM encoded TLS key to use for TLS required connections. (optional)
+                type: string
+            max_version:
+                description: |-
+                    MaxVersion sets the maximum TLS version that is acceptable.
+                    If not set, refer to crypto/tls for defaults. (optional)
+                type: string
+            min_version:
+                description: |-
+                    MinVersion sets the minimum TLS version that is acceptable.
+                    If not set, TLS 1.2 will be used. (optional)
+                type: string
+            reload_interval:
+                description: |-
+                    ReloadInterval specifies the duration after which the certificate will be reloaded
+                    If not set, it will never be reloaded (optional)
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+            server_name_override:
+                description: |-
+                    ServerName requested by client for virtual hosting.
+                    This sets the ServerName in the TLSConfig. Please refer to
+                    https://godoc.org/crypto/tls#Config for more information. (optional)
+                type: string
+            tpm:
+                description: Trusted platform module configuration
+                type: object
+                properties:
+                    auth:
+                        type: string
+                    enabled:
+                        type: boolean
+                    owner_auth:
+                        type: string
+                    path:
+                        description: |-
+                            The path to the TPM device or Unix domain socket.
+                            For instance /dev/tpm0 or /dev/tpmrm0.
+                        type: string
+                additionalProperties: false
+        additionalProperties: false
+    upcloud:
+        description: UpcloudConfig contains user-specified configurations for the upcloud detector
+        type: object
+        properties:
+            fail_on_missing_metadata:
+                type: boolean
+            resource_attributes:
+                type: object
+                properties:
+                    cloud.provider:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.region:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    vultr:
+        description: VultrConfig contains user-specified configurations for the vultr detector
+        type: object
+        properties:
+            fail_on_missing_metadata:
+                type: boolean
+            resource_attributes:
+                type: object
+                properties:
+                    cloud.provider:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    cloud.region:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.id:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                    host.name:
+                        type: object
+                        properties:
+                            enabled:
+                                type: boolean
+                        additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    write_buffer_size:
+        description: |-
+            WriteBufferSize for HTTP client. See http.Transport.WriteBufferSize.
+            Default is 0.
+        type: integer
+additionalProperties: false

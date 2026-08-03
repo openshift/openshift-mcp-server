@@ -26,7 +26,14 @@ const child = childProcess.spawn(resolveBinaryPath(), process.argv.slice(2), {
 });
 
 const handleSignal = () => (signal) => {
-  console.log(`Received ${signal}, terminating child process...`);
+  // SIGHUP no longer terminates the child (it reloads with a config, ignores
+  // without), but still forward it so `kill -HUP` on this parent can trigger a
+  // reload. Just don't log it as a termination.
+  if (signal === 'SIGHUP') {
+    console.log(`Received ${signal}, forwarding to child process...`);
+  } else {
+    console.log(`Received ${signal}, terminating child process...`);
+  }
   if (child && !child.killed) {
     child.kill(signal);
   }

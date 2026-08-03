@@ -1,0 +1,21 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: loki-label-values
+  difficulty: medium
+  parallel: true
+  runs: 1
+  labels:
+    category: logs
+    suite: observability
+    toolType: exploration
+  description: |
+    Tests loki_label_values for SrcK8S_Namespace on the network tenant.
+spec:
+  prompt:
+    inline: |
+      For LokiStack obs-mcp-loki in namespace obs-mcp-loki with tenant network,
+      what values exist for the SrcK8S_Namespace label?
+  verify:
+    - llmJudge:
+        contains: "SrcK8S_Namespace"

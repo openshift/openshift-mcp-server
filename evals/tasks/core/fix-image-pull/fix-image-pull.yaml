@@ -1,0 +1,19 @@
+kind: Task
+metadata:
+  labels:
+    suite: core
+    project: kubernetes
+  annotations:
+    project-name: "Kubernetes"
+    project-url: "https://kubernetes.io"
+  name: "fix-image-pull"
+  difficulty: medium
+steps:
+  setup:
+    file: setup.sh
+  verify:
+    file: verify.sh
+  cleanup:
+    file: cleanup.sh
+  prompt:
+    inline: Please fix the error in the deployment named 'app' in the namespace 'debug'

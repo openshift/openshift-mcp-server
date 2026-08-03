@@ -1,0 +1,2953 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: prometheus receiver configuration
+type: object
+properties:
+    api_server:
+        description: |-
+            APIServer has the settings to enable the receiver to host the Prometheus API
+            server in agent mode. This allows the user to call the endpoint to get
+            the config, service discovery, and targets for debugging purposes.
+        type: object
+        properties:
+            enabled:
+                type: boolean
+            server_config:
+                type: object
+                properties:
+                    auth:
+                        description: Auth for this receiver
+                        type: object
+                        properties:
+                            authenticator:
+                                description: AuthenticatorID specifies the name of the extension to use in order to authenticate the incoming data point.
+                                type: string
+                            request_params:
+                                description: |-
+                                    RequestParameters is a list of parameters that should be extracted from the request and added to the context.
+                                    When a parameter is found in both the query string and the header, the value from the query string will be used.
+                                type: array
+                                items:
+                                    type: string
+                        additionalProperties: false
+                    compression_algorithms:
+                        description: 'CompressionAlgorithms configures the list of compression algorithms the server can accept. Default: ["", "gzip", "zstd", "zlib", "snappy", "deflate"]'
+                        type: array
+                        items:
+                            type: string
+                    cors:
+                        description: CORS configures the server for HTTP cross-origin resource sharing (CORS).
+                        type: object
+                        properties:
+                            allowed_headers:
+                                description: |-
+                                    AllowedHeaders sets what headers will be allowed in CORS requests.
+                                    The Accept, Accept-Language, Content-Type, and Content-Language
+                                    headers are implicitly allowed. If no headers are listed,
+                                    X-Requested-With will also be accepted by default. Include "*" to
+                                    allow any request header.
+                                type: array
+                                items:
+                                    type: string
+                            allowed_origins:
+                                description: |-
+                                    AllowedOrigins sets the allowed values of the Origin header for
+                                    HTTP/JSON requests to an OTLP receiver. An origin may contain a
+                                    wildcard (*) to replace 0 or more characters (e.g.,
+                                    "http://*.domain.com", or "*" to allow any origin).
+                                type: array
+                                items:
+                                    type: string
+                            max_age:
+                                description: |-
+                                    MaxAge sets the value of the Access-Control-Max-Age response header.
+                                    Set it to the number of seconds that browsers should cache a CORS
+                                    preflight response for.
+                                type: integer
+                        additionalProperties: false
+                    dialer:
+                        description: DialerConfig contains options for connecting to an address.
+                        type: object
+                        properties:
+                            timeout:
+                                description: |-
+                                    Timeout is the maximum amount of time a dial will wait for
+                                    a connect to complete. The default is no timeout.
+                                type: string
+                                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+                        additionalProperties: false
+                    endpoint:
+                        description: |-
+                            Endpoint configures the address for this network connection.
+                            For TCP and UDP networks, the address has the form "host:port". The host must be a literal IP address,
+                            or a host name that can be resolved to IP addresses. The port must be a literal port number or a service name.
+                            If the host is a literal IPv6 address it must be enclosed in square brackets, as in "[2001:db8::1]:80" or
+                            "[fe80::1%zone]:80". The zone specifies the scope of the literal IPv6 address as defined in RFC 4007.
+                        type: string
+                    idle_timeout:
+                        description: |-
+                            IdleTimeout is the maximum amount of time to wait for the
+                            next request when keep-alives are enabled. If IdleTimeout
+                            is zero, the value of ReadTimeout is used. If both are
+                            zero, there is no timeout.
+                        type: string
+                        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+                    include_metadata:
+                        description: IncludeMetadata propagates the client metadata from the incoming requests to the downstream consumers
+                        type: boolean
+                    keep_alives_enabled:
+                        description: |-
+                            KeepAlivesEnabled controls whether HTTP keep-alives are enabled.
+                            By default, keep-alives are always enabled. Only very resource-constrained environments should disable them.
+                        type: boolean
+                    max_request_body_size:
+                        description: 'MaxRequestBodySize sets the maximum request body size in bytes. Default: 20MiB.'
+                        type: integer
+                    middlewares:
+                        description: |-
+                            Middlewares are used to add custom functionality to the HTTP server.
+                            Middleware handlers are called in the order they appear in this list,
+                            with the first middleware becoming the outermost handler.
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                id:
+                                    description: ID specifies the name of the extension to use.
+                                    type: string
+                            additionalProperties: false
+                    read_header_timeout:
+                        description: |-
+                            ReadHeaderTimeout is the amount of time allowed to read
+                            request headers. The connection's read deadline is reset
+                            after reading the headers and the Handler can decide what
+                            is considered too slow for the body. If ReadHeaderTimeout
+                            is zero, the value of ReadTimeout is used. If both are
+                            zero, there is no timeout.
+                        type: string
+                        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+                    read_timeout:
+                        description: |-
+                            ReadTimeout is the maximum duration for reading the entire
+                            request, including the body. A zero or negative value means
+                            there will be no timeout.
+
+                            Because ReadTimeout does not let Handlers make per-request
+                            decisions on each request body's acceptable deadline or
+                            upload rate, most users will prefer to use
+                            ReadHeaderTimeout. It is valid to use them both.
+                        type: string
+                        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+                    response_headers:
+                        description: |-
+                            Additional headers attached to each HTTP response sent to the client.
+                            Header values are opaque since they may be sensitive.
+                        type: object
+                    tls:
+                        description: TLS struct exposes TLS server configuration.
+                        type: object
+                        properties:
+                            ca_file:
+                                description: |-
+                                    Path to the CA cert. For a client this verifies the server certificate.
+                                    For a server this verifies client certificates. If empty uses system root CA.
+                                    (optional)
+                                type: string
+                            ca_pem:
+                                description: In memory PEM encoded cert. (optional)
+                                type: string
+                            cert_file:
+                                description: Path to the TLS cert to use for TLS required connections. (optional)
+                                type: string
+                            cert_pem:
+                                description: In memory PEM encoded TLS cert to use for TLS required connections. (optional)
+                                type: string
+                            cipher_suites:
+                                description: |-
+                                    CipherSuites is a list of TLS cipher suites that the TLS transport can use.
+                                    If left blank, a safe default list is used.
+                                    See https://go.dev/src/crypto/tls/cipher_suites.go for a list of supported cipher suites.
+                                type: array
+                                items:
+                                    type: string
+                            client_ca_file:
+                                description: |-
+                                    Path to the TLS cert to use by the server to verify a client certificate. (optional)
+                                    This sets the ClientCAs and ClientAuth to RequireAndVerifyClientCert in the TLSConfig. Please refer to
+                                    https://godoc.org/crypto/tls#Config for more information. (optional)
+                                type: string
+                            client_ca_file_reload:
+                                description: |-
+                                    Reload the ClientCAs file when it is modified
+                                    (optional, default false)
+                                type: boolean
+                            curve_preferences:
+                                description: |-
+                                    contains the elliptic curves that will be used in
+                                    an ECDHE handshake, in preference order
+                                    Defaults to empty list and "crypto/tls" defaults are used, internally.
+                                type: array
+                                items:
+                                    type: string
+                            include_system_ca_certs_pool:
+                                description: |-
+                                    If true, load system CA certificates pool in addition to the certificates
+                                    configured in this struct.
+                                type: boolean
+                            key_file:
+                                description: Path to the TLS key to use for TLS required connections. (optional)
+                                type: string
+                            key_pem:
+                                description: In memory PEM encoded TLS key to use for TLS required connections. (optional)
+                                type: string
+                            max_version:
+                                description: |-
+                                    MaxVersion sets the maximum TLS version that is acceptable.
+                                    If not set, refer to crypto/tls for defaults. (optional)
+                                type: string
+                            min_version:
+                                description: |-
+                                    MinVersion sets the minimum TLS version that is acceptable.
+                                    If not set, TLS 1.2 will be used. (optional)
+                                type: string
+                            reload_interval:
+                                description: |-
+                                    ReloadInterval specifies the duration after which the certificate will be reloaded
+                                    If not set, it will never be reloaded (optional)
+                                type: string
+                                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+                            tpm:
+                                description: Trusted platform module configuration
+                                type: object
+                                properties:
+                                    auth:
+                                        type: string
+                                    enabled:
+                                        type: boolean
+                                    owner_auth:
+                                        type: string
+                                    path:
+                                        description: |-
+                                            The path to the TPM device or Unix domain socket.
+                                            For instance /dev/tpm0 or /dev/tpmrm0.
+                                        type: string
+                                additionalProperties: false
+                        additionalProperties: false
+                    transport:
+                        description: |-
+                            Transport to use. Allowed protocols are "tcp", "tcp4" (IPv4-only), "tcp6" (IPv6-only), "udp", "udp4" (IPv4-only),
+                            "udp6" (IPv6-only), "ip", "ip4" (IPv4-only), "ip6" (IPv6-only), "unix", "unixgram" and "unixpacket".
+                        type: string
+                    write_timeout:
+                        description: |-
+                            WriteTimeout is the maximum duration before timing out
+                            writes of the response. It is reset whenever a new
+                            request's header is read. Like ReadTimeout, it does not
+                            let Handlers make decisions on a per-request basis.
+                            A zero or negative value means there will be no timeout.
+                        type: string
+                        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+                additionalProperties: false
+        additionalProperties: false
+    config:
+        type: object
+        properties:
+            alertingconfig:
+                type: object
+                properties:
+                    alertmanagerconfigs:
+                        type: object
+                    alertrelabelconfigs:
+                        type: array
+                        items:
+                            type: object
+                            properties:
+                                action:
+                                    description: Action is the action to be performed for the relabeling.
+                                    type: string
+                                modulus:
+                                    description: Modulus to take of the hash of concatenated values from the source labels.
+                                    type: integer
+                                namevalidationscheme:
+                                    description: NameValidationScheme to use when validating labels.
+                                    type: integer
+                                regex:
+                                    description: Regex against which the concatenation is matched.
+                                    type: object
+                                    additionalProperties: false
+                                replacement:
+                                    description: Replacement is the regex replacement pattern to be used.
+                                    type: string
+                                separator:
+                                    description: Separator is the string between concatenated values from the source labels.
+                                    type: string
+                                sourcelabels:
+                                    description: |-
+                                        A list of labels from which values are taken and concatenated
+                                        with the configured separator in order.
+                                    type: object
+                                targetlabel:
+                                    description: |-
+                                        TargetLabel is the label to which the resulting string is written in a replacement.
+                                        Regexp interpolation is allowed for the replace action.
+                                    type: string
+                            additionalProperties: false
+                additionalProperties: false
+            globalconfig:
+                type: object
+                properties:
+                    alwaysscrapeclassichistograms:
+                        description: Whether to scrape a classic histogram, even if it is also exposed as a native histogram.
+                        type: boolean
+                    bodysizelimit:
+                        description: |-
+                            An uncompressed response body larger than this many bytes will cause the
+                            scrape to fail. 0 means no limit.
+                        type: integer
+                    convertclassichistogramstonhcb:
+                        description: Whether to convert all scraped classic histograms into native histograms with custom buckets.
+                        type: boolean
+                    evaluationinterval:
+                        description: How frequently to evaluate rules by default.
+                        type: integer
+                    externallabels:
+                        description: The labels to add to any timeseries that this Prometheus instance scrapes.
+                        type: object
+                    extrascrapemetrics:
+                        description: |-
+                            Whether to enable additional scrape metrics.
+                            When enabled, Prometheus stores samples for scrape_timeout_seconds,
+                            scrape_sample_limit, and scrape_body_size_bytes.
+                        type: boolean
+                    keepdroppedtargets:
+                        description: |-
+                            Keep no more than this many dropped targets per job.
+                            0 means no limit.
+                        type: integer
+                    labellimit:
+                        description: |-
+                            More than this many labels post metric-relabeling will cause the scrape to
+                            fail. 0 means no limit.
+                        type: integer
+                    labelnamelengthlimit:
+                        description: |-
+                            More than this label name length post metric-relabeling will cause the
+                            scrape to fail. 0 means no limit.
+                        type: integer
+                    labelvaluelengthlimit:
+                        description: |-
+                            More than this label value length post metric-relabeling will cause the
+                            scrape to fail. 0 means no limit.
+                        type: integer
+                    metricnameescapingscheme:
+                        description: |-
+                            Metric name escaping mode to request through content negotiation. Can be
+                            blank in config files but must have a value if a ScrapeConfig is created
+                            programmatically.
+                        type: string
+                    metricnamevalidationscheme:
+                        description: |-
+                            Allow UTF8 Metric and Label Names. Can be blank in config files but must
+                            have a value if a GlobalConfig is created programmatically.
+                        type: integer
+                    querylogfile:
+                        description: File to which PromQL queries are logged.
+                        type: string
+                    rulequeryoffset:
+                        description: Offset the rule evaluation timestamp of this particular group by the specified duration into the past to ensure the underlying metrics have been received.
+                        type: integer
+                    samplelimit:
+                        description: |-
+                            More than this many samples post metric-relabeling will cause the scrape to
+                            fail. 0 means no limit.
+                        type: integer
+                    scrapefailurelogfile:
+                        description: File to which scrape failures are logged.
+                        type: string
+                    scrapeinterval:
+                        description: How frequently to scrape targets by default.
+                        type: integer
+                    scrapenativehistograms:
+                        description: Whether to scrape native histograms.
+                        type: boolean
+                    scrapeprotocols:
+                        description: |-
+                            The protocols to negotiate during a scrape. It tells clients what
+                            protocol are accepted by Prometheus and with what weight (most wanted is first).
+                            Supported values (case sensitive): PrometheusProto, OpenMetricsText0.0.1,
+                            OpenMetricsText1.0.0, PrometheusText1.0.0, PrometheusText0.0.4
+                        type: array
+                        items:
+                            type: object
+                    scrapetimeout:
+                        description: The default timeout when scraping targets.
+                        type: integer
+                    targetlimit:
+                        description: |-
+                            More than this many targets after the target relabeling will cause the
+                            scrapes to fail. 0 means no limit.
+                        type: integer
+                additionalProperties: false
+            otlpconfig:
+                type: object
+                properties:
+                    converthistogramstonhcb:
+                        type: boolean
+                    ignoreresourceattributes:
+                        type: array
+                        items:
+                            type: string
+                    keepidentifyingresourceattributes:
+                        type: boolean
+                    labelnamepreservemultipleunderscores:
+                        description: |-
+                            LabelNamePreserveMultipleUnderscores enables preserving of multiple consecutive underscores
+                            in label names when AllowUTF8 is false. When false, multiple consecutive underscores are
+                            collapsed to a single underscore during label name sanitization.
+                        type: boolean
+                    labelnameunderscoresanitization:
+                        description: |-
+                            LabelNameUnderscoreSanitization controls whether to enable prepending of 'key_' to labels
+                            starting with '_'. Reserved labels starting with `__` are not modified.
+                            This is only relevant when AllowUTF8 is false (i.e., when using underscore escaping).
+                        type: boolean
+                    promoteallresourceattributes:
+                        type: boolean
+                    promoteresourceattributes:
+                        type: array
+                        items:
+                            type: string
+                    promotescopemetadata:
+                        description: |-
+                            PromoteScopeMetadata controls whether to promote OTel scope metadata (i.e. name, version, schema URL, and attributes) to metric labels.
+                            As per OTel spec, the aforementioned scope metadata should be identifying, i.e. made into metric labels.
+                        type: boolean
+                    translationstrategy:
+                        type: string
+                additionalProperties: false
+            remotereadconfigs:
+                type: array
+                items:
+                    type: object
+                    properties:
+                        chunkedreadlimit:
+                            type: integer
+                        filterexternallabels:
+                            description: Whether to use the external labels as selectors for the remote read endpoint.
+                            type: boolean
+                        headers:
+                            type: object
+                            additionalProperties:
+                                type: string
+                        httpclientconfig:
+                            type: object
+                            properties:
+                                authorization:
+                                    description: The HTTP authorization credentials for the targets.
+                                    type: object
+                                    properties:
+                                        credentials:
+                                            type: string
+                                        credentialsfile:
+                                            type: string
+                                        credentialsref:
+                                            description: CredentialsRef is the name of the secret within the secret manager to use as credentials.
+                                            type: string
+                                        type:
+                                            type: string
+                                    additionalProperties: false
+                                basicauth:
+                                    description: The HTTP basic authentication credentials for the targets.
+                                    type: object
+                                    properties:
+                                        password:
+                                            type: string
+                                        passwordfile:
+                                            type: string
+                                        passwordref:
+                                            description: PasswordRef is the name of the secret within the secret manager to use as the password.
+                                            type: string
+                                        username:
+                                            type: string
+                                        usernamefile:
+                                            type: string
+                                        usernameref:
+                                            description: UsernameRef is the name of the secret within the secret manager to use as the username.
+                                            type: string
+                                    additionalProperties: false
+                                bearertoken:
+                                    description: |-
+                                        The bearer token for the targets. Deprecated in favour of
+                                        Authorization.Credentials.
+                                    type: string
+                                bearertokenfile:
+                                    description: |-
+                                        The bearer token file for the targets. Deprecated in favour of
+                                        Authorization.CredentialsFile.
+                                    type: string
+                                enablehttp2:
+                                    description: |-
+                                        EnableHTTP2 specifies whether the client should configure HTTP2.
+                                        The omitempty flag is not set, because it would be hidden from the
+                                        marshalled configuration when set to false.
+                                    type: boolean
+                                followredirects:
+                                    description: |-
+                                        FollowRedirects specifies whether the client should follow HTTP 3xx redirects.
+                                        The omitempty flag is not set, because it would be hidden from the
+                                        marshalled configuration when set to false.
+                                    type: boolean
+                                httpheaders:
+                                    description: |-
+                                        HTTPHeaders specify headers to inject in the requests. Those headers
+                                        could be marshalled back to the users.
+                                    type: object
+                                    properties:
+                                        headers:
+                                            type: object
+                                            additionalProperties:
+                                                type: object
+                                    additionalProperties: false
+                                noproxy:
+                                    description: NoProxy contains addresses that should not use a proxy.
+                                    type: string
+                                oauth2:
+                                    description: The OAuth2 client credentials used to fetch a token for the targets.
+                                    type: object
+                                    properties:
+                                        audience:
+                                            description: |-
+                                                Audience optionally specifies the intended audience of the
+                                                request.  If empty, the value of TokenURL is used as the
+                                                intended audience. Only used if
+                                                GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+                                            type: string
+                                        claims:
+                                            description: |-
+                                                Claims is a map of claims to be added to the JWT token. Only used if
+                                                GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+                                            type: object
+                                            additionalProperties: {}
+                                        clientcertificatekey:
+                                            type: string
+                                        clientcertificatekeyfile:
+                                            type: string
+                                        clientcertificatekeyid:
+                                            type: string
+                                        clientcertificatekeyref:
+                                            description: |-
+                                                ClientCertificateKeyRef is the name of the secret within the secret manager to use as the client
+                                                secret.
+                                            type: string
+                                        clientid:
+                                            type: string
+                                        clientsecret:
+                                            type: string
+                                        clientsecretfile:
+                                            type: string
+                                        clientsecretref:
+                                            description: |-
+                                                ClientSecretRef is the name of the secret within the secret manager to use as the client
+                                                secret.
+                                            type: string
+                                        endpointparams:
+                                            type: object
+                                            additionalProperties:
+                                                type: string
+                                        granttype:
+                                            description: |-
+                                                GrantType is the OAuth2 grant type to use. It can be one of
+                                                "client_credentials" or "urn:ietf:params:oauth:grant-type:jwt-bearer" (RFC 7523).
+                                                Default value is "client_credentials"
+                                            type: string
+                                        iss:
+                                            description: |-
+                                                Iss is the OAuth client identifier used when communicating with
+                                                the configured OAuth provider. Default value is client_id. Only used if
+                                                GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+                                            type: string
+                                        noproxy:
+                                            description: NoProxy contains addresses that should not use a proxy.
+                                            type: string
+                                        proxyconnectheader:
+                                            description: |-
+                                                ProxyConnectHeader optionally specifies headers to send to
+                                                proxies during CONNECT requests. Assume that at least _some_ of
+                                                these headers are going to contain secrets and use Secret as the
+                                                value type instead of string.
+                                            type: object
+                                        proxyfromenvironment:
+                                            description: |-
+                                                ProxyFromEnvironment makes use of net/http ProxyFromEnvironment function
+                                                to determine proxies.
+                                            type: boolean
+                                        proxyurl:
+                                            description: HTTP proxy server to use to connect to the targets.
+                                            type: object
+                                            properties:
+                                                forcequery:
+                                                    description: append a query ('?') even if RawQuery is empty
+                                                    type: boolean
+                                                fragment:
+                                                    description: fragment for references, without '#'
+                                                    type: string
+                                                host:
+                                                    description: host or host:port (see Hostname and Port methods)
+                                                    type: string
+                                                omithost:
+                                                    description: do not emit empty host (authority)
+                                                    type: boolean
+                                                opaque:
+                                                    description: encoded opaque data
+                                                    type: string
+                                                path:
+                                                    description: path (relative paths may omit leading slash)
+                                                    type: string
+                                                rawfragment:
+                                                    description: encoded fragment hint (see EscapedFragment method)
+                                                    type: string
+                                                rawpath:
+                                                    description: encoded path hint (see EscapedPath method)
+                                                    type: string
+                                                rawquery:
+                                                    description: encoded query values, without '?'
+                                                    type: string
+                                                scheme:
+                                                    type: string
+                                                user:
+                                                    description: username and password information
+                                                    type: object
+                                            additionalProperties: false
+                                        scopes:
+                                            type: array
+                                            items:
+                                                type: string
+                                        signaturealgorithm:
+                                            description: |-
+                                                SignatureAlgorithm is the RSA algorithm used to sign JWT token. Only used if
+                                                GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+                                                Default value is RS256 and valid values RS256, RS384, RS512
+                                            type: string
+                                        tlsconfig:
+                                            type: object
+                                            properties:
+                                                ca:
+                                                    description: Text of the CA cert to use for the targets.
+                                                    type: string
+                                                cafile:
+                                                    description: The CA cert to use for the targets.
+                                                    type: string
+                                                caref:
+                                                    description: |-
+                                                        CARef is the name of the secret within the secret manager to use as the CA cert for the
+                                                        targets.
+                                                    type: string
+                                                cert:
+                                                    description: Text of the client cert file for the targets.
+                                                    type: string
+                                                certfile:
+                                                    description: The client cert file for the targets.
+                                                    type: string
+                                                certref:
+                                                    description: |-
+                                                        CertRef is the name of the secret within the secret manager to use as the client cert for
+                                                        the targets.
+                                                    type: string
+                                                insecureskipverify:
+                                                    description: Disable target certificate validation.
+                                                    type: boolean
+                                                key:
+                                                    description: Text of the client key file for the targets.
+                                                    type: string
+                                                keyfile:
+                                                    description: The client key file for the targets.
+                                                    type: string
+                                                keyref:
+                                                    description: |-
+                                                        KeyRef is the name of the secret within the secret manager to use as the client key for
+                                                        the targets.
+                                                    type: string
+                                                maxversion:
+                                                    description: Maximum TLS version.
+                                                    type: integer
+                                                minversion:
+                                                    description: Minimum TLS version.
+                                                    type: integer
+                                                servername:
+                                                    description: Used to verify the hostname for the targets.
+                                                    type: string
+                                            additionalProperties: false
+                                        tokenurl:
+                                            type: string
+                                    additionalProperties: false
+                                proxyconnectheader:
+                                    description: |-
+                                        ProxyConnectHeader optionally specifies headers to send to
+                                        proxies during CONNECT requests. Assume that at least _some_ of
+                                        these headers are going to contain secrets and use Secret as the
+                                        value type instead of string.
+                                    type: object
+                                proxyfromenvironment:
+                                    description: |-
+                                        ProxyFromEnvironment makes use of net/http ProxyFromEnvironment function
+                                        to determine proxies.
+                                    type: boolean
+                                proxyurl:
+                                    description: HTTP proxy server to use to connect to the targets.
+                                    type: object
+                                    properties:
+                                        forcequery:
+                                            description: append a query ('?') even if RawQuery is empty
+                                            type: boolean
+                                        fragment:
+                                            description: fragment for references, without '#'
+                                            type: string
+                                        host:
+                                            description: host or host:port (see Hostname and Port methods)
+                                            type: string
+                                        omithost:
+                                            description: do not emit empty host (authority)
+                                            type: boolean
+                                        opaque:
+                                            description: encoded opaque data
+                                            type: string
+                                        path:
+                                            description: path (relative paths may omit leading slash)
+                                            type: string
+                                        rawfragment:
+                                            description: encoded fragment hint (see EscapedFragment method)
+                                            type: string
+                                        rawpath:
+                                            description: encoded path hint (see EscapedPath method)
+                                            type: string
+                                        rawquery:
+                                            description: encoded query values, without '?'
+                                            type: string
+                                        scheme:
+                                            type: string
+                                        user:
+                                            description: username and password information
+                                            type: object
+                                    additionalProperties: false
+                                tlsconfig:
+                                    description: TLSConfig to use to connect to the targets.
+                                    type: object
+                                    properties:
+                                        ca:
+                                            description: Text of the CA cert to use for the targets.
+                                            type: string
+                                        cafile:
+                                            description: The CA cert to use for the targets.
+                                            type: string
+                                        caref:
+                                            description: |-
+                                                CARef is the name of the secret within the secret manager to use as the CA cert for the
+                                                targets.
+                                            type: string
+                                        cert:
+                                            description: Text of the client cert file for the targets.
+                                            type: string
+                                        certfile:
+                                            description: The client cert file for the targets.
+                                            type: string
+                                        certref:
+                                            description: |-
+                                                CertRef is the name of the secret within the secret manager to use as the client cert for
+                                                the targets.
+                                            type: string
+                                        insecureskipverify:
+                                            description: Disable target certificate validation.
+                                            type: boolean
+                                        key:
+                                            description: Text of the client key file for the targets.
+                                            type: string
+                                        keyfile:
+                                            description: The client key file for the targets.
+                                            type: string
+                                        keyref:
+                                            description: |-
+                                                KeyRef is the name of the secret within the secret manager to use as the client key for
+                                                the targets.
+                                            type: string
+                                        maxversion:
+                                            description: Maximum TLS version.
+                                            type: integer
+                                        minversion:
+                                            description: Minimum TLS version.
+                                            type: integer
+                                        servername:
+                                            description: Used to verify the hostname for the targets.
+                                            type: string
+                                    additionalProperties: false
+                            additionalProperties: false
+                        name:
+                            type: string
+                        readrecent:
+                            type: boolean
+                        remotetimeout:
+                            type: integer
+                        requiredmatchers:
+                            description: |-
+                                RequiredMatchers is an optional list of equality matchers which have to
+                                be present in a selector to query the remote read endpoint.
+                            type: object
+                        url:
+                            type: object
+                            properties:
+                                forcequery:
+                                    description: append a query ('?') even if RawQuery is empty
+                                    type: boolean
+                                fragment:
+                                    description: fragment for references, without '#'
+                                    type: string
+                                host:
+                                    description: host or host:port (see Hostname and Port methods)
+                                    type: string
+                                omithost:
+                                    description: do not emit empty host (authority)
+                                    type: boolean
+                                opaque:
+                                    description: encoded opaque data
+                                    type: string
+                                path:
+                                    description: path (relative paths may omit leading slash)
+                                    type: string
+                                rawfragment:
+                                    description: encoded fragment hint (see EscapedFragment method)
+                                    type: string
+                                rawpath:
+                                    description: encoded path hint (see EscapedPath method)
+                                    type: string
+                                rawquery:
+                                    description: encoded query values, without '?'
+                                    type: string
+                                scheme:
+                                    type: string
+                                user:
+                                    description: username and password information
+                                    type: object
+                            additionalProperties: false
+                    additionalProperties: false
+            remotewriteconfigs:
+                type: array
+                items:
+                    type: object
+                    properties:
+                        azureadconfig:
+                            type: object
+                            properties:
+                                cloud:
+                                    description: 'Cloud is the Azure cloud in which the service is running. Example: AzurePublic/AzureGovernment/AzureChina.'
+                                    type: string
+                                managedidentity:
+                                    description: ManagedIdentity is the managed identity that is being used to authenticate.
+                                    type: object
+                                    properties:
+                                        clientid:
+                                            description: ClientID is the clientId of the managed identity that is being used to authenticate.
+                                            type: string
+                                    additionalProperties: false
+                                oauth:
+                                    description: OAuth is the oauth config that is being used to authenticate.
+                                    type: object
+                                    properties:
+                                        clientid:
+                                            description: ClientID is the clientId of the azure active directory application that is being used to authenticate.
+                                            type: string
+                                        clientsecret:
+                                            description: ClientSecret is the clientSecret of the azure active directory application that is being used to authenticate.
+                                            type: string
+                                        tenantid:
+                                            description: TenantID is the tenantId of the azure active directory application that is being used to authenticate.
+                                            type: string
+                                    additionalProperties: false
+                                scope:
+                                    description: Scope is the custom OAuth 2.0 scope to request when acquiring tokens.
+                                    type: string
+                                sdk:
+                                    description: SDK is the SDK config that is being used to authenticate.
+                                    type: object
+                                    properties:
+                                        tenantid:
+                                            description: TenantID is the tenantId of the azure active directory application that is being used to authenticate.
+                                            type: string
+                                    additionalProperties: false
+                                workloadidentity:
+                                    description: WorkloadIdentity is the workload identity that is being used to authenticate.
+                                    type: object
+                                    properties:
+                                        clientid:
+                                            description: ClientID is the clientId of the Microsoft Entra application or user-assigned managed identity.
+                                            type: string
+                                        tenantid:
+                                            description: |-
+                                                TenantID is the tenantId of the Microsoft Entra application or user-assigned managed identity.
+                                                This should match the tenant ID where your application or managed identity is registered.
+                                            type: string
+                                        tokenfilepath:
+                                            description: |-
+                                                TokenFilePath is the path to the token file provided by the Kubernetes service account projected volume.
+                                                If not specified, it defaults to DefaultWorkloadIdentityTokenPath.
+                                            type: string
+                                    additionalProperties: false
+                            additionalProperties: false
+                        googleiamconfig:
+                            type: object
+                            properties:
+                                credentialsfile:
+                                    type: string
+                            additionalProperties: false
+                        headers:
+                            type: object
+                            additionalProperties:
+                                type: string
+                        httpclientconfig:
+                            type: object
+                            properties:
+                                authorization:
+                                    description: The HTTP authorization credentials for the targets.
+                                    type: object
+                                    properties:
+                                        credentials:
+                                            type: string
+                                        credentialsfile:
+                                            type: string
+                                        credentialsref:
+                                            description: CredentialsRef is the name of the secret within the secret manager to use as credentials.
+                                            type: string
+                                        type:
+                                            type: string
+                                    additionalProperties: false
+                                basicauth:
+                                    description: The HTTP basic authentication credentials for the targets.
+                                    type: object
+                                    properties:
+                                        password:
+                                            type: string
+                                        passwordfile:
+                                            type: string
+                                        passwordref:
+                                            description: PasswordRef is the name of the secret within the secret manager to use as the password.
+                                            type: string
+                                        username:
+                                            type: string
+                                        usernamefile:
+                                            type: string
+                                        usernameref:
+                                            description: UsernameRef is the name of the secret within the secret manager to use as the username.
+                                            type: string
+                                    additionalProperties: false
+                                bearertoken:
+                                    description: |-
+                                        The bearer token for the targets. Deprecated in favour of
+                                        Authorization.Credentials.
+                                    type: string
+                                bearertokenfile:
+                                    description: |-
+                                        The bearer token file for the targets. Deprecated in favour of
+                                        Authorization.CredentialsFile.
+                                    type: string
+                                enablehttp2:
+                                    description: |-
+                                        EnableHTTP2 specifies whether the client should configure HTTP2.
+                                        The omitempty flag is not set, because it would be hidden from the
+                                        marshalled configuration when set to false.
+                                    type: boolean
+                                followredirects:
+                                    description: |-
+                                        FollowRedirects specifies whether the client should follow HTTP 3xx redirects.
+                                        The omitempty flag is not set, because it would be hidden from the
+                                        marshalled configuration when set to false.
+                                    type: boolean
+                                httpheaders:
+                                    description: |-
+                                        HTTPHeaders specify headers to inject in the requests. Those headers
+                                        could be marshalled back to the users.
+                                    type: object
+                                    properties:
+                                        headers:
+                                            type: object
+                                            additionalProperties:
+                                                type: object
+                                    additionalProperties: false
+                                noproxy:
+                                    description: NoProxy contains addresses that should not use a proxy.
+                                    type: string
+                                oauth2:
+                                    description: The OAuth2 client credentials used to fetch a token for the targets.
+                                    type: object
+                                    properties:
+                                        audience:
+                                            description: |-
+                                                Audience optionally specifies the intended audience of the
+                                                request.  If empty, the value of TokenURL is used as the
+                                                intended audience. Only used if
+                                                GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+                                            type: string
+                                        claims:
+                                            description: |-
+                                                Claims is a map of claims to be added to the JWT token. Only used if
+                                                GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+                                            type: object
+                                            additionalProperties: {}
+                                        clientcertificatekey:
+                                            type: string
+                                        clientcertificatekeyfile:
+                                            type: string
+                                        clientcertificatekeyid:
+                                            type: string
+                                        clientcertificatekeyref:
+                                            description: |-
+                                                ClientCertificateKeyRef is the name of the secret within the secret manager to use as the client
+                                                secret.
+                                            type: string
+                                        clientid:
+                                            type: string
+                                        clientsecret:
+                                            type: string
+                                        clientsecretfile:
+                                            type: string
+                                        clientsecretref:
+                                            description: |-
+                                                ClientSecretRef is the name of the secret within the secret manager to use as the client
+                                                secret.
+                                            type: string
+                                        endpointparams:
+                                            type: object
+                                            additionalProperties:
+                                                type: string
+                                        granttype:
+                                            description: |-
+                                                GrantType is the OAuth2 grant type to use. It can be one of
+                                                "client_credentials" or "urn:ietf:params:oauth:grant-type:jwt-bearer" (RFC 7523).
+                                                Default value is "client_credentials"
+                                            type: string
+                                        iss:
+                                            description: |-
+                                                Iss is the OAuth client identifier used when communicating with
+                                                the configured OAuth provider. Default value is client_id. Only used if
+                                                GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+                                            type: string
+                                        noproxy:
+                                            description: NoProxy contains addresses that should not use a proxy.
+                                            type: string
+                                        proxyconnectheader:
+                                            description: |-
+                                                ProxyConnectHeader optionally specifies headers to send to
+                                                proxies during CONNECT requests. Assume that at least _some_ of
+                                                these headers are going to contain secrets and use Secret as the
+                                                value type instead of string.
+                                            type: object
+                                        proxyfromenvironment:
+                                            description: |-
+                                                ProxyFromEnvironment makes use of net/http ProxyFromEnvironment function
+                                                to determine proxies.
+                                            type: boolean
+                                        proxyurl:
+                                            description: HTTP proxy server to use to connect to the targets.
+                                            type: object
+                                            properties:
+                                                forcequery:
+                                                    description: append a query ('?') even if RawQuery is empty
+                                                    type: boolean
+                                                fragment:
+                                                    description: fragment for references, without '#'
+                                                    type: string
+                                                host:
+                                                    description: host or host:port (see Hostname and Port methods)
+                                                    type: string
+                                                omithost:
+                                                    description: do not emit empty host (authority)
+                                                    type: boolean
+                                                opaque:
+                                                    description: encoded opaque data
+                                                    type: string
+                                                path:
+                                                    description: path (relative paths may omit leading slash)
+                                                    type: string
+                                                rawfragment:
+                                                    description: encoded fragment hint (see EscapedFragment method)
+                                                    type: string
+                                                rawpath:
+                                                    description: encoded path hint (see EscapedPath method)
+                                                    type: string
+                                                rawquery:
+                                                    description: encoded query values, without '?'
+                                                    type: string
+                                                scheme:
+                                                    type: string
+                                                user:
+                                                    description: username and password information
+                                                    type: object
+                                            additionalProperties: false
+                                        scopes:
+                                            type: array
+                                            items:
+                                                type: string
+                                        signaturealgorithm:
+                                            description: |-
+                                                SignatureAlgorithm is the RSA algorithm used to sign JWT token. Only used if
+                                                GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+                                                Default value is RS256 and valid values RS256, RS384, RS512
+                                            type: string
+                                        tlsconfig:
+                                            type: object
+                                            properties:
+                                                ca:
+                                                    description: Text of the CA cert to use for the targets.
+                                                    type: string
+                                                cafile:
+                                                    description: The CA cert to use for the targets.
+                                                    type: string
+                                                caref:
+                                                    description: |-
+                                                        CARef is the name of the secret within the secret manager to use as the CA cert for the
+                                                        targets.
+                                                    type: string
+                                                cert:
+                                                    description: Text of the client cert file for the targets.
+                                                    type: string
+                                                certfile:
+                                                    description: The client cert file for the targets.
+                                                    type: string
+                                                certref:
+                                                    description: |-
+                                                        CertRef is the name of the secret within the secret manager to use as the client cert for
+                                                        the targets.
+                                                    type: string
+                                                insecureskipverify:
+                                                    description: Disable target certificate validation.
+                                                    type: boolean
+                                                key:
+                                                    description: Text of the client key file for the targets.
+                                                    type: string
+                                                keyfile:
+                                                    description: The client key file for the targets.
+                                                    type: string
+                                                keyref:
+                                                    description: |-
+                                                        KeyRef is the name of the secret within the secret manager to use as the client key for
+                                                        the targets.
+                                                    type: string
+                                                maxversion:
+                                                    description: Maximum TLS version.
+                                                    type: integer
+                                                minversion:
+                                                    description: Minimum TLS version.
+                                                    type: integer
+                                                servername:
+                                                    description: Used to verify the hostname for the targets.
+                                                    type: string
+                                            additionalProperties: false
+                                        tokenurl:
+                                            type: string
+                                    additionalProperties: false
+                                proxyconnectheader:
+                                    description: |-
+                                        ProxyConnectHeader optionally specifies headers to send to
+                                        proxies during CONNECT requests. Assume that at least _some_ of
+                                        these headers are going to contain secrets and use Secret as the
+                                        value type instead of string.
+                                    type: object
+                                proxyfromenvironment:
+                                    description: |-
+                                        ProxyFromEnvironment makes use of net/http ProxyFromEnvironment function
+                                        to determine proxies.
+                                    type: boolean
+                                proxyurl:
+                                    description: HTTP proxy server to use to connect to the targets.
+                                    type: object
+                                    properties:
+                                        forcequery:
+                                            description: append a query ('?') even if RawQuery is empty
+                                            type: boolean
+                                        fragment:
+                                            description: fragment for references, without '#'
+                                            type: string
+                                        host:
+                                            description: host or host:port (see Hostname and Port methods)
+                                            type: string
+                                        omithost:
+                                            description: do not emit empty host (authority)
+                                            type: boolean
+                                        opaque:
+                                            description: encoded opaque data
+                                            type: string
+                                        path:
+                                            description: path (relative paths may omit leading slash)
+                                            type: string
+                                        rawfragment:
+                                            description: encoded fragment hint (see EscapedFragment method)
+                                            type: string
+                                        rawpath:
+                                            description: encoded path hint (see EscapedPath method)
+                                            type: string
+                                        rawquery:
+                                            description: encoded query values, without '?'
+                                            type: string
+                                        scheme:
+                                            type: string
+                                        user:
+                                            description: username and password information
+                                            type: object
+                                    additionalProperties: false
+                                tlsconfig:
+                                    description: TLSConfig to use to connect to the targets.
+                                    type: object
+                                    properties:
+                                        ca:
+                                            description: Text of the CA cert to use for the targets.
+                                            type: string
+                                        cafile:
+                                            description: The CA cert to use for the targets.
+                                            type: string
+                                        caref:
+                                            description: |-
+                                                CARef is the name of the secret within the secret manager to use as the CA cert for the
+                                                targets.
+                                            type: string
+                                        cert:
+                                            description: Text of the client cert file for the targets.
+                                            type: string
+                                        certfile:
+                                            description: The client cert file for the targets.
+                                            type: string
+                                        certref:
+                                            description: |-
+                                                CertRef is the name of the secret within the secret manager to use as the client cert for
+                                                the targets.
+                                            type: string
+                                        insecureskipverify:
+                                            description: Disable target certificate validation.
+                                            type: boolean
+                                        key:
+                                            description: Text of the client key file for the targets.
+                                            type: string
+                                        keyfile:
+                                            description: The client key file for the targets.
+                                            type: string
+                                        keyref:
+                                            description: |-
+                                                KeyRef is the name of the secret within the secret manager to use as the client key for
+                                                the targets.
+                                            type: string
+                                        maxversion:
+                                            description: Maximum TLS version.
+                                            type: integer
+                                        minversion:
+                                            description: Minimum TLS version.
+                                            type: integer
+                                        servername:
+                                            description: Used to verify the hostname for the targets.
+                                            type: string
+                                    additionalProperties: false
+                            additionalProperties: false
+                        metadataconfig:
+                            type: object
+                            properties:
+                                maxsamplespersend:
+                                    description: Maximum number of samples per send.
+                                    type: integer
+                                send:
+                                    description: Send controls whether we send metric metadata to remote storage.
+                                    type: boolean
+                                sendinterval:
+                                    description: SendInterval controls how frequently we send metric metadata.
+                                    type: integer
+                            additionalProperties: false
+                        name:
+                            type: string
+                        protobufmessage:
+                            description: |-
+                                ProtobufMessage specifies the protobuf message to use against the remote
+                                receiver as specified in https://prometheus.io/docs/specs/remote_write_spec_2_0/
+                            type: string
+                        queueconfig:
+                            type: object
+                            properties:
+                                batchsenddeadline:
+                                    description: Maximum time sample will wait in buffer.
+                                    type: integer
+                                capacity:
+                                    description: |-
+                                        Number of samples to buffer per shard before we block. Defaults to
+                                        MaxSamplesPerSend.
+                                    type: integer
+                                maxbackoff:
+                                    type: integer
+                                maxsamplespersend:
+                                    description: Maximum number of samples per send.
+                                    type: integer
+                                maxshards:
+                                    description: Max number of shards, i.e. amount of concurrency.
+                                    type: integer
+                                minbackoff:
+                                    description: On recoverable errors, backoff exponentially.
+                                    type: integer
+                                minshards:
+                                    description: Min number of shards, i.e. amount of concurrency.
+                                    type: integer
+                                retryonratelimit:
+                                    type: boolean
+                                sampleagelimit:
+                                    description: Samples older than the limit will be dropped.
+                                    type: integer
+                            additionalProperties: false
+                        remotetimeout:
+                            type: integer
+                        roundrobindns:
+                            type: boolean
+                        sendexemplars:
+                            type: boolean
+                        sendnativehistograms:
+                            type: boolean
+                        sigv4config:
+                            type: object
+                            properties:
+                                accesskey:
+                                    type: string
+                                profile:
+                                    type: string
+                                region:
+                                    type: string
+                                rolearn:
+                                    type: string
+                                secretkey:
+                                    type: string
+                                servicename:
+                                    type: string
+                                usefipsstsendpoint:
+                                    type: boolean
+                            additionalProperties: false
+                        url:
+                            type: object
+                            properties:
+                                forcequery:
+                                    description: append a query ('?') even if RawQuery is empty
+                                    type: boolean
+                                fragment:
+                                    description: fragment for references, without '#'
+                                    type: string
+                                host:
+                                    description: host or host:port (see Hostname and Port methods)
+                                    type: string
+                                omithost:
+                                    description: do not emit empty host (authority)
+                                    type: boolean
+                                opaque:
+                                    description: encoded opaque data
+                                    type: string
+                                path:
+                                    description: path (relative paths may omit leading slash)
+                                    type: string
+                                rawfragment:
+                                    description: encoded fragment hint (see EscapedFragment method)
+                                    type: string
+                                rawpath:
+                                    description: encoded path hint (see EscapedPath method)
+                                    type: string
+                                rawquery:
+                                    description: encoded query values, without '?'
+                                    type: string
+                                scheme:
+                                    type: string
+                                user:
+                                    description: username and password information
+                                    type: object
+                            additionalProperties: false
+                        writerelabelconfigs:
+                            type: array
+                            items:
+                                type: object
+                                properties:
+                                    action:
+                                        description: Action is the action to be performed for the relabeling.
+                                        type: string
+                                    modulus:
+                                        description: Modulus to take of the hash of concatenated values from the source labels.
+                                        type: integer
+                                    namevalidationscheme:
+                                        description: NameValidationScheme to use when validating labels.
+                                        type: integer
+                                    regex:
+                                        description: Regex against which the concatenation is matched.
+                                        type: object
+                                        additionalProperties: false
+                                    replacement:
+                                        description: Replacement is the regex replacement pattern to be used.
+                                        type: string
+                                    separator:
+                                        description: Separator is the string between concatenated values from the source labels.
+                                        type: string
+                                    sourcelabels:
+                                        description: |-
+                                            A list of labels from which values are taken and concatenated
+                                            with the configured separator in order.
+                                        type: object
+                                    targetlabel:
+                                        description: |-
+                                            TargetLabel is the label to which the resulting string is written in a replacement.
+                                            Regexp interpolation is allowed for the replace action.
+                                        type: string
+                                additionalProperties: false
+                    additionalProperties: false
+            rulefiles:
+                type: array
+                items:
+                    type: string
+            runtime:
+                type: object
+                properties:
+                    gogc:
+                        description: The Go garbage collection target percentage.
+                        type: integer
+                additionalProperties: false
+            scrapeconfigfiles:
+                type: array
+                items:
+                    type: string
+            scrapeconfigs:
+                type: array
+                items:
+                    type: object
+                    properties:
+                        alwaysscrapeclassichistograms:
+                            description: Whether to scrape a classic histogram, even if it is also exposed as a native histogram.
+                            type: boolean
+                        bodysizelimit:
+                            description: |-
+                                An uncompressed response body larger than this many bytes will cause the
+                                scrape to fail. 0 means no limit.
+                            type: integer
+                        convertclassichistogramstonhcb:
+                            description: Whether to convert all scraped classic histograms into native histograms with custom buckets.
+                            type: boolean
+                        enablecompression:
+                            description: Indicator whether to request compressed response from the target.
+                            type: boolean
+                        extrascrapemetrics:
+                            description: |-
+                                Whether to enable additional scrape metrics.
+                                When enabled, Prometheus stores samples for scrape_timeout_seconds,
+                                scrape_sample_limit, and scrape_body_size_bytes.
+                            type: boolean
+                        honorlabels:
+                            description: Indicator whether the scraped metrics should remain unmodified.
+                            type: boolean
+                        honortimestamps:
+                            description: Indicator whether the scraped timestamps should be respected.
+                            type: boolean
+                        httpclientconfig:
+                            type: object
+                            properties:
+                                authorization:
+                                    description: The HTTP authorization credentials for the targets.
+                                    type: object
+                                    properties:
+                                        credentials:
+                                            type: string
+                                        credentialsfile:
+                                            type: string
+                                        credentialsref:
+                                            description: CredentialsRef is the name of the secret within the secret manager to use as credentials.
+                                            type: string
+                                        type:
+                                            type: string
+                                    additionalProperties: false
+                                basicauth:
+                                    description: The HTTP basic authentication credentials for the targets.
+                                    type: object
+                                    properties:
+                                        password:
+                                            type: string
+                                        passwordfile:
+                                            type: string
+                                        passwordref:
+                                            description: PasswordRef is the name of the secret within the secret manager to use as the password.
+                                            type: string
+                                        username:
+                                            type: string
+                                        usernamefile:
+                                            type: string
+                                        usernameref:
+                                            description: UsernameRef is the name of the secret within the secret manager to use as the username.
+                                            type: string
+                                    additionalProperties: false
+                                bearertoken:
+                                    description: |-
+                                        The bearer token for the targets. Deprecated in favour of
+                                        Authorization.Credentials.
+                                    type: string
+                                bearertokenfile:
+                                    description: |-
+                                        The bearer token file for the targets. Deprecated in favour of
+                                        Authorization.CredentialsFile.
+                                    type: string
+                                enablehttp2:
+                                    description: |-
+                                        EnableHTTP2 specifies whether the client should configure HTTP2.
+                                        The omitempty flag is not set, because it would be hidden from the
+                                        marshalled configuration when set to false.
+                                    type: boolean
+                                followredirects:
+                                    description: |-
+                                        FollowRedirects specifies whether the client should follow HTTP 3xx redirects.
+                                        The omitempty flag is not set, because it would be hidden from the
+                                        marshalled configuration when set to false.
+                                    type: boolean
+                                httpheaders:
+                                    description: |-
+                                        HTTPHeaders specify headers to inject in the requests. Those headers
+                                        could be marshalled back to the users.
+                                    type: object
+                                    properties:
+                                        headers:
+                                            type: object
+                                            additionalProperties:
+                                                type: object
+                                    additionalProperties: false
+                                noproxy:
+                                    description: NoProxy contains addresses that should not use a proxy.
+                                    type: string
+                                oauth2:
+                                    description: The OAuth2 client credentials used to fetch a token for the targets.
+                                    type: object
+                                    properties:
+                                        audience:
+                                            description: |-
+                                                Audience optionally specifies the intended audience of the
+                                                request.  If empty, the value of TokenURL is used as the
+                                                intended audience. Only used if
+                                                GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+                                            type: string
+                                        claims:
+                                            description: |-
+                                                Claims is a map of claims to be added to the JWT token. Only used if
+                                                GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+                                            type: object
+                                            additionalProperties: {}
+                                        clientcertificatekey:
+                                            type: string
+                                        clientcertificatekeyfile:
+                                            type: string
+                                        clientcertificatekeyid:
+                                            type: string
+                                        clientcertificatekeyref:
+                                            description: |-
+                                                ClientCertificateKeyRef is the name of the secret within the secret manager to use as the client
+                                                secret.
+                                            type: string
+                                        clientid:
+                                            type: string
+                                        clientsecret:
+                                            type: string
+                                        clientsecretfile:
+                                            type: string
+                                        clientsecretref:
+                                            description: |-
+                                                ClientSecretRef is the name of the secret within the secret manager to use as the client
+                                                secret.
+                                            type: string
+                                        endpointparams:
+                                            type: object
+                                            additionalProperties:
+                                                type: string
+                                        granttype:
+                                            description: |-
+                                                GrantType is the OAuth2 grant type to use. It can be one of
+                                                "client_credentials" or "urn:ietf:params:oauth:grant-type:jwt-bearer" (RFC 7523).
+                                                Default value is "client_credentials"
+                                            type: string
+                                        iss:
+                                            description: |-
+                                                Iss is the OAuth client identifier used when communicating with
+                                                the configured OAuth provider. Default value is client_id. Only used if
+                                                GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+                                            type: string
+                                        noproxy:
+                                            description: NoProxy contains addresses that should not use a proxy.
+                                            type: string
+                                        proxyconnectheader:
+                                            description: |-
+                                                ProxyConnectHeader optionally specifies headers to send to
+                                                proxies during CONNECT requests. Assume that at least _some_ of
+                                                these headers are going to contain secrets and use Secret as the
+                                                value type instead of string.
+                                            type: object
+                                        proxyfromenvironment:
+                                            description: |-
+                                                ProxyFromEnvironment makes use of net/http ProxyFromEnvironment function
+                                                to determine proxies.
+                                            type: boolean
+                                        proxyurl:
+                                            description: HTTP proxy server to use to connect to the targets.
+                                            type: object
+                                            properties:
+                                                forcequery:
+                                                    description: append a query ('?') even if RawQuery is empty
+                                                    type: boolean
+                                                fragment:
+                                                    description: fragment for references, without '#'
+                                                    type: string
+                                                host:
+                                                    description: host or host:port (see Hostname and Port methods)
+                                                    type: string
+                                                omithost:
+                                                    description: do not emit empty host (authority)
+                                                    type: boolean
+                                                opaque:
+                                                    description: encoded opaque data
+                                                    type: string
+                                                path:
+                                                    description: path (relative paths may omit leading slash)
+                                                    type: string
+                                                rawfragment:
+                                                    description: encoded fragment hint (see EscapedFragment method)
+                                                    type: string
+                                                rawpath:
+                                                    description: encoded path hint (see EscapedPath method)
+                                                    type: string
+                                                rawquery:
+                                                    description: encoded query values, without '?'
+                                                    type: string
+                                                scheme:
+                                                    type: string
+                                                user:
+                                                    description: username and password information
+                                                    type: object
+                                            additionalProperties: false
+                                        scopes:
+                                            type: array
+                                            items:
+                                                type: string
+                                        signaturealgorithm:
+                                            description: |-
+                                                SignatureAlgorithm is the RSA algorithm used to sign JWT token. Only used if
+                                                GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+                                                Default value is RS256 and valid values RS256, RS384, RS512
+                                            type: string
+                                        tlsconfig:
+                                            type: object
+                                            properties:
+                                                ca:
+                                                    description: Text of the CA cert to use for the targets.
+                                                    type: string
+                                                cafile:
+                                                    description: The CA cert to use for the targets.
+                                                    type: string
+                                                caref:
+                                                    description: |-
+                                                        CARef is the name of the secret within the secret manager to use as the CA cert for the
+                                                        targets.
+                                                    type: string
+                                                cert:
+                                                    description: Text of the client cert file for the targets.
+                                                    type: string
+                                                certfile:
+                                                    description: The client cert file for the targets.
+                                                    type: string
+                                                certref:
+                                                    description: |-
+                                                        CertRef is the name of the secret within the secret manager to use as the client cert for
+                                                        the targets.
+                                                    type: string
+                                                insecureskipverify:
+                                                    description: Disable target certificate validation.
+                                                    type: boolean
+                                                key:
+                                                    description: Text of the client key file for the targets.
+                                                    type: string
+                                                keyfile:
+                                                    description: The client key file for the targets.
+                                                    type: string
+                                                keyref:
+                                                    description: |-
+                                                        KeyRef is the name of the secret within the secret manager to use as the client key for
+                                                        the targets.
+                                                    type: string
+                                                maxversion:
+                                                    description: Maximum TLS version.
+                                                    type: integer
+                                                minversion:
+                                                    description: Minimum TLS version.
+                                                    type: integer
+                                                servername:
+                                                    description: Used to verify the hostname for the targets.
+                                                    type: string
+                                            additionalProperties: false
+                                        tokenurl:
+                                            type: string
+                                    additionalProperties: false
+                                proxyconnectheader:
+                                    description: |-
+                                        ProxyConnectHeader optionally specifies headers to send to
+                                        proxies during CONNECT requests. Assume that at least _some_ of
+                                        these headers are going to contain secrets and use Secret as the
+                                        value type instead of string.
+                                    type: object
+                                proxyfromenvironment:
+                                    description: |-
+                                        ProxyFromEnvironment makes use of net/http ProxyFromEnvironment function
+                                        to determine proxies.
+                                    type: boolean
+                                proxyurl:
+                                    description: HTTP proxy server to use to connect to the targets.
+                                    type: object
+                                    properties:
+                                        forcequery:
+                                            description: append a query ('?') even if RawQuery is empty
+                                            type: boolean
+                                        fragment:
+                                            description: fragment for references, without '#'
+                                            type: string
+                                        host:
+                                            description: host or host:port (see Hostname and Port methods)
+                                            type: string
+                                        omithost:
+                                            description: do not emit empty host (authority)
+                                            type: boolean
+                                        opaque:
+                                            description: encoded opaque data
+                                            type: string
+                                        path:
+                                            description: path (relative paths may omit leading slash)
+                                            type: string
+                                        rawfragment:
+                                            description: encoded fragment hint (see EscapedFragment method)
+                                            type: string
+                                        rawpath:
+                                            description: encoded path hint (see EscapedPath method)
+                                            type: string
+                                        rawquery:
+                                            description: encoded query values, without '?'
+                                            type: string
+                                        scheme:
+                                            type: string
+                                        user:
+                                            description: username and password information
+                                            type: object
+                                    additionalProperties: false
+                                tlsconfig:
+                                    description: TLSConfig to use to connect to the targets.
+                                    type: object
+                                    properties:
+                                        ca:
+                                            description: Text of the CA cert to use for the targets.
+                                            type: string
+                                        cafile:
+                                            description: The CA cert to use for the targets.
+                                            type: string
+                                        caref:
+                                            description: |-
+                                                CARef is the name of the secret within the secret manager to use as the CA cert for the
+                                                targets.
+                                            type: string
+                                        cert:
+                                            description: Text of the client cert file for the targets.
+                                            type: string
+                                        certfile:
+                                            description: The client cert file for the targets.
+                                            type: string
+                                        certref:
+                                            description: |-
+                                                CertRef is the name of the secret within the secret manager to use as the client cert for
+                                                the targets.
+                                            type: string
+                                        insecureskipverify:
+                                            description: Disable target certificate validation.
+                                            type: boolean
+                                        key:
+                                            description: Text of the client key file for the targets.
+                                            type: string
+                                        keyfile:
+                                            description: The client key file for the targets.
+                                            type: string
+                                        keyref:
+                                            description: |-
+                                                KeyRef is the name of the secret within the secret manager to use as the client key for
+                                                the targets.
+                                            type: string
+                                        maxversion:
+                                            description: Maximum TLS version.
+                                            type: integer
+                                        minversion:
+                                            description: Minimum TLS version.
+                                            type: integer
+                                        servername:
+                                            description: Used to verify the hostname for the targets.
+                                            type: string
+                                    additionalProperties: false
+                            additionalProperties: false
+                        jobname:
+                            description: The job name to which the job label is set by default.
+                            type: string
+                        keepdroppedtargets:
+                            description: |-
+                                Keep no more than this many dropped targets per job.
+                                0 means no limit.
+                            type: integer
+                        labellimit:
+                            description: |-
+                                More than this many labels post metric-relabeling will cause the scrape to
+                                fail. 0 means no limit.
+                            type: integer
+                        labelnamelengthlimit:
+                            description: |-
+                                More than this label name length post metric-relabeling will cause the
+                                scrape to fail. 0 means no limit.
+                            type: integer
+                        labelvaluelengthlimit:
+                            description: |-
+                                More than this label value length post metric-relabeling will cause the
+                                scrape to fail. 0 means no limit.
+                            type: integer
+                        metricnameescapingscheme:
+                            description: |-
+                                Metric name escaping mode to request through content negotiation. Can be
+                                blank in config files but must have a value if a ScrapeConfig is created
+                                programmatically.
+                            type: string
+                        metricnamevalidationscheme:
+                            description: |-
+                                Allow UTF8 Metric and Label Names. Can be blank in config files but must
+                                have a value if a GlobalConfig is created programmatically.
+                            type: integer
+                        metricrelabelconfigs:
+                            description: List of metric relabel configurations.
+                            type: array
+                            items:
+                                type: object
+                                properties:
+                                    action:
+                                        description: Action is the action to be performed for the relabeling.
+                                        type: string
+                                    modulus:
+                                        description: Modulus to take of the hash of concatenated values from the source labels.
+                                        type: integer
+                                    namevalidationscheme:
+                                        description: NameValidationScheme to use when validating labels.
+                                        type: integer
+                                    regex:
+                                        description: Regex against which the concatenation is matched.
+                                        type: object
+                                        additionalProperties: false
+                                    replacement:
+                                        description: Replacement is the regex replacement pattern to be used.
+                                        type: string
+                                    separator:
+                                        description: Separator is the string between concatenated values from the source labels.
+                                        type: string
+                                    sourcelabels:
+                                        description: |-
+                                            A list of labels from which values are taken and concatenated
+                                            with the configured separator in order.
+                                        type: object
+                                    targetlabel:
+                                        description: |-
+                                            TargetLabel is the label to which the resulting string is written in a replacement.
+                                            Regexp interpolation is allowed for the replace action.
+                                        type: string
+                                additionalProperties: false
+                        metricspath:
+                            description: The HTTP resource path on which to fetch metrics from targets.
+                            type: string
+                        nativehistogrambucketlimit:
+                            description: |-
+                                If there are more than this many buckets in a native histogram,
+                                buckets will be merged to stay within the limit.
+                            type: integer
+                        nativehistogramminbucketfactor:
+                            description: |-
+                                If the growth factor of one bucket to the next is smaller than this,
+                                buckets will be merged to increase the factor sufficiently.
+                            type: number
+                        params:
+                            description: A set of query parameters with which the target is scraped.
+                            type: object
+                        relabelconfigs:
+                            description: List of target relabel configurations.
+                            type: array
+                            items:
+                                type: object
+                                properties:
+                                    action:
+                                        description: Action is the action to be performed for the relabeling.
+                                        type: string
+                                    modulus:
+                                        description: Modulus to take of the hash of concatenated values from the source labels.
+                                        type: integer
+                                    namevalidationscheme:
+                                        description: NameValidationScheme to use when validating labels.
+                                        type: integer
+                                    regex:
+                                        description: Regex against which the concatenation is matched.
+                                        type: object
+                                        additionalProperties: false
+                                    replacement:
+                                        description: Replacement is the regex replacement pattern to be used.
+                                        type: string
+                                    separator:
+                                        description: Separator is the string between concatenated values from the source labels.
+                                        type: string
+                                    sourcelabels:
+                                        description: |-
+                                            A list of labels from which values are taken and concatenated
+                                            with the configured separator in order.
+                                        type: object
+                                    targetlabel:
+                                        description: |-
+                                            TargetLabel is the label to which the resulting string is written in a replacement.
+                                            Regexp interpolation is allowed for the replace action.
+                                        type: string
+                                additionalProperties: false
+                        samplelimit:
+                            description: |-
+                                More than this many samples post metric-relabeling will cause the scrape to
+                                fail. 0 means no limit.
+                            type: integer
+                        scheme:
+                            description: The URL scheme with which to fetch metrics from targets.
+                            type: string
+                        scrapefailurelogfile:
+                            description: File to which scrape failures are logged.
+                            type: string
+                        scrapefallbackprotocol:
+                            description: |-
+                                The fallback protocol to use if the Content-Type provided by the target
+                                is not provided, blank, or not one of the expected values.
+                                Supported values (case sensitive): PrometheusProto, OpenMetricsText0.0.1,
+                                OpenMetricsText1.0.0, PrometheusText1.0.0, PrometheusText0.0.4.
+                            type: string
+                        scrapeinterval:
+                            description: How frequently to scrape targets by default.
+                            type: integer
+                        scrapenativehistograms:
+                            description: Whether to scrape native histograms.
+                            type: boolean
+                        scrapeprotocols:
+                            description: |-
+                                The protocols to negotiate during a scrape. It tells clients what
+                                protocol are accepted by Prometheus and with what weight (most wanted is first).
+                                Supported values (case sensitive): PrometheusProto, OpenMetricsText0.0.1,
+                                OpenMetricsText1.0.0, PrometheusText1.0.0, PrometheusText0.0.4
+                            type: array
+                            items:
+                                type: object
+                        scrapetimeout:
+                            description: The default timeout when scraping targets.
+                            type: integer
+                        servicediscoveryconfigs:
+                            type: object
+                        targetlimit:
+                            description: |-
+                                More than this many targets after the target relabeling will cause the
+                                scrapes to fail. 0 means no limit.
+                            type: integer
+                        tracktimestampsstaleness:
+                            description: Indicator whether to track the staleness of the scraped timestamps.
+                            type: boolean
+                    additionalProperties: false
+            storageconfig:
+                type: object
+                properties:
+                    exemplarsconfig:
+                        type: object
+                        properties:
+                            maxexemplars:
+                                description: |-
+                                    MaxExemplars sets the size, in # of exemplars stored, of the single circular buffer used to store exemplars in memory.
+                                    Use a value of 0 or less than 0 to disable the storage without having to restart Prometheus.
+                                type: integer
+                        additionalProperties: false
+                    tsdbconfig:
+                        type: object
+                        properties:
+                            outofordertimewindow:
+                                description: |-
+                                    OutOfOrderTimeWindow sets how long back in time an out-of-order sample can be inserted
+                                    into the TSDB. This flag is typically set while unmarshaling the configuration file and translating
+                                    OutOfOrderTimeWindowFlag's duration. The unit of this flag is expected to be the same as any
+                                    other timestamp in the TSDB.
+                                type: integer
+                            outofordertimewindowflag:
+                                description: |-
+                                    OutOfOrderTimeWindowFlag holds the parsed duration from the config file.
+                                    During unmarshall, this is converted into milliseconds and stored in OutOfOrderTimeWindow.
+                                    This should not be used directly and must be converted into OutOfOrderTimeWindow.
+                                type: integer
+                            retention:
+                                type: object
+                                properties:
+                                    size:
+                                        description: Maximum number of bytes that can be stored for blocks.
+                                        type: integer
+                                    time:
+                                        description: How long to retain samples in storage.
+                                        type: integer
+                                additionalProperties: false
+                        additionalProperties: false
+                additionalProperties: false
+            tracingconfig:
+                type: object
+                properties:
+                    clienttype:
+                        type: string
+                    compression:
+                        type: string
+                    endpoint:
+                        type: string
+                    headers:
+                        type: object
+                        additionalProperties:
+                            type: string
+                    insecure:
+                        type: boolean
+                    samplingfraction:
+                        type: number
+                    timeout:
+                        type: integer
+                    tlsconfig:
+                        type: object
+                        properties:
+                            ca:
+                                description: Text of the CA cert to use for the targets.
+                                type: string
+                            cafile:
+                                description: The CA cert to use for the targets.
+                                type: string
+                            caref:
+                                description: |-
+                                    CARef is the name of the secret within the secret manager to use as the CA cert for the
+                                    targets.
+                                type: string
+                            cert:
+                                description: Text of the client cert file for the targets.
+                                type: string
+                            certfile:
+                                description: The client cert file for the targets.
+                                type: string
+                            certref:
+                                description: |-
+                                    CertRef is the name of the secret within the secret manager to use as the client cert for
+                                    the targets.
+                                type: string
+                            insecureskipverify:
+                                description: Disable target certificate validation.
+                                type: boolean
+                            key:
+                                description: Text of the client key file for the targets.
+                                type: string
+                            keyfile:
+                                description: The client key file for the targets.
+                                type: string
+                            keyref:
+                                description: |-
+                                    KeyRef is the name of the secret within the secret manager to use as the client key for
+                                    the targets.
+                                type: string
+                            maxversion:
+                                description: Maximum TLS version.
+                                type: integer
+                            minversion:
+                                description: Minimum TLS version.
+                                type: integer
+                            servername:
+                                description: Used to verify the hostname for the targets.
+                                type: string
+                        additionalProperties: false
+                additionalProperties: false
+        additionalProperties: false
+    report_extra_scrape_metrics:
+        description: |-
+            ReportExtraScrapeMetrics - enables reporting of additional metrics for Prometheus client like scrape_body_size_bytes
+
+            Deprecated: use the feature gate "receiver.prometheusreceiver.EnableReportExtraScrapeMetrics" instead.
+        type: boolean
+    target_allocator:
+        type: object
+        properties:
+            auth:
+                description: Auth configuration for outgoing HTTP calls.
+                type: object
+                properties:
+                    authenticator:
+                        description: AuthenticatorID specifies the name of the extension to use in order to authenticate the incoming data point.
+                        type: string
+                additionalProperties: false
+            collector_id:
+                type: string
+            compression:
+                description: The compression key for supported compression types within collector.
+                type: string
+            compression_params:
+                description: Advanced configuration options for the Compression
+                type: object
+                properties:
+                    level:
+                        type: integer
+                additionalProperties: false
+            cookies:
+                description: Cookies configures the cookie management of the HTTP client.
+                type: object
+            disable_keep_alives:
+                description: |-
+                    DisableKeepAlives, if true, disables HTTP keep-alives and will only use the connection to the server
+                    for a single HTTP request.
+
+                    WARNING: enabling this option can result in significant overhead establishing a new HTTP(S)
+                    connection for every request. Before enabling this option please consider whether changes
+                    to idle connection settings can achieve your goal.
+                type: boolean
+            endpoint:
+                description: 'The target URL to send data to (e.g.: http://some.url:9411/v1/traces).'
+                type: string
+            force_attempt_http2:
+                description: |-
+                    Enabling ForceAttemptHTTP2 forces the HTTP transport to use the HTTP/2 protocol.
+                    By default, this is set to true.
+                    NOTE: HTTP/2 does not support settings such as MaxConnsPerHost, MaxIdleConnsPerHost and MaxIdleConns.
+                type: boolean
+            headers:
+                description: |-
+                    Additional headers attached to each HTTP request sent by the client.
+                    Existing header values are overwritten if collision happens.
+                    Header values are opaque since they may be sensitive.
+                type: object
+            http_scrape_config:
+                type: object
+                properties:
+                    authorization:
+                        type: object
+                        properties:
+                            credentials:
+                                type: string
+                            credentialsfile:
+                                type: string
+                            credentialsref:
+                                description: CredentialsRef is the name of the secret within the secret manager to use as credentials.
+                                type: string
+                            type:
+                                type: string
+                        additionalProperties: false
+                    basicauth:
+                        type: object
+                        properties:
+                            password:
+                                type: string
+                            passwordfile:
+                                type: string
+                            passwordref:
+                                description: PasswordRef is the name of the secret within the secret manager to use as the password.
+                                type: string
+                            username:
+                                type: string
+                            usernamefile:
+                                type: string
+                            usernameref:
+                                description: UsernameRef is the name of the secret within the secret manager to use as the username.
+                                type: string
+                        additionalProperties: false
+                    bearertoken:
+                        type: string
+                    bearertokenfile:
+                        type: string
+                    enablehttp2:
+                        type: boolean
+                    followredirects:
+                        type: boolean
+                    httpheaders:
+                        type: object
+                        properties:
+                            headers:
+                                type: object
+                                additionalProperties:
+                                    type: object
+                        additionalProperties: false
+                    noproxy:
+                        description: NoProxy contains addresses that should not use a proxy.
+                        type: string
+                    oauth2:
+                        type: object
+                        properties:
+                            audience:
+                                description: |-
+                                    Audience optionally specifies the intended audience of the
+                                    request.  If empty, the value of TokenURL is used as the
+                                    intended audience. Only used if
+                                    GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+                                type: string
+                            claims:
+                                description: |-
+                                    Claims is a map of claims to be added to the JWT token. Only used if
+                                    GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+                                type: object
+                                additionalProperties: {}
+                            clientcertificatekey:
+                                type: string
+                            clientcertificatekeyfile:
+                                type: string
+                            clientcertificatekeyid:
+                                type: string
+                            clientcertificatekeyref:
+                                description: |-
+                                    ClientCertificateKeyRef is the name of the secret within the secret manager to use as the client
+                                    secret.
+                                type: string
+                            clientid:
+                                type: string
+                            clientsecret:
+                                type: string
+                            clientsecretfile:
+                                type: string
+                            clientsecretref:
+                                description: |-
+                                    ClientSecretRef is the name of the secret within the secret manager to use as the client
+                                    secret.
+                                type: string
+                            endpointparams:
+                                type: object
+                                additionalProperties:
+                                    type: string
+                            granttype:
+                                description: |-
+                                    GrantType is the OAuth2 grant type to use. It can be one of
+                                    "client_credentials" or "urn:ietf:params:oauth:grant-type:jwt-bearer" (RFC 7523).
+                                    Default value is "client_credentials"
+                                type: string
+                            iss:
+                                description: |-
+                                    Iss is the OAuth client identifier used when communicating with
+                                    the configured OAuth provider. Default value is client_id. Only used if
+                                    GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+                                type: string
+                            noproxy:
+                                description: NoProxy contains addresses that should not use a proxy.
+                                type: string
+                            proxyconnectheader:
+                                description: |-
+                                    ProxyConnectHeader optionally specifies headers to send to
+                                    proxies during CONNECT requests. Assume that at least _some_ of
+                                    these headers are going to contain secrets and use Secret as the
+                                    value type instead of string.
+                                type: object
+                            proxyfromenvironment:
+                                description: |-
+                                    ProxyFromEnvironment makes use of net/http ProxyFromEnvironment function
+                                    to determine proxies.
+                                type: boolean
+                            proxyurl:
+                                description: HTTP proxy server to use to connect to the targets.
+                                type: object
+                                properties:
+                                    forcequery:
+                                        description: append a query ('?') even if RawQuery is empty
+                                        type: boolean
+                                    fragment:
+                                        description: fragment for references, without '#'
+                                        type: string
+                                    host:
+                                        description: host or host:port (see Hostname and Port methods)
+                                        type: string
+                                    omithost:
+                                        description: do not emit empty host (authority)
+                                        type: boolean
+                                    opaque:
+                                        description: encoded opaque data
+                                        type: string
+                                    path:
+                                        description: path (relative paths may omit leading slash)
+                                        type: string
+                                    rawfragment:
+                                        description: encoded fragment hint (see EscapedFragment method)
+                                        type: string
+                                    rawpath:
+                                        description: encoded path hint (see EscapedPath method)
+                                        type: string
+                                    rawquery:
+                                        description: encoded query values, without '?'
+                                        type: string
+                                    scheme:
+                                        type: string
+                                    user:
+                                        description: username and password information
+                                        type: object
+                                additionalProperties: false
+                            scopes:
+                                type: array
+                                items:
+                                    type: string
+                            signaturealgorithm:
+                                description: |-
+                                    SignatureAlgorithm is the RSA algorithm used to sign JWT token. Only used if
+                                    GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+                                    Default value is RS256 and valid values RS256, RS384, RS512
+                                type: string
+                            tlsconfig:
+                                type: object
+                                properties:
+                                    ca:
+                                        description: Text of the CA cert to use for the targets.
+                                        type: string
+                                    cafile:
+                                        description: The CA cert to use for the targets.
+                                        type: string
+                                    caref:
+                                        description: |-
+                                            CARef is the name of the secret within the secret manager to use as the CA cert for the
+                                            targets.
+                                        type: string
+                                    cert:
+                                        description: Text of the client cert file for the targets.
+                                        type: string
+                                    certfile:
+                                        description: The client cert file for the targets.
+                                        type: string
+                                    certref:
+                                        description: |-
+                                            CertRef is the name of the secret within the secret manager to use as the client cert for
+                                            the targets.
+                                        type: string
+                                    insecureskipverify:
+                                        description: Disable target certificate validation.
+                                        type: boolean
+                                    key:
+                                        description: Text of the client key file for the targets.
+                                        type: string
+                                    keyfile:
+                                        description: The client key file for the targets.
+                                        type: string
+                                    keyref:
+                                        description: |-
+                                            KeyRef is the name of the secret within the secret manager to use as the client key for
+                                            the targets.
+                                        type: string
+                                    maxversion:
+                                        description: Maximum TLS version.
+                                        type: integer
+                                    minversion:
+                                        description: Minimum TLS version.
+                                        type: integer
+                                    servername:
+                                        description: Used to verify the hostname for the targets.
+                                        type: string
+                                additionalProperties: false
+                            tokenurl:
+                                type: string
+                        additionalProperties: false
+                    proxyconnectheader:
+                        description: |-
+                            ProxyConnectHeader optionally specifies headers to send to
+                            proxies during CONNECT requests. Assume that at least _some_ of
+                            these headers are going to contain secrets and use Secret as the
+                            value type instead of string.
+                        type: object
+                    proxyfromenvironment:
+                        description: |-
+                            ProxyFromEnvironment makes use of net/http ProxyFromEnvironment function
+                            to determine proxies.
+                        type: boolean
+                    proxyurl:
+                        description: HTTP proxy server to use to connect to the targets.
+                        type: object
+                        properties:
+                            forcequery:
+                                description: append a query ('?') even if RawQuery is empty
+                                type: boolean
+                            fragment:
+                                description: fragment for references, without '#'
+                                type: string
+                            host:
+                                description: host or host:port (see Hostname and Port methods)
+                                type: string
+                            omithost:
+                                description: do not emit empty host (authority)
+                                type: boolean
+                            opaque:
+                                description: encoded opaque data
+                                type: string
+                            path:
+                                description: path (relative paths may omit leading slash)
+                                type: string
+                            rawfragment:
+                                description: encoded fragment hint (see EscapedFragment method)
+                                type: string
+                            rawpath:
+                                description: encoded path hint (see EscapedPath method)
+                                type: string
+                            rawquery:
+                                description: encoded query values, without '?'
+                                type: string
+                            scheme:
+                                type: string
+                            user:
+                                description: username and password information
+                                type: object
+                        additionalProperties: false
+                    tlsconfig:
+                        type: object
+                        properties:
+                            ca:
+                                description: Text of the CA cert to use for the targets.
+                                type: string
+                            cafile:
+                                description: The CA cert to use for the targets.
+                                type: string
+                            caref:
+                                description: |-
+                                    CARef is the name of the secret within the secret manager to use as the CA cert for the
+                                    targets.
+                                type: string
+                            cert:
+                                description: Text of the client cert file for the targets.
+                                type: string
+                            certfile:
+                                description: The client cert file for the targets.
+                                type: string
+                            certref:
+                                description: |-
+                                    CertRef is the name of the secret within the secret manager to use as the client cert for
+                                    the targets.
+                                type: string
+                            insecureskipverify:
+                                description: Disable target certificate validation.
+                                type: boolean
+                            key:
+                                description: Text of the client key file for the targets.
+                                type: string
+                            keyfile:
+                                description: The client key file for the targets.
+                                type: string
+                            keyref:
+                                description: |-
+                                    KeyRef is the name of the secret within the secret manager to use as the client key for
+                                    the targets.
+                                type: string
+                            maxversion:
+                                description: Maximum TLS version.
+                                type: integer
+                            minversion:
+                                description: Minimum TLS version.
+                                type: integer
+                            servername:
+                                description: Used to verify the hostname for the targets.
+                                type: string
+                        additionalProperties: false
+                additionalProperties: false
+            http_sd_config:
+                type: object
+                properties:
+                    httpclientconfig:
+                        type: object
+                        properties:
+                            authorization:
+                                description: The HTTP authorization credentials for the targets.
+                                type: object
+                                properties:
+                                    credentials:
+                                        type: string
+                                    credentialsfile:
+                                        type: string
+                                    credentialsref:
+                                        description: CredentialsRef is the name of the secret within the secret manager to use as credentials.
+                                        type: string
+                                    type:
+                                        type: string
+                                additionalProperties: false
+                            basicauth:
+                                description: The HTTP basic authentication credentials for the targets.
+                                type: object
+                                properties:
+                                    password:
+                                        type: string
+                                    passwordfile:
+                                        type: string
+                                    passwordref:
+                                        description: PasswordRef is the name of the secret within the secret manager to use as the password.
+                                        type: string
+                                    username:
+                                        type: string
+                                    usernamefile:
+                                        type: string
+                                    usernameref:
+                                        description: UsernameRef is the name of the secret within the secret manager to use as the username.
+                                        type: string
+                                additionalProperties: false
+                            bearertoken:
+                                description: |-
+                                    The bearer token for the targets. Deprecated in favour of
+                                    Authorization.Credentials.
+                                type: string
+                            bearertokenfile:
+                                description: |-
+                                    The bearer token file for the targets. Deprecated in favour of
+                                    Authorization.CredentialsFile.
+                                type: string
+                            enablehttp2:
+                                description: |-
+                                    EnableHTTP2 specifies whether the client should configure HTTP2.
+                                    The omitempty flag is not set, because it would be hidden from the
+                                    marshalled configuration when set to false.
+                                type: boolean
+                            followredirects:
+                                description: |-
+                                    FollowRedirects specifies whether the client should follow HTTP 3xx redirects.
+                                    The omitempty flag is not set, because it would be hidden from the
+                                    marshalled configuration when set to false.
+                                type: boolean
+                            httpheaders:
+                                description: |-
+                                    HTTPHeaders specify headers to inject in the requests. Those headers
+                                    could be marshalled back to the users.
+                                type: object
+                                properties:
+                                    headers:
+                                        type: object
+                                        additionalProperties:
+                                            type: object
+                                additionalProperties: false
+                            noproxy:
+                                description: NoProxy contains addresses that should not use a proxy.
+                                type: string
+                            oauth2:
+                                description: The OAuth2 client credentials used to fetch a token for the targets.
+                                type: object
+                                properties:
+                                    audience:
+                                        description: |-
+                                            Audience optionally specifies the intended audience of the
+                                            request.  If empty, the value of TokenURL is used as the
+                                            intended audience. Only used if
+                                            GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+                                        type: string
+                                    claims:
+                                        description: |-
+                                            Claims is a map of claims to be added to the JWT token. Only used if
+                                            GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+                                        type: object
+                                        additionalProperties: {}
+                                    clientcertificatekey:
+                                        type: string
+                                    clientcertificatekeyfile:
+                                        type: string
+                                    clientcertificatekeyid:
+                                        type: string
+                                    clientcertificatekeyref:
+                                        description: |-
+                                            ClientCertificateKeyRef is the name of the secret within the secret manager to use as the client
+                                            secret.
+                                        type: string
+                                    clientid:
+                                        type: string
+                                    clientsecret:
+                                        type: string
+                                    clientsecretfile:
+                                        type: string
+                                    clientsecretref:
+                                        description: |-
+                                            ClientSecretRef is the name of the secret within the secret manager to use as the client
+                                            secret.
+                                        type: string
+                                    endpointparams:
+                                        type: object
+                                        additionalProperties:
+                                            type: string
+                                    granttype:
+                                        description: |-
+                                            GrantType is the OAuth2 grant type to use. It can be one of
+                                            "client_credentials" or "urn:ietf:params:oauth:grant-type:jwt-bearer" (RFC 7523).
+                                            Default value is "client_credentials"
+                                        type: string
+                                    iss:
+                                        description: |-
+                                            Iss is the OAuth client identifier used when communicating with
+                                            the configured OAuth provider. Default value is client_id. Only used if
+                                            GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+                                        type: string
+                                    noproxy:
+                                        description: NoProxy contains addresses that should not use a proxy.
+                                        type: string
+                                    proxyconnectheader:
+                                        description: |-
+                                            ProxyConnectHeader optionally specifies headers to send to
+                                            proxies during CONNECT requests. Assume that at least _some_ of
+                                            these headers are going to contain secrets and use Secret as the
+                                            value type instead of string.
+                                        type: object
+                                    proxyfromenvironment:
+                                        description: |-
+                                            ProxyFromEnvironment makes use of net/http ProxyFromEnvironment function
+                                            to determine proxies.
+                                        type: boolean
+                                    proxyurl:
+                                        description: HTTP proxy server to use to connect to the targets.
+                                        type: object
+                                        properties:
+                                            forcequery:
+                                                description: append a query ('?') even if RawQuery is empty
+                                                type: boolean
+                                            fragment:
+                                                description: fragment for references, without '#'
+                                                type: string
+                                            host:
+                                                description: host or host:port (see Hostname and Port methods)
+                                                type: string
+                                            omithost:
+                                                description: do not emit empty host (authority)
+                                                type: boolean
+                                            opaque:
+                                                description: encoded opaque data
+                                                type: string
+                                            path:
+                                                description: path (relative paths may omit leading slash)
+                                                type: string
+                                            rawfragment:
+                                                description: encoded fragment hint (see EscapedFragment method)
+                                                type: string
+                                            rawpath:
+                                                description: encoded path hint (see EscapedPath method)
+                                                type: string
+                                            rawquery:
+                                                description: encoded query values, without '?'
+                                                type: string
+                                            scheme:
+                                                type: string
+                                            user:
+                                                description: username and password information
+                                                type: object
+                                        additionalProperties: false
+                                    scopes:
+                                        type: array
+                                        items:
+                                            type: string
+                                    signaturealgorithm:
+                                        description: |-
+                                            SignatureAlgorithm is the RSA algorithm used to sign JWT token. Only used if
+                                            GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+                                            Default value is RS256 and valid values RS256, RS384, RS512
+                                        type: string
+                                    tlsconfig:
+                                        type: object
+                                        properties:
+                                            ca:
+                                                description: Text of the CA cert to use for the targets.
+                                                type: string
+                                            cafile:
+                                                description: The CA cert to use for the targets.
+                                                type: string
+                                            caref:
+                                                description: |-
+                                                    CARef is the name of the secret within the secret manager to use as the CA cert for the
+                                                    targets.
+                                                type: string
+                                            cert:
+                                                description: Text of the client cert file for the targets.
+                                                type: string
+                                            certfile:
+                                                description: The client cert file for the targets.
+                                                type: string
+                                            certref:
+                                                description: |-
+                                                    CertRef is the name of the secret within the secret manager to use as the client cert for
+                                                    the targets.
+                                                type: string
+                                            insecureskipverify:
+                                                description: Disable target certificate validation.
+                                                type: boolean
+                                            key:
+                                                description: Text of the client key file for the targets.
+                                                type: string
+                                            keyfile:
+                                                description: The client key file for the targets.
+                                                type: string
+                                            keyref:
+                                                description: |-
+                                                    KeyRef is the name of the secret within the secret manager to use as the client key for
+                                                    the targets.
+                                                type: string
+                                            maxversion:
+                                                description: Maximum TLS version.
+                                                type: integer
+                                            minversion:
+                                                description: Minimum TLS version.
+                                                type: integer
+                                            servername:
+                                                description: Used to verify the hostname for the targets.
+                                                type: string
+                                        additionalProperties: false
+                                    tokenurl:
+                                        type: string
+                                additionalProperties: false
+                            proxyconnectheader:
+                                description: |-
+                                    ProxyConnectHeader optionally specifies headers to send to
+                                    proxies during CONNECT requests. Assume that at least _some_ of
+                                    these headers are going to contain secrets and use Secret as the
+                                    value type instead of string.
+                                type: object
+                            proxyfromenvironment:
+                                description: |-
+                                    ProxyFromEnvironment makes use of net/http ProxyFromEnvironment function
+                                    to determine proxies.
+                                type: boolean
+                            proxyurl:
+                                description: HTTP proxy server to use to connect to the targets.
+                                type: object
+                                properties:
+                                    forcequery:
+                                        description: append a query ('?') even if RawQuery is empty
+                                        type: boolean
+                                    fragment:
+                                        description: fragment for references, without '#'
+                                        type: string
+                                    host:
+                                        description: host or host:port (see Hostname and Port methods)
+                                        type: string
+                                    omithost:
+                                        description: do not emit empty host (authority)
+                                        type: boolean
+                                    opaque:
+                                        description: encoded opaque data
+                                        type: string
+                                    path:
+                                        description: path (relative paths may omit leading slash)
+                                        type: string
+                                    rawfragment:
+                                        description: encoded fragment hint (see EscapedFragment method)
+                                        type: string
+                                    rawpath:
+                                        description: encoded path hint (see EscapedPath method)
+                                        type: string
+                                    rawquery:
+                                        description: encoded query values, without '?'
+                                        type: string
+                                    scheme:
+                                        type: string
+                                    user:
+                                        description: username and password information
+                                        type: object
+                                additionalProperties: false
+                            tlsconfig:
+                                description: TLSConfig to use to connect to the targets.
+                                type: object
+                                properties:
+                                    ca:
+                                        description: Text of the CA cert to use for the targets.
+                                        type: string
+                                    cafile:
+                                        description: The CA cert to use for the targets.
+                                        type: string
+                                    caref:
+                                        description: |-
+                                            CARef is the name of the secret within the secret manager to use as the CA cert for the
+                                            targets.
+                                        type: string
+                                    cert:
+                                        description: Text of the client cert file for the targets.
+                                        type: string
+                                    certfile:
+                                        description: The client cert file for the targets.
+                                        type: string
+                                    certref:
+                                        description: |-
+                                            CertRef is the name of the secret within the secret manager to use as the client cert for
+                                            the targets.
+                                        type: string
+                                    insecureskipverify:
+                                        description: Disable target certificate validation.
+                                        type: boolean
+                                    key:
+                                        description: Text of the client key file for the targets.
+                                        type: string
+                                    keyfile:
+                                        description: The client key file for the targets.
+                                        type: string
+                                    keyref:
+                                        description: |-
+                                            KeyRef is the name of the secret within the secret manager to use as the client key for
+                                            the targets.
+                                        type: string
+                                    maxversion:
+                                        description: Maximum TLS version.
+                                        type: integer
+                                    minversion:
+                                        description: Minimum TLS version.
+                                        type: integer
+                                    servername:
+                                        description: Used to verify the hostname for the targets.
+                                        type: string
+                                additionalProperties: false
+                        additionalProperties: false
+                    refreshinterval:
+                        type: integer
+                    url:
+                        type: string
+                additionalProperties: false
+            http2_ping_timeout:
+                description: |-
+                    HTTP2PingTimeout if there's no response to the ping within the configured value, the connection will be closed.
+                    If not set or set to 0, it defaults to 15s.
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+            http2_read_idle_timeout:
+                description: |-
+                    This is needed in case you run into
+                    https://github.com/golang/go/issues/59690
+                    https://github.com/golang/go/issues/36026
+                    HTTP2ReadIdleTimeout if the connection has been idle for the configured value send a ping frame for health check
+                    0s means no health check will be performed.
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+            idle_conn_timeout:
+                description: |-
+                    IdleConnTimeout is the maximum amount of time a connection will remain open before closing itself.
+                    By default, it is set to 90 seconds.
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+            interval:
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+            max_conns_per_host:
+                description: |-
+                    MaxConnsPerHost limits the total number of connections per host, including connections in the dialing,
+                    active, and idle states. Default is 0 (unlimited).
+                type: integer
+            max_idle_conns:
+                description: |-
+                    MaxIdleConns is used to set a limit to the maximum idle HTTP connections the client can keep open.
+                    By default, it is set to 100. Zero means no limit.
+                type: integer
+            max_idle_conns_per_host:
+                description: |-
+                    MaxIdleConnsPerHost is used to set a limit to the maximum idle HTTP connections the host can keep open.
+                    If zero, [net/http.DefaultMaxIdleConnsPerHost] is used.
+                type: integer
+            middlewares:
+                description: |-
+                    Middlewares are used to add custom functionality to the HTTP client.
+                    Middleware handlers are called in the order they appear in this list,
+                    with the first middleware becoming the outermost handler.
+                type: array
+                items:
+                    type: object
+                    properties:
+                        id:
+                            description: ID specifies the name of the extension to use.
+                            type: string
+                    additionalProperties: false
+            proxy_url:
+                description: ProxyURL setting for the collector
+                type: string
+            read_buffer_size:
+                description: |-
+                    ReadBufferSize for HTTP client. See http.Transport.ReadBufferSize.
+                    Default is 0.
+                type: integer
+            timeout:
+                description: |-
+                    Timeout parameter configures `http.Client.Timeout`.
+                    Default is 0 (unlimited).
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+            tls:
+                description: TLS struct exposes TLS client configuration.
+                type: object
+                properties:
+                    ca_file:
+                        description: |-
+                            Path to the CA cert. For a client this verifies the server certificate.
+                            For a server this verifies client certificates. If empty uses system root CA.
+                            (optional)
+                        type: string
+                    ca_pem:
+                        description: In memory PEM encoded cert. (optional)
+                        type: string
+                    cert_file:
+                        description: Path to the TLS cert to use for TLS required connections. (optional)
+                        type: string
+                    cert_pem:
+                        description: In memory PEM encoded TLS cert to use for TLS required connections. (optional)
+                        type: string
+                    cipher_suites:
+                        description: |-
+                            CipherSuites is a list of TLS cipher suites that the TLS transport can use.
+                            If left blank, a safe default list is used.
+                            See https://go.dev/src/crypto/tls/cipher_suites.go for a list of supported cipher suites.
+                        type: array
+                        items:
+                            type: string
+                    curve_preferences:
+                        description: |-
+                            contains the elliptic curves that will be used in
+                            an ECDHE handshake, in preference order
+                            Defaults to empty list and "crypto/tls" defaults are used, internally.
+                        type: array
+                        items:
+                            type: string
+                    include_system_ca_certs_pool:
+                        description: |-
+                            If true, load system CA certificates pool in addition to the certificates
+                            configured in this struct.
+                        type: boolean
+                    insecure:
+                        description: |-
+                            In gRPC and HTTP when set to true, this is used to disable the client transport security.
+                            See https://godoc.org/google.golang.org/grpc#WithInsecure for gRPC.
+                            Please refer to https://godoc.org/crypto/tls#Config for more information.
+                            (optional, default false)
+                        type: boolean
+                    insecure_skip_verify:
+                        description: InsecureSkipVerify will enable TLS but not verify the certificate.
+                        type: boolean
+                    key_file:
+                        description: Path to the TLS key to use for TLS required connections. (optional)
+                        type: string
+                    key_pem:
+                        description: In memory PEM encoded TLS key to use for TLS required connections. (optional)
+                        type: string
+                    max_version:
+                        description: |-
+                            MaxVersion sets the maximum TLS version that is acceptable.
+                            If not set, refer to crypto/tls for defaults. (optional)
+                        type: string
+                    min_version:
+                        description: |-
+                            MinVersion sets the minimum TLS version that is acceptable.
+                            If not set, TLS 1.2 will be used. (optional)
+                        type: string
+                    reload_interval:
+                        description: |-
+                            ReloadInterval specifies the duration after which the certificate will be reloaded
+                            If not set, it will never be reloaded (optional)
+                        type: string
+                        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+                    server_name_override:
+                        description: |-
+                            ServerName requested by client for virtual hosting.
+                            This sets the ServerName in the TLSConfig. Please refer to
+                            https://godoc.org/crypto/tls#Config for more information. (optional)
+                        type: string
+                    tpm:
+                        description: Trusted platform module configuration
+                        type: object
+                        properties:
+                            auth:
+                                type: string
+                            enabled:
+                                type: boolean
+                            owner_auth:
+                                type: string
+                            path:
+                                description: |-
+                                    The path to the TPM device or Unix domain socket.
+                                    For instance /dev/tpm0 or /dev/tpmrm0.
+                                type: string
+                        additionalProperties: false
+                additionalProperties: false
+            write_buffer_size:
+                description: |-
+                    WriteBufferSize for HTTP client. See http.Transport.WriteBufferSize.
+                    Default is 0.
+                type: integer
+        additionalProperties: false
+    trim_metric_suffixes:
+        type: boolean
+additionalProperties: false

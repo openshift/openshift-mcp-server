@@ -1,6 +1,7 @@
 package prometheus
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"os"
@@ -9,14 +10,16 @@ import (
 
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 )
 
 // ClientOption is a function that configures a Client.
-type ClientOption func(*Client)
+type ClientOption func(context.Context, *Client)
 
 // WithBearerToken sets the bearer token for authentication.
 func WithBearerToken(token string) ClientOption {
-	return func(c *Client) {
+	return func(_ context.Context, c *Client) {
 		c.bearerToken = strings.TrimSpace(token)
 	}
 }
@@ -24,7 +27,7 @@ func WithBearerToken(token string) ClientOption {
 // WithBearerTokenFromRESTConfig extracts and sets the bearer token from a Kubernetes REST config.
 // It tries the token directly first, then falls back to reading from a token file.
 func WithBearerTokenFromRESTConfig(config *rest.Config) ClientOption {
-	return func(c *Client) {
+	return func(ctx context.Context, c *Client) {
 		if config == nil {
 			return
 		}
@@ -39,7 +42,7 @@ func WithBearerTokenFromRESTConfig(config *rest.Config) ClientOption {
 		if config.BearerTokenFile != "" {
 			token, err := os.ReadFile(config.BearerTokenFile)
 			if err != nil {
-				klog.V(2).Infof("Failed to read token file %s: %v", config.BearerTokenFile, err)
+				klogutil.LogInfo(klog.FromContext(ctx).V(2), "Failed to read token file", klogutil.Field("file", config.BearerTokenFile), klogutil.Err(err))
 				return
 			}
 			c.bearerToken = strings.TrimSpace(string(token))
@@ -50,10 +53,12 @@ func WithBearerTokenFromRESTConfig(config *rest.Config) ClientOption {
 // WithTLSFromRESTConfig configures TLS using the CA from a Kubernetes REST config.
 // It tries CAData first, then CAFile, then system cert pool, and finally falls back to insecure.
 func WithTLSFromRESTConfig(config *rest.Config) ClientOption {
-	return func(c *Client) {
+	return func(ctx context.Context, c *Client) {
 		if config == nil {
 			return
 		}
+
+		logger := klog.FromContext(ctx)
 
 		// Try to build a cert pool with the cluster CA
 		var certPool *x509.CertPool
@@ -70,9 +75,9 @@ func WithTLSFromRESTConfig(config *rest.Config) ClientOption {
 			if ok := certPool.AppendCertsFromPEM(config.CAData); ok {
 				c.tlsConfig.RootCAs = certPool
 				caLoaded = true
-				klog.V(4).Info("Loaded cluster CA from REST config CAData")
+				logger.V(4).Info("Loaded cluster CA from REST config CAData")
 			} else {
-				klog.V(2).Info("Failed to parse CA certificates from REST config CAData")
+				logger.V(2).Info("Failed to parse CA certificates from REST config CAData")
 			}
 		}
 
@@ -80,7 +85,7 @@ func WithTLSFromRESTConfig(config *rest.Config) ClientOption {
 		if !caLoaded && config.CAFile != "" {
 			caPEM, err := os.ReadFile(config.CAFile)
 			if err != nil {
-				klog.V(2).Infof("Failed to read CA file %s: %v", config.CAFile, err)
+				klogutil.LogInfo(logger.V(2), "Failed to read CA file", klogutil.Field("file", config.CAFile), klogutil.Err(err))
 			} else {
 				// Start with system cert pool if available
 				if systemPool, err := x509.SystemCertPool(); err == nil && systemPool != nil {
@@ -91,9 +96,9 @@ func WithTLSFromRESTConfig(config *rest.Config) ClientOption {
 				if ok := certPool.AppendCertsFromPEM(caPEM); ok {
 					c.tlsConfig.RootCAs = certPool
 					caLoaded = true
-					klog.V(4).Infof("Loaded cluster CA from file %s", config.CAFile)
+					logger.V(4).Info("Loaded cluster CA from file", "file", config.CAFile)
 				} else {
-					klog.V(2).Infof("Failed to parse CA certificates from file %s", config.CAFile)
+					logger.V(2).Info("Failed to parse CA certificates from file", "file", config.CAFile)
 				}
 			}
 		}
@@ -102,10 +107,10 @@ func WithTLSFromRESTConfig(config *rest.Config) ClientOption {
 		if !caLoaded {
 			if systemPool, err := x509.SystemCertPool(); err == nil && systemPool != nil {
 				c.tlsConfig.RootCAs = systemPool
-				klog.V(4).Info("Using system certificate pool for TLS verification")
+				logger.V(4).Info("Using system certificate pool for TLS verification")
 			} else {
 				// Last resort: skip verification with a warning
-				klog.Warning("No cluster CA available and system cert pool failed; using insecure TLS (skip verification)")
+				klogutil.LogWarn(logger, "No cluster CA available and system cert pool failed; using insecure TLS (skip verification)")
 				c.tlsConfig.InsecureSkipVerify = true
 			}
 		}
@@ -114,15 +119,17 @@ func WithTLSFromRESTConfig(config *rest.Config) ClientOption {
 
 // WithCustomCA configures TLS using a custom CA certificate file.
 func WithCustomCA(caFile string) ClientOption {
-	return func(c *Client) {
+	return func(ctx context.Context, c *Client) {
 		caFile = strings.TrimSpace(caFile)
 		if caFile == "" {
 			return
 		}
 
+		logger := klog.FromContext(ctx)
+
 		caPEM, err := os.ReadFile(caFile)
 		if err != nil {
-			klog.Errorf("Failed to read CA certificate from file %s: %v; proceeding without custom CA", caFile, err)
+			logger.Error(err, "Failed to read CA certificate file; proceeding without custom CA", "file", caFile)
 			return
 		}
 
@@ -136,21 +143,21 @@ func WithCustomCA(caFile string) ClientOption {
 		if ok := certPool.AppendCertsFromPEM(caPEM); ok {
 			c.tlsConfig.RootCAs = certPool
 		} else {
-			klog.V(0).Infof("Failed to append provided certificate authority; proceeding without custom CA")
+			logger.V(0).Info("Failed to append provided certificate authority; proceeding without custom CA")
 		}
 	}
 }
 
 // WithInsecure configures whether to skip TLS verification.
 func WithInsecure(insecure bool) ClientOption {
-	return func(c *Client) {
+	return func(_ context.Context, c *Client) {
 		c.tlsConfig.InsecureSkipVerify = insecure
 	}
 }
 
 // WithTimeout sets the HTTP client timeout.
 func WithTimeout(timeout time.Duration) ClientOption {
-	return func(c *Client) {
+	return func(_ context.Context, c *Client) {
 		c.timeout = timeout
 	}
 }

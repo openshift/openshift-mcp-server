@@ -78,7 +78,7 @@ type GetAlertGroupsParams struct {
 
 	/* Active.
 
-	   Show active alerts
+	   Include active alerts within the returned groups. If false, excludes active alerts from groups and only shows suppressed (silenced or inhibited) alerts.
 
 	   Default: true
 	*/
@@ -92,7 +92,7 @@ type GetAlertGroupsParams struct {
 
 	/* Inhibited.
 
-	   Show inhibited alerts
+	   Include inhibited alerts within the returned groups. If false, excludes inhibited alerts from groups. Note that true (default) shows both inhibited and non-inhibited alerts.
 
 	   Default: true
 	*/
@@ -100,7 +100,7 @@ type GetAlertGroupsParams struct {
 
 	/* Muted.
 
-	   Show muted alerts
+	   Include muted (silenced or inhibited) alert groups in results. If false, excludes entire groups where all alerts are muted.
 
 	   Default: true
 	*/
@@ -112,9 +112,15 @@ type GetAlertGroupsParams struct {
 	*/
 	Receiver *string
 
+	/* ReceiverMatchers.
+
+	   A matcher expression to filter by receiver labels. For example `owner="my-team"`. Can be repeated to apply multiple matchers.
+	*/
+	ReceiverMatchers []string
+
 	/* Silenced.
 
-	   Show silenced alerts
+	   Include silenced alerts within the returned groups. If false, excludes silenced alerts from groups. Note that true (default) shows both silenced and non-silenced alerts.
 
 	   Default: true
 	*/
@@ -248,6 +254,17 @@ func (o *GetAlertGroupsParams) SetReceiver(receiver *string) {
 	o.Receiver = receiver
 }
 
+// WithReceiverMatchers adds the receiverMatchers to the get alert groups params
+func (o *GetAlertGroupsParams) WithReceiverMatchers(receiverMatchers []string) *GetAlertGroupsParams {
+	o.SetReceiverMatchers(receiverMatchers)
+	return o
+}
+
+// SetReceiverMatchers adds the receiverMatchers to the get alert groups params
+func (o *GetAlertGroupsParams) SetReceiverMatchers(receiverMatchers []string) {
+	o.ReceiverMatchers = receiverMatchers
+}
+
 // WithSilenced adds the silenced to the get alert groups params
 func (o *GetAlertGroupsParams) WithSilenced(silenced *bool) *GetAlertGroupsParams {
 	o.SetSilenced(silenced)
@@ -346,6 +363,17 @@ func (o *GetAlertGroupsParams) WriteToRequest(r runtime.ClientRequest, reg strfm
 		}
 	}
 
+	if o.ReceiverMatchers != nil {
+
+		// binding items for receiver_matchers
+		joinedReceiverMatchers := o.bindParamReceiverMatchers(reg)
+
+		// query array param receiver_matchers
+		if err := r.SetQueryParam("receiver_matchers", joinedReceiverMatchers...); err != nil {
+			return err
+		}
+	}
+
 	if o.Silenced != nil {
 
 		// query param silenced
@@ -384,4 +412,21 @@ func (o *GetAlertGroupsParams) bindParamFilter(formats strfmt.Registry) []string
 	filterIS := swag.JoinByFormat(filterIC, "multi")
 
 	return filterIS
+}
+
+// bindParamGetAlertGroups binds the parameter receiver_matchers
+func (o *GetAlertGroupsParams) bindParamReceiverMatchers(formats strfmt.Registry) []string {
+	receiverMatchersIR := o.ReceiverMatchers
+
+	var receiverMatchersIC []string
+	for _, receiverMatchersIIR := range receiverMatchersIR { // explode []string
+
+		receiverMatchersIIV := receiverMatchersIIR // string as string
+		receiverMatchersIC = append(receiverMatchersIC, receiverMatchersIIV)
+	}
+
+	// items.CollectionFormat: "multi"
+	receiverMatchersIS := swag.JoinByFormat(receiverMatchersIC, "multi")
+
+	return receiverMatchersIS
 }

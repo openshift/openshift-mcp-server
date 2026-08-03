@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -18,11 +19,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/util/httpstream"
-	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/streaming/pkg/httpstream"
+	"k8s.io/streaming/pkg/httpstream/spdy"
 )
 
 type MockServer struct {
@@ -35,6 +36,8 @@ type MockServer struct {
 func NewMockServer() *MockServer {
 	ms := &MockServer{}
 	scheme := runtime.NewScheme()
+	// Register metav1.Status so error responses can be properly serialized
+	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
 	codecs := serializer.NewCodecFactory(scheme)
 	ms.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ms.mu.RLock()
@@ -112,11 +115,39 @@ type streamAndReply struct {
 }
 
 type StreamContext struct {
-	Closer       io.Closer
+	closer       io.Closer
 	StdinStream  io.ReadCloser
 	StdoutStream io.WriteCloser
 	StderrStream io.WriteCloser
+	errorStream  io.WriteCloser
 	writeStatus  func(status *apierrors.StatusError) error
+}
+
+// Close gracefully tears down the exec streams so the client always observes a
+// clean EOF (and a v4 success terminal status on the error stream) before the
+// SPDY connection is torn down. Closing each stream first blocks until that
+// stream's reply has been flushed and then sends a FIN, so the connection
+// teardown's stream resets reach the client only after it has received every
+// reply and a clean EOF, instead of racing them — the race that otherwise
+// surfaces intermittently as a "Stream reset" on slow runners. The underlying
+// connection is intentionally unexported, so handlers must defer Close to tear
+// the streams down — this graceful teardown is the only path.
+func (c *StreamContext) Close() error {
+	// Send the v4 success terminal status on the error stream.
+	if c.writeStatus != nil {
+		_ = c.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{Status: metav1.StatusSuccess}})
+	}
+	// Close every stream so each delivers a clean EOF (and flushes its reply)
+	// before the connection-level teardown.
+	for _, stream := range []io.Closer{c.StdoutStream, c.StderrStream, c.StdinStream, c.errorStream} {
+		if stream != nil {
+			_ = stream.Close()
+		}
+	}
+	if c.closer != nil {
+		return c.closer.Close()
+	}
+	return nil
 }
 
 type StreamOptions struct {
@@ -148,7 +179,7 @@ func CreateHTTPStreams(w http.ResponseWriter, req *http.Request, opts *StreamOpt
 		return nil
 	})
 	ctx := &StreamContext{
-		Closer: connection,
+		closer: connection,
 	}
 
 	// wait for stream
@@ -173,6 +204,7 @@ WaitForStreams:
 			switch streamType {
 			case v1.StreamTypeError:
 				replyChan <- struct{}{}
+				ctx.errorStream = stream
 				ctx.writeStatus = v4WriteStatusFunc(stream)
 			case v1.StreamTypeStdout:
 				replyChan <- struct{}{}
@@ -287,6 +319,24 @@ func (h *DiscoveryClientHandler) ServeHTTP(w http.ResponseWriter, req *http.Requ
 					return
 				}
 			}
+			// GroupVersion not found - return 404
+			// Set Content-Type before WriteHeader
+			w.Header().Set("Content-Type", runtime.ContentTypeJSON)
+			w.WriteHeader(http.StatusNotFound)
+			status := &metav1.Status{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "Status",
+				},
+				Status:  metav1.StatusFailure,
+				Code:    404,
+				Reason:  metav1.StatusReasonNotFound,
+				Message: fmt.Sprintf("the server could not find the requested resource (get APIResourceList %s)", requestedGV),
+			}
+			if err := json.NewEncoder(w).Encode(status); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+			return
 		}
 	}
 }
@@ -321,6 +371,17 @@ func NewInOpenShiftHandler(additionalResources ...metav1.APIResourceList) *Disco
 					Kind:       "Project",
 					Namespaced: false,
 					ShortNames: []string{"pr"},
+					Verbs:      metav1.Verbs{"create", "delete", "get", "list", "patch", "update", "watch"},
+				},
+			},
+		},
+		{
+			GroupVersion: "route.openshift.io/v1",
+			APIResources: []metav1.APIResource{
+				{
+					Name:       "routes",
+					Kind:       "Route",
+					Namespaced: true,
 					Verbs:      metav1.Verbs{"create", "delete", "get", "list", "patch", "update", "watch"},
 				},
 			},

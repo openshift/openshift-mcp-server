@@ -33,6 +33,19 @@ Implement new functionality in the Go sources under `cmd/` and `pkg/`.
 The JavaScript (`npm/`) and Python (`python/`) directories only wrap the compiled binary for distribution (npm and PyPI).
 Most changes will not require touching them unless the version or packaging needs to be updated.
 
+### Logging
+
+When adding log lines, always use a contextual logger (`klogutil.FromContext(ctx)` from `pkg/klogutil`). If necessary, add a `ctx` parameter to the function, and wire
+the context through to where you need a logger.
+
+`klogutil.FromContext` wraps `klog.FromContext` and injects the context into the logger's values so
+the OpenTelemetry log bridge can extract the active trace span for log-trace correlation. Do not use
+`klog.FromContext` directly in production code.
+
+If you start a new trace span (e.g. `ctx, span := tracer.Start(ctx, "op")`), you must call
+`klogutil.FromContext(ctx)` again to pick up the new span — the logger captured before the span was
+created still carries the old (or empty) span context.
+
 ### Adding new MCP tools
 
 The project uses a toolset-based architecture for organizing MCP tools:
@@ -41,6 +54,8 @@ The project uses a toolset-based architecture for organizing MCP tools:
 - **Toolsets** group related tools together (e.g., config tools, core Kubernetes tools, Helm tools).
 - **Registration** happens in `pkg/toolsets/` where toolsets are registered at initialization.
 - Each toolset lives in its own subdirectory under `pkg/toolsets/` (e.g., `pkg/toolsets/config/`, `pkg/toolsets/core/`, `pkg/toolsets/helm/`).
+
+**Important:** When creating a new toolset, adding tools to an existing toolset, or modifying tool definitions, **always use the `/toolset-design` skill first**. This skill validates the design (naming, grouping, input schema, eval coverage) before implementation begins.
 
 When adding a new tool:
 1. Define the tool handler function that implements the tool's logic.
@@ -234,12 +249,143 @@ func FieldString(obj *unstructured.Unstructured, path string) string {
 }
 ```
 
+#### Test Configuration and Downstream Compatibility
+
+Downstream builds may override defaults at two layers, and tests must work
+regardless of which overrides are active:
+
+1. **Static config overrides** — `pkg/config/config_default_overrides.go`
+   exposes a stub `defaultOverrides()` that downstream forks populate to
+   change defaults such as `ReadOnly`, `Toolsets`, or `ToolOverrides`.
+2. **Per-toolset overrides** — toolsets like `kiali` and `kubevirt` carry an
+   `internal/defaults/defaults_override.go` stub that downstream uses to
+   rebrand the toolset name and description (e.g. `kiali` → `ossm`).
+
+The rules below keep the test suite portable across both layers.
+
+##### Start from `BaseDefault()`, not `Default()`
+
+`BaseMcpSuite.SetupTest()` initializes `s.Cfg` from `config.BaseDefault()`
+(pure upstream defaults), then layers test-specific tweaks like
+`ListOutput = "yaml"` on top. Any custom suite (`ToolsetsSuite`, etc.) must
+do the same — using `config.Default()` would let downstream overrides leak
+into the test environment.
+
+##### Prefer merging TOML into `s.Cfg`
+
+The dominant pattern across the test suite is to unmarshal TOML directly
+into the existing `s.Cfg`. This keeps the configuration visible inline
+(matching how a real config file looks) and automatically preserves the
+runtime fields the suite already set (`KubeConfig`, `ListOutput`,
+`ReadOnly`, etc.):
+
+```go
+s.Require().NoError(toml.Unmarshal([]byte(`
+    toolsets = [ "kubevirt" ]
+`), s.Cfg), "Expected to parse toolsets config")
+```
+
+See `pkg/mcp/kubevirt_test.go`, `pkg/mcp/pods_exec_test.go`, and
+`pkg/mcp/helm_test.go` for representative examples.
+
+##### When `config.ReadToml` is required
+
+`toml.Unmarshal` only does a single decode pass. Fields like
+`toolset_configs` and `cluster_provider_configs` are typed as
+`map[string]toml.Primitive` and need a second parse phase that uses the
+TOML metadata returned by `config.ReadToml`. If your TOML uses one of those
+sections, `toml.Unmarshal` will leave them unparsed and `GetToolsetConfig`
+/ `GetProviderConfig` will return nothing.
+
+In that case, use `ReadToml` and restore the runtime fields explicitly:
+
+```go
+kubeConfig := s.Cfg.KubeConfig
+listOutput := s.Cfg.ListOutput
+readOnly := s.Cfg.ReadOnly
+cfg, err := config.ReadToml([]byte(tomlStr))
+s.Require().NoError(err)
+s.Cfg = cfg
+s.Cfg.KubeConfig = kubeConfig
+s.Cfg.ListOutput = listOutput
+s.Cfg.ReadOnly = readOnly
+```
+
+`pkg/mcp/kiali_test.go` and the `TestToolHandlerReceivesToolsetConfig`
+case in `pkg/mcp/mcp_config_provider_test.go` follow this pattern.
+
+Note that the **TOML key under `[toolset_configs.<key>]` is the literal
+name the toolset registers its parser under, not the toolset's exposed
+name**. The Kiali toolset registers its parser as `"kiali"`
+(see `pkg/kiali/config.go`), so even when downstream rebrands the
+toolset to `ossm`, the section is still `[toolset_configs.kiali]`
+and `params.GetToolsetConfig("kiali")` is the correct lookup. Resolve
+the *toolset name* dynamically via `GetName()` (see below), but keep
+the *toolset_configs key* hardcoded — using the dynamic name there will
+silently produce `(nil, false)`.
+
+##### Inherit runtime fields when building secondary configs
+
+Reload tests sometimes need a separate `*StaticConfig` derived from
+`config.Default()`. This is the deliberate exception to the "start from
+`BaseDefault()`" rule above: a reload simulates the SIGHUP path the
+running server takes, which goes through `Default()` and therefore sees
+any downstream overrides. Carry across the runtime fields from `s.Cfg`
+so the candidate config still points at the test kubeconfig and respects
+the suite's `ReadOnly` value (see `pkg/mcp/mcp_reload_test.go`):
+
+```go
+candidateStatic := config.Default()
+candidateStatic.KubeConfig = s.Cfg.KubeConfig
+candidateStatic.ReadOnly = s.Cfg.ReadOnly
+```
+
+##### Append to `s.Cfg.Toolsets`, never reset it
+
+Hardcoding the toolset list assumes upstream defaults and breaks downstream
+builds that ship a different default set:
+
+```go
+// Good - preserves whatever the suite already has
+s.Cfg.Toolsets = append(s.Cfg.Toolsets, "helm")
+
+// Bad - assumes upstream defaults
+s.Cfg.Toolsets = []string{"core", "config", "helm"}
+```
+
+##### Resolve toolset names through the toolset's `GetName()`
+
+When a test invokes a tool from a rebrandable toolset, ask the toolset for
+its current name rather than hardcoding the upstream string. `kiali_test.go`
+does this so the same test works whether the toolset is exposed as `kiali`
+upstream or `ossm` downstream:
+
+```go
+s.toolsetName = (&kialiToolset.Toolset{}).GetName()
+// ...
+s.CallTool(fmt.Sprintf("%s_get_trace_details", s.toolsetName), …)
+```
+
+##### Never hardcode override-prone defaults
+
+`ReadOnly`, `Toolsets`, `ToolOverrides`, `ListOutput`, and toolset names
+are all subject to downstream override. Read them from `s.Cfg` or resolve
+them at runtime — never assume the upstream value.
+
 #### Examples from the Codebase
 
 Good examples of these patterns can be found in:
 - `internal/test/unstructured_test.go` - demonstrates proper use of testify/suite, nested subtests, and edge case testing
-- `pkg/mcp/kubevirt_test.go` - shows behavior-based testing of the MCP layer
+- `pkg/mcp/kubevirt_test.go` - merges TOML into `s.Cfg` for toolset selection; behavior-based MCP-layer testing
 - `pkg/kubernetes/manager_test.go` - illustrates testing with proper setup/teardown and subtests
+- `pkg/mcp/pods_exec_test.go` - inline TOML for `denied_resources` configuration
+- `pkg/mcp/confirmation_test.go` - inline TOML for `confirmation_rules` and `confirmation_fallback`
+- `pkg/mcp/helm_test.go` - appends to `s.Cfg.Toolsets` instead of resetting it
+- `pkg/mcp/kiali_test.go` - resolves the toolset name dynamically via `GetName()` and uses `ReadToml` for `toolset_configs`
+- `pkg/mcp/toolsets_test.go` - uses `BaseDefault()` in `ToolsetsSuite.SetupTest()` to avoid downstream config leaking
+- `pkg/mcp/mcp_reload_test.go` - inherits `ReadOnly` from `s.Cfg` when building candidate configs for reload tests
+- `pkg/mcp/mcp_config_provider_test.go` - demonstrates inheriting `ReadOnly` from suite config when `toolset_configs` requires `ReadToml`
+- `pkg/mcp/require_tls_test.go` - shows both patterns side by side: `CoreRequireTLSSuite` merges plain `require_tls` into `s.Cfg`, while `KialiRequireTLSSuite` keeps `ReadToml` for `[toolset_configs.kiali]`
 
 ## Linting
 
@@ -293,7 +439,7 @@ When introducing new modules run `make tidy` so that `go.mod` and `go.sum` remai
 
 ## Coding style
 
-- Go modules target Go **1.25** (see `go.mod`).
+- The Go version is declared in `go.mod`; CI installs whatever it requires via `go-version-file`.
 - Tests are written with the standard library `testing` package.
 - Build, test and lint steps are defined in the Makefile—keep them working.
 
@@ -306,6 +452,10 @@ The `docs/` directory contains user-facing documentation:
 - `docs/prompts.md` – MCP Prompts configuration guide
 - `docs/logging.md` – MCP Logging guide (automatic K8s error logging, secret redaction)
 - `docs/OTEL.md` – OpenTelemetry observability setup
+- `docs/observability/metrics.md` – Metrics toolset (Prometheus / Alertmanager via obs-mcp)
+- `docs/observability/tracing.md` – Tracing toolset (Grafana Tempo via obs-mcp)
+- `docs/observability/logs.md` – Logs toolset (Grafana Loki via obs-mcp)
+- `docs/observability/otelcol.md` – OpenTelemetry Collector toolset (component discovery, schemas, and config validation via obs-mcp)
 - `docs/KIALI.md` – Kiali toolset configuration
 - `docs/getting-started-kubernetes.md` – Kubernetes ServiceAccount setup
 - `docs/getting-started-claude-code.md` – Claude Code CLI integration
@@ -318,8 +468,13 @@ The `docs/specs/` directory contains feature specifications (living documentatio
 ### Documentation conventions
 
 - Use **lowercase filenames** for new documentation files (e.g., `configuration.md`, `prompts.md`)
-- The toolsets table in `README.md` and `docs/configuration.md` is **auto-generated** - use `make update-readme-tools` to update it
-- Both files use markers (`<!-- AVAILABLE-TOOLSETS-START -->` / `<!-- AVAILABLE-TOOLSETS-END -->`) for the generated content
+- The toolsets table, tools, prompts, resources, and resource templates in `README.md` and `docs/configuration.md` are **auto-generated** - use `make update-readme-tools` to update them after modifying toolsets
+- Both files use marker pairs for the generated content:
+  - `<!-- AVAILABLE-TOOLSETS-START -->` / `<!-- AVAILABLE-TOOLSETS-END -->` (toolset summary table)
+  - `<!-- AVAILABLE-TOOLSETS-TOOLS-START -->` / `<!-- AVAILABLE-TOOLSETS-TOOLS-END -->` (tool details)
+  - `<!-- AVAILABLE-TOOLSETS-PROMPTS-START -->` / `<!-- AVAILABLE-TOOLSETS-PROMPTS-END -->` (prompt details)
+  - `<!-- AVAILABLE-TOOLSETS-RESOURCES-START -->` / `<!-- AVAILABLE-TOOLSETS-RESOURCES-END -->` (resource details)
+  - `<!-- AVAILABLE-TOOLSETS-RESOURCES-TEMPLATES-START -->` / `<!-- AVAILABLE-TOOLSETS-RESOURCES-TEMPLATES-END -->` (resource template details)
 
 ## Distribution Methods
 

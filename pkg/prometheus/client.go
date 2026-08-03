@@ -28,7 +28,7 @@ type Client struct {
 }
 
 // NewClient creates a new Prometheus client with the specified base URL and options.
-func NewClient(baseURL string, opts ...ClientOption) *Client {
+func NewClient(ctx context.Context, baseURL string, opts ...ClientOption) *Client {
 	c := &Client{
 		baseURL:   baseURL,
 		tlsConfig: newDefaultTLSConfig(),
@@ -36,7 +36,7 @@ func NewClient(baseURL string, opts ...ClientOption) *Client {
 	}
 
 	for _, opt := range opts {
-		opt(c)
+		opt(ctx, c)
 	}
 
 	return c

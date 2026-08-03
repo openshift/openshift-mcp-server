@@ -1,8 +1,15 @@
 package kubevirt
 
 import (
+	"context"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
+
+// Scheme is the runtime scheme for KubeVirt resources
+var Scheme = runtime.NewScheme()
 
 // KubeVirt core resources
 var (
@@ -23,6 +30,13 @@ var (
 	// VirtualMachineInstanceGVR is the GroupVersionResource for VirtualMachineInstance resources
 	VirtualMachineInstanceGVR = schema.GroupVersionResource{
 		Group:    "kubevirt.io",
+		Version:  "v1",
+		Resource: "virtualmachineinstances",
+	}
+
+	// VirtualMachineInstanceSubresourcesGVR is the GroupVersionResource for VirtualMachineInstance subresources
+	VirtualMachineInstanceSubresourcesGVR = schema.GroupVersionResource{
+		Group:    "subresources.kubevirt.io",
 		Version:  "v1",
 		Resource: "virtualmachineinstances",
 	}
@@ -88,6 +102,14 @@ var (
 		Resource: "virtualmachineclones",
 	}
 )
+
+// HasVirtualMachine returns a TargetCompatibilityFilter that checks whether any
+// target cluster has the VirtualMachine GVK registered.
+func HasVirtualMachine(p api.FilteringProvider) func() bool {
+	return func() bool {
+		return p.AnyTargetHasGVKs(context.TODO(), []schema.GroupVersionKind{VirtualMachineGVK})
+	}
+}
 
 // Kubernetes core resources
 var (

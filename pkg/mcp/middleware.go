@@ -3,15 +3,13 @@ package mcp
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
 
-	internalk8s "github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
-	"github.com/containers/kubernetes-mcp-server/pkg/mcplog"
-	"github.com/containers/kubernetes-mcp-server/pkg/telemetry"
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"go.opentelemetry.io/otel"
@@ -19,8 +17,128 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/time/rate"
-	"k8s.io/klog/v2"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
+	internalk8s "github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
+	"github.com/containers/kubernetes-mcp-server/pkg/mcplog"
+	"github.com/containers/kubernetes-mcp-server/pkg/telemetry"
 )
+
+// redactedHeaders lists the request header names that protocolReceivingMiddleware
+// must exclude from V(7) dumps. Header.WriteSubset treats true as "exclude",
+// so any name set here is redacted; everything else is logged verbatim.
+//
+// SECURITY: This is a denylist, not an allowlist — uncommon auth schemes
+// (e.g. a vendor-specific X-Foo-Auth header) will leak. Operators enabling
+// log_level >= 7 should treat the log file as a credential.
+var redactedHeaders = map[string]bool{
+	// Standard HTTP authentication channels.
+	"Authorization":       true,
+	"authorization":       true,
+	"Proxy-Authorization": true,
+	"proxy-authorization": true,
+	"Cookie":              true,
+	"cookie":              true,
+	// Common API gateway / token-auth conventions.
+	"X-Api-Key":    true,
+	"x-api-key":    true,
+	"X-Auth-Token": true,
+	"x-auth-token": true,
+	// Project-specific kubernetes auth header forwarded by HTTP middleware.
+	string(internalk8s.CustomAuthorizationHeader): true,
+}
+
+// protocolReceivingMiddleware logs inbound MCP method calls (client → server)
+// at V(6) and tool-call details at V(5)/V(7). It is the receiving half of
+// the protocol-logging pair; protocolSendingMiddleware handles outbound.
+//
+// Every payload, header buffer, and error string is passed through
+// mcplog.Sanitize before reaching klog so that inline Bearer tokens, JWTs,
+// JSON "token"/"secret"/"password" fields, and other secret-shaped strings
+// are redacted. This is best-effort (denylist + regex) — see docs/logging.md.
+func protocolReceivingMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
+	return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+		rawParams := req.GetParams()
+		logger := klogutil.FromContext(ctx)
+		// Gate the JSON marshal explicitly: Info's args are evaluated
+		// before the V(6) check, so an unguarded jsonCompact(rawParams)
+		// would marshal every request even at the default log_level=0.
+		if logger.V(6).Enabled() {
+			logger.V(6).Info("mcp protocol", "mcp.client.method", method, "mcp.params", mcplog.Sanitize(jsonCompact(rawParams)))
+		}
+		if params, ok := rawParams.(*mcp.CallToolParamsRaw); ok && logger.V(5).Enabled() {
+			// Same gating rationale as the V(6) block above: the per-tool
+			// conversion and the per-header buffer build run before the
+			// V() check unless we short-circuit explicitly.
+			var attributes []any
+
+			if toolCallRequest, err := GoSdkToolCallParamsToToolCallRequest(params); err == nil {
+				attributes = append(attributes,
+					"mcp.tool_call.tool_name", toolCallRequest.Name,
+					"mcp.tool_call.arguments", mcplog.Sanitize(fmt.Sprintf("%v", toolCallRequest.GetArguments())),
+				)
+			}
+
+			if logger.V(7).Enabled() && req.GetExtra() != nil && req.GetExtra().Header != nil {
+				buffer := bytes.NewBuffer(make([]byte, 0))
+				if err := req.GetExtra().Header.WriteSubset(buffer, redactedHeaders); err == nil {
+					attributes = append(attributes,
+						"mcp.tool_call.headers", mcplog.Sanitize(buffer.String()),
+					)
+				}
+			}
+
+			logger.V(5).Info("mcp tool call", attributes...)
+		}
+		result, err := next(ctx, method, req)
+		if err != nil {
+			// Field (not Err) so the error is routed through mcplog.Sanitize; Err would log the raw err.Error().
+			klogutil.LogInfo(logger.V(6), "mcp protocol", klogutil.Field("mcp.client.method", method), klogutil.Field("exception.message", mcplog.Sanitize(fmt.Sprintf("%v", err))))
+		} else if logger.V(6).Enabled() {
+			logger.V(6).Info("mcp protocol", "mcp.client.method", method, "mcp.call.result", mcplog.Sanitize(jsonCompact(result)))
+		}
+		return result, err
+	}
+}
+
+// protocolSendingMiddleware logs outbound MCP traffic (server → client) at
+// V(6). It is the counterpart to protocolReceivingMiddleware and exists
+// because server-initiated frames (logging notifications, list_changed
+// notifications, progress, server-side pings) bypass the receiving path
+// entirely. Without it, only the request half of every exchange would be
+// visible — which is exactly the gap stdio-mode debugging hits.
+//
+// Sanitization is applied identically to the receiving path.
+func protocolSendingMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
+	return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+		logger := klogutil.FromContext(ctx)
+		if logger.V(6).Enabled() {
+			logger.V(6).Info("mcp protocol", "mcp.server.method", method, "mcp.params", mcplog.Sanitize(jsonCompact(req.GetParams())))
+		}
+		result, err := next(ctx, method, req)
+		if err != nil {
+			// Field (not Err) so the error is routed through mcplog.Sanitize; Err would log the raw err.Error().
+			klogutil.LogInfo(logger.V(6), "mcp protocol", klogutil.Field("mcp.server.method", method), klogutil.Field("exception.message", mcplog.Sanitize(fmt.Sprintf("%v", err))))
+		} else if result != nil && logger.V(6).Enabled() {
+			// Notifications return nil result; only requests have one.
+			logger.V(6).Info("mcp protocol", "mcp.server.method", method, "mcp.call.result", mcplog.Sanitize(jsonCompact(result)))
+		}
+		return result, err
+	}
+}
+
+// jsonCompact marshals v to compact JSON for protocol logging.
+// Falls back to fmt.Sprintf on marshal failure.
+func jsonCompact(v any) string {
+	if v == nil {
+		return "<nil>"
+	}
+	data, err := json.Marshal(v)
+	if err != nil {
+		return fmt.Sprintf("%+v", v)
+	}
+	return string(data)
+}
 
 // sessionInjectionMiddleware injects the MCP session into the context for logging support.
 // This middleware should be added first so all subsequent middleware and handlers have access.
@@ -73,25 +191,6 @@ func userAgentPropagationMiddleware(serverName, serverVersion string) func(mcp.M
 	}
 }
 
-func toolCallLoggingMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
-	return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
-		switch params := req.GetParams().(type) {
-		case *mcp.CallToolParamsRaw:
-			toolCallRequest, err := GoSdkToolCallParamsToToolCallRequest(params)
-			if err == nil {
-				klog.V(5).Infof("mcp tool call: %s(%v)", toolCallRequest.Name, toolCallRequest.GetArguments())
-			}
-			if req.GetExtra() != nil && req.GetExtra().Header != nil {
-				buffer := bytes.NewBuffer(make([]byte, 0))
-				if err := req.GetExtra().Header.WriteSubset(buffer, map[string]bool{"Authorization": true, "authorization": true}); err == nil {
-					klog.V(7).Infof("mcp tool call headers: %s", buffer)
-				}
-			}
-		}
-		return next(ctx, method, req)
-	}
-}
-
 // traceContextPropagationMiddleware extracts distributed trace context from MCP request metadata
 // and propagates it into the Go context. This enables distributed tracing across MCP protocol boundaries.
 //
@@ -103,6 +202,8 @@ func traceContextPropagationMiddleware(next mcp.MethodHandler) mcp.MethodHandler
 			return next(ctx, method, req)
 		}
 
+		logger := klogutil.FromContext(ctx)
+
 		// Extract trace context from request params metadata
 		if params := req.GetParams(); params != nil {
 			if callParams, ok := params.(interface{ GetMeta() map[string]any }); ok {
@@ -112,7 +213,7 @@ func traceContextPropagationMiddleware(next mcp.MethodHandler) mcp.MethodHandler
 				func() {
 					defer func() {
 						if r := recover(); r != nil {
-							klog.V(7).Infof("GetMeta() panicked (metadata not set): %v", r)
+							logger.V(7).Info("GetMeta() panicked (metadata not set)", "recover.value", r)
 						}
 					}()
 					meta = callParams.GetMeta()
@@ -127,7 +228,10 @@ func traceContextPropagationMiddleware(next mcp.MethodHandler) mcp.MethodHandler
 					scAfter := trace.SpanContextFromContext(ctx)
 
 					if scAfter.IsValid() && !scAfter.Equal(scBefore) {
-						klog.V(6).Infof("Extracted trace context from MCP request: trace_id=%s span_id=%s", scAfter.TraceID(), scAfter.SpanID())
+						logger.V(6).Info("Extracted trace context from MCP request",
+							"trace_id", scAfter.TraceID(),
+							"span_id", scAfter.SpanID(),
+						)
 					}
 				}
 			}

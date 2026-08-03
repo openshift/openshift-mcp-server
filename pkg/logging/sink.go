@@ -1,0 +1,332 @@
+// Package logging owns the server's klog wiring and the runtime-reloadable
+// log destination (file, stderr, or discard).
+//
+// The whole package exists so that runtime reloads — log_file rotations on
+// SIGHUP — never call klog.SetLoggerWithOptions. klog's own contract states
+// that "modifying the logger is not thread-safe and should be done while no
+// other goroutines invoke log calls, usually during program initialization."
+// We honor that by configuring klog exactly once in New and routing every
+// subsequent reload through a mutex-guarded writer that the textlogger
+// writes to.
+package logging
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"io"
+	"log/slog"
+	"os"
+	"strconv"
+	"sync"
+	"time"
+
+	"github.com/go-logr/logr"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/textlogger"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
+)
+
+// StderrSentinel is the magic value users put in log_file to route logs to
+// stderr without opening a file on disk.
+const StderrSentinel = "stderr"
+
+// maxTextloggerVerbosity makes the textlogger pass everything through; klog's
+// own -v flag is the real verbosity gate at runtime. See package docs.
+const maxTextloggerVerbosity = 9
+
+// Sink is the runtime-reloadable log destination. It implements io.Writer
+// so the textlogger can write through it; reloads swap the underlying
+// writer and close the previous file (if any).
+//
+// Construct with New. Reload on SIGHUP. Close on shutdown.
+type Sink struct {
+	// httpOut and errOut are the process-level stdout/stderr (or test
+	// substitutes). They are the defaults when log_file is unset or set to
+	// the "stderr" sentinel respectively.
+	httpOut io.Writer
+	errOut  io.Writer
+
+	// httpMode pins whether the running process is serving HTTP. It is
+	// captured from cfg.Port at New time and never re-read from config.
+	// The serve mode (HTTP vs stdio) is decided once at startup and
+	// blocks for the process lifetime, so a SIGHUP-reloaded config that
+	// flipped Port must not flip the log destination — flipping to
+	// httpOut while still serving stdio would corrupt the MCP protocol
+	// channel.
+	httpMode bool
+
+	// mu makes the writer-swap + file-close (in reload and Close) mutually
+	// exclusive with in-flight Write calls, so a descriptor is never closed
+	// mid-write. That race is a harmless EBADF on POSIX but deadlocks the
+	// runtime poller on Windows. Write holds the shared read lock (writers
+	// stay concurrent); reload and Close take the exclusive lock.
+	mu sync.RWMutex
+
+	// writer is what every Write call routes through, guarded by mu. Replaced
+	// (never mutated in place) by reload and Close under the exclusive lock.
+	writer io.Writer
+
+	// file is the currently-open log file (nil when the destination is
+	// httpOut, errOut, or io.Discard), guarded by mu. Owned by the Sink —
+	// close happens on reload (when replaced) and Close.
+	file *os.File
+
+	// lastLogFile is the last cfg.LogFile value applyDestination acted on,
+	// used to short-circuit reloads that wouldn't change the destination
+	// (an unchanged "" or "stderr"). A real path is never short-circuited
+	// — even an unchanged path needs reopen for logrotate compatibility.
+	// Only meaningful once applied is true; the zero value of "" would
+	// otherwise spuriously match the empty-log-file case on first call.
+	lastLogFile string
+	applied     bool
+
+	// klogFlags retains the FlagSet bound to klog's globals so we can flip
+	// verbosity at runtime via klogFlags.Set("v", ...). klog protects this
+	// path with its own mutex.
+	klogFlags *flag.FlagSet
+
+	// sdkLogger is captured once, after klog has been wired, and handed to
+	// the MCP SDK as its server-activity logger. It routes through klog and
+	// therefore through this Sink, so log_file changes follow it.
+	sdkLogger *slog.Logger
+
+	// logProvider is the OTel LoggerProvider backing the secondary log sink
+	// (if configured). Close calls Shutdown on it to flush pending records
+	// before releasing the file descriptor. Nil when OTel logging is not
+	// configured.
+	logProvider LogProvider
+}
+
+// LogProvider is implemented by providers that buffer log records and need
+// a graceful shutdown to flush them (e.g. *sdklog.LoggerProvider).
+type LogProvider interface {
+	Shutdown(ctx context.Context) error
+}
+
+// Option configures optional Sink behavior.
+type Option func(*sinkOptions)
+
+type sinkOptions struct {
+	otelSink     logr.LogSink
+	otelProvider LogProvider
+}
+
+// WithOtelLogSink adds an OpenTelemetry logr bridge sink alongside the text
+// logger. When set, every klog call is forwarded to both the text logger
+// (which writes through the Sink's io.Writer) and the OTel bridge (which
+// exports log records via the OTel SDK). The text logger is always the
+// primary — OTel failures never block local logging.
+//
+// The provider is shut down by Sink.Close to flush pending log records.
+func WithOtelLogSink(sink logr.LogSink, provider LogProvider) Option {
+	return func(o *sinkOptions) {
+		o.otelSink = sink
+		o.otelProvider = provider
+	}
+}
+
+// New configures klog and returns a Sink ready to use.
+//
+// httpOut is the writer used in HTTP mode when log_file is unset (typically
+// os.Stdout). errOut is the writer used when log_file is "stderr"
+// (typically os.Stderr). In stdio mode without log_file the sink writes to
+// io.Discard so klog stays out of the protocol channel.
+//
+// New must be called at most once per process (outside of tests, which
+// guard with klog.CaptureState/Restore). It mutates klog's package-level
+// logger and rebinds a fresh FlagSet to klog's globals; a second New
+// would leave the previous Sink's flag bindings dangling and reset
+// klog's writer behind its back. Production wires a single Sink in
+// cmd.Complete and reuses it for the process lifetime.
+//
+// On error, the caller does not need to Close — no file is opened.
+func New(cfg *config.StaticConfig, httpOut, errOut io.Writer, opts ...Option) (*Sink, error) {
+	s := &Sink{
+		httpOut:  httpOut,
+		errOut:   errOut,
+		httpMode: cfg.Port != "",
+	}
+
+	if err := s.applyDestination(cfg); err != nil {
+		return nil, err
+	}
+
+	s.klogFlags = flag.NewFlagSet("klog", flag.ContinueOnError)
+	klog.InitFlags(s.klogFlags)
+	if cfg.LogLevel >= 0 {
+		_ = s.klogFlags.Set("v", strconv.Itoa(cfg.LogLevel))
+	}
+
+	var o sinkOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+
+	cfgOpts := []textlogger.ConfigOption{
+		textlogger.Output(s),
+		textlogger.Verbosity(maxTextloggerVerbosity),
+	}
+	textLogger := textlogger.NewLogger(textlogger.NewConfig(cfgOpts...))
+
+	if o.otelSink != nil {
+		klog.SetLoggerWithOptions(logr.New(&teeSink{
+			primary:   textLogger.GetSink(),
+			secondary: o.otelSink,
+		}))
+		s.logProvider = o.otelProvider
+		klogutil.SetOtelLogSinkActive(true)
+	} else {
+		klog.SetLoggerWithOptions(textLogger)
+		klogutil.SetOtelLogSinkActive(false)
+	}
+
+	s.sdkLogger = slog.New(logr.ToSlogHandler(klog.Background()))
+	return s, nil
+}
+
+// Write implements io.Writer. It routes to whichever writer Reload most
+// recently installed, holding mu's read lock so a reload cannot close the
+// file mid-write (see mu).
+func (s *Sink) Write(p []byte) (int, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.writer == nil {
+		return io.Discard.Write(p)
+	}
+	return s.writer.Write(p)
+}
+
+// SDKLogger is the slog.Logger to hand to the MCP SDK's ServerOptions. It
+// follows reloads — log_file changes apply to SDK-internal logs too.
+func (s *Sink) SDKLogger() *slog.Logger {
+	return s.sdkLogger
+}
+
+// Reload re-applies cfg to the running sink: it opens the new log file (if
+// any), swaps the writer, closes the previous file, and updates klog's
+// verbosity.
+//
+// Reload is intended to be called by a single goroutine (the SIGHUP
+// handler). mu makes each swap+close safe against concurrent Writes, but
+// two concurrent Reloads could still interleave their open-then-swap and
+// leave the sink pointing at an already-closed file. The package assumes
+// a single reloader.
+//
+// The returned error reflects only the destination swap (open-file
+// failure). On error, the previous destination is preserved unchanged.
+// A verbosity-update failure after a successful destination swap is
+// logged via klog.Warningf rather than returned, so the caller's
+// success/failure decision lines up cleanly with whether logs are now
+// landing in the right place. In practice klog.Level.Set never fails on
+// strconv.Itoa output, so this is a defensive path.
+func (s *Sink) Reload(cfg *config.StaticConfig) error {
+	if err := s.applyDestination(cfg); err != nil {
+		return err
+	}
+	if cfg.LogLevel >= 0 {
+		// klog protects this with its own mutex; safe under concurrent V() reads.
+		if err := s.klogFlags.Set("v", strconv.Itoa(cfg.LogLevel)); err != nil {
+			klog.Warningf("logging: failed to update klog verbosity, destination already swapped: %v", err)
+		}
+	}
+	return nil
+}
+
+// Close releases the current log file, if any. It is idempotent and
+// re-routes the writer to errOut first so that any klog call after Close
+// (e.g. an error log emitted by the caller's defer when Close itself
+// returns an error) lands somewhere visible instead of being swallowed by
+// the file descriptor we are about to close.
+//
+// When an OTel LogProvider is configured, Close shuts it down first so
+// pending log records are flushed to the backend while the text sink is
+// still active.
+func (s *Sink) Close() error {
+	// Flush OTel logs before closing the file-based sink. This runs outside
+	// the write lock — the provider shutdown may itself emit log calls that
+	// need to pass through Write.
+	if s.logProvider != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_ = s.logProvider.Shutdown(ctx)
+		cancel()
+		s.logProvider = nil
+	}
+
+	// Exclusive lock so the swap+close can't race an in-flight Write (see mu).
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.writer = s.errOut
+	old := s.file
+	s.file = nil
+	if old == nil {
+		return nil
+	}
+	return old.Close()
+}
+
+// applyDestination resolves cfg.LogFile to a writer (and optionally an open
+// file), swaps it in, and closes the previously-held file. It is the only
+// path that opens or closes log files — Reload and New both go through it.
+//
+// A reload that wouldn't change the destination is skipped, with one
+// exception: a real file path always reopens, even when the path is
+// unchanged, so external rotation tools (logrotate's rename-and-reload
+// flow, etc.) work as expected.
+func (s *Sink) applyDestination(cfg *config.StaticConfig) error {
+	// Skip when the destination is constant for the process and unchanged.
+	// Real file paths fall through — see godoc above.
+	if s.applied && cfg.LogFile == s.lastLogFile && (cfg.LogFile == "" || cfg.LogFile == StderrSentinel) {
+		return nil
+	}
+
+	var (
+		newFile   *os.File
+		newWriter io.Writer
+	)
+
+	switch cfg.LogFile {
+	case "":
+		if s.httpMode {
+			newWriter = s.httpOut
+		} else {
+			// stdio mode: stdout is the MCP protocol channel, don't pollute it.
+			newWriter = io.Discard
+		}
+	case StderrSentinel:
+		newWriter = s.errOut
+	default:
+		f, err := os.OpenFile(cfg.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+		if err != nil {
+			return fmt.Errorf("failed to open log file %q: %w", cfg.LogFile, err)
+		}
+		newFile = f
+		newWriter = f
+	}
+
+	s.lastLogFile = cfg.LogFile
+	s.applied = true
+
+	// Swap + close under the exclusive lock (see mu). The new file was opened
+	// above, outside the lock, so writers only ever block for the swap+close,
+	// not for open latency.
+	s.mu.Lock()
+	s.writer = newWriter
+	oldFile := s.file
+	s.file = newFile
+	var closeErr error
+	if oldFile != nil {
+		closeErr = oldFile.Close()
+	}
+	s.mu.Unlock()
+
+	if closeErr != nil {
+		// Logged outside the lock: klog.Warningf re-enters Write's read lock
+		// and sync.RWMutex is not reentrant. A rotation Close failure warrants
+		// default verbosity — it drops fds under disk pressure or flaky netfs.
+		klog.Warningf("logging: failed to close previous log file: %v", closeErr)
+	}
+	return nil
+}

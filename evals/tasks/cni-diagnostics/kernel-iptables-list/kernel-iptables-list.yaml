@@ -1,0 +1,16 @@
+kind: Task
+metadata:
+  labels:
+    suite: cni-diagnostics
+    category: kernel
+  name: "kernel-iptables-list"
+  difficulty: easy
+steps:
+  setup:
+    file: setup.sh
+  verify:
+    contains: "The agent retrieved iptables NAT rules with packet and byte counters, including chain names and target rules"
+  cleanup:
+    file: cleanup.sh
+  prompt:
+    inline: "Show the iptables NAT rules on a Kubernetes worker node. Include packet and byte counters in the output."

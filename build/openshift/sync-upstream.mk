@@ -1,9 +1,15 @@
 ##@ Upstream Sync
+# Limitation: -X theirs silently resolves textual conflicts in favor of upstream.
+# Downstream-specific patches to shared code (same lines as upstream) will be
+# dropped without warning. Only structural conflicts (delete/modify, rename)
+# trigger a hard failure. If downstream carries patches to files upstream also
+# edits, verify the merge result before approving the sync PR.
 
 UPSTREAM_REPO ?= containers/kubernetes-mcp-server
 UPSTREAM_REMOTE ?= upstream
 ORIGIN_REMOTE ?= origin
 SYNC_BRANCH_NAME ?= upstream-sync
+OWNER_REPO ?= $(shell git remote get-url $(ORIGIN_REMOTE) | sed 's|https://[^@]*@github\.com/||; s|https://github\.com/||; s|git@github\.com:||; s|\.git$$||')
 
 .PHONY: sync-upstream-check
 sync-upstream-check: ## Check if fork is behind upstream (dry-run)
@@ -37,29 +43,90 @@ sync-upstream-pr: ## Create/update PR to sync with upstream (requires gh CLI)
 		exit 0; \
 	fi
 	@echo "📝 Creating sync branch..."
-	@CURRENT_BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
-	BEHIND_COUNT=$$(git rev-list --count $(ORIGIN_REMOTE)/main..$(UPSTREAM_REMOTE)/main); \
+	@BEHIND_COUNT=$$(git rev-list --count $(ORIGIN_REMOTE)/main..$(UPSTREAM_REMOTE)/main); \
 	echo "  Behind by $$BEHIND_COUNT commits"; \
-	git checkout -B $(SYNC_BRANCH_NAME) $(UPSTREAM_REMOTE)/main
+	git checkout -B $(SYNC_BRANCH_NAME) $(ORIGIN_REMOTE)/main
+	@echo "🔀 Merging upstream changes..."
+	@if ! git merge --no-ff -X theirs $(UPSTREAM_REMOTE)/main -m "chore: merge upstream changes"; then \
+		echo "⚠️  Merge conflicts remain after -X theirs. Attempting to resolve generated files..."; \
+		CONFLICTED=$$(git diff --name-only --diff-filter=U); \
+		UNRESOLVABLE=""; \
+		for f in $$CONFLICTED; do \
+			case "$$f" in \
+				go.sum|go.mod|vendor/*) \
+					echo "  Accepting upstream for generated file: $$f"; \
+					git checkout --theirs "$$f"; \
+					git add "$$f"; \
+					;; \
+				*) \
+					UNRESOLVABLE="$$UNRESOLVABLE $$f"; \
+					;; \
+			esac; \
+		done; \
+		if [ -n "$$UNRESOLVABLE" ]; then \
+			echo "❌ Unresolvable conflicts in:$$UNRESOLVABLE"; \
+			git merge --abort; \
+			exit 1; \
+		fi; \
+		git commit --no-edit; \
+	fi
 	@echo "🔧 Updating dependencies..."
 	@go mod tidy && go mod vendor
 	@if [ -n "$$(git status --porcelain go.mod go.sum vendor/)" ]; then \
-		echo "📦 Changes detected. Committing and pushing..."; \
+		echo "📦 Changes detected in generated files. Committing..."; \
 		git add go.mod go.sum vendor/; \
 		git commit -m "chore: update dependencies and vendor"; \
 	fi
+	@echo "Updating toolset documentation..."
+	@$(MAKE) update-readme-tools
+	@if [ -n "$$(git status --porcelain README.md docs/configuration.md)" ]; then \
+		echo "Changes detected in toolset documentation. Committing..."; \
+		git add README.md docs/configuration.md; \
+		git commit -m "chore: update toolset documentation"; \
+	fi
+	@echo "Updating test snapshots..."
+	@$(MAKE) test-update-snapshots
+	@if [ -n "$$(git status --porcelain pkg/mcp/testdata/)" ]; then \
+		echo "Changes detected in test snapshots. Committing..."; \
+		git add pkg/mcp/testdata; \
+		git commit -m "chore: update test snapshots"; \
+	fi
 	@echo "📤 Pushing sync branch..."
-	@git push -f $(ORIGIN_REMOTE) $(SYNC_BRANCH_NAME)
+	@PUSHED_SHA=$$(git rev-parse $(SYNC_BRANCH_NAME)); \
+	git push -f $(ORIGIN_REMOTE) $(SYNC_BRANCH_NAME); \
+	echo "⏳ Waiting for GitHub to index pushed branch at $$PUSHED_SHA..."; \
+	INDEXED=""; \
+	for i in $$(seq 1 30); do \
+		INDEXED=$$(git ls-remote --refs $(ORIGIN_REMOTE) "refs/heads/$(SYNC_BRANCH_NAME)" 2>/dev/null | awk '{print $$1}'); \
+		if [ "$$INDEXED" = "$$PUSHED_SHA" ]; then \
+			echo "✅ Branch indexed at $$PUSHED_SHA."; \
+			break; \
+		fi; \
+		echo "  (attempt $$i/30: got='$$INDEXED' want='$$PUSHED_SHA', retrying in 5s...)"; \
+		sleep 5; \
+	done; \
+	if [ "$$INDEXED" != "$$PUSHED_SHA" ]; then \
+		echo "❌ Timed out waiting for GitHub to index branch after $$((30 * 5))s. Exiting."; \
+		exit 1; \
+	fi
 	@echo "🚀 Creating or updating PR..."
-	@CHANGELOG=$$(git log --pretty=format:"- %h %s (%an)" $(ORIGIN_REMOTE)/main..$(UPSTREAM_REMOTE)/main); \
+	@echo "  OWNER_REPO='$(OWNER_REPO)'"; \
+	CHANGELOG=$$(git log --pretty=format:"- %h %s (%an)" $(ORIGIN_REMOTE)/main..$(UPSTREAM_REMOTE)/main); \
 	BEHIND_COUNT=$$(git rev-list --count $(ORIGIN_REMOTE)/main..$(UPSTREAM_REMOTE)/main); \
-	if gh pr list --head $(SYNC_BRANCH_NAME) --state open | grep -q "$(SYNC_BRANCH_NAME)"; then \
-		echo "  Updating existing PR..."; \
-		gh pr edit $(SYNC_BRANCH_NAME) --body "### 🔄 Upstream Sync"$$'\n'$$'\n'"**Update:** $$(date)"$$'\n'$$'\n'"New changes detected from upstream:"$$'\n'"$$CHANGELOG"; \
+	if ! PR_NUMBER=$$(gh pr list --repo "$(OWNER_REPO)" --head $(SYNC_BRANCH_NAME) --state open --json number --jq '.[0].number'); then \
+		echo "❌ Failed to list PRs (possible rate-limit or auth error). Aborting to prevent duplicate PR creation."; \
+		exit 1; \
+	fi; \
+	if [ -n "$$PR_NUMBER" ] && [ "$$PR_NUMBER" != "null" ]; then \
+		echo "  Updating existing PR #$$PR_NUMBER..."; \
+		PR_BODY="### 🔄 Upstream Sync"$$'\n'$$'\n'"**Update:** $$(date)"$$'\n'$$'\n'"New changes detected from upstream:"$$'\n'"$$CHANGELOG"; \
+		gh api --method PATCH "repos/$(OWNER_REPO)/pulls/$$PR_NUMBER" \
+			--raw-field body="$$PR_BODY"; \
 	else \
 		echo "  Creating new PR..."; \
 		gh pr create \
-			--title "chore: sync with upstream $$(date +'%Y-%m-%d') - $$BEHIND_COUNT new commits" \
+			--repo "$(OWNER_REPO)" \
+			--title "NO-JIRA: sync with upstream $$(date +'%Y-%m-%d')" \
 			--body "### 🔄 Upstream Sync"$$'\n'$$'\n'"This PR syncs the fork with the latest upstream changes."$$'\n'$$'\n'"**Changes:**"$$'\n'"$$CHANGELOG" \
 			--base main \
 			--head $(SYNC_BRANCH_NAME); \

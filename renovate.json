@@ -44,6 +44,15 @@
   "gomod": {
     "enabled": false
   },
+  "pip_requirements": {
+    "enabled": false
+  },
+  "pep621": {
+    "enabled": false
+  },
+  "github-actions": {
+    "enabled": false
+  },
   "vulnerabilityAlerts": {
     "enabled": true
   }

@@ -9,11 +9,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/klog/v2"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 )
 
 type Manager struct {
@@ -22,14 +23,12 @@ type Manager struct {
 	config api.BaseConfig
 }
 
-var _ api.Openshift = (*Manager)(nil)
-
 var (
 	ErrorKubeconfigInClusterNotAllowed = errors.New("kubeconfig manager cannot be used in in-cluster deployments")
 	ErrorInClusterNotInCluster         = errors.New("in-cluster manager cannot be used outside of a cluster")
 )
 
-func NewKubeconfigManager(config api.BaseConfig, kubeconfigContext string) (*Manager, error) {
+func NewKubeconfigManager(ctx context.Context, config api.BaseConfig, kubeconfigContext string) (*Manager, error) {
 	if IsInCluster(config) {
 		return nil, ErrorKubeconfigInClusterNotAllowed
 	}
@@ -39,7 +38,7 @@ func NewKubeconfigManager(config api.BaseConfig, kubeconfigContext string) (*Man
 		pathOptions.LoadingRules.ExplicitPath = config.GetKubeConfigPath()
 	}
 
-	resolvedContext, err := resolveKubeconfigContext(pathOptions.LoadingRules, kubeconfigContext)
+	resolvedContext, err := resolveKubeconfigContext(ctx, pathOptions.LoadingRules, kubeconfigContext)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +55,7 @@ func NewKubeconfigManager(config api.BaseConfig, kubeconfigContext string) (*Man
 		return nil, fmt.Errorf("failed to create kubernetes rest config from kubeconfig: %w", err)
 	}
 
-	return NewManager(config, restConfig, clientCmdConfig)
+	return NewManager(ctx, config, restConfig, clientCmdConfig)
 }
 
 // resolveKubeconfigContext determines which kubeconfig context to use.
@@ -65,7 +64,7 @@ func NewKubeconfigManager(config api.BaseConfig, kubeconfigContext string) (*Man
 //   - returns the current-context if set
 //   - auto-selects the only available context if there is exactly one
 //   - returns a descriptive error if there are zero or multiple contexts
-func resolveKubeconfigContext(loadingRules *clientcmd.ClientConfigLoadingRules, kubeconfigContext string) (string, error) {
+func resolveKubeconfigContext(ctx context.Context, loadingRules *clientcmd.ClientConfigLoadingRules, kubeconfigContext string) (string, error) {
 	if kubeconfigContext != "" {
 		return kubeconfigContext, nil
 	}
@@ -86,7 +85,10 @@ func resolveKubeconfigContext(loadingRules *clientcmd.ClientConfigLoadingRules, 
 				"Configure a context with 'kubectl config set-context <name>' and 'kubectl config use-context <name>'")
 	case 1:
 		for name := range rawConfig.Contexts {
-			klog.Infof("current-context is not set in kubeconfig, auto-selecting the only available context %q", name)
+			klogutil.FromContext(ctx).Info(
+				"current-context is not set in kubeconfig, auto-selecting the only available context",
+				"context_name", name,
+			)
 			return name, nil
 		}
 	}
@@ -102,7 +104,7 @@ func resolveKubeconfigContext(loadingRules *clientcmd.ClientConfigLoadingRules, 
 		strings.Join(names, ", "))
 }
 
-func NewInClusterManager(config api.BaseConfig) (*Manager, error) {
+func NewInClusterManager(ctx context.Context, config api.BaseConfig) (*Manager, error) {
 	if config.GetKubeConfigPath() != "" {
 		return nil, fmt.Errorf("kubeconfig file %s cannot be used with the in-cluster deployments: %w", config.GetKubeConfigPath(), ErrorKubeconfigInClusterNotAllowed)
 	}
@@ -131,10 +133,10 @@ func NewInClusterManager(config api.BaseConfig) (*Manager, error) {
 	}
 	clientCmdConfig.CurrentContext = inClusterKubeConfigDefaultContext
 
-	return NewManager(config, restConfig, clientcmd.NewDefaultClientConfig(*clientCmdConfig, nil))
+	return NewManager(ctx, config, restConfig, clientcmd.NewDefaultClientConfig(*clientCmdConfig, nil))
 }
 
-func NewManager(config api.BaseConfig, restConfig *rest.Config, clientCmdConfig clientcmd.ClientConfig) (*Manager, error) {
+func NewManager(ctx context.Context, config api.BaseConfig, restConfig *rest.Config, clientCmdConfig clientcmd.ClientConfig) (*Manager, error) {
 	if config == nil {
 		return nil, errors.New("config cannot be nil")
 	}
@@ -156,7 +158,7 @@ func NewManager(config api.BaseConfig, restConfig *rest.Config, clientCmdConfig 
 	//k8s.restConfig.Wrap(func(original http.RoundTripper) http.RoundTripper {
 	//	return &impersonateRoundTripper{original}
 	//})
-	k8s.kubernetes, err = NewKubernetes(k8s.config, clientCmdConfig, restConfig)
+	k8s.kubernetes, err = NewKubernetes(ctx, k8s.config, clientCmdConfig, restConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -166,6 +168,7 @@ func NewManager(config api.BaseConfig, restConfig *rest.Config, clientCmdConfig 
 func (m *Manager) Derived(ctx context.Context) (*Kubernetes, error) {
 	authorization, ok := ctx.Value(OAuthAuthorizationHeader).(string)
 	hasToken := ok && strings.HasPrefix(authorization, "Bearer ")
+	logger := klogutil.FromContext(ctx)
 
 	// No token: fall back to kubeconfig credentials, unless require_oauth=true.
 	// In kubeconfig mode, the token exchange layer clears the auth header before we get here,
@@ -177,11 +180,11 @@ func (m *Manager) Derived(ctx context.Context) (*Kubernetes, error) {
 		if m.config.IsRequireOAuth() {
 			return nil, errors.New("oauth token required")
 		}
-		klog.V(5).Infof("No bearer token in context, falling back to kubeconfig credentials")
+		logger.V(5).Info("No bearer token in context, falling back to kubeconfig credentials")
 		return m.kubernetes, nil
 	}
 
-	klog.V(5).Infof("%s header found (Bearer), using provided bearer token", OAuthAuthorizationHeader)
+	logger.V(5).Info("Authorization header found (Bearer), using provided bearer token")
 	userAgent := CustomUserAgent
 	if ua, ok := ctx.Value(UserAgentHeader).(string); ok && ua != "" {
 		userAgent = ua
@@ -209,7 +212,7 @@ func (m *Manager) Derived(ctx context.Context) (*Kubernetes, error) {
 		return nil, fmt.Errorf("failed to get kubeconfig: %w", err)
 	}
 	clientCmdApiConfig.AuthInfos = make(map[string]*clientcmdapi.AuthInfo)
-	derived, err := NewKubernetes(m.config, clientcmd.NewDefaultClientConfig(clientCmdApiConfig, nil), derivedCfg)
+	derived, err := NewKubernetes(ctx, m.config, clientcmd.NewDefaultClientConfig(clientCmdApiConfig, nil), derivedCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create derived client: %w", err)
 	}

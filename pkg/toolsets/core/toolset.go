@@ -11,7 +11,7 @@ import (
 const REGEX_LABELSELECTOR_VALID_CHARS = "^([/_.\\-A-Za-z0-9=, ()!])+$"
 
 // Details: https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/
-const REGEX_FIELDSELECTOR = "^[.\\-A-Za-z0-9]+([=!,]{1,2}[.\\-A-Za-z0-9]+)+$"
+const REGEX_FIELDSELECTOR = "^[.\\-A-Za-z0-9]+([=!,]{1,2}[./\\-A-Za-z0-9]+)+$"
 
 type Toolset struct{}
 
@@ -25,13 +25,13 @@ func (t *Toolset) GetDescription() string {
 	return "Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)"
 }
 
-func (t *Toolset) GetTools(o api.Openshift) []api.ServerTool {
+func (t *Toolset) GetTools(p api.FilteringProvider) []api.ServerTool {
 	return slices.Concat(
 		initEvents(),
-		initNamespaces(o),
+		initNamespaces(p),
 		initNodes(),
 		initPods(),
-		initResources(o),
+		initResources(p),
 	)
 }
 
@@ -39,6 +39,14 @@ func (t *Toolset) GetPrompts() []api.ServerPrompt {
 	return slices.Concat(
 		initHealthChecks(),
 	)
+}
+
+func (t *Toolset) GetResources() []api.ServerResource {
+	return nil
+}
+
+func (t *Toolset) GetResourceTemplates() []api.ServerResourceTemplate {
+	return nil
 }
 
 func init() {

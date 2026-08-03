@@ -6,6 +6,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubevirt"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt/internal/defaults"
 	"github.com/google/jsonschema-go/jsonschema"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/utils/ptr"
@@ -20,12 +21,12 @@ const (
 	ActionRestart Action = "restart"
 )
 
-func Tools() []api.ServerTool {
+func Tools(p api.FilteringProvider) []api.ServerTool {
 	return []api.ServerTool{
 		{
 			Tool: api.Tool{
 				Name:        "vm_lifecycle",
-				Description: "Manage VirtualMachine lifecycle: start, stop, or restart a VM",
+				Description: fmt.Sprintf("Manage %s VirtualMachine lifecycle: start, stop, or restart a VM", defaults.ProductName()),
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
@@ -54,6 +55,9 @@ func Tools() []api.ServerTool {
 				},
 			},
 			Handler: lifecycle,
+			TargetCompatibilityFilters: []func() bool{
+				kubevirt.HasVirtualMachine(p),
+			},
 		},
 	}
 }

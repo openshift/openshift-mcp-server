@@ -1,0 +1,38 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: k8s_events receiver configuration
+type: object
+properties:
+    auth_type:
+        description: |-
+            How to authenticate to the K8s API server.  This can be one of `none`
+            (for no auth), `serviceAccount` (to use the standard service account
+            token provided to the agent pod), or `kubeConfig` to use credentials
+            from `~/.kube/config`.
+        type: string
+    context:
+        description: When using auth_type `kubeConfig`, override the current context.
+        type: string
+    k8s_leader_elector:
+        type: string
+    kube_api_burst:
+        description: |-
+            KubeAPIBurst is the maximum burst of requests to the Kubernetes API.
+            Uses client-go's default (10) if unset. Increase if you see client-side throttling warnings.
+        type: integer
+    kube_api_qps:
+        description: |-
+            KubeAPIQPS is the maximum number of queries per second to the Kubernetes API.
+            Uses client-go's default (5) if unset. Increase if you see client-side throttling warnings.
+        type: number
+    namespaces:
+        description: List of ‘namespaces’ to collect events from.
+        type: array
+        items:
+            type: string
+    storage:
+        description: |-
+            Storage is the ID of the storage extension to use for resource version persistence.
+            When set, the receiver will persist the latest resource version and resume from it on restart,
+            preventing duplicate events. Only valid for watch mode (which is the only mode this receiver uses).
+        type: string
+additionalProperties: false

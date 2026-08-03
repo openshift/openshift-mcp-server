@@ -14,7 +14,8 @@ import (
 // Kubernetes cluster. Used for in-cluster deployments or when multi-cluster
 // support is disabled.
 type singleClusterProvider struct {
-	config              api.BaseConfig
+	api.BaseConfig
+	*ProviderGVKFilter
 	strategy            string
 	manager             *Manager
 	kubeconfigWatcher   *watcher.Kubeconfig
@@ -32,32 +33,33 @@ func init() {
 // When used within a cluster or with an 'in-cluster' strategy, it uses an InClusterManager.
 // Otherwise, it uses a KubeconfigManager.
 func newSingleClusterProvider(strategy string) ProviderFactory {
-	return func(cfg api.BaseConfig) (Provider, error) {
+	return func(ctx context.Context, cfg api.BaseConfig) (Provider, error) {
 		ret := &singleClusterProvider{
-			config:   cfg,
-			strategy: strategy,
+			BaseConfig: cfg,
+			strategy:   strategy,
 		}
-		if err := ret.reset(); err != nil {
+		if err := ret.reset(ctx); err != nil {
 			return nil, err
 		}
+		ret.ProviderGVKFilter = NewProviderGVKFilter(ret)
 		return ret, nil
 	}
 }
 
-func (p *singleClusterProvider) reset() error {
-	if p.config != nil && p.config.GetKubeConfigPath() != "" && p.strategy == api.ClusterProviderInCluster {
+func (p *singleClusterProvider) reset(ctx context.Context) error {
+	if p.BaseConfig != nil && p.GetKubeConfigPath() != "" && p.strategy == api.ClusterProviderInCluster {
 		return fmt.Errorf("kubeconfig file %s cannot be used with the in-cluster ClusterProviderStrategy",
-			p.config.GetKubeConfigPath())
+			p.GetKubeConfigPath())
 	}
 
 	if p.manager != nil {
 		p.manager.Close()
 	}
 	var err error
-	if p.strategy == api.ClusterProviderInCluster || IsInCluster(p.config) {
-		p.manager, err = NewInClusterManager(p.config)
+	if p.strategy == api.ClusterProviderInCluster || IsInCluster(p) {
+		p.manager, err = NewInClusterManager(ctx, p)
 	} else {
-		p.manager, err = NewKubeconfigManager(p.config, "")
+		p.manager, err = NewKubeconfigManager(ctx, p, "")
 	}
 	if err != nil {
 		if errors.Is(err, ErrorInClusterNotInCluster) {
@@ -68,13 +70,9 @@ func (p *singleClusterProvider) reset() error {
 	}
 
 	p.Close()
-	p.kubeconfigWatcher = watcher.NewKubeconfig(p.manager.kubernetes.clientCmdConfig)
-	p.clusterStateWatcher = watcher.NewClusterState(p.manager.kubernetes.DiscoveryClient())
+	p.kubeconfigWatcher = watcher.NewKubeconfig(ctx, p.manager.kubernetes.clientCmdConfig)
+	p.clusterStateWatcher = watcher.NewClusterState(ctx, p.manager.kubernetes.DiscoveryClient())
 	return nil
-}
-
-func (p *singleClusterProvider) IsOpenShift(ctx context.Context) bool {
-	return p.manager.IsOpenShift(ctx)
 }
 
 func (p *singleClusterProvider) IsMultiTarget() bool {
@@ -83,6 +81,10 @@ func (p *singleClusterProvider) IsMultiTarget() bool {
 
 func (p *singleClusterProvider) GetTargets(_ context.Context) ([]string, error) {
 	return []string{""}, nil
+}
+
+func (p *singleClusterProvider) GetTargetManagers(_ context.Context) ([]*Manager, error) {
+	return []*Manager{p.manager}, nil
 }
 
 func (p *singleClusterProvider) GetDerivedKubernetes(ctx context.Context, target string) (*Kubernetes, error) {
@@ -101,16 +103,16 @@ func (p *singleClusterProvider) GetTargetParameterName() string {
 	return ""
 }
 
-func (p *singleClusterProvider) WatchTargets(reload McpReload) {
+func (p *singleClusterProvider) WatchTargets(ctx context.Context, reload McpReload) {
 	reloadWithReset := func() error {
-		if err := p.reset(); err != nil {
+		if err := p.reset(ctx); err != nil {
 			return err
 		}
-		p.WatchTargets(reload)
+		p.WatchTargets(ctx, reload)
 		return reload()
 	}
-	p.kubeconfigWatcher.Watch(reloadWithReset)
-	p.clusterStateWatcher.Watch(reload)
+	p.kubeconfigWatcher.Watch(ctx, reloadWithReset)
+	p.clusterStateWatcher.Watch(ctx, reload)
 }
 
 func (p *singleClusterProvider) Close() {

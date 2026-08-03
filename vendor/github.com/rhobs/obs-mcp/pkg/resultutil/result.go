@@ -53,11 +53,8 @@ func (r *Result) ToMCPResult() (*mcp.CallToolResult, error) {
 		//nolint:nilerr // MCP pattern encodes errors in result, not error return
 		return callToolRes, nil
 	}
-	callToolRes.Content = []mcp.Content{
-		&mcp.ToolResultContent{
-			StructuredContent: r.Data, Content: []mcp.Content{&mcp.TextContent{Text: r.JSONText}},
-		},
-	}
+	callToolRes.Content = []mcp.Content{&mcp.TextContent{Text: r.JSONText}}
+	callToolRes.StructuredContent = r.Data
 	return callToolRes, nil
 }
 

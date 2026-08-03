@@ -1,0 +1,27 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "ovn-get-specific-router"
+  difficulty: easy
+  category: "OVN Database Query"
+  description: "Get ovn_cluster_router record from Logical_Router table"
+  labels:
+    suite: ovn-kubernetes
+    requires: ovn-kubernetes
+spec:
+  limits:
+    timeout: "5m"
+  setup:
+    - script:
+        file: ./setup.sh
+  prompt:
+    inline: |
+      Get the ovn_cluster_router record from the Logical_Router table in the OVN Northbound database.
+  verify:
+    - llmJudge:
+        contains: "Shows ovn_cluster_router record from the Logical_Router table. Should include list of ports, routing policies and static routes configured for the cluster router(k8s-cluster-router)"
+        reasoning: "Output should show ovn_cluster_router record with ports, routing policies, and static routes"
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "ovn_get"

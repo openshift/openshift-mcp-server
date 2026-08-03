@@ -1,0 +1,30 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "ovn-show-northbound"
+  difficulty: easy
+  category: "OVN Configuration"
+  description: "Display OVN Northbound database configuration using ovn_show tool"
+  labels:
+    suite: ovn-kubernetes
+    requires: ovn-kubernetes
+spec:
+  limits:
+    timeout: "5m"
+  setup:
+    - script:
+        file: ./setup.sh
+  prompt:
+    inline: |
+      Show me the OVN Northbound database configuration from one of the ovnkube-node pods. show me last 1000 lines.
+  verify:
+    - llmJudge:
+        contains: "Shows logical topology comprised of node specific switches, join switch, transit switch, gateway router and ovn_cluster_router"
+        reasoning: "Output should describe the logical topology including switches and routers"
+    - llmJudge:
+        contains: "Includes logical router ports, logical switch ports, IP address, MAC address of ports and SNAT rules"
+        reasoning: "Output should include details about ports, addresses, and SNAT rules"
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "ovn_show"

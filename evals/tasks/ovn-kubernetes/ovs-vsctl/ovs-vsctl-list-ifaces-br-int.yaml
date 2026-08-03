@@ -1,0 +1,27 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "ovs-vsctl-list-ifaces-br-int"
+  difficulty: easy
+  category: "OVS Configuration"
+  description: "List interfaces attached to the br-int bridge on an ovnkube-node pod"
+  labels:
+    suite: ovn-kubernetes
+    requires: ovn-kubernetes
+spec:
+  limits:
+    timeout: "5m"
+  setup:
+    - script:
+        file: ./setup.sh
+  prompt:
+    inline: |
+      List all the interfaces attached to the br-int bridge on one of the ovnkube-node pods.
+  verify:
+    - llmJudge:
+        contains: "Lists the interfaces attached to br-int including the ovn-k8s-mp0 management interface"
+        reasoning: "ovn-k8s-mp0 is the management interface every OVN-K node uses on br-int; it is a structural invariant"
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "ovs_vsctl"

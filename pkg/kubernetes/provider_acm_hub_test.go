@@ -38,7 +38,7 @@ func (s *ProviderACMHubTestSuite) SetupTest() {
 		cluster_proxy_addon_skip_tls_verify = true
 	`)))
 
-	provider, err := NewProvider(cfg)
+	provider, err := NewProvider(s.T().Context(), cfg)
 	s.Require().NoError(err, "Expected no error creating ACM provider")
 	s.provider = provider
 }
@@ -56,13 +56,6 @@ func (s *ProviderACMHubTestSuite) TearDownTest() {
 
 func (s *ProviderACMHubTestSuite) TestType() {
 	s.IsType(&acmHubClusterProvider{}, s.provider)
-}
-
-func (s *ProviderACMHubTestSuite) TestWithNonOpenShiftCluster() {
-	s.Run("IsOpenShift returns false", func() {
-		inOpenShift := s.provider.IsOpenShift(s.T().Context())
-		s.False(inOpenShift, "Expected IsOpenShift to return false")
-	})
 }
 
 func (s *ProviderACMHubTestSuite) TestGetTargets() {

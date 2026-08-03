@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/BurntSushi/toml"
@@ -20,11 +21,15 @@ import (
 )
 
 type mockRoundTripper struct {
+	mu        sync.Mutex
 	called    *bool
 	onRequest func(w http.ResponseWriter, r *http.Request)
 }
 
 func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	*m.called = true
 	rec := httptest.NewRecorder()
 	m.onRequest(rec, req)
@@ -295,7 +300,7 @@ func (s *AccessControlRoundTripperTestSuite) TestValidationDisabledBypassesValid
 
 	s.Run("validation disabled allows request with unknown fields", func() {
 		delegateCalled = false
-		rt := NewAccessControlRoundTripper(AccessControlRoundTripperConfig{
+		rt := NewAccessControlRoundTripper(s.T().Context(), AccessControlRoundTripperConfig{
 			Delegate:           mockDelegate,
 			RestMapperProvider: func() meta.RESTMapper { return s.restMapper },
 			ValidationEnabled:  false,
@@ -311,7 +316,7 @@ func (s *AccessControlRoundTripperTestSuite) TestValidationDisabledBypassesValid
 
 	s.Run("validation enabled rejects request with unknown fields", func() {
 		delegateCalled = false
-		rt := NewAccessControlRoundTripper(AccessControlRoundTripperConfig{
+		rt := NewAccessControlRoundTripper(s.T().Context(), AccessControlRoundTripperConfig{
 			Delegate:           mockDelegate,
 			RestMapperProvider: func() meta.RESTMapper { return s.restMapper },
 			ValidationEnabled:  true,

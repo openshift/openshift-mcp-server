@@ -1,0 +1,16 @@
+kind: Task
+metadata:
+  labels:
+    suite: cni-diagnostics
+    category: kernel
+  name: "kernel-conntrack-filter"
+  difficulty: medium
+steps:
+  setup:
+    file: setup.sh
+  verify:
+    contains: "The agent retrieved filtered conntrack entries for TCP connections to the Kubernetes API server on destination port 443 or 6443"
+  cleanup:
+    file: cleanup.sh
+  prompt:
+    inline: "Find connection tracking entries on a worker node for TCP connections to the Kubernetes API server (typically port 443 or 6443). Filter the conntrack table to show only these specific connections."

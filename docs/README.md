@@ -22,8 +22,15 @@ Choose the guide that matches your needs:
 
 ## Toolset Guides
 
+- **[Metrics](./observability/metrics.md)** - Prometheus and Alertmanager tools (`observability/metrics` toolset, via [obs-mcp](https://github.com/rhobs/obs-mcp))
+- **[Tracing](./observability/tracing.md)** - Grafana Tempo and TraceQL (`observability/traces` toolset, via [obs-mcp](https://github.com/rhobs/obs-mcp))
+- **[Logs](./observability/logs.md)** - Grafana Loki and LogQL (`observability/logs` toolset, via [obs-mcp](https://github.com/rhobs/obs-mcp))
+- **[OpenTelemetry Collector](./observability/otelcol.md)** - Component discovery, schemas, and config validation (`observability/otelcol` toolset, via [obs-mcp](https://github.com/rhobs/obs-mcp))
+- **[OADP](OADP.md)** - Tools for OpenShift API for Data Protection (Velero backups, restores, schedules)
 - **[Kiali](KIALI.md)** - Tools for Kiali ServiceMesh with Istio
+- **[NetObserv](NETOBSERV.md)** - Network observability flows, metrics, and alerts (Helm on OpenShift)
 - **[KubeVirt](kubevirt.md)** - KubeVirt virtual machine management tools
+- **[Tekton](tekton.md)** - Tekton PipelineRun, TaskRun, and troubleshooting tools
 
 ## Feature Specifications
 
@@ -32,6 +39,7 @@ Living documentation for implemented and planned features:
 | Spec | Description | Status |
 |------|-------------|--------|
 | **[Validation](specs/validation.md)** | Pre-execution validation layer (resource existence, schema, RBAC) | Implemented |
+| **[Structured Tool Output](specs/structured-output.md)** | Conventions for tools that emit `structuredContent` | Implemented |
 
 ## Advanced Topics
 

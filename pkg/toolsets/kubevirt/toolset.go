@@ -5,8 +5,10 @@ import (
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
+	kubevirtdefaults "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt/internal/defaults"
 	vm_clone "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt/vm/clone"
 	vm_create "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt/vm/create"
+	vm_guestagent "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt/vm/guestagent"
 	vm_lifecycle "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt/vm/lifecycle"
 )
 
@@ -19,19 +21,31 @@ func (t *Toolset) GetName() string {
 }
 
 func (t *Toolset) GetDescription() string {
-	return "KubeVirt virtual machine management tools, check the [KubeVirt documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/kubevirt.md) for more details."
+	return kubevirtdefaults.ToolsetDescription()
 }
 
-func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
+func (t *Toolset) GetTools(p api.FilteringProvider) []api.ServerTool {
 	return slices.Concat(
-		vm_clone.Tools(),
-		vm_create.Tools(),
-		vm_lifecycle.Tools(),
+		vm_clone.Tools(p),
+		vm_create.Tools(p),
+		vm_guestagent.Tools(p),
+		vm_lifecycle.Tools(p),
 	)
 }
 
 func (t *Toolset) GetPrompts() []api.ServerPrompt {
-	return initVMTroubleshoot()
+	return slices.Concat(
+		initVMTroubleshoot(),
+		initWindowsGoldenImage(),
+	)
+}
+
+func (t *Toolset) GetResources() []api.ServerResource {
+	return nil
+}
+
+func (t *Toolset) GetResourceTemplates() []api.ServerResourceTemplate {
+	return nil
 }
 
 func init() {

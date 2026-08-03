@@ -1,5 +1,5 @@
-ARG BUILDER_IMAGE=registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.23
-ARG BASE_IMAGE=registry.ci.openshift.org/ocp/4.23:base-rhel9
+ARG BUILDER_IMAGE=registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.26-openshift-5.0
+ARG BASE_IMAGE=registry.ci.openshift.org/ocp/5.0:base-rhel9
 
 # Build the manager binary
 FROM ${BUILDER_IMAGE} AS builder
@@ -22,9 +22,6 @@ RUN mkdir /licenses
 COPY --from=builder /workspace/LICENSE /licenses/.
 USER 65532:65532
 
-COPY mcp_config.toml /mcp_config.toml
-ENV CONFIG_PATH=/mcp_config.toml
-
 # Labels for enterprise contract
 LABEL com.redhat.component=openshift-mcp-server
 LABEL description="Red Hat OpenShift MCP Server"
@@ -38,4 +35,4 @@ LABEL vendor="Red Hat, Inc."
 LABEL version=0.0.1
 LABEL summary="Red Hat OpenShift MCP Server"
 
-ENTRYPOINT ["/openshift-mcp-server", "--config", "$CONFIG_PATH"]
+ENTRYPOINT ["/openshift-mcp-server"]

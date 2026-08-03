@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"github.com/containers/kubernetes-mcp-server/internal/test"
 	"regexp"
 	"strings"
 	"testing"
@@ -66,6 +67,18 @@ func (s *ResourcesSuite) TestResourcesList() {
 		s.Run("returns more than 2 items", func() {
 			s.Truef(len(decodedNamespaces) >= 3, "invalid namespace count, expected >2, got %v", len(decodedNamespaces))
 		})
+		s.Run("returns structured content with items", func() {
+			s.Require().NotNil(namespaces.StructuredContent, "expected structuredContent for resources_list")
+			structured, ok := namespaces.StructuredContent.(map[string]interface{})
+			s.Require().True(ok, "expected structuredContent to be wrapped in an object per MCP spec")
+			items, ok := structured["items"].([]interface{})
+			s.Require().True(ok, "expected items array in structured content")
+			s.Truef(len(items) >= 3, "expected >=3 structured items, got %d", len(items))
+			first, ok := items[0].(map[string]interface{})
+			s.Require().True(ok, "expected each item to be a map")
+			s.Equal("Namespace", first["kind"], "structured item kind should be Namespace")
+			s.Equal("v1", first["apiVersion"], "structured item apiVersion should be v1")
+		})
 	})
 	s.Run("resources_list with label selector returns filtered pods", func() {
 		s.Run("list pods with app=nginx label", func() {
@@ -104,7 +117,7 @@ func (s *ResourcesSuite) TestResourcesList() {
 	})
 	s.Run("resources_list with field selector returns filtered pods", func() {
 		// Create an additional pod in default namespace to verify it gets excluded
-		kc := kubernetes.NewForConfigOrDie(envTestRestConfig)
+		kc := kubernetes.NewForConfigOrDie(test.EnvTestRestConfig())
 		_, _ = kc.CoreV1().Pods("default").Create(s.T().Context(), &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "resources-field-excluded",
@@ -202,7 +215,7 @@ func (s *ResourcesSuite) TestResourcesListDenied() {
 func (s *ResourcesSuite) TestResourcesListForbidden() {
 	s.InitMcpClient()
 	defer restoreAuth(s.T().Context())
-	client := kubernetes.NewForConfigOrDie(envTestRestConfig)
+	client := kubernetes.NewForConfigOrDie(test.EnvTestRestConfig())
 	// Remove all permissions - user will have forbidden access
 	_ = client.RbacV1().ClusterRoles().Delete(s.T().Context(), "allow-all", metav1.DeleteOptions{})
 
@@ -231,7 +244,7 @@ func (s *ResourcesSuite) TestResourcesListAsTable() {
 	s.InitMcpClient()
 
 	s.Run("resources_list(apiVersion=v1, kind=ConfigMap) (list_output=table)", func() {
-		kc := kubernetes.NewForConfigOrDie(envTestRestConfig)
+		kc := kubernetes.NewForConfigOrDie(test.EnvTestRestConfig())
 		_, _ = kc.CoreV1().ConfigMaps("default").Create(s.T().Context(), &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Name: "a-configmap-to-list-as-table", Labels: map[string]string{"resource": "config-map"}},
 			Data:       map[string]string{"key": "value"},
@@ -261,10 +274,30 @@ func (s *ResourcesSuite) TestResourcesListAsTable() {
 			s.Truef(m, "Expected row '%s' not found in output:\n%s", expectedRow, outConfigMapList)
 			s.NoErrorf(e, "Error matching row regex: %v", e)
 		})
+		s.Run("returns structured content from table", func() {
+			s.Require().NotNil(configMapList.StructuredContent, "expected structuredContent for table output")
+			structured, ok := configMapList.StructuredContent.(map[string]interface{})
+			s.Require().True(ok, "expected structuredContent to be wrapped in an object per MCP spec")
+			items, ok := structured["items"].([]interface{})
+			s.Require().True(ok, "expected items array in structured content")
+			s.Truef(len(items) >= 1, "expected >=1 structured items, got %d", len(items))
+			var found bool
+			for _, item := range items {
+				row, ok := item.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				if name, _ := row["Name"].(string); name == "a-configmap-to-list-as-table" {
+					found = true
+					break
+				}
+			}
+			s.True(found, "expected to find a-configmap-to-list-as-table in structured content items")
+		})
 	})
 
 	s.Run("resources_list(apiVersion=route.openshift.io/v1, kind=Route) (list_output=table)", func() {
-		_, _ = dynamic.NewForConfigOrDie(envTestRestConfig).
+		_, _ = dynamic.NewForConfigOrDie(test.EnvTestRestConfig()).
 			Resource(schema.GroupVersionResource{Group: "route.openshift.io", Version: "v1", Resource: "routes"}).
 			Namespace("default").
 			Create(s.T().Context(), &unstructured.Unstructured{Object: map[string]interface{}{
@@ -361,6 +394,16 @@ func (s *ResourcesSuite) TestResourcesGet() {
 		s.Run("returns default namespace", func() {
 			s.Equalf("default", decodedNamespace.GetName(), "invalid namespace name, expected default, got %v", decodedNamespace.GetName())
 		})
+		s.Run("returns structured content", func() {
+			s.Require().NotNil(namespace.StructuredContent, "expected structuredContent for resources_get")
+			structured, ok := namespace.StructuredContent.(map[string]interface{})
+			s.Require().True(ok, "expected structuredContent to be a map")
+			s.Equal("Namespace", structured["kind"], "structured kind should be Namespace")
+			s.Equal("v1", structured["apiVersion"], "structured apiVersion should be v1")
+			metadata, ok := structured["metadata"].(map[string]interface{})
+			s.Require().True(ok, "expected metadata map in structured content")
+			s.Equal("default", metadata["name"], "structured metadata.name should be default")
+		})
 	})
 }
 
@@ -372,7 +415,7 @@ func (s *ResourcesSuite) TestResourcesGetDenied() {
 		]
 	`), s.Cfg), "Expected to parse denied resources config")
 	s.InitMcpClient()
-	kc := kubernetes.NewForConfigOrDie(envTestRestConfig)
+	kc := kubernetes.NewForConfigOrDie(test.EnvTestRestConfig())
 	_, _ = kc.CoreV1().Secrets("default").Create(s.T().Context(), &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: "denied-secret"},
 	}, metav1.CreateOptions{})
@@ -416,7 +459,7 @@ func (s *ResourcesSuite) TestResourcesGetDenied() {
 
 func (s *ResourcesSuite) TestResourcesCreateOrUpdate() {
 	s.InitMcpClient()
-	client := kubernetes.NewForConfigOrDie(envTestRestConfig)
+	client := kubernetes.NewForConfigOrDie(test.EnvTestRestConfig())
 
 	s.Run("resources_create_or_update with nil resource returns error", func() {
 		toolResult, _ := s.CallTool("resources_create_or_update", map[string]interface{}{})
@@ -490,7 +533,7 @@ func (s *ResourcesSuite) TestResourcesCreateOrUpdate() {
 			s.Falsef(resourcesCreateOrUpdateCrd.IsError, "call tool failed")
 		})
 		s.Run("creates custom resource definition", func() {
-			apiExtensionsV1Client := apiextensionsv1.NewForConfigOrDie(envTestRestConfig)
+			apiExtensionsV1Client := apiextensionsv1.NewForConfigOrDie(test.EnvTestRestConfig())
 			_, err = apiExtensionsV1Client.CustomResourceDefinitions().Get(s.T().Context(), "customs.example.com", metav1.GetOptions{})
 			s.Nilf(err, "custom resource definition not found")
 		})
@@ -505,7 +548,7 @@ func (s *ResourcesSuite) TestResourcesCreateOrUpdate() {
 			s.Falsef(resourcesCreateOrUpdateCustom.IsError, "call tool failed, got: %v", resourcesCreateOrUpdateCustom.Content)
 		})
 		s.Run("creates custom resource", func() {
-			dynamicClient := dynamic.NewForConfigOrDie(envTestRestConfig)
+			dynamicClient := dynamic.NewForConfigOrDie(test.EnvTestRestConfig())
 			_, err = dynamicClient.
 				Resource(schema.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "customs"}).
 				Namespace("default").
@@ -522,7 +565,7 @@ func (s *ResourcesSuite) TestResourcesCreateOrUpdate() {
 			s.Falsef(resourcesCreateOrUpdateCustomUpdated.IsError, "call tool failed")
 		})
 		s.Run("updates custom resource", func() {
-			dynamicClient := dynamic.NewForConfigOrDie(envTestRestConfig)
+			dynamicClient := dynamic.NewForConfigOrDie(test.EnvTestRestConfig())
 			customResource, _ := dynamicClient.
 				Resource(schema.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "customs"}).
 				Namespace("default").
@@ -554,7 +597,7 @@ func (s *ResourcesSuite) TestResourcesCreateOrUpdate() {
 			s.Require().Nilf(cmErr, "ConfigMap not found")
 			s.NotNil(cm, "ConfigMap not found")
 			// Retrieve the resource via dynamic client to inspect the raw object for status
-			dynamicClient := dynamic.NewForConfigOrDie(envTestRestConfig)
+			dynamicClient := dynamic.NewForConfigOrDie(test.EnvTestRestConfig())
 			raw, rawErr := dynamicClient.
 				Resource(schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}).
 				Namespace("default").
@@ -568,7 +611,7 @@ func (s *ResourcesSuite) TestResourcesCreateOrUpdate() {
 
 func (s *ResourcesSuite) TestResourcesCreateOrUpdateForcesSSA() {
 	s.InitMcpClient()
-	dynamicClient := dynamic.NewForConfigOrDie(envTestRestConfig)
+	dynamicClient := dynamic.NewForConfigOrDie(test.EnvTestRestConfig())
 	cmResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}
 
 	s.Run("succeeds when another field manager owns the fields", func() {
@@ -657,7 +700,7 @@ func (s *ResourcesSuite) TestResourcesCreateOrUpdateDenied() {
 func (s *ResourcesSuite) TestResourcesCreateOrUpdateForbidden() {
 	s.InitMcpClient()
 	defer restoreAuth(s.T().Context())
-	client := kubernetes.NewForConfigOrDie(envTestRestConfig)
+	client := kubernetes.NewForConfigOrDie(test.EnvTestRestConfig())
 	// Remove all permissions - user will have forbidden access
 	_ = client.RbacV1().ClusterRoles().Delete(s.T().Context(), "allow-all", metav1.DeleteOptions{})
 
@@ -680,7 +723,7 @@ func (s *ResourcesSuite) TestResourcesCreateOrUpdateForbidden() {
 
 func (s *ResourcesSuite) TestResourcesDelete() {
 	s.InitMcpClient()
-	client := kubernetes.NewForConfigOrDie(envTestRestConfig)
+	client := kubernetes.NewForConfigOrDie(test.EnvTestRestConfig())
 
 	s.Run("resources_delete with missing apiVersion returns error", func() {
 		toolResult, _ := s.CallTool("resources_delete", map[string]interface{}{})
@@ -778,7 +821,7 @@ func (s *ResourcesSuite) TestResourcesDeleteDenied() {
 		]
 	`), s.Cfg), "Expected to parse denied resources config")
 	s.InitMcpClient()
-	kc := kubernetes.NewForConfigOrDie(envTestRestConfig)
+	kc := kubernetes.NewForConfigOrDie(test.EnvTestRestConfig())
 	_, _ = kc.CoreV1().ConfigMaps("default").Create(s.T().Context(), &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: "allowed-configmap-to-delete"},
 	}, metav1.CreateOptions{})
@@ -819,7 +862,7 @@ func (s *ResourcesSuite) TestResourcesDeleteDenied() {
 
 func (s *ResourcesSuite) TestResourcesScale() {
 	s.InitMcpClient()
-	kc := kubernetes.NewForConfigOrDie(envTestRestConfig)
+	kc := kubernetes.NewForConfigOrDie(test.EnvTestRestConfig())
 	deploymentName := "deployment-to-scale"
 	_, _ = kc.AppsV1().Deployments("default").Create(s.T().Context(), &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: deploymentName},

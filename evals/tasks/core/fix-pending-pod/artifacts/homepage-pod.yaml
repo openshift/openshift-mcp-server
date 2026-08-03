@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: homepage-pod
+  namespace: homepage-ns
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: nginx
+      image: quay.io/nginx/nginx-unprivileged:latest
+      ports:
+        - containerPort: 80
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      volumeMounts:
+        - name: my-persistent-storage
+          mountPath: /usr/share/nginx/html
+  volumes:
+    - name: my-persistent-storage
+      persistentVolumeClaim:
+        claimName: homepage-pvc

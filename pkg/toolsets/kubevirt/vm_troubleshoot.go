@@ -13,6 +13,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubevirt"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt/internal/defaults"
 )
 
 // initVMTroubleshoot initializes the VM troubleshooting prompt
@@ -21,8 +22,8 @@ func initVMTroubleshoot() []api.ServerPrompt {
 		{
 			Prompt: api.Prompt{
 				Name:        "vm-troubleshoot",
-				Title:       "VirtualMachine Troubleshoot",
-				Description: "Generate a step-by-step troubleshooting guide for diagnosing VirtualMachine issues",
+				Title:       fmt.Sprintf("%s VirtualMachine Troubleshoot", defaults.ProductName()),
+				Description: fmt.Sprintf("Generate a step-by-step troubleshooting guide for diagnosing %s VirtualMachine issues", defaults.ProductName()),
 				Arguments: []api.PromptArgument{
 					{
 						Name:        "namespace",
@@ -70,11 +71,11 @@ func vmTroubleshootHandler(params api.PromptHandlerParams) (*api.PromptCallResul
 	eventsYaml := fetchEvents(ctx, params.KubernetesClient, namespace, name)
 
 	// Build the troubleshooting guide message with embedded resource data
-	guideText := fmt.Sprintf(`# VirtualMachine Troubleshooting Guide
+	guideText := fmt.Sprintf(`# %s VirtualMachine Troubleshooting Guide
 
 ## VM: %s (namespace: %s)
 
-Use this guide to diagnose issues with the VirtualMachine. The relevant resource data has been collected below.
+Use this guide to diagnose issues with the %s VirtualMachine. The relevant resource data has been collected below.
 
 ---
 
@@ -184,7 +185,7 @@ After completing troubleshooting and attempting fixes, report:
 - **Root Cause:** Description or "None found"
 - **Action Taken:** What was done to fix the issue (or "None" if no fix was needed/possible)
 - **Result:** Whether the fix was successful or further action is needed
-`, name, namespace, vmYaml, vmiYaml, volumesYaml, podYaml, podLogsText, eventsYaml)
+`, defaults.ProductName(), name, namespace, defaults.ProductName(), vmYaml, vmiYaml, volumesYaml, podYaml, podLogsText, eventsYaml)
 
 	return api.NewPromptCallResult(
 		"VirtualMachine troubleshooting guide generated",
@@ -357,31 +358,40 @@ func fetchVirtLauncherPodLogs(ctx context.Context, client api.KubernetesClient, 
 // fetchEvents fetches events related to the VM and returns them formatted
 func fetchEvents(ctx context.Context, client api.KubernetesClient, namespace, vmName string) string {
 	core := kubernetes.NewCore(client)
-	eventMap, err := core.EventsList(ctx, namespace)
+
+	// Server-side filter: events whose involvedObject.name exactly matches the VM name
+	vmEvents, err := core.EventsList(ctx, namespace, api.ListOptions{
+		ListOptions: metav1.ListOptions{FieldSelector: "involvedObject.name=" + vmName},
+	})
 	if err != nil {
 		return fmt.Sprintf("### Events\n\n*Error listing events: %v*", err)
 	}
 
-	if len(eventMap) == 0 {
-		return "### Events\n\n*No events found in namespace*"
+	var relatedEvents []map[string]any
+	for _, event := range vmEvents {
+		involvedObj, ok := event["InvolvedObject"].(map[string]string)
+		if !ok {
+			continue
+		}
+		objKind := involvedObj["Kind"]
+		// Include events for VM, VMI
+		if objKind == "VirtualMachine" || objKind == "VirtualMachineInstance" {
+			relatedEvents = append(relatedEvents, event)
+		}
 	}
 
-	// Filter events related to the VM
-	var relatedEvents []map[string]any
-	for _, event := range eventMap {
+	// Prefix-based matches (virt-launcher pods, vmName-suffixed objects) can't be expressed
+	// as a field selector; list all events in the namespace and filter client-side.
+	allEvents, err := core.EventsList(ctx, namespace, api.ListOptions{})
+	if err != nil {
+		return fmt.Sprintf("### Events\n\n*Error listing events: %v*", err)
+	}
+	for _, event := range allEvents {
 		involvedObj, ok := event["InvolvedObject"].(map[string]string)
 		if !ok {
 			continue
 		}
 		objName := involvedObj["Name"]
-		objKind := involvedObj["Kind"]
-
-		// Include events for VM, VMI
-		if objName == vmName && (objKind == "VirtualMachine" || objKind == "VirtualMachineInstance") {
-			relatedEvents = append(relatedEvents, event)
-			continue
-		}
-
 		// Include events for pods with VM name prefix
 		if strings.HasPrefix(objName, vmName+"-") || strings.HasPrefix(objName, "virt-launcher-"+vmName) {
 			relatedEvents = append(relatedEvents, event)

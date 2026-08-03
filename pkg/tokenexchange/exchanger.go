@@ -8,10 +8,13 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
 	"golang.org/x/oauth2"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 )
 
 const (
@@ -43,12 +46,15 @@ const (
 	StrategyRFC8693    = "rfc8693"
 )
 
+// TokenExchanger performs a token exchange against an STS endpoint.
+// The subjectToken parameter contains the user's OAuth token for strategies that
+// exchange user tokens (rfc8693, keycloak-v1, entra-obo).
 type TokenExchanger interface {
 	Exchange(ctx context.Context, cfg *TargetTokenExchangeConfig, subjectToken string) (*oauth2.Token, error)
 }
 
 // injectClientAuth adds client credentials to the request based on auth style
-func injectClientAuth(cfg *TargetTokenExchangeConfig, data url.Values, header http.Header) error {
+func injectClientAuth(ctx context.Context, cfg *TargetTokenExchangeConfig, data url.Values, header http.Header) error {
 	if cfg.ClientID == "" {
 		return nil
 	}
@@ -58,13 +64,29 @@ func injectClientAuth(cfg *TargetTokenExchangeConfig, data url.Values, header ht
 		credentials := cfg.ClientID + ":" + cfg.ClientSecret
 		header.Set(HeaderAuthorization, "Basic "+base64.StdEncoding.EncodeToString([]byte(credentials)))
 	case AuthStyleAssertion:
-		assertion, err := cfg.GetOrBuildAssertion()
+		assertion, err := cfg.GetOrBuildAssertion(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to build client assertion: %w", err)
 		}
 		data.Set(FormKeyClientID, cfg.ClientID)
 		data.Set(FormKeyClientAssertionType, ClientAssertionType)
 		data.Set(FormKeyClientAssertion, assertion)
+	case AuthStyleFederated:
+		tokenBytes, err := os.ReadFile(cfg.FederatedTokenFile)
+		if err != nil {
+			return fmt.Errorf("failed to read federated token file %q: %w", cfg.FederatedTokenFile, err)
+		}
+		token := strings.TrimSpace(string(tokenBytes))
+		if token == "" {
+			return fmt.Errorf("federated token file %q is empty: the external identity provider may not have written a token yet", cfg.FederatedTokenFile)
+		}
+		klogutil.FromContext(ctx).V(4).Info("Read federated token from file",
+			"token_exchange.federated_token_file", cfg.FederatedTokenFile,
+			"token_exchange.token.size", len(token),
+		)
+		data.Set(FormKeyClientID, cfg.ClientID)
+		data.Set(FormKeyClientAssertionType, ClientAssertionType)
+		data.Set(FormKeyClientAssertion, token)
 	default: // AuthStyleParams or empty (default)
 		data.Set(FormKeyClientID, cfg.ClientID)
 		if cfg.ClientSecret != "" {

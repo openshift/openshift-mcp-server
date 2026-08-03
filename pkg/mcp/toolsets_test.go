@@ -13,13 +13,17 @@ import (
 	configuration "github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
+	clusterDiagnosticsToolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/cluster-diagnostics"
+	cniDiagnosticsToolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/cni-diagnostics"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/core"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/helm"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kcp"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kiali"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt"
+	mgToolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/mustgather"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/openshift"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/ovnkubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/tekton"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/suite"
@@ -41,7 +45,9 @@ type ToolsetsSuite struct {
 func (s *ToolsetsSuite) SetupTest() {
 	s.originalToolsets = toolsets.Toolsets()
 	s.MockServer = test.NewMockServer()
-	s.Cfg = configuration.Default()
+	// Set up default discovery handler for non-OpenShift cluster
+	s.Handle(test.NewDiscoveryClientHandler())
+	s.Cfg = configuration.BaseDefault()
 	s.Cfg.KubeConfig = s.KubeconfigFile(s.T())
 	s.updateJson = os.Getenv(updateJsonEnvVar) != ""
 }
@@ -93,6 +99,8 @@ func (s *ToolsetsSuite) TestDefaultToolsetsTools() {
 
 func (s *ToolsetsSuite) TestDefaultToolsetsToolsInOpenShift() {
 	s.Run("Default configuration toolsets in OpenShift", func() {
+		// Replace default handler with OpenShift handler
+		s.ResetHandlers()
 		s.Handle(test.NewInOpenShiftHandler())
 		s.InitMcpClient()
 		tools, err := s.ListTools()
@@ -102,6 +110,44 @@ func (s *ToolsetsSuite) TestDefaultToolsetsToolsInOpenShift() {
 		})
 		s.Run("ListTools returns correct Tool metadata", func() {
 			s.assertJsonSnapshot("toolsets-full-tools-openshift.json", tools.Tools)
+		})
+	})
+}
+
+func (s *ToolsetsSuite) TestDefaultToolsetsToolsWithFilteringEnabled() {
+	s.Run("Default configuration toolsets with filtering enabled on non-OpenShift", func() {
+		s.Cfg.EnableTargetCompatibilityToolFilters = true
+		s.InitMcpClient()
+		tools, err := s.ListTools()
+		s.Run("ListTools returns tools", func() {
+			s.NotNil(tools, "Expected tools from ListTools")
+			s.NoError(err, "Expected no error from ListTools")
+		})
+		s.Run("projects_list tool is not present", func() {
+			for _, tool := range tools.Tools {
+				s.Require().NotEqual("projects_list", tool.Name, "Expected projects_list to not be present when filtering enabled on non-OpenShift cluster")
+			}
+		})
+	})
+}
+
+func (s *ToolsetsSuite) TestKubevirtToolsFilteredWithoutCRDs() {
+	s.Run("Kubevirt tools are filtered out when VirtualMachine GVK is not present", func() {
+		s.Cfg.Toolsets = []string{"kubevirt"}
+		s.Cfg.EnableTargetCompatibilityToolFilters = true
+		s.InitMcpClient()
+		tools, err := s.ListTools()
+		s.Run("ListTools returns tools", func() {
+			s.NotNil(tools, "Expected tools from ListTools")
+			s.NoError(err, "Expected no error from ListTools")
+		})
+		s.Run("kubevirt tools are not present", func() {
+			kubevirtTools := []string{"vm_create", "vm_lifecycle", "vm_clone", "vm_guest_info"}
+			for _, tool := range tools.Tools {
+				for _, kvTool := range kubevirtTools {
+					s.Require().NotEqual(kvTool, tool.Name, "Expected %s to not be present when filtering enabled on cluster without KubeVirt", kvTool)
+				}
+			}
 		})
 	})
 }
@@ -178,7 +224,10 @@ func (s *ToolsetsSuite) TestGranularToolsetsTools() {
 		&helm.Toolset{},
 		&kiali.Toolset{},
 		&kubevirt.Toolset{},
+		&ovnkubernetes.Toolset{},
 		&tekton.Toolset{},
+		&clusterDiagnosticsToolset.Toolset{},
+		&cniDiagnosticsToolset.Toolset{},
 	}
 	for _, testCase := range testCases {
 		s.Run("Toolset "+testCase.GetName(), func() {
@@ -234,29 +283,47 @@ func (s *ToolsetsSuite) TestOpenShiftToolsetPrompts() {
 	})
 }
 
-func (s *ToolsetsSuite) TestInputSchemaEdgeCases() {
-	//https://github.com/containers/kubernetes-mcp-server/issues/340
-	s.Run("InputSchema for no-arg tool is object with empty properties", func() {
+func (s *ToolsetsSuite) TestOpenShiftMustGatherToolset() {
+	s.Run("OpenShift must-gather toolset", func() {
+		toolsets.Clear()
+		toolsets.Register(&mgToolset.Toolset{})
+		s.Cfg.Toolsets = []string{"openshift/mustgather"}
 		s.InitMcpClient()
 		tools, err := s.ListTools()
 		s.Run("ListTools returns tools", func() {
 			s.NotNil(tools, "Expected tools from ListTools")
 			s.NoError(err, "Expected no error from ListTools")
 		})
-		var namespacesList *mcp.Tool
+		s.Run("ListTools returns correct Tool metadata", func() {
+			s.assertJsonSnapshot("toolsets-openshift-mustgather-tools.json", tools.Tools)
+		})
+	})
+}
+
+func (s *ToolsetsSuite) TestInputSchemaEdgeCases() {
+	//https://github.com/containers/kubernetes-mcp-server/issues/340
+	s.Run("InputSchema for no-arg tool is object with empty properties", func() {
+		s.Handle(test.NewInOpenShiftHandler())
+		s.InitMcpClient()
+		tools, err := s.ListTools()
+		s.Run("ListTools returns tools", func() {
+			s.NotNil(tools, "Expected tools from ListTools")
+			s.NoError(err, "Expected no error from ListTools")
+		})
+		var projectsList *mcp.Tool
 		for _, t := range tools.Tools {
-			if t.Name == "namespaces_list" {
-				namespacesList = t
+			if t.Name == "projects_list" {
+				projectsList = t
 				break
 			}
 		}
-		s.Require().NotNil(namespacesList, "Expected namespaces_list from ListTools")
-		schema, ok := namespacesList.InputSchema.(map[string]any)
+		s.Require().NotNil(projectsList, "Expected projects_list from ListTools")
+		schema, ok := projectsList.InputSchema.(map[string]any)
 		s.Require().True(ok, "Expected InputSchema to be map[string]any")
-		s.NotNil(schema["properties"], "Expected namespaces_list.InputSchema.properties not to be nil")
+		s.NotNil(schema["properties"], "Expected projects_list.InputSchema.properties not to be nil")
 		properties, ok := schema["properties"].(map[string]any)
 		s.Require().True(ok, "Expected properties to be map[string]any")
-		s.Empty(properties, "Expected namespaces_list.InputSchema.properties to be empty")
+		s.Empty(properties, "Expected projects_list.InputSchema.properties to be empty")
 	})
 	// https://github.com/containers/kubernetes-mcp-server/issues/717
 	// Verifies ALL tools have Properties initialized (not just cluster-aware ones)
@@ -292,9 +359,9 @@ func (s *ToolsetsSuite) TestInputSchemaEdgeCases() {
 }
 
 func (s *ToolsetsSuite) InitMcpClient() {
-	provider, err := kubernetes.NewProvider(s.Cfg)
+	provider, err := kubernetes.NewProvider(s.T().Context(), s.Cfg)
 	s.Require().NoError(err, "Expected no error creating kubernetes target provider")
-	s.mcpServer, err = NewServer(Configuration{StaticConfig: s.Cfg}, provider)
+	s.mcpServer, err = NewServer(s.T().Context(), Configuration{StaticConfig: s.Cfg}, provider)
 	s.Require().NoError(err, "Expected no error creating MCP server")
 	s.McpClient = test.NewMcpClient(s.T(), s.mcpServer.ServeHTTP())
 }

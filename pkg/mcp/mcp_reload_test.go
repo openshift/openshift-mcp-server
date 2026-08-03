@@ -1,13 +1,40 @@
 package mcp
 
 import (
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
+
+	"github.com/google/jsonschema-go/jsonschema"
 
 	"github.com/containers/kubernetes-mcp-server/internal/test"
+	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/stretchr/testify/suite"
 )
+
+// brokenToolset is a fake api.Toolset whose single tool has a non-object
+// input schema. ServerToolToGoSdkTool rejects this in the convert phase
+// ("input schema must have type \"object\""), which is the only failure
+// mode that exercises applyToolsets's transactional swap path —
+// config-level errors fail earlier, in Validate. We can't simply use
+// InputSchema: nil because the WithTargetParameter mutator initializes a
+// nil schema to type=object for cluster-aware tools.
+type brokenToolset struct{}
+
+func (brokenToolset) GetName() string        { return "broken-test-toolset" }
+func (brokenToolset) GetDescription() string { return "test-only toolset that fails convert phase" }
+func (brokenToolset) GetTools(api.FilteringProvider) []api.ServerTool {
+	return []api.ServerTool{{Tool: api.Tool{
+		Name:        "broken-tool",
+		InputSchema: &jsonschema.Schema{Type: "string"},
+	}}}
+}
+func (brokenToolset) GetPrompts() []api.ServerPrompt                     { return nil }
+func (brokenToolset) GetResources() []api.ServerResource                 { return nil }
+func (brokenToolset) GetResourceTemplates() []api.ServerResourceTemplate { return nil }
 
 type ConfigReloadSuite struct {
 	BaseMcpSuite
@@ -34,9 +61,9 @@ func (s *ConfigReloadSuite) TearDownTest() {
 
 func (s *ConfigReloadSuite) TestConfigurationReload() {
 	// Initialize server with initial config
-	provider, err := kubernetes.NewProvider(s.Cfg)
+	provider, err := kubernetes.NewProvider(s.T().Context(), s.Cfg)
 	s.Require().NoError(err)
-	server, err := NewServer(Configuration{
+	server, err := NewServer(s.T().Context(), Configuration{
 		StaticConfig: s.Cfg,
 	}, provider)
 	s.Require().NoError(err)
@@ -44,9 +71,9 @@ func (s *ConfigReloadSuite) TestConfigurationReload() {
 	s.server = server
 
 	s.Run("initial configuration loaded correctly", func() {
-		s.Equal(s.Cfg.LogLevel, server.configuration.LogLevel)
-		s.Equal(s.Cfg.ListOutput, server.configuration.StaticConfig.ListOutput)
-		s.Equal(s.Cfg.Toolsets, server.configuration.StaticConfig.Toolsets)
+		s.Equal(s.Cfg.LogLevel, server.configuration.Load().LogLevel)
+		s.Equal(s.Cfg.ListOutput, server.configuration.Load().StaticConfig.ListOutput)
+		s.Equal(s.Cfg.Toolsets, server.configuration.Load().StaticConfig.Toolsets)
 	})
 
 	s.Run("reload with new log level", func() {
@@ -56,12 +83,12 @@ func (s *ConfigReloadSuite) TestConfigurationReload() {
 		newConfig.Toolsets = []string{"core", "config"}
 		newConfig.KubeConfig = s.Cfg.KubeConfig
 
-		err = server.ReloadConfiguration(newConfig)
+		err = server.ReloadConfiguration(s.T().Context(), newConfig)
 		s.Require().NoError(err)
 
-		s.Equal(5, server.configuration.LogLevel)
-		s.Equal("yaml", server.configuration.StaticConfig.ListOutput)
-		s.Equal([]string{"core", "config"}, server.configuration.StaticConfig.Toolsets)
+		s.Equal(5, server.configuration.Load().LogLevel)
+		s.Equal("yaml", server.configuration.Load().StaticConfig.ListOutput)
+		s.Equal([]string{"core", "config"}, server.configuration.Load().StaticConfig.Toolsets)
 	})
 
 	s.Run("reload with additional toolsets", func() {
@@ -71,12 +98,12 @@ func (s *ConfigReloadSuite) TestConfigurationReload() {
 		newConfig.Toolsets = []string{"core", "config", "helm"}
 		newConfig.KubeConfig = s.Cfg.KubeConfig
 
-		err = server.ReloadConfiguration(newConfig)
+		err = server.ReloadConfiguration(s.T().Context(), newConfig)
 		s.Require().NoError(err)
 
-		s.Equal(5, server.configuration.LogLevel)
-		s.Equal("yaml", server.configuration.StaticConfig.ListOutput)
-		s.Equal([]string{"core", "config", "helm"}, server.configuration.StaticConfig.Toolsets)
+		s.Equal(5, server.configuration.Load().LogLevel)
+		s.Equal("yaml", server.configuration.Load().StaticConfig.ListOutput)
+		s.Equal([]string{"core", "config", "helm"}, server.configuration.Load().StaticConfig.Toolsets)
 	})
 
 	s.Run("reload with partial changes", func() {
@@ -86,12 +113,12 @@ func (s *ConfigReloadSuite) TestConfigurationReload() {
 		newConfig.Toolsets = []string{"core", "config", "helm"}
 		newConfig.KubeConfig = s.Cfg.KubeConfig
 
-		err = server.ReloadConfiguration(newConfig)
+		err = server.ReloadConfiguration(s.T().Context(), newConfig)
 		s.Require().NoError(err)
 
-		s.Equal(7, server.configuration.LogLevel)
-		s.Equal("yaml", server.configuration.StaticConfig.ListOutput)
-		s.Equal([]string{"core", "config", "helm"}, server.configuration.StaticConfig.Toolsets)
+		s.Equal(7, server.configuration.Load().LogLevel)
+		s.Equal("yaml", server.configuration.Load().StaticConfig.ListOutput)
+		s.Equal([]string{"core", "config", "helm"}, server.configuration.Load().StaticConfig.Toolsets)
 	})
 
 	s.Run("reload back to defaults", func() {
@@ -101,19 +128,19 @@ func (s *ConfigReloadSuite) TestConfigurationReload() {
 		newConfig.Toolsets = []string{"core", "config"}
 		newConfig.KubeConfig = s.Cfg.KubeConfig
 
-		err = server.ReloadConfiguration(newConfig)
+		err = server.ReloadConfiguration(s.T().Context(), newConfig)
 		s.Require().NoError(err)
 
-		s.Equal(0, server.configuration.LogLevel)
-		s.Equal("table", server.configuration.StaticConfig.ListOutput)
-		s.Equal([]string{"core", "config"}, server.configuration.StaticConfig.Toolsets)
+		s.Equal(0, server.configuration.Load().LogLevel)
+		s.Equal("table", server.configuration.Load().StaticConfig.ListOutput)
+		s.Equal([]string{"core", "config"}, server.configuration.Load().StaticConfig.Toolsets)
 	})
 }
 
 func (s *ConfigReloadSuite) TestConfigurationValues() {
-	provider, err := kubernetes.NewProvider(s.Cfg)
+	provider, err := kubernetes.NewProvider(s.T().Context(), s.Cfg)
 	s.Require().NoError(err)
-	server, err := NewServer(Configuration{
+	server, err := NewServer(s.T().Context(), Configuration{
 		StaticConfig: s.Cfg,
 	}, provider)
 	s.Require().NoError(err)
@@ -121,7 +148,7 @@ func (s *ConfigReloadSuite) TestConfigurationValues() {
 
 	s.Run("reload updates configuration values", func() {
 		// Verify initial values
-		initialLogLevel := server.configuration.LogLevel
+		initialLogLevel := server.configuration.Load().LogLevel
 
 		newConfig := config.Default()
 		newConfig.LogLevel = 9
@@ -129,21 +156,21 @@ func (s *ConfigReloadSuite) TestConfigurationValues() {
 		newConfig.Toolsets = []string{"core", "config", "helm"}
 		newConfig.KubeConfig = s.Cfg.KubeConfig
 
-		err = server.ReloadConfiguration(newConfig)
+		err = server.ReloadConfiguration(s.T().Context(), newConfig)
 		s.Require().NoError(err)
 
 		// Verify configuration was updated
-		s.NotEqual(initialLogLevel, server.configuration.LogLevel)
-		s.Equal(9, server.configuration.LogLevel)
-		s.Equal([]string{"core", "config", "helm"}, server.configuration.StaticConfig.Toolsets)
-		s.Equal("yaml", server.configuration.StaticConfig.ListOutput)
+		s.NotEqual(initialLogLevel, server.configuration.Load().LogLevel)
+		s.Equal(9, server.configuration.Load().LogLevel)
+		s.Equal([]string{"core", "config", "helm"}, server.configuration.Load().StaticConfig.Toolsets)
+		s.Equal("yaml", server.configuration.Load().StaticConfig.ListOutput)
 	})
 }
 
 func (s *ConfigReloadSuite) TestMultipleReloads() {
-	provider, err := kubernetes.NewProvider(s.Cfg)
+	provider, err := kubernetes.NewProvider(s.T().Context(), s.Cfg)
 	s.Require().NoError(err)
-	server, err := NewServer(Configuration{
+	server, err := NewServer(s.T().Context(), Configuration{
 		StaticConfig: s.Cfg,
 	}, provider)
 	s.Require().NoError(err)
@@ -155,27 +182,27 @@ func (s *ConfigReloadSuite) TestMultipleReloads() {
 		cfg1.LogLevel = 3
 		cfg1.KubeConfig = s.Cfg.KubeConfig
 		cfg1.Toolsets = []string{"core"}
-		err = server.ReloadConfiguration(cfg1)
+		err = server.ReloadConfiguration(s.T().Context(), cfg1)
 		s.Require().NoError(err)
-		s.Equal(3, server.configuration.LogLevel)
+		s.Equal(3, server.configuration.Load().LogLevel)
 
 		// Second reload
 		cfg2 := config.Default()
 		cfg2.LogLevel = 6
 		cfg2.KubeConfig = s.Cfg.KubeConfig
 		cfg2.Toolsets = []string{"core", "config"}
-		err = server.ReloadConfiguration(cfg2)
+		err = server.ReloadConfiguration(s.T().Context(), cfg2)
 		s.Require().NoError(err)
-		s.Equal(6, server.configuration.LogLevel)
+		s.Equal(6, server.configuration.Load().LogLevel)
 
 		// Third reload
 		cfg3 := config.Default()
 		cfg3.LogLevel = 9
 		cfg3.KubeConfig = s.Cfg.KubeConfig
 		cfg3.Toolsets = []string{"core", "config", "helm"}
-		err = server.ReloadConfiguration(cfg3)
+		err = server.ReloadConfiguration(s.T().Context(), cfg3)
 		s.Require().NoError(err)
-		s.Equal(9, server.configuration.LogLevel)
+		s.Equal(9, server.configuration.Load().LogLevel)
 	})
 }
 
@@ -192,7 +219,7 @@ func (s *ConfigReloadSuite) TestReloadUpdatesToolsets() {
 	newConfig.KubeConfig = s.Cfg.KubeConfig
 
 	// Reload configuration on the server the MCP client is connected to
-	err = s.mcpServer.ReloadConfiguration(newConfig)
+	err = s.mcpServer.ReloadConfiguration(s.T().Context(), newConfig)
 	s.Require().NoError(err)
 
 	// Verify helm tools are available
@@ -210,9 +237,9 @@ func (s *ConfigReloadSuite) TestReloadUpdatesToolsets() {
 }
 
 func (s *ConfigReloadSuite) TestReloadRejectsHTTPURLsWhenRequireTLS() {
-	provider, err := kubernetes.NewProvider(s.Cfg)
+	provider, err := kubernetes.NewProvider(s.T().Context(), s.Cfg)
 	s.Require().NoError(err)
-	server, err := NewServer(Configuration{
+	server, err := NewServer(s.T().Context(), Configuration{
 		StaticConfig: s.Cfg,
 	}, provider)
 	s.Require().NoError(err)
@@ -224,7 +251,7 @@ func (s *ConfigReloadSuite) TestReloadRejectsHTTPURLsWhenRequireTLS() {
 		newConfig.RequireTLS = true
 		newConfig.AuthorizationURL = "http://example.com/auth"
 		newConfig.KubeConfig = s.Cfg.KubeConfig
-		err := server.ReloadConfiguration(newConfig)
+		err := server.ReloadConfiguration(s.T().Context(), newConfig)
 		s.Require().Error(err)
 		s.Contains(err.Error(), "authorization_url")
 		s.Contains(err.Error(), "secure scheme required")
@@ -237,7 +264,7 @@ func (s *ConfigReloadSuite) TestReloadRejectsHTTPURLsWhenRequireTLS() {
 		newConfig.AuthorizationURL = "https://example.com/auth"
 		newConfig.ServerURL = "http://example.com:8080"
 		newConfig.KubeConfig = s.Cfg.KubeConfig
-		err := server.ReloadConfiguration(newConfig)
+		err := server.ReloadConfiguration(s.T().Context(), newConfig)
 		s.Require().Error(err)
 		s.Contains(err.Error(), "server_url")
 		s.Contains(err.Error(), "secure scheme required")
@@ -250,7 +277,7 @@ func (s *ConfigReloadSuite) TestReloadRejectsHTTPURLsWhenRequireTLS() {
 		newConfig.AuthorizationURL = "https://example.com/auth"
 		newConfig.ServerURL = "https://example.com:8080"
 		newConfig.KubeConfig = s.Cfg.KubeConfig
-		err := server.ReloadConfiguration(newConfig)
+		err := server.ReloadConfiguration(s.T().Context(), newConfig)
 		s.NoError(err)
 	})
 
@@ -260,15 +287,15 @@ func (s *ConfigReloadSuite) TestReloadRejectsHTTPURLsWhenRequireTLS() {
 		newConfig.RequireTLS = false
 		newConfig.AuthorizationURL = "http://example.com/auth"
 		newConfig.KubeConfig = s.Cfg.KubeConfig
-		err := server.ReloadConfiguration(newConfig)
+		err := server.ReloadConfiguration(s.T().Context(), newConfig)
 		s.NoError(err)
 	})
 }
 
 func (s *ConfigReloadSuite) TestReloadRejectsInvalidConfig() {
-	provider, err := kubernetes.NewProvider(s.Cfg)
+	provider, err := kubernetes.NewProvider(s.T().Context(), s.Cfg)
 	s.Require().NoError(err)
-	server, err := NewServer(Configuration{
+	server, err := NewServer(s.T().Context(), Configuration{
 		StaticConfig: s.Cfg,
 	}, provider)
 	s.Require().NoError(err)
@@ -278,7 +305,7 @@ func (s *ConfigReloadSuite) TestReloadRejectsInvalidConfig() {
 		newConfig := config.Default()
 		newConfig.ListOutput = "invalid-format"
 		newConfig.KubeConfig = s.Cfg.KubeConfig
-		err := server.ReloadConfiguration(newConfig)
+		err := server.ReloadConfiguration(s.T().Context(), newConfig)
 		s.Require().Error(err)
 		s.Contains(err.Error(), "invalid output name")
 	})
@@ -287,7 +314,7 @@ func (s *ConfigReloadSuite) TestReloadRejectsInvalidConfig() {
 		newConfig := config.Default()
 		newConfig.Toolsets = []string{"nonexistent-toolset"}
 		newConfig.KubeConfig = s.Cfg.KubeConfig
-		err := server.ReloadConfiguration(newConfig)
+		err := server.ReloadConfiguration(s.T().Context(), newConfig)
 		s.Require().Error(err)
 		s.Contains(err.Error(), "invalid toolset name")
 	})
@@ -296,7 +323,7 @@ func (s *ConfigReloadSuite) TestReloadRejectsInvalidConfig() {
 		newConfig := config.Default()
 		newConfig.ClusterProviderStrategy = "nonexistent-strategy"
 		newConfig.KubeConfig = s.Cfg.KubeConfig
-		err := server.ReloadConfiguration(newConfig)
+		err := server.ReloadConfiguration(s.T().Context(), newConfig)
 		s.Require().Error(err)
 		s.Contains(err.Error(), "invalid cluster-provider")
 	})
@@ -306,7 +333,7 @@ func (s *ConfigReloadSuite) TestReloadRejectsInvalidConfig() {
 		newConfig.RequireOAuth = true
 		newConfig.AuthorizationURL = "ftp://example.com/auth"
 		newConfig.KubeConfig = s.Cfg.KubeConfig
-		err := server.ReloadConfiguration(newConfig)
+		err := server.ReloadConfiguration(s.T().Context(), newConfig)
 		s.Require().Error(err)
 		s.Contains(err.Error(), "--authorization-url must be a valid URL")
 	})
@@ -317,7 +344,7 @@ func (s *ConfigReloadSuite) TestReloadRejectsInvalidConfig() {
 		newConfig.AuthorizationURL = "https://example.com/auth"
 		newConfig.CertificateAuthority = "/nonexistent/path/ca.crt"
 		newConfig.KubeConfig = s.Cfg.KubeConfig
-		err := server.ReloadConfiguration(newConfig)
+		err := server.ReloadConfiguration(s.T().Context(), newConfig)
 		s.Require().Error(err)
 		s.Contains(err.Error(), "certificate-authority must be a valid file path")
 	})
@@ -327,7 +354,7 @@ func (s *ConfigReloadSuite) TestReloadRejectsInvalidConfig() {
 		newConfig.TLSCert = "/some/cert.pem"
 		newConfig.TLSKey = ""
 		newConfig.KubeConfig = s.Cfg.KubeConfig
-		err := server.ReloadConfiguration(newConfig)
+		err := server.ReloadConfiguration(s.T().Context(), newConfig)
 		s.Require().Error(err)
 		s.Contains(err.Error(), "both --tls-cert and --tls-key must be provided together")
 	})
@@ -338,7 +365,7 @@ func (s *ConfigReloadSuite) TestReloadRejectsInvalidConfig() {
 		newConfig.AuthorizationURL = ""
 		newConfig.SkipJWTVerification = false
 		newConfig.KubeConfig = s.Cfg.KubeConfig
-		err := server.ReloadConfiguration(newConfig)
+		err := server.ReloadConfiguration(s.T().Context(), newConfig)
 		s.Require().Error(err)
 		s.Contains(err.Error(), "require_oauth is enabled but authorization_url is not configured")
 	})
@@ -349,15 +376,172 @@ func (s *ConfigReloadSuite) TestReloadRejectsInvalidConfig() {
 		newConfig.AuthorizationURL = ""
 		newConfig.SkipJWTVerification = true
 		newConfig.KubeConfig = s.Cfg.KubeConfig
-		err := server.ReloadConfiguration(newConfig)
+		err := server.ReloadConfiguration(s.T().Context(), newConfig)
 		s.NoError(err)
 	})
 }
 
-func (s *ConfigReloadSuite) TestServerLifecycle() {
-	provider, err := kubernetes.NewProvider(s.Cfg)
+// TestReloadFailureLeavesConfigurationIntact is the regression for issue
+// #1128: a reload whose convert phase fails must leave s.configuration, the
+// SDK surface, and the enabled-X bookkeeping all at their pre-reload values.
+// We trigger the failure via brokenToolset (a tool with a non-object input
+// schema is rejected by ServerToolToGoSdkTool) and call applyToolsets
+// directly so we exercise the transactional swap rather than the Validate
+// fast-path.
+func (s *ConfigReloadSuite) TestReloadFailureLeavesConfigurationIntact() {
+	provider, err := kubernetes.NewProvider(s.T().Context(), s.Cfg)
 	s.Require().NoError(err)
-	server, err := NewServer(Configuration{
+	server, err := NewServer(s.T().Context(), Configuration{
+		StaticConfig: s.Cfg,
+	}, provider)
+	s.Require().NoError(err)
+	s.server = server
+
+	prevConfig := server.configuration.Load()
+	prevEnabledTools := server.GetEnabledTools()
+	prevEnabledPrompts := server.GetEnabledPrompts()
+	prevEnabledResources := server.GetEnabledResources()
+	prevEnabledResourceTemplates := server.GetEnabledResourceTemplates()
+	s.Require().NotEmpty(prevEnabledTools, "baseline must have some enabled tools to be a meaningful regression target")
+
+	// Build a candidate Configuration that bypasses the StaticConfig.Toolsets
+	// resolver and goes straight to the broken toolset, so collectApplicable*
+	// returns the bad tool and the convert phase fails.
+	candidateStatic := config.Default()
+	candidateStatic.KubeConfig = s.Cfg.KubeConfig
+	candidateStatic.ReadOnly = s.Cfg.ReadOnly
+	candidate := &Configuration{
+		StaticConfig: candidateStatic,
+		toolsets:     []api.Toolset{brokenToolset{}},
+	}
+
+	s.Run("convert-phase failure does not mutate s.configuration", func() {
+		err := server.applyToolsets(s.T().Context(), candidate)
+		s.Require().Error(err, "reload must fail when a tool has a non-object input schema")
+
+		s.Same(prevConfig, server.configuration.Load(),
+			"s.configuration pointer must be unchanged after a rejected reload")
+		s.Equal(prevEnabledTools, server.GetEnabledTools(),
+			"enabledTools must be unchanged after a rejected reload")
+		s.Equal(prevEnabledPrompts, server.GetEnabledPrompts(),
+			"enabledPrompts must be unchanged after a rejected reload")
+		s.Equal(prevEnabledResources, server.GetEnabledResources(),
+			"enabledResources must be unchanged after a rejected reload")
+		s.Equal(prevEnabledResourceTemplates, server.GetEnabledResourceTemplates(),
+			"enabledResourceTemplates must be unchanged after a rejected reload")
+	})
+
+	s.Run("a subsequent successful re-apply still works", func() {
+		// Confirms the failed swap didn't leave reloadMu/mu in a bad state
+		// or corrupt the existing SDK surface.
+		s.Require().NoError(server.reapplyToolsets())
+		s.Equal(prevEnabledTools, server.GetEnabledTools())
+	})
+}
+
+// TestConcurrentReadsDuringReload runs many reader goroutines that exercise
+// the same s.configuration access pattern handlers use (Load() + read fields
+// off the snapshot), in parallel with a writer goroutine that calls
+// ReloadConfiguration repeatedly. With the field stored as a plain pointer
+// guarded only by the now-unused-by-handlers s.mu, `go test -race` would
+// report a data race on the field. With atomic.Pointer it is race-free.
+func (s *ConfigReloadSuite) TestConcurrentReadsDuringReload() {
+	provider, err := kubernetes.NewProvider(s.T().Context(), s.Cfg)
+	s.Require().NoError(err)
+	server, err := NewServer(s.T().Context(), Configuration{
+		StaticConfig: s.Cfg,
+	}, provider)
+	s.Require().NoError(err)
+	s.server = server
+
+	stop := make(chan struct{})
+	var observedReads atomic.Int64
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+				cfg := server.configuration.Load()
+				_ = cfg.HTTP.RateLimitRPS
+				_ = cfg.Stateless
+				_ = cfg.LogLevel
+				observedReads.Add(1)
+			}
+		}()
+	}
+
+	deadline := time.After(500 * time.Millisecond)
+	toggle := false
+	for {
+		select {
+		case <-deadline:
+			close(stop)
+			wg.Wait()
+			s.Greater(observedReads.Load(), int64(0), "readers must have run")
+			return
+		default:
+		}
+		newCfg := config.Default()
+		newCfg.KubeConfig = s.Cfg.KubeConfig
+		if toggle {
+			newCfg.LogLevel = 9
+		} else {
+			newCfg.LogLevel = 1
+		}
+		toggle = !toggle
+		s.Require().NoError(server.ReloadConfiguration(s.T().Context(), newCfg))
+	}
+}
+
+// TestConcurrentListOutputAfterReload exercises the lazy ListOutput cache
+// race: after a successful reload, several handlers reading
+// cfg.ListOutput() concurrently for the first time would each write the
+// cache field unsynchronized. With the cache pre-warmed by warmCaches in
+// applyToolsets before publish, the first-read writes are gone and
+// `-race` stays clean.
+func (s *ConfigReloadSuite) TestConcurrentListOutputAfterReload() {
+	provider, err := kubernetes.NewProvider(s.T().Context(), s.Cfg)
+	s.Require().NoError(err)
+	server, err := NewServer(s.T().Context(), Configuration{
+		StaticConfig: s.Cfg,
+	}, provider)
+	s.Require().NoError(err)
+	s.server = server
+
+	for iter := 0; iter < 5; iter++ {
+		newCfg := config.Default()
+		newCfg.KubeConfig = s.Cfg.KubeConfig
+		if iter%2 == 0 {
+			newCfg.ListOutput = "yaml"
+		} else {
+			newCfg.ListOutput = "table"
+		}
+		s.Require().NoError(server.ReloadConfiguration(s.T().Context(), newCfg))
+
+		var wg sync.WaitGroup
+		for r := 0; r < 16; r++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				cfg := server.configuration.Load()
+				_ = cfg.ListOutput()
+				_ = cfg.Toolsets()
+			}()
+		}
+		wg.Wait()
+	}
+}
+
+func (s *ConfigReloadSuite) TestServerLifecycle() {
+	provider, err := kubernetes.NewProvider(s.T().Context(), s.Cfg)
+	s.Require().NoError(err)
+	server, err := NewServer(s.T().Context(), Configuration{
 		StaticConfig: s.Cfg,
 	}, provider)
 	s.Require().NoError(err)

@@ -1,8 +1,10 @@
 package kubernetes
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -28,7 +30,8 @@ const (
 	OAuthAuthorizationHeader  = HeaderKey("Authorization")
 	UserAgentHeader           = HeaderKey("User-Agent")
 
-	CustomUserAgent = "kubernetes-mcp-server/bearer-token-auth"
+	CustomUserAgent         = "kubernetes-mcp-server/bearer-token-auth"
+	defaultDiscoveryTimeout = 10 * time.Second
 )
 
 type CloseWatchKubeConfig func() error
@@ -53,7 +56,12 @@ type Kubernetes struct {
 
 var _ api.KubernetesClient = (*Kubernetes)(nil)
 
-func NewKubernetes(baseConfig api.BaseConfig, clientCmdConfig clientcmd.ClientConfig, restConfig *rest.Config) (*Kubernetes, error) {
+func NewKubernetes(
+	ctx context.Context,
+	baseConfig api.BaseConfig,
+	clientCmdConfig clientcmd.ClientConfig,
+	restConfig *rest.Config,
+) (*Kubernetes, error) {
 	k := &Kubernetes{
 		config:          baseConfig,
 		clientCmdConfig: clientCmdConfig,
@@ -64,7 +72,7 @@ func NewKubernetes(baseConfig api.BaseConfig, clientCmdConfig clientcmd.ClientCo
 	}
 
 	k.restConfig.Wrap(func(original http.RoundTripper) http.RoundTripper {
-		return NewAccessControlRoundTripper(AccessControlRoundTripperConfig{
+		return NewAccessControlRoundTripper(ctx, AccessControlRoundTripperConfig{
 			Delegate:                  original,
 			DeniedResourcesProvider:   baseConfig,
 			RestMapperProvider:        func() meta.RESTMapper { return k.restMapper },
@@ -83,7 +91,13 @@ func NewKubernetes(baseConfig api.BaseConfig, clientCmdConfig clientcmd.ClientCo
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
 	}
-	discoveryClient, err := discovery.NewDiscoveryClientForConfigAndClient(k.restConfig, k.httpClient)
+	// Discovery runs synchronously while tools are registered. Use a client copy
+	// so an unreachable cluster cannot block startup without timing out watches or execs.
+	discoveryHTTPClient := *k.httpClient
+	if discoveryHTTPClient.Timeout <= 0 {
+		discoveryHTTPClient.Timeout = defaultDiscoveryTimeout
+	}
+	discoveryClient, err := discovery.NewDiscoveryClientForConfigAndClient(k.restConfig, &discoveryHTTPClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create discovery client: %w", err)
 	}

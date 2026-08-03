@@ -1,0 +1,22 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: k8s_events receiver configuration
+type: object
+properties:
+    auth_type:
+        description: |-
+            How to authenticate to the K8s API server.  This can be one of `none`
+            (for no auth), `serviceAccount` (to use the standard service account
+            token provided to the agent pod), or `kubeConfig` to use credentials
+            from `~/.kube/config`.
+        type: string
+    context:
+        description: When using auth_type `kubeConfig`, override the current context.
+        type: string
+    k8s_leader_elector:
+        type: string
+    namespaces:
+        description: List of ‘namespaces’ to collect events from.
+        type: array
+        items:
+            type: string
+additionalProperties: false

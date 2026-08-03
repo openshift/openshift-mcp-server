@@ -14,6 +14,5 @@ func TestMain(m *testing.M) {
 	// Run tests
 	code := m.Run()
 
-	// Tear down
 	os.Exit(code)
 }

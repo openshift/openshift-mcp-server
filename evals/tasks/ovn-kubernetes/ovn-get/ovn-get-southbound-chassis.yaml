@@ -1,0 +1,27 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "ovn-get-southbound-chassis"
+  difficulty: easy
+  category: "OVN Database Query"
+  description: "Query Chassis table from OVN Southbound database"
+  labels:
+    suite: ovn-kubernetes
+    requires: ovn-kubernetes
+spec:
+  limits:
+    timeout: "5m"
+  setup:
+    - script:
+        file: ./setup.sh
+  prompt:
+    inline: |
+      Show me all Chassis records from the OVN Southbound database.
+  verify:
+    - llmJudge:
+        contains: "Shows Chassis records corresponding to all cluster nodes from the OVN Southbound database. Indicates whether a chassis is local or remote"
+        reasoning: "Output should show Chassis records for all cluster nodes with local/remote indication"
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "ovn_get"

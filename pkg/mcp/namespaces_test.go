@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"github.com/containers/kubernetes-mcp-server/internal/test"
 	"regexp"
 	"slices"
 	"testing"
@@ -88,7 +89,7 @@ func (s *NamespacesSuite) TestNamespacesListDenied() {
 func (s *NamespacesSuite) TestNamespacesListForbidden() {
 	s.InitMcpClient()
 	defer restoreAuth(s.T().Context())
-	client := kubernetes.NewForConfigOrDie(envTestRestConfig)
+	client := kubernetes.NewForConfigOrDie(test.EnvTestRestConfig())
 	// Remove all permissions - user will have forbidden access
 	_ = client.RbacV1().ClusterRoles().Delete(s.T().Context(), "allow-all", metav1.DeleteOptions{})
 
@@ -150,6 +151,37 @@ func (s *NamespacesSuite) TestNamespacesListAsTable() {
 	})
 }
 
+func (s *NamespacesSuite) TestNamespacesListWithFieldSelector() {
+	s.InitMcpClient()
+
+	s.Run("namespaces_list(fieldSelector=metadata.name=ns-1) returns only matching namespace", func() {
+		toolResult, err := s.CallTool("namespaces_list", map[string]interface{}{
+			"fieldSelector": "metadata.name=ns-1",
+		})
+		s.Run("no error", func() {
+			s.Nil(err, "call tool failed %v", err)
+			s.False(toolResult.IsError, "call tool failed")
+		})
+		var decoded []unstructured.Unstructured
+		err = yaml.Unmarshal([]byte(toolResult.Content[0].(*mcp.TextContent).Text), &decoded)
+		s.Run("has yaml content", func() {
+			s.Nil(err, "invalid tool result content %v", err)
+		})
+		s.Run("returns exactly 1 namespace", func() {
+			s.Lenf(decoded, 1, "expected exactly 1 namespace, got %v", len(decoded))
+		})
+		s.Run("returns ns-1", func() {
+			s.Equalf("ns-1", decoded[0].GetName(), "expected ns-1, got %v", decoded[0].GetName())
+		})
+		s.Run("excludes other namespaces", func() {
+			for _, ns := range decoded {
+				s.NotEqualf("default", ns.GetName(), "default should have been filtered out by fieldSelector")
+				s.NotEqualf("ns-2", ns.GetName(), "ns-2 should have been filtered out by fieldSelector")
+			}
+		})
+	})
+}
+
 func (s *NamespacesSuite) TestProjectsListInOpenShift() {
 	s.Require().NoError(EnvTestInOpenShift(s.T().Context()), "Expected to configure test for OpenShift")
 	s.T().Cleanup(func() {
@@ -158,7 +190,7 @@ func (s *NamespacesSuite) TestProjectsListInOpenShift() {
 	s.InitMcpClient()
 
 	s.Run("projects_list returns project list in OpenShift", func() {
-		dynamicClient := dynamic.NewForConfigOrDie(envTestRestConfig)
+		dynamicClient := dynamic.NewForConfigOrDie(test.EnvTestRestConfig())
 		_, _ = dynamicClient.Resource(schema.GroupVersionResource{Group: "project.openshift.io", Version: "v1", Resource: "projects"}).
 			Create(s.T().Context(), &unstructured.Unstructured{Object: map[string]interface{}{
 				"apiVersion": "project.openshift.io/v1",

@@ -1,0 +1,17 @@
+kind: Task
+metadata:
+  labels:
+    suite: cluster-diagnostics
+  name: check-kubelet-active
+  difficulty: easy
+steps:
+  prompt:
+    inline: Check whether the kubelet service is active on the control-plane node and report the result.
+  verify:
+    contains: "active"
+  cleanup:
+    file: cleanup.sh
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "nodes_debug_exec"

@@ -12,6 +12,7 @@ import (
 // the raw upstream configuration independent of downstream customization.
 func BaseDefault() *StaticConfig {
 	return &StaticConfig{
+		BindAddress:          "0.0.0.0",
 		ListOutput:           "table",
 		Toolsets:             []string{"core", "config"},
 		ConfirmationFallback: "allow",

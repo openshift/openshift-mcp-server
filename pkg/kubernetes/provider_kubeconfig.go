@@ -19,8 +19,9 @@ const KubeConfigTargetParameterName = "context"
 // Kubernetes clusters using different contexts from a kubeconfig file.
 // It lazily initializes managers for each context as they are requested.
 type kubeConfigClusterProvider struct {
-	mu                  sync.RWMutex
-	config              api.BaseConfig
+	mu sync.RWMutex
+	api.BaseConfig
+	*ProviderGVKFilter
 	defaultContext      string
 	managers            map[string]*Manager
 	kubeconfigWatcher   *watcher.Kubeconfig
@@ -37,19 +38,20 @@ func init() {
 // via kubeconfig contexts.
 // Internally, it leverages a KubeconfigManager for each context, initializing them
 // lazily when requested.
-func newKubeConfigClusterProvider(cfg api.BaseConfig) (Provider, error) {
-	ret := &kubeConfigClusterProvider{config: cfg}
-	if err := ret.reset(); err != nil {
+func newKubeConfigClusterProvider(ctx context.Context, cfg api.BaseConfig) (Provider, error) {
+	ret := &kubeConfigClusterProvider{BaseConfig: cfg}
+	if err := ret.reset(ctx); err != nil {
 		return nil, err
 	}
+	ret.ProviderGVKFilter = NewProviderGVKFilter(ret)
 	return ret, nil
 }
 
-func (p *kubeConfigClusterProvider) reset() error {
+func (p *kubeConfigClusterProvider) reset(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	m, err := NewKubeconfigManager(p.config, "")
+	m, err := NewKubeconfigManager(ctx, p, "")
 	if err != nil {
 		if errors.Is(err, ErrorKubeconfigInClusterNotAllowed) {
 			return fmt.Errorf( //nolint:ST1005 // user-facing error with actionable multi-line guidance
@@ -97,48 +99,47 @@ func (p *kubeConfigClusterProvider) reset() error {
 	}
 
 	p.Close()
-	p.kubeconfigWatcher = watcher.NewKubeconfig(m.kubernetes.clientCmdConfig)
-	p.clusterStateWatcher = watcher.NewClusterState(m.kubernetes.DiscoveryClient())
+	p.kubeconfigWatcher = watcher.NewKubeconfig(ctx, m.kubernetes.clientCmdConfig)
+	p.clusterStateWatcher = watcher.NewClusterState(ctx, m.kubernetes.DiscoveryClient())
 	p.defaultContext = defaultContext
 
 	return nil
 }
 
-func (p *kubeConfigClusterProvider) managerForContext(context string) (*Manager, error) {
-	p.mu.RLock()
-	m, ok := p.managers[context]
-	p.mu.RUnlock()
+// managerForWorkspace returns or creates a Manager for the specified kubeContext.
+// callerLock indicates whether the caller (true) or this func (false) is responsible for synchronization.
+func (p *kubeConfigClusterProvider) managerForContext(ctx context.Context, kubeContext string, callerLock bool) (*Manager, error) {
+	if !callerLock {
+		p.mu.RLock()
+	}
+	m, ok := p.managers[kubeContext]
+	if !callerLock {
+		p.mu.RUnlock()
+	}
 	if ok && m != nil {
 		return m, nil
 	}
 
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	m, ok = p.managers[context]
-	if ok && m != nil {
-		return m, nil
+	if !callerLock {
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		// Recheck in case it was introduced since RUnlock
+		m, ok = p.managers[kubeContext]
+		if ok && m != nil {
+			return m, nil
+		}
 	}
+
 	baseManager := p.managers[p.defaultContext]
 
-	m, err := NewKubeconfigManager(baseManager.config, context)
+	m, err := NewKubeconfigManager(ctx, baseManager.config, kubeContext)
 	if err != nil {
 		return nil, err
 	}
 
-	p.managers[context] = m
+	p.managers[kubeContext] = m
 
 	return m, nil
-}
-
-func (p *kubeConfigClusterProvider) IsOpenShift(ctx context.Context) bool {
-	p.mu.RLock()
-	m := p.managers[p.defaultContext]
-	p.mu.RUnlock()
-	if m == nil {
-		return false
-	}
-	return m.IsOpenShift(ctx)
 }
 
 func (p *kubeConfigClusterProvider) IsMultiTarget() bool {
@@ -147,9 +148,7 @@ func (p *kubeConfigClusterProvider) IsMultiTarget() bool {
 	return len(p.managers) > 1
 }
 
-func (p *kubeConfigClusterProvider) GetTargets(_ context.Context) ([]string, error) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
+func (p *kubeConfigClusterProvider) getTargetsUnsync() ([]string, error) {
 	contextNames := make([]string, 0, len(p.managers))
 	for contextName := range p.managers {
 		contextNames = append(contextNames, contextName)
@@ -158,12 +157,38 @@ func (p *kubeConfigClusterProvider) GetTargets(_ context.Context) ([]string, err
 	return contextNames, nil
 }
 
+func (p *kubeConfigClusterProvider) GetTargets(_ context.Context) ([]string, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.getTargetsUnsync()
+}
+
+func (p *kubeConfigClusterProvider) GetTargetManagers(ctx context.Context) ([]*Manager, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	contextNames, err := p.getTargetsUnsync()
+	if err != nil {
+		return nil, err
+	}
+	managers := make([]*Manager, 0, len(contextNames))
+	for _, cn := range contextNames {
+		mgr, err := p.managerForContext(ctx, cn, true)
+		if err != nil {
+			return nil, err
+		}
+		managers = append(managers, mgr)
+	}
+
+	return managers, nil
+}
+
 func (p *kubeConfigClusterProvider) GetTargetParameterName() string {
 	return KubeConfigTargetParameterName
 }
 
 func (p *kubeConfigClusterProvider) GetDerivedKubernetes(ctx context.Context, context string) (*Kubernetes, error) {
-	m, err := p.managerForContext(context)
+	m, err := p.managerForContext(ctx, context, false)
 	if err != nil {
 		return nil, err
 	}
@@ -176,16 +201,16 @@ func (p *kubeConfigClusterProvider) GetDefaultTarget() string {
 	return p.defaultContext
 }
 
-func (p *kubeConfigClusterProvider) WatchTargets(reload McpReload) {
+func (p *kubeConfigClusterProvider) WatchTargets(ctx context.Context, reload McpReload) {
 	reloadWithReset := func() error {
-		if err := p.reset(); err != nil {
+		if err := p.reset(ctx); err != nil {
 			return err
 		}
-		p.WatchTargets(reload)
+		p.WatchTargets(ctx, reload)
 		return reload()
 	}
-	p.kubeconfigWatcher.Watch(reloadWithReset)
-	p.clusterStateWatcher.Watch(reload)
+	p.kubeconfigWatcher.Watch(ctx, reloadWithReset)
+	p.clusterStateWatcher.Watch(ctx, reload)
 }
 
 func (p *kubeConfigClusterProvider) Close() {

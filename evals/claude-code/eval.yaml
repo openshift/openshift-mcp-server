@@ -9,15 +9,17 @@ config:
   extensions:
     kubernetes:
       package: https://github.com/mcpchecker/kubernetes-extension@v0.0.4
+  # The claude-code agent judges with claude-code too, so the whole flow (agent +
+  # judge) runs on one Anthropic/Claude-subscription auth with no OpenAI key.
+  # (The openai-agent config keeps an independent openai:gpt-5 judge for CI.)
   llmJudge:
     ref:
-      type: builtin.llm-agent
-      model: "openai:gpt-5"
+      type: builtin.claude-code
   taskSets:
     # Kubernetes tasks
     - glob: ../tasks/*/*/*.yaml
       labelSelector:
-        suite: kubernetes
+        suite: core
       assertions:
         toolsUsed:
           - server: kubernetes
@@ -53,7 +55,7 @@ config:
         minToolCalls: 1
         maxToolCalls: 20
     # Kiali tasks
-    - glob: ../tasks/*/*/*.yaml
+    - glob: ../tasks/kiali/*/*.yaml
       labelSelector:
         suite: kiali
       assertions:
@@ -61,7 +63,7 @@ config:
           - server: kubernetes
             toolPattern: ".*"
         minToolCalls: 1
-        maxToolCalls: 40
+        maxToolCalls: 20
     # Tekton tasks
     - glob: ../tasks/tekton/*/*.yaml
       labelSelector:
@@ -85,3 +87,13 @@ config:
             tool: resource_create_or_update
         minToolCalls: 1
         maxToolCalls: 15
+    # NetObserv tasks
+    - glob: ../tasks/netobserv/*/*.yaml
+      labelSelector:
+        suite: netobserv
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            toolPattern: "netobserv_.*"
+        minToolCalls: 1
+        maxToolCalls: 10

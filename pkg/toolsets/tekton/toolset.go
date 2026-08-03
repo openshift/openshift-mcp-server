@@ -17,10 +17,10 @@ func (t *Toolset) GetName() string {
 }
 
 func (t *Toolset) GetDescription() string {
-	return "Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, and TaskRuns."
+	return "Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, TaskRuns, and troubleshooting."
 }
 
-func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
+func (t *Toolset) GetTools(_ api.FilteringProvider) []api.ServerTool {
 	return slices.Concat(
 		pipelineTools(),
 		pipelineRunTools(),
@@ -30,6 +30,14 @@ func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
 }
 
 func (t *Toolset) GetPrompts() []api.ServerPrompt {
+	return pipelineTroubleshootPrompts()
+}
+
+func (t *Toolset) GetResources() []api.ServerResource {
+	return nil
+}
+
+func (t *Toolset) GetResourceTemplates() []api.ServerResourceTemplate {
 	return nil
 }
 

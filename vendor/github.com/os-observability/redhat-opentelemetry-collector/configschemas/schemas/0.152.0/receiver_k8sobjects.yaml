@@ -1,0 +1,72 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: k8sobjects receiver configuration
+type: object
+properties:
+    auth_type:
+        description: |-
+            How to authenticate to the K8s API server.  This can be one of `none`
+            (for no auth), `serviceAccount` (to use the standard service account
+            token provided to the agent pod), or `kubeConfig` to use credentials
+            from `~/.kube/config`.
+        type: string
+    context:
+        description: When using auth_type `kubeConfig`, override the current context.
+        type: string
+    error_mode:
+        type: string
+    include_initial_state:
+        type: boolean
+    k8s_leader_elector:
+        type: string
+    kube_api_burst:
+        description: |-
+            KubeAPIBurst is the maximum burst of requests to the Kubernetes API.
+            Uses client-go's default (10) if unset. Increase if you see client-side throttling warnings.
+        type: integer
+    kube_api_qps:
+        description: |-
+            KubeAPIQPS is the maximum number of queries per second to the Kubernetes API.
+            Uses client-go's default (5) if unset. Increase if you see client-side throttling warnings.
+        type: number
+    objects:
+        type: array
+        items:
+            type: object
+            properties:
+                exclude_namespaces:
+                    type: array
+                    items:
+                        type: object
+                        properties:
+                            regexp:
+                                type: string
+                            strict:
+                                type: string
+                        additionalProperties: false
+                exclude_watch_type:
+                    type: array
+                    items:
+                        type: object
+                field_selector:
+                    type: string
+                group:
+                    type: string
+                interval:
+                    type: string
+                    pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+                label_selector:
+                    type: string
+                mode:
+                    type: string
+                name:
+                    type: string
+                namespaces:
+                    type: array
+                    items:
+                        type: string
+                resource_version:
+                    type: string
+            additionalProperties: false
+    storage:
+        type: string
+additionalProperties: false

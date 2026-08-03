@@ -1,0 +1,30 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "ovn-lflow-list-datapath-with-pattern"
+  difficulty: medium
+  category: "OVN Logical Flows"
+  description: "List flows for specific datapath with pattern filter"
+  labels:
+    suite: ovn-kubernetes
+    requires: ovn-kubernetes
+spec:
+  limits:
+    timeout: "5m"
+  setup:
+    - script:
+        file: ./setup.sh
+  prompt:
+    inline: |
+      From the ovn_cluster_router datapath, show me logical flows from the routing table.
+  verify:
+    - llmJudge:
+        contains: "Shows logical flows equivalent to routes in routing table for the ovn_cluster_router datapath"
+        reasoning: "Output should show logical flows representing the routing table for ovn_cluster_router"
+    - llmJudge:
+        contains: "Comprised of routing information from ovn_cluster_router to other switches"
+        reasoning: "Output should describe routing information between ovn_cluster_router and connected switches"
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "ovn_lflow_list"

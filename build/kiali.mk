@@ -2,8 +2,8 @@
 
 ISTIOCTL = $(shell pwd)/_output/tools/bin/istioctl
 ISTIO_ADDONS_DIR = $(shell pwd)/_output/istio-addons
-ISTIO_VERSION = 1.28.0
-KIALI_VERSION = v2.22.0
+ISTIO_VERSION = 1.30.1
+KIALI_VERSION = v2.27
 # Release version without patch (e.g. 1.28.0 -> 1.28)
 
 # Download and install istioctl (also copies samples/addons for install-istio)
@@ -24,6 +24,11 @@ istioctl:
 		cd - >/dev/null ;\
 		rm -rf $$TMPDIR ;\
 	}
+
+# Install Gateway API CRDs required for Gateway API eval tasks and Kiali AI tools
+.PHONY: install-gateway-api-crds
+install-gateway-api-crds:
+	@evals/tasks/kiali/scripts/ensure_gateway_api_crds.sh
 
 # Install Istio (demo profile) and enable sidecar injection in default namespace
 .PHONY: install-istio
@@ -55,7 +60,7 @@ install-bookinfo-demo:
 .PHONY: update-kiali-version
 update-kiali-version:
 	@echo "Updating Kiali version to $(KIALI_VERSION)..."
-	@kubectl patch deployment kiali -n istio-system -p '{"spec":{"template":{"spec":{"containers":[{"name":"kiali","image":"quay.io/kiali/kiali:$(KIALI_VERSION)"}]}}}}'
+	@kubectl patch deployment kiali -n istio-system -p '{"spec":{"template":{"spec":{"containers":[{"name":"kiali","image":"quay.io/kiali/kiali_mcp:$(KIALI_VERSION)"}]}}}}'
 	@kubectl delete pod -l app=kiali -n istio-system
 	@kubectl wait --for=condition=available deployment/kiali -n istio-system --timeout=300s
 
@@ -76,4 +81,4 @@ expose-kiali:
 	echo "Kiali is being exposed on http://localhost:20001"
 
 .PHONY: setup-kiali
-setup-kiali: install-istio update-kiali-version install-bookinfo-demo expose-kiali expose-bookinfo-demo ## Setup Kiali
+setup-kiali: install-istio install-gateway-api-crds update-kiali-version install-bookinfo-demo expose-kiali expose-bookinfo-demo ## Setup Kiali

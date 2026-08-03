@@ -1,0 +1,27 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "ovn-get-list-logical-routers"
+  difficulty: easy
+  category: "OVN Database Query"
+  description: "List all Logical_Router records from OVN Northbound database"
+  labels:
+    suite: ovn-kubernetes
+    requires: ovn-kubernetes
+spec:
+  limits:
+    timeout: "5m"
+  setup:
+    - script:
+        file: ./setup.sh
+  prompt:
+    inline: |
+      List all Logical_Router records from the OVN Northbound database.
+  verify:
+    - llmJudge:
+        contains: "Shows all the Logical_Router records from the OVN Northbound database. Should include a distributed router handling inter-node routing and a local gateway router handling external connectivity"
+        reasoning: "Output should show all Logical_Router records including distributed router and gateway router"
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "ovn_get"

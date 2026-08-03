@@ -9,6 +9,6 @@ steps:
   assertions:
     toolsUsed:
       - server: kubernetes
-        toolPattern: "netedge__query_prometheus"
+        toolPattern: "query_prometheus"
         args:
           diagnostic_target: "ingress"

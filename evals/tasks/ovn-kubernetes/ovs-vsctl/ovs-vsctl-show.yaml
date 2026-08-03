@@ -1,0 +1,30 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "ovs-vsctl-show"
+  difficulty: easy
+  category: "OVS Configuration"
+  description: "Display OVS configuration overview from an ovnkube-node pod"
+  labels:
+    suite: ovn-kubernetes
+    requires: ovn-kubernetes
+spec:
+  limits:
+    timeout: "5m"
+  setup:
+    - script:
+        file: ./setup.sh
+  prompt:
+    inline: |
+      Show me the OVS configuration overview from one of the ovnkube-node pods.
+  verify:
+    - llmJudge:
+        contains: "Shows the OVS switch configuration comprised of the br-int integration bridge which handles pod-to-pod traffic within the OVN logical network"
+        reasoning: "Output should describe br-int as the integration bridge central to OVN-Kubernetes datapath"
+    - llmJudge:
+        contains: "Includes ports and interfaces attached to each bridge, with patch ports connecting the OVN logical topology to the physical network"
+        reasoning: "Output should describe the port/interface hierarchy and patch port connections between bridges"
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "ovs_vsctl"

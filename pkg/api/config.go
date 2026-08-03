@@ -72,6 +72,14 @@ type StsConfigProvider interface {
 	GetStsAuthStyle() string
 	GetStsClientCertFile() string
 	GetStsClientKeyFile() string
+	GetStsFederatedTokenFile() string
+}
+
+// CertificateAuthorityProvider provides access to the top-level certificate_authority
+// TLS setting. It is a general OAuth/TLS option (also consumed by pkg/oauth) rather
+// than an STS-specific one, so it is kept separate from StsConfigProvider.
+type CertificateAuthorityProvider interface {
+	GetCertificateAuthority() string
 }
 
 // ValidationEnabledProvider provides access to validation enabled setting.
@@ -79,9 +87,21 @@ type ValidationEnabledProvider interface {
 	IsValidationEnabled() bool
 }
 
+// TargetCompatibilityToolFiltersEnabledProvider provides access to target compatibility tool filters setting.
+type TargetCompatibilityToolFiltersEnabledProvider interface {
+	IsTargetCompatibilityToolFiltersEnabled() bool
+}
+
 // RequireTLSProvider provides access to require_tls setting.
 type RequireTLSProvider interface {
 	IsRequireTLS() bool
+}
+
+// TLSConfigProvider provides access to global TLS min version and cipher suite settings.
+// Values include TLS_MIN_VERSION and TLS_CIPHER_SUITES env overrides when set.
+type TLSConfigProvider interface {
+	GetTLSMinVersionConfig() string
+	GetTLSCipherSuitesConfig() []string
 }
 
 // RequireOAuthProvider provides access to require_oauth setting.
@@ -96,7 +116,10 @@ type BaseConfig interface {
 	DeniedResourcesProvider
 	ExtendedConfigProvider
 	StsConfigProvider
+	CertificateAuthorityProvider
 	ValidationEnabledProvider
+	TargetCompatibilityToolFiltersEnabledProvider
 	RequireTLSProvider
+	TLSConfigProvider
 	RequireOAuthProvider
 }

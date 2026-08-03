@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/klog/v2"
 )
 
 func captureOutput(f func() error) (string, error) {
@@ -55,7 +56,7 @@ func TestConfig(t *testing.T) {
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1"})
-		expectedConfig := `" - Config: "`
+		expectedConfig := `config.path=""`
 		if err := rootCmd.Execute(); !strings.Contains(out.String(), expectedConfig) {
 			t.Fatalf("Expected config to be %s, got %s %v", expectedConfig, out.String(), err)
 		}
@@ -67,7 +68,7 @@ func TestConfig(t *testing.T) {
 		emptyConfigPath := filepath.Join(filepath.Dir(file), "testdata", "empty-config.toml")
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--config", emptyConfigPath})
 		_ = rootCmd.Execute()
-		expected := `(?m)\" - Config\:[^\"]+empty-config\.toml\"`
+		expected := `config\.path="[^"]*empty-config\.toml"`
 		if m, err := regexp.MatchString(expected, out.String()); !m || err != nil {
 			t.Fatalf("Expected config to be %s, got %s %v", expected, out.String(), err)
 		}
@@ -92,23 +93,23 @@ func TestConfig(t *testing.T) {
 		validConfigPath := filepath.Join(filepath.Dir(file), "testdata", "valid-config.toml")
 		rootCmd.SetArgs([]string{"--version", "--config", validConfigPath})
 		_ = rootCmd.Execute()
-		expectedConfig := `(?m)\" - Config\:[^\"]+valid-config\.toml\"`
+		expectedConfig := `config\.path="[^"]*valid-config\.toml"`
 		if m, err := regexp.MatchString(expectedConfig, out.String()); !m || err != nil {
 			t.Fatalf("Expected config to be %s, got %s %v", expectedConfig, out.String(), err)
 		}
-		expectedListOutput := `(?m)\" - ListOutput\: yaml"`
+		expectedListOutput := `config\.list_output="yaml"`
 		if m, err := regexp.MatchString(expectedListOutput, out.String()); !m || err != nil {
 			t.Fatalf("Expected config to be %s, got %s %v", expectedListOutput, out.String(), err)
 		}
-		expectedReadOnly := `(?m)\" - Read-only mode: true"`
+		expectedReadOnly := `config\.read_only=true`
 		if m, err := regexp.MatchString(expectedReadOnly, out.String()); !m || err != nil {
 			t.Fatalf("Expected config to be %s, got %s %v", expectedReadOnly, out.String(), err)
 		}
-		expectedDisableDestruction := `(?m)\" - Disable destructive tools: true"`
+		expectedDisableDestruction := `config\.disable_destructive=true`
 		if m, err := regexp.MatchString(expectedDisableDestruction, out.String()); !m || err != nil {
 			t.Fatalf("Expected config to be %s, got %s %v", expectedDisableDestruction, out.String(), err)
 		}
-		expectedStateless := `(?m)\" - Stateless mode: true"`
+		expectedStateless := `config\.stateless=true`
 		if m, err := regexp.MatchString(expectedStateless, out.String()); !m || err != nil {
 			t.Fatalf("Expected config to be %s, got %s %v", expectedStateless, out.String(), err)
 		}
@@ -120,23 +121,23 @@ func TestConfig(t *testing.T) {
 		validConfigPath := filepath.Join(filepath.Dir(file), "testdata", "valid-config.toml")
 		rootCmd.SetArgs([]string{"--version", "--list-output=table", "--disable-destructive=false", "--read-only=false", "--stateless=false", "--config", validConfigPath})
 		_ = rootCmd.Execute()
-		expected := `(?m)\" - Config\:[^\"]+valid-config\.toml\"`
+		expected := `config\.path="[^"]*valid-config\.toml"`
 		if m, err := regexp.MatchString(expected, out.String()); !m || err != nil {
 			t.Fatalf("Expected config to be %s, got %s %v", expected, out.String(), err)
 		}
-		expectedListOutput := `(?m)\" - ListOutput\: table"`
+		expectedListOutput := `config\.list_output="table"`
 		if m, err := regexp.MatchString(expectedListOutput, out.String()); !m || err != nil {
 			t.Fatalf("Expected config to be %s, got %s %v", expectedListOutput, out.String(), err)
 		}
-		expectedReadOnly := `(?m)\" - Read-only mode: false"`
+		expectedReadOnly := `config\.read_only=false`
 		if m, err := regexp.MatchString(expectedReadOnly, out.String()); !m || err != nil {
 			t.Fatalf("Expected config to be %s, got %s %v", expectedReadOnly, out.String(), err)
 		}
-		expectedDisableDestruction := `(?m)\" - Disable destructive tools: false"`
+		expectedDisableDestruction := `config\.disable_destructive=false`
 		if m, err := regexp.MatchString(expectedDisableDestruction, out.String()); !m || err != nil {
 			t.Fatalf("Expected config to be %s, got %s %v", expectedDisableDestruction, out.String(), err)
 		}
-		expectedStateless := `(?m)\" - Stateless mode: false"`
+		expectedStateless := `config\.stateless=false`
 		if m, err := regexp.MatchString(expectedStateless, out.String()); !m || err != nil {
 			t.Fatalf("Expected stateless mode to be false (flag overrides config), got %s %v", out.String(), err)
 		}
@@ -146,7 +147,7 @@ func TestConfig(t *testing.T) {
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1"})
 		_ = rootCmd.Execute()
-		expectedStateless := `(?m)\" - Stateless mode: false"`
+		expectedStateless := `config\.stateless=false`
 		if m, err := regexp.MatchString(expectedStateless, out.String()); !m || err != nil {
 			t.Fatalf("Expected stateless mode to be false by default, got %s %v", out.String(), err)
 		}
@@ -156,7 +157,7 @@ func TestConfig(t *testing.T) {
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--stateless=true"})
 		_ = rootCmd.Execute()
-		expectedStateless := `(?m)\" - Stateless mode: true"`
+		expectedStateless := `config\.stateless=true`
 		if m, err := regexp.MatchString(expectedStateless, out.String()); !m || err != nil {
 			t.Fatalf("Expected stateless mode to be true, got %s %v", out.String(), err)
 		}
@@ -166,7 +167,7 @@ func TestConfig(t *testing.T) {
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--stateless=false"})
 		_ = rootCmd.Execute()
-		expectedStateless := `(?m)\" - Stateless mode: false"`
+		expectedStateless := `config\.stateless=false`
 		if m, err := regexp.MatchString(expectedStateless, out.String()); !m || err != nil {
 			t.Fatalf("Expected stateless mode to be false, got %s %v", out.String(), err)
 		}
@@ -176,11 +177,24 @@ func TestConfig(t *testing.T) {
 type CmdSuite struct {
 	suite.Suite
 	testDataDir string
+	klogState   klog.State
 }
 
 func (s *CmdSuite) SetupSuite() {
 	_, file, _, _ := runtime.Caller(0)
 	s.testDataDir = filepath.Join(filepath.Dir(file), "testdata")
+}
+
+// SetupTest captures klog's package-level state before each test so that
+// each test method starts from a clean slate. The tests run rootCmd.Execute,
+// which constructs a logging.Sink and mutates klog globals; without this,
+// per-method state would bleed and (under -race) could surface as flakes.
+func (s *CmdSuite) SetupTest() {
+	s.klogState = klog.CaptureState()
+}
+
+func (s *CmdSuite) TearDownTest() {
+	s.klogState.Restore()
 }
 
 func (s *CmdSuite) TestConfigDir() {
@@ -190,20 +204,20 @@ func (s *CmdSuite) TestConfigDir() {
 			list_output = "yaml"
 			read_only = true
 			disable_destructive = true
-		`), 0644))
+		`), 0o644))
 
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--config-dir", dropInDir})
 		s.Require().NoError(rootCmd.Execute())
-		s.Contains(out.String(), "ListOutput: yaml")
-		s.Contains(out.String(), "Read-only mode: true")
-		s.Contains(out.String(), "Disable destructive tools: true")
+		s.Contains(out.String(), `config.list_output="yaml"`)
+		s.Contains(out.String(), "config.read_only=true")
+		s.Contains(out.String(), "config.disable_destructive=true")
 	})
 	s.Run("--config-dir path is a file throws error", func() {
 		tempDir := s.T().TempDir()
 		filePath := filepath.Join(tempDir, "not-a-directory.toml")
-		s.Require().NoError(os.WriteFile(filePath, []byte("log_level = 1"), 0644))
+		s.Require().NoError(os.WriteFile(filePath, []byte("log_level = 1"), 0o644))
 
 		ioStreams, _ := testStream()
 		rootCmd := NewMCPServer(ioStreams)
@@ -218,7 +232,7 @@ func (s *CmdSuite) TestConfigDir() {
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--config-dir", "/nonexistent/path/to/config-dir"})
 		err := rootCmd.Execute()
 		s.Require().NoError(err, "Nonexistent directories should be gracefully skipped")
-		s.Contains(out.String(), fmt.Sprintf("ListOutput: %s", config.Default().ListOutput), "Default values should be used")
+		s.Contains(out.String(), fmt.Sprintf(`config.list_output="%s"`, config.Default().ListOutput), "Default values should be used")
 	})
 	s.Run("--config with --config-dir merges configs", func() {
 		tempDir := s.T().TempDir()
@@ -226,43 +240,43 @@ func (s *CmdSuite) TestConfigDir() {
 		s.Require().NoError(os.WriteFile(mainConfigPath, []byte(`
 			list_output = "table"
 			read_only = false
-		`), 0644))
+		`), 0o644))
 
 		dropInDir := filepath.Join(tempDir, "conf.d")
-		s.Require().NoError(os.Mkdir(dropInDir, 0755))
+		s.Require().NoError(os.Mkdir(dropInDir, 0o755))
 		s.Require().NoError(os.WriteFile(filepath.Join(dropInDir, "10-override.toml"), []byte(`
 			read_only = true
 			disable_destructive = true
 			stateless = true
-		`), 0644))
+		`), 0o644))
 
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--config", mainConfigPath, "--config-dir", dropInDir})
 		s.Require().NoError(rootCmd.Execute())
-		s.Contains(out.String(), "ListOutput: table", "list_output from main config")
-		s.Contains(out.String(), "Read-only mode: true", "read_only overridden by drop-in")
-		s.Contains(out.String(), "Disable destructive tools: true", "disable_destructive from drop-in")
-		s.Contains(out.String(), "Stateless mode: true", "stateless from drop-in")
+		s.Contains(out.String(), `config.list_output="table"`, "list_output from main config")
+		s.Contains(out.String(), "config.read_only=true", "read_only overridden by drop-in")
+		s.Contains(out.String(), "config.disable_destructive=true", "disable_destructive from drop-in")
+		s.Contains(out.String(), "config.stateless=true", "stateless from drop-in")
 	})
 	s.Run("multiple drop-in files are merged in order", func() {
 		dropInDir := s.T().TempDir()
 		s.Require().NoError(os.WriteFile(filepath.Join(dropInDir, "10-first.toml"), []byte(`
 			list_output = "yaml"
 			read_only = true
-		`), 0644))
+		`), 0o644))
 		s.Require().NoError(os.WriteFile(filepath.Join(dropInDir, "20-second.toml"), []byte(`
 			list_output = "table"
 			disable_destructive = true
-		`), 0644))
+		`), 0o644))
 
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--config-dir", dropInDir})
 		s.Require().NoError(rootCmd.Execute())
-		s.Contains(out.String(), "ListOutput: table", "list_output from 20-second.toml (last wins)")
-		s.Contains(out.String(), "Read-only mode: true", "read_only from 10-first.toml")
-		s.Contains(out.String(), "Disable destructive tools: true", "disable_destructive from 20-second.toml")
+		s.Contains(out.String(), `config.list_output="table"`, "list_output from 20-second.toml (last wins)")
+		s.Contains(out.String(), "config.read_only=true", "read_only from 10-first.toml")
+		s.Contains(out.String(), "config.disable_destructive=true", "disable_destructive from 20-second.toml")
 	})
 	s.Run("flags take precedence over --config-dir", func() {
 		dropInDir := s.T().TempDir()
@@ -271,16 +285,16 @@ func (s *CmdSuite) TestConfigDir() {
 			read_only = true
 			disable_destructive = true
 			stateless = true
-		`), 0644))
+		`), 0o644))
 
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--list-output=table", "--read-only=false", "--disable-destructive=false", "--stateless=false", "--config-dir", dropInDir})
 		s.Require().NoError(rootCmd.Execute())
-		s.Contains(out.String(), "ListOutput: table", "flag takes precedence")
-		s.Contains(out.String(), "Read-only mode: false", "flag takes precedence")
-		s.Contains(out.String(), "Disable destructive tools: false", "flag takes precedence")
-		s.Contains(out.String(), "Stateless mode: false", "flag takes precedence")
+		s.Contains(out.String(), `config.list_output="table"`, "flag takes precedence")
+		s.Contains(out.String(), "config.read_only=false", "flag takes precedence")
+		s.Contains(out.String(), "config.disable_destructive=false", "flag takes precedence")
+		s.Contains(out.String(), "config.stateless=false", "flag takes precedence")
 	})
 }
 
@@ -303,7 +317,7 @@ func TestToolsets(t *testing.T) {
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1"})
-		expected := "- Toolsets: " + strings.Join(config.Default().Toolsets, ", ")
+		expected := `config.toolsets=["` + strings.Join(config.Default().Toolsets, `","`) + `"]`
 		if err := rootCmd.Execute(); !strings.Contains(out.String(), expected) {
 			t.Fatalf("Expected toolsets '%s', got %s %v", expected, out, err)
 		}
@@ -313,7 +327,7 @@ func TestToolsets(t *testing.T) {
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--toolsets", "helm,config"})
 		_ = rootCmd.Execute()
-		expected := `(?m)\" - Toolsets\: helm, config\"`
+		expected := `config\.toolsets=\["helm","config"\]`
 		if m, err := regexp.MatchString(expected, out.String()); !m || err != nil {
 			t.Fatalf("Expected toolset to be %s, got %s %v", expected, out.String(), err)
 		}
@@ -335,7 +349,7 @@ func TestListOutput(t *testing.T) {
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1"})
 		defaults := config.Default()
-		expected := fmt.Sprintf("- ListOutput: %s", defaults.ListOutput)
+		expected := fmt.Sprintf(`config.list_output="%s"`, defaults.ListOutput)
 		if err := rootCmd.Execute(); !strings.Contains(out.String(), expected) {
 			t.Fatalf("Expected list-output '%s', got %s %v", defaults.ListOutput, out, err)
 		}
@@ -345,7 +359,7 @@ func TestListOutput(t *testing.T) {
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--list-output", "yaml"})
 		_ = rootCmd.Execute()
-		expected := `(?m)\" - ListOutput\: yaml\"`
+		expected := `config\.list_output="yaml"`
 		if m, err := regexp.MatchString(expected, out.String()); !m || err != nil {
 			t.Fatalf("Expected list-output to be %s, got %s %v", expected, out.String(), err)
 		}
@@ -357,7 +371,7 @@ func TestReadOnly(t *testing.T) {
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1"})
-		expected := fmt.Sprintf(" - Read-only mode: %v", config.Default().ReadOnly)
+		expected := fmt.Sprintf("config.read_only=%v", config.Default().ReadOnly)
 		if err := rootCmd.Execute(); !strings.Contains(out.String(), expected) {
 			t.Fatalf("Expected read-only mode %v, got %s %v", config.Default().ReadOnly, out, err)
 		}
@@ -367,7 +381,7 @@ func TestReadOnly(t *testing.T) {
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--read-only"})
 		_ = rootCmd.Execute()
-		expected := `(?m)\" - Read-only mode\: true\"`
+		expected := `config\.read_only=true`
 		if m, err := regexp.MatchString(expected, out.String()); !m || err != nil {
 			t.Fatalf("Expected read-only mode to be %s, got %s %v", expected, out.String(), err)
 		}
@@ -380,7 +394,7 @@ func TestDisableDestructive(t *testing.T) {
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1"})
 		defaults := config.Default()
-		expected := fmt.Sprintf(" - Disable destructive tools: %t", defaults.DisableDestructive)
+		expected := fmt.Sprintf("config.disable_destructive=%t", defaults.DisableDestructive)
 		if err := rootCmd.Execute(); !strings.Contains(out.String(), expected) {
 			t.Fatalf("Expected disable destructive %t, got %s %v", defaults.DisableDestructive, out, err)
 		}
@@ -390,7 +404,7 @@ func TestDisableDestructive(t *testing.T) {
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--disable-destructive"})
 		_ = rootCmd.Execute()
-		expected := `(?m)\" - Disable destructive tools\: true\"`
+		expected := `config\.disable_destructive=true`
 		if m, err := regexp.MatchString(expected, out.String()); !m || err != nil {
 			t.Fatalf("Expected disable-destructive mode to be %s, got %s %v", expected, out.String(), err)
 		}
@@ -426,7 +440,7 @@ func TestStdioLogging(t *testing.T) {
 	t.Run("stdio disables klog", func(t *testing.T) {
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
-		rootCmd.SetArgs([]string{"--version", "--log-level=1"})
+		rootCmd.SetArgs([]string{"--version", "--log-level=1", "--port="}) // use --port= to manually force no port (=stdio)
 		err := rootCmd.Execute()
 		require.NoErrorf(t, err, "Expected no error executing command, got %v", err)
 		assert.Equalf(t, "0.0.0\n", out.String(), "Expected only version output, got %s", out.String())
@@ -446,7 +460,7 @@ func TestDisableMultiCluster(t *testing.T) {
 		ioStreams, out := testStream()
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1"})
-		if err := rootCmd.Execute(); !strings.Contains(out.String(), " - ClusterProviderStrategy: auto-detect (it is recommended to set this explicitly in your Config)") {
+		if err := rootCmd.Execute(); !strings.Contains(out.String(), `config.cluster_provider_strategy="auto-detect (it is recommended to set this explicitly in your Config)"`) {
 			t.Fatalf("Expected ClusterProviderStrategy kubeconfig, got %s %v", out, err)
 		}
 	})
@@ -455,7 +469,7 @@ func TestDisableMultiCluster(t *testing.T) {
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--disable-multi-cluster"})
 		_ = rootCmd.Execute()
-		expected := `(?m)\" - ClusterProviderStrategy\: disabled\"`
+		expected := `config\.cluster_provider_strategy="disabled"`
 		if m, err := regexp.MatchString(expected, out.String()); !m || err != nil {
 			t.Fatalf("Expected ClusterProviderStrategy %s, got %s %v", expected, out.String(), err)
 		}
@@ -508,7 +522,7 @@ func TestStateless(t *testing.T) {
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1"})
 		defaults := config.Default()
-		expected := fmt.Sprintf(" - Stateless mode: %t", defaults.Stateless)
+		expected := fmt.Sprintf("config.stateless=%t", defaults.Stateless)
 		if err := rootCmd.Execute(); !strings.Contains(out.String(), expected) {
 			t.Fatalf("Expected stateless mode %t, got %s %v", defaults.Stateless, out, err)
 		}
@@ -518,7 +532,7 @@ func TestStateless(t *testing.T) {
 		rootCmd := NewMCPServer(ioStreams)
 		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--stateless"})
 		_ = rootCmd.Execute()
-		expected := `(?m)\" - Stateless mode\: true\"`
+		expected := `config\.stateless=true`
 		if m, err := regexp.MatchString(expected, out.String()); !m || err != nil {
 			t.Fatalf("Expected stateless mode to be %s, got %s %v", expected, out.String(), err)
 		}
@@ -539,8 +553,8 @@ func TestRequireTLSValidation(t *testing.T) {
 		tempDir := t.TempDir()
 		certPath := filepath.Join(tempDir, "cert.pem")
 		keyPath := filepath.Join(tempDir, "key.pem")
-		require.NoError(t, os.WriteFile(certPath, []byte("cert content"), 0644))
-		require.NoError(t, os.WriteFile(keyPath, []byte("key content"), 0644))
+		require.NoError(t, os.WriteFile(certPath, []byte("cert content"), 0o644))
+		require.NoError(t, os.WriteFile(keyPath, []byte("key content"), 0o644))
 
 		ioStreams, _ := testStream()
 		rootCmd := NewMCPServer(ioStreams)
@@ -552,7 +566,7 @@ func TestRequireTLSValidation(t *testing.T) {
 	t.Run("require-tls in STDIO mode does not require TLS certs", func(t *testing.T) {
 		ioStreams, _ := testStream()
 		rootCmd := NewMCPServer(ioStreams)
-		rootCmd.SetArgs([]string{"--version", "--require-tls"})
+		rootCmd.SetArgs([]string{"--version", "--require-tls", "--port="}) // use --port= to manually force no port (=stdio)
 		err := rootCmd.Execute()
 		require.NoError(t, err)
 	})
@@ -561,8 +575,8 @@ func TestRequireTLSValidation(t *testing.T) {
 		tempDir := t.TempDir()
 		certPath := filepath.Join(tempDir, "cert.pem")
 		keyPath := filepath.Join(tempDir, "key.pem")
-		require.NoError(t, os.WriteFile(certPath, []byte("cert content"), 0644))
-		require.NoError(t, os.WriteFile(keyPath, []byte("key content"), 0644))
+		require.NoError(t, os.WriteFile(certPath, []byte("cert content"), 0o644))
+		require.NoError(t, os.WriteFile(keyPath, []byte("key content"), 0o644))
 
 		ioStreams, _ := testStream()
 		rootCmd := NewMCPServer(ioStreams)
@@ -583,8 +597,8 @@ func TestRequireTLSValidation(t *testing.T) {
 		tempDir := t.TempDir()
 		certPath := filepath.Join(tempDir, "cert.pem")
 		keyPath := filepath.Join(tempDir, "key.pem")
-		require.NoError(t, os.WriteFile(certPath, []byte("cert content"), 0644))
-		require.NoError(t, os.WriteFile(keyPath, []byte("key content"), 0644))
+		require.NoError(t, os.WriteFile(certPath, []byte("cert content"), 0o644))
+		require.NoError(t, os.WriteFile(keyPath, []byte("key content"), 0o644))
 
 		ioStreams, _ := testStream()
 		rootCmd := NewMCPServer(ioStreams)
@@ -605,8 +619,8 @@ func TestRequireTLSValidation(t *testing.T) {
 		tempDir := t.TempDir()
 		certPath := filepath.Join(tempDir, "cert.pem")
 		keyPath := filepath.Join(tempDir, "key.pem")
-		require.NoError(t, os.WriteFile(certPath, []byte("cert content"), 0644))
-		require.NoError(t, os.WriteFile(keyPath, []byte("key content"), 0644))
+		require.NoError(t, os.WriteFile(certPath, []byte("cert content"), 0o644))
+		require.NoError(t, os.WriteFile(keyPath, []byte("key content"), 0o644))
 
 		ioStreams, _ := testStream()
 		rootCmd := NewMCPServer(ioStreams)
@@ -622,11 +636,132 @@ func TestRequireTLSValidation(t *testing.T) {
 	})
 }
 
+func (s *CmdSuite) TestLogFile() {
+	s.Run("http mode writes logs to file instead of stdout", func() {
+		logPath := filepath.Join(s.T().TempDir(), "server.log")
+
+		ioStreams, out := testStream()
+		rootCmd := NewMCPServer(ioStreams)
+		rootCmd.SetArgs([]string{"--version", "--port=1337", "--log-level=1", "--log-file", logPath})
+		s.Require().NoError(rootCmd.Execute())
+
+		s.Equal("0.0.0\n", out.String(), "stdout should contain only version output, not logs")
+		logContent, err := os.ReadFile(logPath)
+		s.Require().NoError(err)
+		s.Contains(string(logContent), "Starting kubernetes-mcp-server")
+	})
+
+	s.Run("stdio mode writes logs to file", func() {
+		logPath := filepath.Join(s.T().TempDir(), "server.log")
+
+		ioStreams, out := testStream()
+		rootCmd := NewMCPServer(ioStreams)
+		rootCmd.SetArgs([]string{"--version", "--log-level=1", "--log-file", logPath})
+		s.Require().NoError(rootCmd.Execute())
+
+		s.Equal("0.0.0\n", out.String(), "stdout should contain only version output in stdio mode")
+		logContent, err := os.ReadFile(logPath)
+		s.Require().NoError(err)
+		s.Contains(string(logContent), "Starting kubernetes-mcp-server")
+	})
+
+	s.Run("log file is created if it does not exist", func() {
+		logPath := filepath.Join(s.T().TempDir(), "new-server.log")
+
+		_, err := os.Stat(logPath)
+		s.Require().True(os.IsNotExist(err), "log file should not exist before the test")
+
+		ioStreams, _ := testStream()
+		rootCmd := NewMCPServer(ioStreams)
+		rootCmd.SetArgs([]string{"--version", "--log-level=1", "--log-file", logPath})
+		s.Require().NoError(rootCmd.Execute())
+
+		_, err = os.Stat(logPath)
+		s.Require().NoError(err, "log file should have been created")
+	})
+
+	s.Run("log file is appended to if it already exists", func() {
+		logPath := filepath.Join(s.T().TempDir(), "server.log")
+		existingContent := "existing log line\n"
+		s.Require().NoError(os.WriteFile(logPath, []byte(existingContent), 0o600))
+
+		ioStreams, _ := testStream()
+		rootCmd := NewMCPServer(ioStreams)
+		rootCmd.SetArgs([]string{"--version", "--log-level=1", "--log-file", logPath})
+		s.Require().NoError(rootCmd.Execute())
+
+		logContent, err := os.ReadFile(logPath)
+		s.Require().NoError(err)
+		s.True(strings.HasPrefix(string(logContent), existingContent), "existing content should be preserved at the start")
+		s.Greater(len(logContent), len(existingContent), "new content should be appended after existing content")
+	})
+
+	s.Run("nonexistent parent directory returns error", func() {
+		logPath := filepath.Join(s.T().TempDir(), "missing", "server.log")
+		ioStreams, _ := testStream()
+		rootCmd := NewMCPServer(ioStreams)
+		rootCmd.SetArgs([]string{"--version", "--log-file", logPath})
+		err := rootCmd.Execute()
+		s.Require().Error(err)
+		s.Contains(err.Error(), "failed to open log file")
+		s.Contains(err.Error(), logPath)
+	})
+
+	s.Run("log_file from TOML config is used", func() {
+		logPath := filepath.Join(s.T().TempDir(), "server.log")
+		configPath := filepath.Join(s.T().TempDir(), "config.toml")
+		s.Require().NoError(os.WriteFile(configPath, []byte(fmt.Sprintf("log_level = 1\nlog_file = %q\n", logPath)), 0o600))
+
+		ioStreams, out := testStream()
+		rootCmd := NewMCPServer(ioStreams)
+		rootCmd.SetArgs([]string{"--version", "--port=1337", "--config", configPath})
+		s.Require().NoError(rootCmd.Execute())
+
+		s.Equal("0.0.0\n", out.String(), "stdout should not contain log output when log_file is set")
+		logContent, err := os.ReadFile(logPath)
+		s.Require().NoError(err)
+		s.Contains(string(logContent), "Starting kubernetes-mcp-server")
+	})
+
+	s.Run("--log-file flag overrides log_file in TOML config", func() {
+		configLogPath := filepath.Join(s.T().TempDir(), "config-server.log")
+		flagLogPath := filepath.Join(s.T().TempDir(), "flag-server.log")
+		configPath := filepath.Join(s.T().TempDir(), "config.toml")
+		s.Require().NoError(os.WriteFile(configPath, []byte(fmt.Sprintf("log_level = 1\nlog_file = %q\n", configLogPath)), 0o600))
+
+		ioStreams, _ := testStream()
+		rootCmd := NewMCPServer(ioStreams)
+		rootCmd.SetArgs([]string{"--version", "--port=1337", "--config", configPath, "--log-file", flagLogPath})
+		s.Require().NoError(rootCmd.Execute())
+
+		flagContent, err := os.ReadFile(flagLogPath)
+		s.Require().NoError(err)
+		s.Contains(string(flagContent), "Starting kubernetes-mcp-server", "flag log path should receive logs")
+
+		_, err = os.Stat(configLogPath)
+		s.Require().True(os.IsNotExist(err), "config log file should not be created when flag overrides it")
+	})
+
+	s.Run("stderr routes logs to ErrOut without opening a file", func() {
+		errOut := &bytes.Buffer{}
+		ioStreams := genericiooptions.IOStreams{
+			In:     &bytes.Buffer{},
+			Out:    &bytes.Buffer{},
+			ErrOut: errOut,
+		}
+		rootCmd := NewMCPServer(ioStreams)
+		rootCmd.SetArgs([]string{"--version", "--log-level=1", "--log-file=stderr"})
+		s.Require().NoError(rootCmd.Execute())
+
+		s.Contains(errOut.String(), "Starting kubernetes-mcp-server", "logs should go to ErrOut")
+	})
+}
+
 func TestTLSValidation(t *testing.T) {
 	t.Run("tls-cert without tls-key returns error", func(t *testing.T) {
 		tempDir := t.TempDir()
 		certPath := filepath.Join(tempDir, "cert.pem")
-		require.NoError(t, os.WriteFile(certPath, []byte("cert content"), 0644))
+		require.NoError(t, os.WriteFile(certPath, []byte("cert content"), 0o644))
 
 		ioStreams, _ := testStream()
 		rootCmd := NewMCPServer(ioStreams)
@@ -639,7 +774,7 @@ func TestTLSValidation(t *testing.T) {
 	t.Run("tls-key without tls-cert returns error", func(t *testing.T) {
 		tempDir := t.TempDir()
 		keyPath := filepath.Join(tempDir, "key.pem")
-		require.NoError(t, os.WriteFile(keyPath, []byte("key content"), 0644))
+		require.NoError(t, os.WriteFile(keyPath, []byte("key content"), 0o644))
 
 		ioStreams, _ := testStream()
 		rootCmd := NewMCPServer(ioStreams)
@@ -652,7 +787,7 @@ func TestTLSValidation(t *testing.T) {
 	t.Run("invalid tls-cert path returns error", func(t *testing.T) {
 		tempDir := t.TempDir()
 		keyPath := filepath.Join(tempDir, "key.pem")
-		require.NoError(t, os.WriteFile(keyPath, []byte("key content"), 0644))
+		require.NoError(t, os.WriteFile(keyPath, []byte("key content"), 0o644))
 
 		ioStreams, _ := testStream()
 		rootCmd := NewMCPServer(ioStreams)
@@ -665,7 +800,7 @@ func TestTLSValidation(t *testing.T) {
 	t.Run("invalid tls-key path returns error", func(t *testing.T) {
 		tempDir := t.TempDir()
 		certPath := filepath.Join(tempDir, "cert.pem")
-		require.NoError(t, os.WriteFile(certPath, []byte("cert content"), 0644))
+		require.NoError(t, os.WriteFile(certPath, []byte("cert content"), 0o644))
 
 		ioStreams, _ := testStream()
 		rootCmd := NewMCPServer(ioStreams)
@@ -679,8 +814,8 @@ func TestTLSValidation(t *testing.T) {
 		tempDir := t.TempDir()
 		certPath := filepath.Join(tempDir, "cert.pem")
 		keyPath := filepath.Join(tempDir, "key.pem")
-		require.NoError(t, os.WriteFile(certPath, []byte("cert content"), 0644))
-		require.NoError(t, os.WriteFile(keyPath, []byte("key content"), 0644))
+		require.NoError(t, os.WriteFile(certPath, []byte("cert content"), 0o644))
+		require.NoError(t, os.WriteFile(keyPath, []byte("key content"), 0o644))
 
 		ioStreams, _ := testStream()
 		rootCmd := NewMCPServer(ioStreams)
@@ -693,12 +828,12 @@ func TestTLSValidation(t *testing.T) {
 		tempDir := t.TempDir()
 		certPath := filepath.Join(tempDir, "cert.pem")
 		keyPath := filepath.Join(tempDir, "key.pem")
-		require.NoError(t, os.WriteFile(certPath, []byte("cert content"), 0644))
-		require.NoError(t, os.WriteFile(keyPath, []byte("key content"), 0644))
+		require.NoError(t, os.WriteFile(certPath, []byte("cert content"), 0o644))
+		require.NoError(t, os.WriteFile(keyPath, []byte("key content"), 0o644))
 
 		ioStreams, _ := testStream()
 		rootCmd := NewMCPServer(ioStreams)
-		rootCmd.SetArgs([]string{"--version", "--tls-cert", certPath, "--tls-key", keyPath})
+		rootCmd.SetArgs([]string{"--version", "--port=", "--tls-cert", certPath, "--tls-key", keyPath}) // use --port= to manually force no port (=stdio)
 		err := rootCmd.Execute()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "--tls-cert and --tls-key require --port to be set")

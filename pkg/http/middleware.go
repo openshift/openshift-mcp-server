@@ -8,17 +8,34 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/telemetry"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
-	"k8s.io/klog/v2"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
+	"github.com/containers/kubernetes-mcp-server/pkg/telemetry"
 )
 
 // httpTracer is the tracer used for HTTP request spans
 var httpTracer = otel.Tracer("kubernetes-mcp-server/http")
+
+// Middleware decorates an http.Handler. It is the shape returned by
+// RequestMiddleware, AuthorizationMiddleware, and MaxBodyMiddleware so they
+// can be composed via chain.
+type Middleware func(http.Handler) http.Handler
+
+// chain composes middlewares into a single handler, applied in the order
+// listed: the first middleware is the outermost (runs first on inbound,
+// last on outbound). Reads top-down like the request flow.
+func chain(handler http.Handler, middlewares ...Middleware) http.Handler {
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		handler = middlewares[i](handler)
+	}
+	return handler
+}
 
 // getClientIP extracts the client IP address from the request.
 // When trustProxy is true, it checks X-Forwarded-For and X-Real-IP headers first
@@ -63,9 +80,11 @@ func getHTTPRoute(path string) string {
 }
 
 // RequestMiddleware creates OpenTelemetry spans for HTTP requests.
-// When trustProxy is true, X-Forwarded-* and X-Real-IP headers are used for
-// client IP and scheme detection. Only enable when behind a trusted reverse proxy.
-func RequestMiddleware(trustProxy bool) func(http.Handler) http.Handler {
+// The trust_proxy_headers config flag is read per request from cfgState so
+// SIGHUP-reloaded values take effect immediately. When enabled, X-Forwarded-*
+// and X-Real-IP headers are used for client IP and scheme detection. Only
+// enable when behind a trusted reverse proxy.
+func RequestMiddleware(cfgState *config.StaticConfigState) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Skip tracing for health checks
@@ -73,6 +92,8 @@ func RequestMiddleware(trustProxy bool) func(http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
+
+			trustProxy := cfgState.Load().TrustProxyHeaders
 
 			// Skip all tracing work if telemetry is not enabled
 			if !telemetry.Enabled() {
@@ -82,7 +103,12 @@ func RequestMiddleware(trustProxy bool) func(http.Handler) http.Handler {
 				}
 				start := time.Now()
 				next.ServeHTTP(lrw, r)
-				klog.V(5).Infof("%s %s %d %v", r.Method, r.URL.Path, lrw.statusCode, time.Since(start))
+				klogutil.FromContext(r.Context()).V(5).Info("HTTP request completed",
+					"http.request.method", r.Method,
+					"url.path", r.URL.Path,
+					"http.response.status_code", lrw.statusCode,
+					"duration", time.Since(start),
+				)
 				return
 			}
 
@@ -155,7 +181,12 @@ func RequestMiddleware(trustProxy bool) func(http.Handler) http.Handler {
 				span.SetStatus(codes.Ok, "")
 			}
 
-			klog.V(5).Infof("%s %s %d %v", r.Method, r.URL.Path, lrw.statusCode, duration)
+			klogutil.FromContext(r.Context()).V(5).Info("HTTP request completed",
+				"http.request.method", r.Method,
+				"url.path", r.URL.Path,
+				"http.response.status_code", lrw.statusCode,
+				"duration", duration,
+			)
 		})
 	}
 }
@@ -212,7 +243,9 @@ func (lrw *loggingResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) 
 // MaxBodyMiddleware limits the size of incoming request bodies.
 // It wraps the request body with http.MaxBytesReader to enforce the limit.
 // Requests exceeding the limit receive a 413 Request Entity Too Large response.
-func MaxBodyMiddleware(maxBytes int64) func(http.Handler) http.Handler {
+// The max_body_bytes limit is read per request from cfgState so SIGHUP-reloaded
+// values take effect immediately.
+func MaxBodyMiddleware(cfgState *config.StaticConfigState) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Skip for methods that typically don't have bodies
@@ -221,6 +254,7 @@ func MaxBodyMiddleware(maxBytes int64) func(http.Handler) http.Handler {
 				return
 			}
 
+			maxBytes := cfgState.Load().HTTP.MaxBodyBytes
 			// Skip if maxBytes is 0 or negative (disabled)
 			if maxBytes <= 0 {
 				next.ServeHTTP(w, r)

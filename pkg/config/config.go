@@ -13,15 +13,21 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
+	"github.com/containers/kubernetes-mcp-server/pkg/tlsutil"
 	"github.com/containers/kubernetes-mcp-server/pkg/tokenexchange"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
-	"k8s.io/klog/v2"
 )
 
 const (
 	DefaultDropInConfigDir = "conf.d"
+
+	// Environment variable names for TLS configuration.
+	EnvTLSMinVersion   = "TLS_MIN_VERSION"
+	EnvTLSCipherSuites = "TLS_CIPHER_SUITES"
 )
 
 // ToolOverride contains per-tool configuration overrides.
@@ -34,11 +40,13 @@ type ToolOverride struct {
 type StaticConfig struct {
 	DeniedResources []api.GroupVersionKind `toml:"denied_resources"`
 
-	LogLevel   int    `toml:"log_level,omitzero"`
-	Port       string `toml:"port,omitempty"`
-	SSEBaseURL string `toml:"sse_base_url,omitempty"`
-	KubeConfig string `toml:"kubeconfig,omitempty"`
-	ListOutput string `toml:"list_output,omitempty"`
+	LogLevel    int    `toml:"log_level,omitzero"`
+	LogFile     string `toml:"log_file,omitempty"`
+	Port        string `toml:"port,omitempty"`
+	BindAddress string `toml:"bind_address,omitempty"`
+	SSEBaseURL  string `toml:"sse_base_url,omitempty"`
+	KubeConfig  string `toml:"kubeconfig,omitempty"`
+	ListOutput  string `toml:"list_output,omitempty"`
 	// Stateless configures the MCP server to operate in stateless mode.
 	// When true, the server will not send notifications to clients (e.g., tools/list_changed, prompts/list_changed).
 	// This is useful for container deployments, load balancing, and serverless environments where
@@ -92,11 +100,15 @@ type StaticConfig struct {
 	// "params" (default): client_id/secret in request body
 	// "header": HTTP Basic Authentication header
 	// "assertion": JWT client assertion (RFC 7523, for Entra ID certificate auth)
+	// "federated": JWT from an external identity provider file (workload identity federation)
 	StsAuthStyle string `toml:"sts_auth_style,omitempty"`
 	// StsClientCertFile is the path to the client certificate PEM file for JWT assertion auth
 	StsClientCertFile string `toml:"sts_client_cert_file,omitempty"`
 	// StsClientKeyFile is the path to the client private key PEM file for JWT assertion auth
 	StsClientKeyFile string `toml:"sts_client_key_file,omitempty"`
+	// StsFederatedTokenFile is the path to a file containing a JWT from an external identity
+	// provider (e.g., SPIRE JWT-SVID). Used with sts_auth_style="federated".
+	StsFederatedTokenFile string `toml:"sts_federated_token_file,omitempty"`
 	// ClusterAuthMode determines how the MCP server authenticates to the cluster.
 	// Valid values: "passthrough" (forward Authorization header, with optional exchange), "kubeconfig" (use kubeconfig credentials).
 	// If empty, defaults to passthrough: forwards the token when present, falls back to kubeconfig when absent.
@@ -119,6 +131,12 @@ type StaticConfig struct {
 	// When true, the server will refuse to start without TLS certificates,
 	// and outbound connections to non-HTTPS endpoints will be rejected.
 	RequireTLS bool `toml:"require_tls,omitempty"`
+	// TLSMinVersion is the minimum TLS version to accept (e.g., "1.2", "1.3").
+	// Defaults to TLS 1.2 if not set. Can be overridden by TLS_MIN_VERSION env var.
+	TLSMinVersion string `toml:"tls_min_version,omitempty"`
+	// TLSCipherSuites is a list of supported cipher suites for TLS connections.
+	// If empty, Go's default cipher suites are used. Can be overridden by TLS_CIPHER_SUITES env var.
+	TLSCipherSuites []string `toml:"tls_cipher_suites,omitempty"`
 
 	// HTTP server configuration (timeouts, size limits)
 	HTTP HTTPConfig `toml:"http,omitempty"`
@@ -148,6 +166,13 @@ type StaticConfig struct {
 	// When enabled, validates resources, schemas, and RBAC before execution.
 	// Defaults to false.
 	ValidationEnabled bool `toml:"validation_enabled,omitempty"`
+
+	// EnableTargetCompatibilityToolFilters enables filtering of tools based on
+	// cluster target compatibility (e.g., hiding OpenShift-specific tools when
+	// connected to a non-OpenShift cluster). This feature is experimental, and
+	// this option is subject to change or removal in a future release.
+	// Defaults to false.
+	EnableTargetCompatibilityToolFilters bool `toml:"experimental_enable_target_compatibility_tool_filters,omitempty"`
 
 	// ConfirmationFallback is the global default fallback behavior when a client
 	// does not support elicitation. Valid values are "deny" and "allow".
@@ -182,13 +207,15 @@ func WithDirPath(path string) ReadConfigOpt {
 // Read reads the toml file, applies drop-in configs from configDir (if provided),
 // and returns the StaticConfig with any opts applied.
 // Loading order: defaults → main config file → drop-in files (lexically sorted)
-func Read(configPath, dropInConfigDir string) (*StaticConfig, error) {
+func Read(ctx context.Context, configPath, dropInConfigDir string) (*StaticConfig, error) {
 	var configFiles []string
 	var configDir string
 
+	logger := klogutil.FromContext(ctx)
+
 	// Main config file
 	if configPath != "" {
-		klog.V(2).Infof("Loading main config from: %s", configPath)
+		logger.V(2).Info("Loading main config", "path", configPath)
 		configFiles = append(configFiles, configPath)
 
 		// get and save the absolute dir path to the config file, so that other config parsers can use it
@@ -213,19 +240,19 @@ func Read(configPath, dropInConfigDir string) (*StaticConfig, error) {
 		configDir = dropInConfigDir
 	}
 
-	dropInFiles, err := loadDropInConfigs(dropInConfigDir)
+	dropInFiles, err := loadDropInConfigs(ctx, dropInConfigDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load drop-in configs from %s: %w", dropInConfigDir, err)
 	}
 	if len(dropInFiles) == 0 {
-		klog.V(2).Infof("No drop-in config files found in: %s", dropInConfigDir)
+		logger.V(2).Info("No drop-in config files found", "config_dir", dropInConfigDir)
 	} else {
-		klog.V(2).Infof("Loading %d drop-in config file(s) from: %s", len(dropInFiles), dropInConfigDir)
+		logger.V(2).Info("Loading drop-in config file(s)", "num_config_files", len(dropInFiles), "config_dir", dropInConfigDir)
 	}
 	configFiles = append(configFiles, dropInFiles...)
 
 	// Read and merge all config files
-	configData, err := readAndMergeFiles(configFiles)
+	configData, err := readAndMergeFiles(ctx, configFiles)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read and merge config files: %w", err)
 	}
@@ -236,12 +263,13 @@ func Read(configPath, dropInConfigDir string) (*StaticConfig, error) {
 // loadDropInConfigs loads and merges config files from a drop-in directory.
 // Files are processed in lexical (alphabetical) order.
 // Only files with .toml extension are processed; dotfiles are ignored.
-func loadDropInConfigs(dropInConfigDir string) ([]string, error) {
+func loadDropInConfigs(ctx context.Context, dropInConfigDir string) ([]string, error) {
+	logger := klogutil.FromContext(ctx)
 	// Check if directory exists
 	info, err := os.Stat(dropInConfigDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			klog.V(2).Infof("Drop-in config directory does not exist, skipping: %s", dropInConfigDir)
+			logger.V(2).Info("Drop-in config directory does not exist, skipping", "config_dir", dropInConfigDir)
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to stat drop-in directory: %w", err)
@@ -252,13 +280,15 @@ func loadDropInConfigs(dropInConfigDir string) ([]string, error) {
 	}
 
 	// Get all .toml files in the directory
-	return getSortedConfigFiles(dropInConfigDir)
+	return getSortedConfigFiles(ctx, dropInConfigDir)
 }
 
 // getSortedConfigFiles returns a sorted list of .toml files in the specified directory.
 // Dotfiles (starting with '.') and non-.toml files are ignored.
 // Files are sorted lexically (alphabetically) by filename.
-func getSortedConfigFiles(dir string) ([]string, error) {
+func getSortedConfigFiles(ctx context.Context, dir string) ([]string, error) {
+	logger := klogutil.FromContext(ctx)
+
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory: %w", err)
@@ -275,13 +305,13 @@ func getSortedConfigFiles(dir string) ([]string, error) {
 
 		// Skip dotfiles
 		if strings.HasPrefix(name, ".") {
-			klog.V(4).Infof("Skipping dotfile: %s", name)
+			logger.V(4).Info("Skipping dotfile", "file_name", name)
 			continue
 		}
 
 		// Only process .toml files
 		if !strings.HasSuffix(name, ".toml") {
-			klog.V(4).Infof("Skipping non-.toml file: %s", name)
+			logger.V(4).Info("Skipping non-.toml file", "file_name", name)
 			continue
 		}
 
@@ -296,11 +326,11 @@ func getSortedConfigFiles(dir string) ([]string, error) {
 
 // readAndMergeFiles reads and merges multiple TOML config files into a single byte slice.
 // Files are merged in the order provided, with later files overriding earlier ones.
-func readAndMergeFiles(files []string) ([]byte, error) {
+func readAndMergeFiles(ctx context.Context, files []string) ([]byte, error) {
 	rawConfig := map[string]interface{}{}
 	// Merge each file in order using deep merge
 	for _, file := range files {
-		klog.V(3).Infof("  - Merging config: %s", filepath.Base(file))
+		klogutil.FromContext(ctx).V(3).Info("Merging config", "file_name", filepath.Base(file))
 		configData, err := os.ReadFile(file)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read config %s: %w", file, err)
@@ -424,8 +454,20 @@ func (c *StaticConfig) GetStsClientKeyFile() string {
 	return c.StsClientKeyFile
 }
 
+func (c *StaticConfig) GetStsFederatedTokenFile() string {
+	return c.StsFederatedTokenFile
+}
+
+func (c *StaticConfig) GetCertificateAuthority() string {
+	return c.CertificateAuthority
+}
+
 func (c *StaticConfig) IsValidationEnabled() bool {
 	return c.ValidationEnabled
+}
+
+func (c *StaticConfig) IsTargetCompatibilityToolFiltersEnabled() bool {
+	return c.EnableTargetCompatibilityToolFilters
 }
 
 func (c *StaticConfig) GetConfirmationRules() []api.ConfirmationRule {
@@ -438,6 +480,28 @@ func (c *StaticConfig) GetConfirmationFallback() string {
 
 func (c *StaticConfig) IsRequireTLS() bool {
 	return c.RequireTLS
+}
+
+// GetTLSMinVersionConfig returns the effective tls_min_version, with TLS_MIN_VERSION
+// env var taking precedence over the TOML/CLI value.
+func (c *StaticConfig) GetTLSMinVersionConfig() string {
+	if envValue := os.Getenv(EnvTLSMinVersion); envValue != "" {
+		return envValue
+	}
+	return c.TLSMinVersion
+}
+
+// GetTLSCipherSuitesConfig returns the effective tls_cipher_suites, with
+// TLS_CIPHER_SUITES env var taking precedence over the TOML/CLI value.
+func (c *StaticConfig) GetTLSCipherSuitesConfig() []string {
+	if envValue := os.Getenv(EnvTLSCipherSuites); envValue != "" {
+		suites := strings.Split(envValue, ",")
+		for i, suite := range suites {
+			suites[i] = strings.TrimSpace(suite)
+		}
+		return suites
+	}
+	return c.TLSCipherSuites
 }
 
 func (c *StaticConfig) IsRequireOAuth() bool {
@@ -466,7 +530,7 @@ func (c *StaticConfig) WithTokenExchangeStrategies(strategies []string) *StaticC
 
 // Validate validates config-level invariants that must hold at both startup and
 // on SIGHUP reload.
-func (c *StaticConfig) Validate() error {
+func (c *StaticConfig) Validate(ctx context.Context) error {
 	// Normalize whitespace-padded fields before any checks use them.
 	c.CertificateAuthority = strings.TrimSpace(c.CertificateAuthority)
 	c.TLSCert = strings.TrimSpace(c.TLSCert)
@@ -474,6 +538,7 @@ func (c *StaticConfig) Validate() error {
 	c.StsAuthStyle = strings.TrimSpace(c.StsAuthStyle)
 	c.StsClientCertFile = strings.TrimSpace(c.StsClientCertFile)
 	c.StsClientKeyFile = strings.TrimSpace(c.StsClientKeyFile)
+	c.StsFederatedTokenFile = strings.TrimSpace(c.StsFederatedTokenFile)
 	if output.FromString(c.ListOutput) == nil {
 		return fmt.Errorf("invalid output name: %s, valid names are: %s", c.ListOutput, strings.Join(output.Names, ", "))
 	}
@@ -497,10 +562,14 @@ func (c *StaticConfig) Validate() error {
 			return fmt.Errorf("--authorization-url must be a valid URL")
 		}
 		if u.Scheme == "http" {
-			klog.Warningf("authorization-url is using http://, this is not recommended production use")
+			klogutil.LogWarn(
+				klogutil.FromContext(ctx),
+				"authorization-url is using insecure scheme, this is not recommended production use",
+				klogutil.Field("url.scheme", "http"),
+			)
 		}
 	}
-	if err := c.validateSkipJWTVerification(); err != nil {
+	if err := c.validateSkipJWTVerification(ctx); err != nil {
 		return err
 	}
 	if c.CertificateAuthority != "" {
@@ -520,6 +589,9 @@ func (c *StaticConfig) Validate() error {
 		if _, err := os.Stat(c.TLSKey); err != nil {
 			return fmt.Errorf("tls-key must be a valid file path: %w", err)
 		}
+	}
+	if err := c.validateTLSSettings(ctx); err != nil {
+		return err
 	}
 	if err := c.ValidateRequireTLS(); err != nil {
 		return err
@@ -562,13 +634,14 @@ func (c *StaticConfig) validateConfirmation() error {
 // validateSkipJWTVerification checks that the user has explicitly opted in to
 // skipping JWT signature verification when require_oauth is enabled but no
 // authorization_url is configured.
-func (c *StaticConfig) validateSkipJWTVerification() error {
+func (c *StaticConfig) validateSkipJWTVerification(ctx context.Context) error {
 	if !c.RequireOAuth || c.AuthorizationURL != "" {
 		return nil
 	}
 	if c.SkipJWTVerification {
-		klog.Warningf("skip_jwt_verification is enabled: JWTs will be accepted without cryptographic signature verification. " +
-			"Only use this behind a trusted reverse proxy that performs token verification.")
+		klogutil.LogWarn(klogutil.FromContext(ctx),
+			"skip_jwt_verification is enabled with no authorization_url: bearer tokens will be forwarded without any local validation. "+
+				"The cluster (or a trusted upstream) is the sole authority. Only use this when cluster_auth_mode=passthrough and the cluster validates tokens directly.")
 		return nil
 	}
 	return fmt.Errorf("require_oauth is enabled but authorization_url is not configured: " +
@@ -579,9 +652,10 @@ func (c *StaticConfig) validateSkipJWTVerification() error {
 
 // validateTokenExchange validates token-exchange-related fields:
 //   - token_exchange_strategy must be a known strategy (when registry is provided)
-//   - sts_auth_style must be one of "params", "header", "assertion"
+//   - sts_auth_style must be one of "params", "header", "assertion", "federated"
 //   - when sts_auth_style is "assertion", sts_client_cert_file and sts_client_key_file
 //     must both be set and reference existing files
+//   - when sts_auth_style is "federated", sts_federated_token_file must be set and exist
 func (c *StaticConfig) validateTokenExchange() error {
 	if c.TokenExchangeStrategy != "" && len(c.tokenExchangeStrategies) > 0 {
 		if !slices.Contains(c.tokenExchangeStrategies, c.TokenExchangeStrategy) {
@@ -604,8 +678,42 @@ func (c *StaticConfig) validateTokenExchange() error {
 		if _, err := os.Stat(c.StsClientKeyFile); err != nil {
 			return fmt.Errorf("sts_client_key_file must be a valid file path: %w", err)
 		}
+	case tokenexchange.AuthStyleFederated:
+		if c.StsFederatedTokenFile == "" {
+			return fmt.Errorf("sts_federated_token_file is required when sts_auth_style is %q", tokenexchange.AuthStyleFederated)
+		}
+		if _, err := os.Stat(c.StsFederatedTokenFile); err != nil {
+			return fmt.Errorf("sts_federated_token_file must be a valid file path: %w", err)
+		}
 	default:
-		return fmt.Errorf("invalid sts_auth_style %q: must be %q, %q, or %q", c.StsAuthStyle, tokenexchange.AuthStyleParams, tokenexchange.AuthStyleHeader, tokenexchange.AuthStyleAssertion)
+		return fmt.Errorf("invalid sts_auth_style %q: must be %q, %q, %q, or %q", c.StsAuthStyle, tokenexchange.AuthStyleParams, tokenexchange.AuthStyleHeader, tokenexchange.AuthStyleAssertion, tokenexchange.AuthStyleFederated)
+	}
+	return nil
+}
+
+// validateTLSSettings validates TLS settings via the getters so env overrides are included,
+// and logs once at startup/reload when TLS env vars override TOML.
+func (c *StaticConfig) validateTLSSettings(ctx context.Context) error {
+	logger := klogutil.FromContext(ctx).V(1)
+	if os.Getenv(EnvTLSMinVersion) != "" {
+		klogutil.LogInfo(logger, "TLS min version overridden by environment variable",
+			klogutil.Field("env", EnvTLSMinVersion),
+			klogutil.Field("value", c.GetTLSMinVersionConfig()),
+		)
+	}
+	if os.Getenv(EnvTLSCipherSuites) != "" {
+		klogutil.LogInfo(logger, "TLS cipher suites overridden by environment variable",
+			klogutil.Field("env", EnvTLSCipherSuites),
+		)
+	}
+
+	minVersion := c.GetTLSMinVersionConfig()
+	if _, err := tlsutil.ParseTLSVersion(minVersion); err != nil {
+		return err
+	}
+	cipherSuites := c.GetTLSCipherSuitesConfig()
+	if _, err := tlsutil.ParseTLSCipherSuites(cipherSuites); err != nil {
+		return err
 	}
 	return nil
 }
@@ -643,6 +751,9 @@ func (c *StaticConfig) ResolveClusterAuthMode() string {
 func (c *StaticConfig) ValidateClusterAuthMode() error {
 	if c.ClusterAuthMode != "" && c.ClusterAuthMode != api.ClusterAuthPassthrough && c.ClusterAuthMode != api.ClusterAuthKubeconfig {
 		return fmt.Errorf("invalid cluster_auth_mode %q: must be %q or %q", c.ClusterAuthMode, api.ClusterAuthPassthrough, api.ClusterAuthKubeconfig)
+	}
+	if c.ClusterAuthMode == api.ClusterAuthKubeconfig && c.RequireOAuth {
+		return fmt.Errorf("cluster_auth_mode %q is not compatible with require_oauth=true: all authenticated users would share a single cluster identity, breaking per-user audit trails; use passthrough or token exchange to preserve user identity on the cluster", api.ClusterAuthKubeconfig)
 	}
 	hasTokenExchange := c.TokenExchangeStrategy != "" || c.StsAudience != ""
 	if c.ClusterAuthMode == api.ClusterAuthKubeconfig && hasTokenExchange {

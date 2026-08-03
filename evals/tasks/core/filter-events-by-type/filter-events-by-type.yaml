@@ -1,0 +1,38 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  labels:
+    suite: core
+    project: kubernetes
+  annotations:
+    project-name: "Kubernetes"
+    project-url: "https://kubernetes.io"
+  name: filter-events-by-type
+  difficulty: easy
+spec:
+  setup:
+  - script:
+      file: setup.sh
+  verify:
+  - script:
+      env:
+        AGENTS_OUTPUT: "{agent.output}"
+      inline: |-
+        # bad-pod's only events are Warning image-pull failures for the bogus image
+        # quay.io/this-image-does-not-exist (see setup.sh). A correct answer surfaces
+        # that content (kubelet's verbatim ErrImagePull / ImagePullBackOff / "Failed to
+        # pull image" messages) and must exclude the healthy good-pod, whose events are
+        # all Normal. Anchor on the event content, not the agent's surrounding prose,
+        # which varies in wording and word order between models (some correct answers
+        # never write the words "Warning" or "bad-pod" at all).
+        if echo "$AGENTS_OUTPUT" | grep -qiE 'ErrImagePull|ImagePullBackOff|Failed to pull image|this-image-does-not-exist' \
+          && ! echo "$AGENTS_OUTPUT" | grep -q 'good-pod'; then
+          exit 0
+        else
+          exit 1
+        fi
+  cleanup:
+  - script:
+      file: cleanup.sh
+  prompt:
+    inline: "List only the Warning events for the pod named 'bad-pod' in the 'events-filter-test' namespace"

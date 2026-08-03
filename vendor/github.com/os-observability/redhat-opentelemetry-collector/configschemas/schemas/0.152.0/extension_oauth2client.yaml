@@ -1,0 +1,188 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: oauth2client extension configuration
+type: object
+properties:
+    audience:
+        description: |-
+            Audience optionally specifies the intended audience of the
+            request.  If empty, the value of TokenURL is used as the
+            intended audience. Only used if
+            GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+        type: string
+    claims:
+        description: |-
+            Claims is a map of claims to be added to the JWT token. Only used if
+            GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+        type: object
+        additionalProperties: {}
+    client_certificate_key:
+        description: |-
+            ClientCertificateKey is the application's private key. Only used if
+            GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+        type: string
+    client_certificate_key_file:
+        description: |-
+            ClientSecrClientCertificateKeyFileetFile is the file pathg to read the application's secret from. Only used if
+            GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+        type: string
+    client_certificate_key_id:
+        description: |-
+            ClientCertificateKeyID is the Key ID to include in the jwt. Only used if
+            GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+        type: string
+    client_id:
+        description: |-
+            ClientID is the application's ID.
+            See https://datatracker.ietf.org/doc/html/rfc6749#section-2.2
+        type: string
+    client_id_file:
+        description: ClientIDFile is the file path to read the application's ID from.
+        type: string
+    client_secret:
+        description: |-
+            ClientSecret is the application's secret.
+            See https://datatracker.ietf.org/doc/html/rfc6749#section-2.3.1
+        type: string
+    client_secret_file:
+        description: ClientSecretFile is the file pathg to read the application's secret from.
+        type: string
+    endpoint_params:
+        description: EndpointParams specifies additional parameters for requests to the token endpoint.
+        type: object
+    expiry_buffer:
+        description: ExpiryBuffer specifies the time buffer before token expiry to refresh it.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    grant_type:
+        description: |-
+            GrantType is the OAuth2 grant type to use. It can be one of
+            "client_credentials" or "urn:ietf:params:oauth:grant-type:jwt-bearer" (RFC 7523).
+            Default value is "client_credentials"
+        type: string
+    iss:
+        description: |-
+            Iss is the OAuth client identifier used when communicating with
+            the configured OAuth provider. Default value is client_id. Only used if
+            GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+        type: string
+    scopes:
+        description: |-
+            Scope specifies optional requested permissions.
+            See https://datatracker.ietf.org/doc/html/rfc6749#section-3.3
+        type: array
+        items:
+            type: string
+    signature_algorithm:
+        description: |-
+            SignatureAlgorithm is the RSA algorithm used to sign JWT token. Only used if
+            GrantType is set to "urn:ietf:params:oauth:grant-type:jwt-bearer".
+            Default value is RS256 and valid values RS256, RS384, RS512
+        type: string
+    timeout:
+        description: |-
+            Timeout parameter configures `http.Client.Timeout` for the underneath client to authorization
+            server while fetching and refreshing tokens.
+        type: string
+        pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+    tls:
+        description: TLS struct exposes TLS client configuration for the underneath client to authorization server.
+        type: object
+        properties:
+            ca_file:
+                description: |-
+                    Path to the CA cert. For a client this verifies the server certificate.
+                    For a server this verifies client certificates. If empty uses system root CA.
+                    (optional)
+                type: string
+            ca_pem:
+                description: In memory PEM encoded cert. (optional)
+                type: string
+            cert_file:
+                description: Path to the TLS cert to use for TLS required connections. (optional)
+                type: string
+            cert_pem:
+                description: In memory PEM encoded TLS cert to use for TLS required connections. (optional)
+                type: string
+            cipher_suites:
+                description: |-
+                    CipherSuites is a list of TLS cipher suites that the TLS transport can use.
+                    If left blank, a safe default list is used.
+                    See https://go.dev/src/crypto/tls/cipher_suites.go for a list of supported cipher suites.
+                type: array
+                items:
+                    type: string
+            curve_preferences:
+                description: |-
+                    contains the elliptic curves that will be used in
+                    an ECDHE handshake, in preference order
+                    Defaults to empty list and "crypto/tls" defaults are used, internally.
+                type: array
+                items:
+                    type: string
+            include_system_ca_certs_pool:
+                description: |-
+                    If true, load system CA certificates pool in addition to the certificates
+                    configured in this struct.
+                type: boolean
+            insecure:
+                description: |-
+                    In gRPC and HTTP when set to true, this is used to disable the client transport security.
+                    See https://godoc.org/google.golang.org/grpc#WithInsecure for gRPC.
+                    Please refer to https://godoc.org/crypto/tls#Config for more information.
+                    (optional, default false)
+                type: boolean
+            insecure_skip_verify:
+                description: InsecureSkipVerify will enable TLS but not verify the certificate.
+                type: boolean
+            key_file:
+                description: Path to the TLS key to use for TLS required connections. (optional)
+                type: string
+            key_pem:
+                description: In memory PEM encoded TLS key to use for TLS required connections. (optional)
+                type: string
+            max_version:
+                description: |-
+                    MaxVersion sets the maximum TLS version that is acceptable.
+                    If not set, refer to crypto/tls for defaults. (optional)
+                type: string
+            min_version:
+                description: |-
+                    MinVersion sets the minimum TLS version that is acceptable.
+                    If not set, TLS 1.2 will be used. (optional)
+                type: string
+            reload_interval:
+                description: |-
+                    ReloadInterval specifies the duration after which the certificate will be reloaded
+                    If not set, it will never be reloaded (optional)
+                type: string
+                pattern: ^(0|[-+]?((\d+(\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h))+)$
+            server_name_override:
+                description: |-
+                    ServerName requested by client for virtual hosting.
+                    This sets the ServerName in the TLSConfig. Please refer to
+                    https://godoc.org/crypto/tls#Config for more information. (optional)
+                type: string
+            tpm:
+                description: Trusted platform module configuration
+                type: object
+                properties:
+                    auth:
+                        type: string
+                    enabled:
+                        type: boolean
+                    owner_auth:
+                        type: string
+                    path:
+                        description: |-
+                            The path to the TPM device or Unix domain socket.
+                            For instance /dev/tpm0 or /dev/tpmrm0.
+                        type: string
+                additionalProperties: false
+        additionalProperties: false
+    token_url:
+        description: |-
+            TokenURL is the resource server's token endpoint
+            URL. This is a constant specific to each server.
+            See https://datatracker.ietf.org/doc/html/rfc6749#section-3.2
+        type: string
+additionalProperties: false

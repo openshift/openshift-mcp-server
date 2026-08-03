@@ -90,15 +90,21 @@ func (s *McpConfigProviderSuite) TestToolHandlerReceivesToolsetConfig() {
 	toolsets.Clear()
 	toolsets.Register(testToolset)
 
+	// toolset_configs requires the two-phase parsing performed by config.ReadToml,
+	// so we replace s.Cfg and restore the runtime fields the suite already set.
+	kubeConfig := s.Cfg.KubeConfig
+	listOutput := s.Cfg.ListOutput
+	readOnly := s.Cfg.ReadOnly
 	cfg, err := config.ReadToml([]byte(`
 		toolsets = ["config-provider-test"]
 		[toolset_configs.kiali]
 		url = "http://kiali.example/"
 	`))
-	s.Require().NoError(err)
-	cfg.KubeConfig = s.Cfg.KubeConfig
-	cfg.ReadOnly = s.Cfg.ReadOnly
+	s.Require().NoError(err, "Expected to parse config")
 	s.Cfg = cfg
+	s.Cfg.KubeConfig = kubeConfig
+	s.Cfg.ListOutput = listOutput
+	s.Cfg.ReadOnly = readOnly
 
 	s.InitMcpClient()
 
@@ -153,7 +159,7 @@ func (s *McpConfigProviderSuite) TestStrategyReflectsConfigReload() {
 		toolsets = ["config-provider-test"]
 		cluster_provider_strategy = "in-cluster"
 	`), newConfig), "Expected to parse reload config")
-	err := s.mcpServer.ReloadConfiguration(newConfig)
+	err := s.mcpServer.ReloadConfiguration(s.T().Context(), newConfig)
 	s.Require().NoError(err)
 
 	s.Run("strategy reflects config reload", func() {
@@ -217,10 +223,14 @@ type configProviderToolset struct {
 	prompts []api.ServerPrompt
 }
 
-func (t *configProviderToolset) GetName() string                           { return t.name }
-func (t *configProviderToolset) GetDescription() string                    { return "Test toolset for ConfigProvider" }
-func (t *configProviderToolset) GetTools(_ api.Openshift) []api.ServerTool { return t.tools }
-func (t *configProviderToolset) GetPrompts() []api.ServerPrompt            { return t.prompts }
+func (t *configProviderToolset) GetName() string        { return t.name }
+func (t *configProviderToolset) GetDescription() string { return "Test toolset for ConfigProvider" }
+func (t *configProviderToolset) GetTools(_ api.FilteringProvider) []api.ServerTool {
+	return t.tools
+}
+func (t *configProviderToolset) GetPrompts() []api.ServerPrompt                     { return t.prompts }
+func (t *configProviderToolset) GetResources() []api.ServerResource                 { return nil }
+func (t *configProviderToolset) GetResourceTemplates() []api.ServerResourceTemplate { return nil }
 
 func TestMcpConfigProvider(t *testing.T) {
 	suite.Run(t, new(McpConfigProviderSuite))

@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: storage-pod
+  namespace: resize-pv
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  volumes:
+    - name: my-storage
+      persistentVolumeClaim:
+        claimName: storage-pvc
+  containers:
+    - name: storage-user
+      image: quay.io/nginx/nginx-unprivileged:alpine
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      volumeMounts:
+        - name: my-storage
+          mountPath: /usr/share/nginx/html
+      ports:
+        - containerPort: 80

@@ -1,0 +1,22 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: loki-backend-reachability
+  difficulty: easy
+  parallel: true
+  runs: 1
+  labels:
+    category: logs
+    suite: observability
+    toolType: smoke-test
+  description: |
+    Smoke test that the agent can reach Loki via loki_list_instances and report
+    a discovered LokiStack. Run obs-mcp with --toolsets observability/logs (or observability/metrics,observability/traces,observability/logs).
+spec:
+  prompt:
+    inline: |
+      Is the Loki backend reachable? List LokiStack instances and report the
+      name, namespace, and URL of any stack you find.
+  verify:
+    - llmJudge:
+        contains: "obs-mcp-loki"

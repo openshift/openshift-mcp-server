@@ -7,7 +7,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	authv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
-	"k8s.io/klog/v2"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 )
 
 // CanI checks if the current identity can perform verb on resource.
@@ -40,13 +41,23 @@ func CanI(
 		return false, err
 	}
 
-	if klog.V(5).Enabled() {
+	logger := klogutil.FromContext(ctx)
+	if logger.V(5).Enabled() {
 		if response.Status.Allowed {
-			klog.V(5).Infof("RBAC check: allowed %s on %s/%s in %s",
-				verb, gvr.Group, gvr.Resource, namespace)
+			logger.V(5).Info("RBAC check allowed",
+				"kubernetes.rbac.verb", verb,
+				"kubernetes.api.group", gvr.Group,
+				"kubernetes.api.resource", gvr.Resource,
+				"kubernetes.namespace.name", namespace,
+			)
 		} else {
-			klog.V(5).Infof("RBAC check: denied %s on %s/%s in %s: %s",
-				verb, gvr.Group, gvr.Resource, namespace, response.Status.Reason)
+			logger.V(5).Info("RBAC check denied",
+				"kubernetes.rbac.verb", verb,
+				"kubernetes.api.group", gvr.Group,
+				"kubernetes.api.resource", gvr.Resource,
+				"kubernetes.namespace.name", namespace,
+				"kubernetes.rbac.reason", response.Status.Reason,
+			)
 		}
 	}
 

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storage-pvc
+  namespace: resize-pv
+spec:
+  # csi-hostpath-sc allows volume expansion (allowVolumeExpansion: true); kind's
+  # default `standard` StorageClass (rancher.io/local-path) does not, so the
+  # resize would never take effect. Installed via `make csi-hostpath-install`.
+  storageClassName: csi-hostpath-sc
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

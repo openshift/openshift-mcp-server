@@ -19,7 +19,7 @@ func (t *Toolset) GetDescription() string {
 	return "View and manage the current local Kubernetes configuration (kubeconfig)"
 }
 
-func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
+func (t *Toolset) GetTools(_ api.FilteringProvider) []api.ServerTool {
 	return slices.Concat(
 		initConfiguration(),
 	)
@@ -27,6 +27,14 @@ func (t *Toolset) GetTools(_ api.Openshift) []api.ServerTool {
 
 func (t *Toolset) GetPrompts() []api.ServerPrompt {
 	// Config toolset does not provide prompts
+	return nil
+}
+
+func (t *Toolset) GetResources() []api.ServerResource {
+	return nil
+}
+
+func (t *Toolset) GetResourceTemplates() []api.ServerResourceTemplate {
 	return nil
 }
 

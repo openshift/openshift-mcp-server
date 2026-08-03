@@ -1,0 +1,28 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "ovn-get-pattern-with-columns"
+  difficulty: medium
+  category: "OVN Database Query"
+  description: "Filter records with pattern and show specific columns"
+  labels:
+    suite: ovn-kubernetes
+    requires: ovn-kubernetes
+spec:
+  limits:
+    timeout: "5m"
+  setup:
+    - script:
+        file: ./setup.sh
+  prompt:
+    inline: |
+      From the Logical_Router table in the OVN Northbound database, show me only the name and nat
+      columns for entries matching the pattern "GR_".
+  verify:
+    - llmJudge:
+        contains: "Shows Logical_Router entry matching the pattern \"GR_\" with name and nat columns."
+        reasoning: "Output should show Logical_Router entries matching pattern GR_ with name and nat columns"
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "ovn_get"
