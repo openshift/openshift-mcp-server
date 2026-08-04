@@ -15,8 +15,6 @@ config:
       path: agent.yaml
   taskSets:
     - glob: ../../tasks/*/*/*.yaml
-      labelSelector:
-        suite: core
       assertions:
         toolsUsed:
           - server: kubernetes
