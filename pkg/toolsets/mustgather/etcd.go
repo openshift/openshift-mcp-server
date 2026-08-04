@@ -21,6 +21,9 @@ func initEtcd() []api.ServerTool {
 				},
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
+					Properties: map[string]*jsonschema.Schema{
+						"path": {Type: "string", Description: "Path to the must-gather archive directory (optional if mustgather_use was called earlier)"},
+					},
 				},
 			},
 			Handler:      mustgatherETCDHealth,
@@ -37,6 +40,7 @@ func initEtcd() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
+						"path":  {Type: "string", Description: "Path to the must-gather archive directory (optional if mustgather_use was called earlier)"},
 						"limit": {Type: "integer", Description: "Maximum number of resource types to show (default: 50, sorted by count descending)"},
 					},
 				},
@@ -48,7 +52,9 @@ func initEtcd() []api.ServerTool {
 }
 
 func mustgatherETCDHealth(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	args := params.GetArguments()
+	path := getString(args, "path", "")
+	p, err := InitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -83,12 +89,14 @@ func mustgatherETCDHealth(params api.ToolHandlerParams) (*api.ToolCallResult, er
 }
 
 func mustgatherETCDObjectCount(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	args := params.GetArguments()
+	path := getString(args, "path", "")
+	p, err := InitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
 
-	limit := getInt(params.GetArguments(), "limit", 50)
+	limit := getInt(args, "limit", 50)
 
 	counts, err := p.GetETCDObjectCount()
 	if err != nil {

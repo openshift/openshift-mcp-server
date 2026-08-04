@@ -25,6 +25,7 @@ func initResources() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
+						"path":          {Type: "string", Description: "Path to the must-gather archive directory (optional if mustgather_use was called earlier)"},
 						"kind":          {Type: "string", Description: "Resource kind (e.g., Pod, Deployment, Service)"},
 						"namespace":     {Type: "string", Description: "Filter by namespace"},
 						"apiVersion":    {Type: "string", Description: "API version (default: v1)"},
@@ -42,12 +43,13 @@ func initResources() []api.ServerTool {
 }
 
 func mustgatherResourcesList(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	args := params.GetArguments()
+	path := getString(args, "path", "")
+	p, err := InitProvider(params.Context, path)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
 
-	args := params.GetArguments()
 	kind := getString(args, "kind", "")
 	namespace := getString(args, "namespace", "")
 	apiVersion := getString(args, "apiVersion", "v1")
