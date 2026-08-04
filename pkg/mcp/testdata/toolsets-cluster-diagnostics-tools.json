@@ -2,7 +2,9 @@
   {
     "annotations": {
       "destructiveHint": true,
+      "idempotentHint": false,
       "openWorldHint": true,
+      "readOnlyHint": false,
       "title": "Nodes: Debug Exec"
     },
     "description": "Run commands on an OpenShift node using a privileged debug pod with comprehensive troubleshooting utilities. The debug pod uses the UBI9 toolbox image which includes: systemd tools (systemctl, journalctl), networking tools (ss, ip, ping, traceroute, nmap), process tools (ps, top, lsof, strace), file system tools (find, tar, rsync), and debugging tools (gdb). The host filesystem is mounted at /host, allowing commands to chroot /host if needed to access node-level resources.",

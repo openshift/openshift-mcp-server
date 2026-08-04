@@ -278,6 +278,7 @@
   {
     "annotations": {
       "destructiveHint": false,
+      "idempotentHint": false,
       "openWorldHint": true,
       "readOnlyHint": true,
       "title": "CNI-Diagnostics: Network eBPF Packet Tracing"
@@ -321,6 +322,7 @@
   {
     "annotations": {
       "destructiveHint": false,
+      "idempotentHint": false,
       "openWorldHint": true,
       "readOnlyHint": true,
       "title": "CNI-Diagnostics: Network Packet Capture"

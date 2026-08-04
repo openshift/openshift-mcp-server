@@ -232,6 +232,7 @@
   },
   {
     "annotations": {
+      "idempotentHint": false,
       "openWorldHint": true,
       "readOnlyHint": true,
       "title": "OVN-Kubernetes: ovs-appctl"
@@ -299,6 +300,7 @@
   },
   {
     "annotations": {
+      "idempotentHint": false,
       "openWorldHint": true,
       "readOnlyHint": true,
       "title": "OVN-Kubernetes: ovs-ofctl"
@@ -355,6 +357,7 @@
   },
   {
     "annotations": {
+      "idempotentHint": false,
       "openWorldHint": true,
       "readOnlyHint": true,
       "title": "OVN-Kubernetes: ovs-vsctl"
