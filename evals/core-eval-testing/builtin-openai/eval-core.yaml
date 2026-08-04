@@ -23,3 +23,12 @@ config:
             toolPattern: ".*"
         minToolCalls: 1
         maxToolCalls: 20
+    - glob: ../../tasks/*/*/*.yaml
+      labelSelector:
+        suite: config
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            toolPattern: "configuration_.*"
+        minToolCalls: 1
+        maxToolCalls: 10

@@ -23,7 +23,7 @@ jobs:
           WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           JOB_CONCLUSION=$(gh api "repos/${REPOSITORY}/actions/runs/${WORKFLOW_RUN_ID}/jobs" \
-            --jq '.jobs[] | select(.name == "Run MCP Evaluation") | .conclusion')
+            --jq '[.jobs[] | select(.name | startswith("Run MCP Evaluation")) | .conclusion] | first')
 
           if [[ -n "$JOB_CONCLUSION" && "$JOB_CONCLUSION" != "skipped" ]]; then
             echo "should-report=true" >> $GITHUB_OUTPUT
@@ -36,7 +36,8 @@ jobs:
         if: steps.check.outputs.should-report == 'true'
         uses: actions/download-artifact@v8
         with:
-          name: eval-context
+          pattern: eval-context-*
+          merge-multiple: true
           path: eval-context/
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
