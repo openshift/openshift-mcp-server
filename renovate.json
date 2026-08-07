@@ -13,6 +13,16 @@
   "recreateWhen": "always",
   "commitMessageSuffix": "{{baseBranch}}",
   "ignorePaths": ["Dockerfile", "/npm/**", "/docs/**", "/python/**"],
+  "packageRules": [
+    {
+      "matchCategories": ["python"],
+      "enabled": false
+    },
+    {
+      "matchManagers": ["helm-values"],
+      "recreateWhen": "auto"
+    }
+  ],
   "tekton": {
     "enabled": true,
     "packageRules": [
