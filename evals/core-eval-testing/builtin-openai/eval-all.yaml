@@ -83,3 +83,13 @@ config:
             toolPattern: "netobserv_.*"
         minToolCalls: 1
         maxToolCalls: 10
+    # Must-gather tasks
+    - glob: ../../tasks/*/*/*.yaml
+      labelSelector:
+        suite: mustgather
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            toolPattern: "mustgather_.*"
+        minToolCalls: 1
+        maxToolCalls: 15
