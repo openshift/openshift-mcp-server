@@ -17,6 +17,10 @@
     {
       "matchCategories": ["python"],
       "enabled": false
+    },
+    {
+      "matchManagers": ["helm-values"],
+      "recreateWhen": "auto"
     }
   ],
   "tekton": {
