@@ -144,9 +144,8 @@ The server will:
 |-------|------|---------|-------------|
 | `log_level` | integer | `0` | Logging verbosity level (0-9). Higher values produce more verbose output. Similar to [kubectl logging levels](https://kubernetes.io/docs/reference/kubectl/quick-reference/#kubectl-output-verbosity-and-debugging). |
 | `log_file` | string | `""` | Path to a server log file. Required for logging in stdio mode (where stdout is reserved for the MCP protocol); replaces stdout logging in HTTP mode. The file is created if it does not exist and opened in append mode (`O_APPEND`, `0o600`). Use the special value `stderr` to route logs to stderr without opening a file. |
-| `port` | string | `""` | When set, starts the MCP server in HTTP mode (Streamable HTTP at `/mcp`, SSE at `/sse`) on the specified port. |
+| `port` | string | `""` | When set, starts the MCP server in HTTP mode (Streamable HTTP at `/mcp`) on the specified port. |
 | `bind_address` | string | `"0.0.0.0"` | Address to bind the HTTP server to. Set to `127.0.0.1` to restrict to localhost. A warning is logged when listening on all interfaces (`0.0.0.0` or `::`) without TLS or OAuth. |
-| `sse_base_url` | string | `""` | Base URL for Server-Sent Events (SSE) connections. Used when the server is behind a reverse proxy. |
 | `list_output` | string | `"table"` | Output format for resource list operations. Valid values: `yaml`, `table`. |
 | `stateless` | boolean | `false` | When `true`, disables tool and prompt change notifications. Useful for container deployments, load balancing, and serverless environments. |
 | `tls_cert` | string | `""` | Path to TLS certificate file for HTTPS. When set along with `tls_key`, the server serves HTTPS instead of HTTP. |
@@ -323,7 +322,7 @@ Control what operations the MCP server can perform on your Kubernetes cluster. T
 |-------|------|---------|-------------|
 | `read_only` | boolean | `false` | When `true`, only exposes tools annotated with `readOnlyHint=true`. Prevents any write operations on the cluster. |
 | `disable_destructive` | boolean | `false` | When `true`, disables tools annotated with `destructiveHint=true` (delete, update operations). Has no effect when `read_only` is `true`. |
-| `experimental_enable_target_compatibility_tool_filters` | boolean | `false` | Controls cluster-capability tool filtering. Tools that require API groups absent from the cluster (for example the OpenShift-only `projects_list`) are hidden. **NOTE:** This feature is experimental, and this option is subject to change or removal in a future release. |
+| `experimental_enable_target_compatibility_tool_filters` | boolean | `false` | Controls cluster-capability tool filtering. Tools that require API groups absent from the cluster are hidden (for example OpenShift-only `projects_list`, or `pods_top` / `nodes_top` when the Metrics Server API is unavailable). **NOTE:** This feature is experimental, and this option is subject to change or removal in a future release. |
 
 **Example:**
 ```toml
