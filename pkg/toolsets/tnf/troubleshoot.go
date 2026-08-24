@@ -3,7 +3,7 @@ package tnf
 import (
 	"context"
 	"fmt"
-	"log/slog"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	"strings"
 	"time"
 
@@ -230,7 +230,7 @@ func fetchClusterTopology(ctx context.Context, dynamicClient dynamic.Interface, 
 
 	infra, err := dynamicClient.Resource(fencing.InfrastructureGVR).Get(ctx, "cluster", metav1.GetOptions{})
 	if err != nil {
-		slog.Debug("could not get Infrastructure CR", "error", err)
+		klogutil.FromContext(ctx).V(1).Info("could not get Infrastructure CR", "error", err)
 		result.WriteString("*Infrastructure CR not available*\n")
 		return result.String(), false
 	}
@@ -245,7 +245,7 @@ func fetchClusterTopology(ctx context.Context, dynamicClient dynamic.Interface, 
 
 	nodes, err := coreClient.Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
-		slog.Debug("could not list nodes", "error", err)
+		klogutil.FromContext(ctx).V(1).Info("could not list nodes", "error", err)
 		return result.String(), false
 	}
 
@@ -335,7 +335,7 @@ func fetchOperatorHealth(ctx context.Context, dynamicClient dynamic.Interface) s
 
 	list, err := dynamicClient.Resource(fencing.ClusterOperatorGVR).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		slog.Debug("could not list ClusterOperators", "error", err)
+		klogutil.FromContext(ctx).V(1).Info("could not list ClusterOperators", "error", err)
 		result.WriteString("*ClusterOperators not available (may not be an OpenShift cluster)*\n")
 		return result.String()
 	}
@@ -506,7 +506,7 @@ func fetchRemediationStatus(ctx context.Context, dynamicClient dynamic.Interface
 	result.WriteString("#### FenceAgentsRemediation Templates\n\n")
 	templates, err := dynamicClient.Resource(fencing.FenceAgentsRemediationTemplateGVR).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		slog.Debug("could not list FAR templates", "error", err)
+		klogutil.FromContext(ctx).V(1).Info("could not list FAR templates", "error", err)
 		result.WriteString("*FenceAgentsRemediationTemplate CRD not installed — cluster may use traditional pacemaker/STONITH fencing*\n\n")
 	} else if len(templates.Items) == 0 {
 		result.WriteString("*No FenceAgentsRemediationTemplates configured*\n\n")
@@ -528,7 +528,7 @@ func fetchRemediationStatus(ctx context.Context, dynamicClient dynamic.Interface
 	result.WriteString("#### Active Remediations\n\n")
 	remediations, err := dynamicClient.Resource(fencing.FenceAgentsRemediationGVR).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		slog.Debug("could not list FAR remediations", "error", err)
+		klogutil.FromContext(ctx).V(1).Info("could not list FAR remediations", "error", err)
 		result.WriteString("*Could not check active remediations*\n\n")
 	} else if len(remediations.Items) == 0 {
 		result.WriteString("*No active fencing remediations*\n\n")
@@ -544,7 +544,7 @@ func fetchRemediationStatus(ctx context.Context, dynamicClient dynamic.Interface
 	result.WriteString("#### NodeHealthCheck\n\n")
 	nhcList, err := dynamicClient.Resource(fencing.NodeHealthCheckGVR).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		slog.Debug("could not list NHC", "error", err)
+		klogutil.FromContext(ctx).V(1).Info("could not list NHC", "error", err)
 		result.WriteString("*NodeHealthCheck CRD not installed*\n\n")
 	} else if len(nhcList.Items) == 0 {
 		result.WriteString("*No NodeHealthCheck resources configured*\n\n")

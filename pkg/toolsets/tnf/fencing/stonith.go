@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	"math"
 	"strings"
 	"time"
@@ -148,7 +148,7 @@ func RunSTONITHDiagnostics(ctx context.Context, k8sClient api.KubernetesClient, 
 	report, issues := buildSTONITHReport(nodeName, stdout)
 
 	if stderr != "" {
-		slog.Debug("STONITH diagnostic stderr", "node", nodeName, "stderr", stderr)
+		klogutil.FromContext(ctx).V(1).Info("STONITH diagnostic stderr", "node", nodeName, "stderr", stderr)
 	}
 
 	return report, issues, nil

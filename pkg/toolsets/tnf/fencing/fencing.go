@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	"strings"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -156,7 +156,7 @@ func checkInfrastructureTopology(ctx context.Context, client dynamic.Interface, 
 
 	infra, err := client.Resource(InfrastructureGVR).Get(ctx, "cluster", metav1.GetOptions{})
 	if err != nil {
-		slog.Debug("could not get Infrastructure CR", "error", err)
+		klogutil.FromContext(ctx).V(1).Info("could not get Infrastructure CR", "error", err)
 		if isCRDNotInstalled(err) {
 			report.WriteString("- Infrastructure CR: not available (may not be an OpenShift cluster)\n\n")
 		} else {
@@ -168,15 +168,15 @@ func checkInfrastructureTopology(ctx context.Context, client dynamic.Interface, 
 
 	platform, _, err := unstructured.NestedString(infra.Object, "status", "platform")
 	if err != nil {
-		slog.Debug("malformed Infrastructure CR field", "field", "status.platform", "error", err)
+		klogutil.FromContext(ctx).V(1).Info("malformed Infrastructure CR field", "field", "status.platform", "error", err)
 	}
 	infraTopology, _, err := unstructured.NestedString(infra.Object, "status", "infrastructureTopology")
 	if err != nil {
-		slog.Debug("malformed Infrastructure CR field", "field", "status.infrastructureTopology", "error", err)
+		klogutil.FromContext(ctx).V(1).Info("malformed Infrastructure CR field", "field", "status.infrastructureTopology", "error", err)
 	}
 	cpTopology, _, err := unstructured.NestedString(infra.Object, "status", "controlPlaneTopology")
 	if err != nil {
-		slog.Debug("malformed Infrastructure CR field", "field", "status.controlPlaneTopology", "error", err)
+		klogutil.FromContext(ctx).V(1).Info("malformed Infrastructure CR field", "field", "status.controlPlaneTopology", "error", err)
 	}
 
 	fmt.Fprintf(report, "- Platform: %s\n", ValueOrNA(platform))
@@ -185,7 +185,7 @@ func checkInfrastructureTopology(ctx context.Context, client dynamic.Interface, 
 
 	nodes, err := coreClient.Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
-		slog.Debug("could not list nodes for topology check", "error", err)
+		klogutil.FromContext(ctx).V(1).Info("could not list nodes for topology check", "error", err)
 	} else {
 		cpCount := 0
 		for _, node := range nodes.Items {
@@ -228,7 +228,7 @@ func checkClusterOperatorHealth(ctx context.Context, client dynamic.Interface, r
 
 	list, err := client.Resource(ClusterOperatorGVR).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		slog.Debug("could not list ClusterOperators", "error", err)
+		klogutil.FromContext(ctx).V(1).Info("could not list ClusterOperators", "error", err)
 		if isCRDNotInstalled(err) {
 			report.WriteString("- ClusterOperators: not available (may not be an OpenShift cluster)\n\n")
 		} else {
@@ -307,7 +307,7 @@ func correlateMachinesWithHosts(ctx context.Context, client dynamic.Interface, r
 
 	list, err := client.Resource(MachineGVR).Namespace("openshift-machine-api").List(ctx, metav1.ListOptions{})
 	if err != nil {
-		slog.Debug("could not list Machines", "error", err)
+		klogutil.FromContext(ctx).V(1).Info("could not list Machines", "error", err)
 		if isCRDNotInstalled(err) {
 			report.WriteString("- Machines: not available (Machine API not installed)\n\n")
 		} else {
@@ -459,7 +459,7 @@ func checkFenceAgentsRemediation(ctx context.Context, client dynamic.Interface, 
 	report.WriteString("### Templates\n\n")
 	templates, err := client.Resource(FenceAgentsRemediationTemplateGVR).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		slog.Debug("could not list FenceAgentsRemediationTemplates", "error", err)
+		klogutil.FromContext(ctx).V(1).Info("could not list FenceAgentsRemediationTemplates", "error", err)
 		if isCRDNotInstalled(err) {
 			report.WriteString("FenceAgentsRemediationTemplate CRD not installed. Cluster may use traditional pacemaker/STONITH fencing instead.\n\n")
 		} else {
@@ -498,7 +498,7 @@ func checkFenceAgentsRemediation(ctx context.Context, client dynamic.Interface, 
 	report.WriteString("\n### Active Remediations\n\n")
 	remediations, err := client.Resource(FenceAgentsRemediationGVR).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		slog.Debug("could not list FenceAgentsRemediations", "error", err)
+		klogutil.FromContext(ctx).V(1).Info("could not list FenceAgentsRemediations", "error", err)
 		if isCRDNotInstalled(err) {
 			report.WriteString("FenceAgentsRemediation CRD not installed.\n\n")
 		} else {
@@ -542,7 +542,7 @@ func checkNodeHealthChecks(ctx context.Context, client dynamic.Interface, report
 
 	list, err := client.Resource(NodeHealthCheckGVR).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		slog.Debug("could not list NodeHealthChecks", "error", err)
+		klogutil.FromContext(ctx).V(1).Info("could not list NodeHealthChecks", "error", err)
 		if isCRDNotInstalled(err) {
 			report.WriteString("NodeHealthCheck CRD not installed. Cluster may use traditional pacemaker-based health monitoring.\n\n")
 		} else {
@@ -671,7 +671,7 @@ func checkNodeHealth(ctx context.Context, client corev1.CoreV1Interface, hostNam
 
 	node, err := client.Nodes().Get(ctx, hostName, metav1.GetOptions{})
 	if err != nil {
-		slog.Debug("could not find Node matching BareMetalHost", "host", hostName, "error", err)
+		klogutil.FromContext(ctx).V(1).Info("could not find Node matching BareMetalHost", "host", hostName, "error", err)
 		issues = append(issues, fmt.Sprintf("%s: no matching Node resource found", hostName))
 		return issues
 	}

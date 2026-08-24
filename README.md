@@ -306,6 +306,7 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 | ossm                  | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                                                                         |         |
 | ovn-kubernetes        | OVN-Kubernetes CNI network troubleshooting tools                                                                                                                                                                                        |         |
 | tekton                | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, TaskRuns, and troubleshooting.                                                                                                                                     |         |
+| tnf                   | Two-Node Fencing (TNF) cluster diagnostics                                                                                                                                                                                              |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -1733,6 +1734,20 @@ Example output:
 
 </details>
 
+<details>
+
+<summary>tnf</summary>
+
+- **tnf_check_fencing_config** - Check fencing configuration and readiness for a Two-Node Fencing (TNF) cluster. Validates cluster topology, critical operator health (etcd, machine-api, baremetal), Machine/Node/BareMetalHost correlation, BMC addresses and credentials, pacemaker/STONITH fencing status via Kubernetes resources. Returns a diagnostic summary identifying configuration issues that could prevent fencing from functioning correctly.
+  - `namespace` (`string`) - Namespace containing BareMetalHost resources (e.g. 'openshift-machine-api'). If omitted, searches all namespaces.
+
+- **tnf_check_stonith_status** - Check STONITH and pacemaker fencing status on a Two-Node Fencing (TNF) cluster. Creates a temporary privileged debug pod on a control-plane node to run pcs diagnostic commands. Returns pacemaker cluster state, STONITH device configuration, quorum status, and recent fencing history. The debug pod is automatically cleaned up after execution.
+  - `namespace` (`string`) - Namespace to create the temporary debug pod in (optional, defaults to 'default').
+  - `node` (`string`) - Name of the node to run diagnostics on. If omitted, auto-detects the first control-plane node.
+  - `timeout_seconds` (`integer`) - Maximum time in seconds to wait for the diagnostic commands to complete (optional, defaults to 120).
+
+</details>
+
 
 <!-- AVAILABLE-TOOLSETS-TOOLS-END -->
 
@@ -1846,6 +1861,16 @@ Example output:
 
 </details>
 
+<details>
+
+<summary>tnf</summary>
+
+- **tnf-troubleshoot** - Generate a step-by-step troubleshooting guide for diagnosing Two-Node Fencing (TNF) cluster issues including STONITH configuration, quorum status, BMC health, and split-brain risk assessment
+  - `node` (`string`) - Node to run STONITH diagnostics on (auto-detects if omitted)
+  - `namespace` (`string`) - Namespace for BareMetalHost resources (default: openshift-machine-api)
+
+</details>
+
 
 <!-- AVAILABLE-TOOLSETS-PROMPTS-END -->
 
@@ -1875,6 +1900,15 @@ Example output:
 - **must-gather-alertmanager-status** - AlertManager status from the must-gather archive
   - URI: `must-gather://current/alertmanager/status`
   - MIME Type: `text/plain`
+</details>
+
+<details>
+
+<summary>tnf</summary>
+
+- **tnf-fencing-domain-knowledge** - TNF two-node fencing domain knowledge: quorum rules, split-brain risk matrix, and recovery procedures
+  - URI: `tnf://domain-knowledge/fencing`
+  - MIME Type: `text/markdown`
 </details>
 
 
