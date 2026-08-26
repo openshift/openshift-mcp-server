@@ -7,6 +7,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/containers/kubernetes-mcp-server/internal/test"
+	kubevirtgvr "github.com/containers/kubernetes-mcp-server/pkg/kubevirt"
 	kubevirttesting "github.com/containers/kubernetes-mcp-server/pkg/kubevirt/testing"
 	kubevirttoolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -30,6 +31,11 @@ var kubevirtApis = []schema.GroupVersionResource{
 	{Group: "instancetype.kubevirt.io", Version: "v1beta1", Resource: "virtualmachineinstancetypes"},
 	{Group: "instancetype.kubevirt.io", Version: "v1beta1", Resource: "virtualmachineclusterpreferences"},
 	{Group: "instancetype.kubevirt.io", Version: "v1beta1", Resource: "virtualmachinepreferences"},
+	{Group: "template.kubevirt.io", Version: "v1beta1", Resource: "virtualmachinetemplates"},
+	{Group: "hco.kubevirt.io", Version: "v1", Resource: "hyperconvergeds"},
+	{Group: "kubevirt.io", Version: "v1", Resource: "kubevirts"},
+	{Group: "cdi.kubevirt.io", Version: "v1beta1", Resource: "cdis"},
+	{Group: "networkaddonsoperator.network.kubevirt.io", Version: "v1", Resource: "networkaddonsconfigs"},
 }
 
 type KubevirtSuite struct {
@@ -45,9 +51,11 @@ func (s *KubevirtSuite) SetupSuite() {
 	}
 	s.Require().NoError(tasks.Wait())
 
-	_, err := kubernetes.NewForConfigOrDie(test.EnvTestRestConfig()).CoreV1().Namespaces().
-		Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "openshift-virtualization-os-images"}}, metav1.CreateOptions{})
+	nsClient := kubernetes.NewForConfigOrDie(test.EnvTestRestConfig()).CoreV1().Namespaces()
+	_, err := nsClient.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "openshift-virtualization-os-images"}}, metav1.CreateOptions{})
 	s.Require().NoError(err, "failed to create test namespace openshift-virtualization-os-images")
+	_, err = nsClient.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "kubevirt-hyperconverged"}}, metav1.CreateOptions{})
+	s.Require().NoError(err, "failed to create test namespace kubevirt-hyperconverged")
 }
 
 func (s *KubevirtSuite) TearDownSuite() {
@@ -668,6 +676,20 @@ func (s *KubevirtSuite) TestVMLifecycle() {
 					"Expected error message about VM not found, got %v", toolResult.Content[0].(*mcp.TextContent).Text)
 			})
 		}
+		for _, action := range []string{"pause", "unpause"} {
+			s.Run("action="+action, func() {
+				toolResult, err := s.CallTool("vm_lifecycle", map[string]interface{}{
+					"name":      "non-existent-vm",
+					"namespace": "default",
+					"action":    action,
+				})
+				s.Nilf(err, "call tool failed %v", err)
+				s.Truef(toolResult.IsError, "expected call tool to fail for non-existent VM")
+				expectedErr := fmt.Sprintf("failed to %s VirtualMachineInstance", action)
+				s.Truef(strings.Contains(toolResult.Content[0].(*mcp.TextContent).Text, expectedErr),
+					"Expected error message for non-existent VM, got %v", toolResult.Content[0].(*mcp.TextContent).Text)
+			})
+		}
 	})
 }
 
@@ -1239,6 +1261,133 @@ func (s *KubevirtSuite) TestVMGuestInfo() {
 			Version:  "v1",
 			Resource: "virtualmachineinstances",
 		}).Namespace("default").Delete(s.T().Context(), "default-info-vm", metav1.DeleteOptions{})
+	})
+}
+
+func (s *KubevirtSuite) TestCreateFromTemplate() {
+	s.Run("vm_create_from_template missing required params", func() {
+		testCases := []string{"namespace", "template_name"}
+		for _, param := range testCases {
+			s.Run("missing "+param, func() {
+				params := map[string]interface{}{
+					"namespace":     "default",
+					"template_name": "test-template",
+				}
+				delete(params, param)
+				toolResult, err := s.CallTool("vm_create_from_template", params)
+				s.Require().Nilf(err, "call tool failed %v", err)
+				s.Truef(toolResult.IsError, "expected call tool to fail due to missing %s", param)
+				s.Contains(toolResult.Content[0].(*mcp.TextContent).Text, param+" parameter required")
+			})
+		}
+	})
+
+	s.Run("vm_create_from_template with non-existent template", func() {
+		toolResult, err := s.CallTool("vm_create_from_template", map[string]interface{}{
+			"namespace":     "default",
+			"template_name": "non-existent-template",
+		})
+		s.Nilf(err, "call tool failed %v", err)
+		s.Truef(toolResult.IsError, "expected call tool to fail for non-existent template")
+		s.Contains(toolResult.Content[0].(*mcp.TextContent).Text, "failed to create VM from template")
+	})
+
+	s.Run("vm_create_from_template with parameters", func() {
+		toolResult, err := s.CallTool("vm_create_from_template", map[string]interface{}{
+			"namespace":     "default",
+			"template_name": "test-template",
+			"parameters": map[string]interface{}{
+				"VM_NAME": "my-vm",
+				"MEMORY":  "4Gi",
+			},
+		})
+		s.Nilf(err, "call tool failed %v", err)
+		s.Truef(toolResult.IsError, "expected call tool to fail without virt-template API server")
+		s.Contains(toolResult.Content[0].(*mcp.TextContent).Text, "failed to create VM from template")
+	})
+
+	s.Run("vm_create_from_template with invalid parameter types", func() {
+		toolResult, err := s.CallTool("vm_create_from_template", map[string]interface{}{
+			"namespace":     "default",
+			"template_name": "test-template",
+			"parameters": map[string]interface{}{
+				"VM_NAME": 123,
+			},
+		})
+		s.Nilf(err, "call tool failed %v", err)
+		s.Truef(toolResult.IsError, "expected call tool to fail for invalid parameter types")
+		s.Contains(toolResult.Content[0].(*mcp.TextContent).Text, "must be a string")
+	})
+}
+
+func (s *KubevirtSuite) TestHCOStatusPrompt() {
+	s.Run("hco-status prompt returns report when no HCO CR exists", func() {
+		result, err := s.GetPrompt("hco-status", map[string]string{})
+
+		s.Run("returns error for missing HCO", func() {
+			s.Error(err, "expected error when HCO is not installed")
+			s.Nil(result)
+			s.Contains(err.Error(), "not installed")
+		})
+	})
+
+	s.Run("hco-status prompt returns report with HCO CR present", func() {
+		dynamicClient := dynamic.NewForConfigOrDie(test.EnvTestRestConfig())
+		ctx := s.T().Context()
+
+		// Create a HyperConverged CR
+		hcoCR := &unstructured.Unstructured{
+			Object: map[string]any{
+				"apiVersion": "hco.kubevirt.io/v1",
+				"kind":       "HyperConverged",
+				"metadata": map[string]any{
+					"name":      "kubevirt-hyperconverged",
+					"namespace": "kubevirt-hyperconverged",
+				},
+				"spec": map[string]any{
+					"featureGates": []any{
+						map[string]string{
+							"name":  "downwardMetrics",
+							"state": "Disabled",
+						},
+					},
+					"virtualization": map[string]any{
+						"liveMigrationConfig": map[string]any{
+							"completionTimeoutPerGiB":           int64(150),
+							"parallelMigrationsPerCluster":      int64(5),
+							"parallelOutboundMigrationsPerNode": int64(2),
+							"progressTimeout":                   int64(150),
+						},
+					},
+				},
+			},
+		}
+
+		_, err := dynamicClient.Resource(kubevirtgvr.HyperConvergedGVR).Namespace("kubevirt-hyperconverged").Create(ctx, hcoCR, metav1.CreateOptions{})
+		s.Require().NoError(err, "failed to create HyperConverged CR")
+
+		defer func() {
+			_ = dynamicClient.Resource(kubevirtgvr.HyperConvergedGVR).Namespace("kubevirt-hyperconverged").Delete(ctx, "kubevirt-hyperconverged", metav1.DeleteOptions{})
+		}()
+
+		result, err := s.GetPrompt("hco-status", map[string]string{})
+
+		s.Run("no error", func() {
+			s.NoError(err, "GetPrompt failed")
+			s.NotNil(result)
+		})
+
+		s.Run("returns status report with correct details", func() {
+			s.Require().NotNil(result)
+			s.Require().Len(result.Messages, 2, "Expected 2 messages")
+
+			textContent, ok := result.Messages[0].Content.(*mcp.TextContent)
+			s.Require().True(ok, "expected TextContent")
+			s.Contains(textContent.Text, "HyperConverged Cluster Operator Status Report")
+			s.Contains(textContent.Text, "kubevirt-hyperconverged")
+			s.Contains(textContent.Text, "Feature Gates")
+			s.Contains(textContent.Text, "Virtualization Configuration")
+		})
 	})
 }
 
