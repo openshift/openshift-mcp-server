@@ -273,7 +273,7 @@ and only needed for the project-specific scenarios noted.
 | [Istio](https://istio.io) | `kiali` | 5 |
 | [Kiali](https://kiali.io) | `kiali` | 16 |
 | [Kubernetes](https://kubernetes.io) | - | 32 |
-| [KubeVirt](https://kubevirt.io) | `kubevirt`, `tekton` | 19 |
+| [KubeVirt](https://kubevirt.io) | `kubevirt`, `tekton` | 26 |
 | [NetObserv](https://netobserv.io) | `netobserv` | 4 |
 | [Tekton](https://tekton.dev) | `tekton` | 9 |
 
@@ -618,10 +618,15 @@ In case multi-cluster support is enabled (default) and you have access to multip
   - `name` (`string`) **(required)** - The name of the virtual machine
   - `namespace` (`string`) **(required)** - The namespace of the virtual machine
 
-- **vm_lifecycle** - Manage OpenShift Virtualization VirtualMachine lifecycle: start, stop, or restart a VM
-  - `action` (`string`) **(required)** - The lifecycle action to perform: 'start' (changes runStrategy to Always), 'stop' (changes runStrategy to Halted), or 'restart' (stops then starts the VM)
+- **vm_lifecycle** - Manage OpenShift Virtualization VirtualMachine lifecycle: start, stop, restart, pause, or unpause a VM
+  - `action` (`string`) **(required)** - The lifecycle action to perform: 'start' (changes runStrategy to Always), 'stop' (changes runStrategy to Halted), 'restart' (stops then starts the VM), 'pause' (suspends the running VMI in-place), or 'unpause' (resumes a paused VMI)
   - `name` (`string`) **(required)** - The name of the virtual machine
   - `namespace` (`string`) **(required)** - The namespace of the virtual machine
+
+- **vm_create_from_template** - Create a VirtualMachine from a VirtualMachineTemplate (virt-template) on OpenShift Virtualization. Processes the template server-side to substitute parameters (required values, defaults, and auto-generated values like passwords), then creates the resulting VirtualMachine in the same namespace. Cross-namespace template usage is not supported.
+  - `namespace` (`string`) **(required)** - The namespace of the VirtualMachineTemplate and the resulting VirtualMachine (must be the same)
+  - `parameters` (`object`) - Parameter values to substitute in the template. Keys are parameter names (e.g. VM_NAME), values are strings. Required parameters must be provided; optional parameters use their defaults if omitted; parameters with generate/from will be auto-generated if not provided.
+  - `template_name` (`string`) **(required)** - The name of the VirtualMachineTemplate to create the VM from
 
 - **vm_troubleshoot** - Diagnose OpenShift Virtualization VirtualMachine issues with automated root-cause detection. Collects VM status, VMI status, volumes, DataVolume/PVC state, cloud-init configuration, pod state, logs, and events, then runs heuristic checks to identify specific problems and suggest fixes. Returns a 'Detected Issues' section with CRITICAL/WARNING findings and actionable remediation steps, followed by raw diagnostic data. Use this tool FIRST whenever a user asks why a VM is not starting, stuck in Provisioning, crashlooping, failing to migrate, or exhibiting unexpected behavior. Automatically detects: missing StorageClasses, invalid PVC specs, dangerous cloud-init commands (shutdown/halt), nodeSelector migration blockers, failed migrations, and pod crashloops. If the user asks to fix or remediate the issue, use the Suggested Fixes from the report with vm_lifecycle (restart) or resources_create_or_update.
   - `name` (`string`) **(required)** - The name of the VirtualMachine to troubleshoot
@@ -1763,6 +1768,8 @@ Example output:
   - `namespace` (`string`) - Target namespace for the PipelineRun
   - `windowsVersion` (`string`) - Windows version: 10, 11, 2k22 (default), or 2k25
   - `pipelineVersion` (`string`) - Pipeline version (default: latest). Use specific version like 0.25.0 if needed
+
+- **hco-status** - Generate a status report for the HyperConverged Cluster Operator (HCO) managing OpenShift Virtualization and related components
 
 </details>
 

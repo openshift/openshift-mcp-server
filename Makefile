@@ -104,11 +104,11 @@ update-readme-tools: ## Update the README.md and docs/configuration.md files wit
 ##@ Local Development
 
 .PHONY: local-env-setup
-local-env-setup: ## Setup complete local development environment with Kind cluster
+local-env-setup: ## Setup complete local development environment with Minikube cluster
 	@echo "========================================="
 	@echo "Kubernetes MCP Server - Local Setup"
 	@echo "========================================="
-	$(MAKE) kind-create-cluster
+	$(MAKE) minikube-create-cluster
 	$(MAKE) keycloak-install
 	$(MAKE) build
 	@echo ""
@@ -126,12 +126,12 @@ local-env-setup: ## Setup complete local development environment with Kind clust
 	@echo "  npx @modelcontextprotocol/inspector@latest \$$(pwd)/$(BINARY_NAME) --config _output/config.toml"
 
 .PHONY: local-env-setup-kubevirt
-local-env-setup-kubevirt: ## Setup complete local development environment with Kind cluster and KubeVirt
+local-env-setup-kubevirt: ## Setup complete local development environment with Minikube cluster and KubeVirt
 	@echo "========================================="
 	@echo "Kubernetes MCP Server - Local Setup"
 	@echo "           with KubeVirt"
 	@echo "========================================="
-	$(MAKE) kind-create-cluster
+	$(MAKE) minikube-create-cluster
 	$(MAKE) kubevirt-install
 	$(MAKE) build
 	@echo ""
@@ -148,13 +148,36 @@ local-env-setup-kubevirt: ## Setup complete local development environment with K
 	@echo "KubeVirt is now available!"
 	@echo "Check status with: make kubevirt-status"
 
+.PHONY: local-env-setup-hco
+local-env-setup-hco: ## Setup complete local development environment with Kind cluster and HCO
+	@echo "========================================="
+	@echo "Kubernetes MCP Server - Local Setup"
+	@echo "            with HCO"
+	@echo "========================================="
+	$(MAKE) kind-create-cluster
+	$(MAKE) hco-install
+	$(MAKE) build
+	@echo ""
+	@echo "========================================="
+	@echo "Local environment ready!"
+	@echo "========================================="
+	@echo ""
+	@echo "Run the MCP server with:"
+	@echo "  ./$(BINARY_NAME)"
+	@echo ""
+	@echo "Or run with MCP inspector:"
+	@echo "  npx @modelcontextprotocol/inspector@latest \$$(pwd)/$(BINARY_NAME)"
+	@echo ""
+	@echo "HCO is now available!"
+	@echo "Check status with: make hco-status"
+
 .PHONY: local-env-setup-tekton
-local-env-setup-tekton: ## Setup complete local development environment with Kind cluster and Tekton Pipelines
+local-env-setup-tekton: ## Setup complete local development environment with Minikube cluster and Tekton Pipelines
 	@echo "========================================="
 	@echo "Kubernetes MCP Server - Local Setup"
 	@echo "        with Tekton Pipelines"
 	@echo "========================================="
-	$(MAKE) kind-create-cluster
+	$(MAKE) minikube-create-cluster
 	$(MAKE) tekton-install
 	$(MAKE) build
 	@echo ""
@@ -172,12 +195,12 @@ local-env-setup-tekton: ## Setup complete local development environment with Kin
 	@echo "Check status with: make tekton-status"
 
 .PHONY: local-env-setup-kuadrant
-local-env-setup-kuadrant: ## Setup complete local development environment with Kind cluster and Kuadrant MCP Gateway
+local-env-setup-kuadrant: ## Setup complete local development environment with Minikube cluster and Kuadrant MCP Gateway
 	@echo "========================================="
 	@echo "Kubernetes MCP Server - Local Setup"
 	@echo "     with Kuadrant MCP Gateway"
 	@echo "========================================="
-	$(MAKE) kind-create-cluster
+	$(MAKE) minikube-create-cluster
 	$(MAKE) kuadrant-setup
 	$(MAKE) build
 	@echo ""
@@ -195,8 +218,8 @@ local-env-setup-kuadrant: ## Setup complete local development environment with K
 	@echo "Check status with: make kuadrant-status"
 
 .PHONY: local-env-teardown
-local-env-teardown: ## Tear down the local Kind cluster
-	$(MAKE) kind-delete-cluster
+local-env-teardown: ## Tear down the local Minikube cluster
+	$(MAKE) minikube-delete-cluster
 
 .PHONY: print-git-tag-version
 print-git-tag-version: ## Print the GIT_TAG_VERSION
