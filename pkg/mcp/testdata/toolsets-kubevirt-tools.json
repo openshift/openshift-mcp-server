@@ -166,7 +166,7 @@
       "readOnlyHint": false,
       "title": "Virtual Machine: Create from Template"
     },
-    "description": "Create a VirtualMachine from a VirtualMachineTemplate (virt-template) on KubeVirt. Processes the template server-side to substitute parameters (required values, defaults, and auto-generated values like passwords), then creates the resulting VirtualMachine in the same namespace. Cross-namespace template usage is not supported.",
+    "description": "Create a VirtualMachine from a VirtualMachineTemplate (virt-template) on OpenShift Virtualization. Processes the template server-side to substitute parameters (required values, defaults, and auto-generated values like passwords), then creates the resulting VirtualMachine in the same namespace. Cross-namespace template usage is not supported.",
     "inputSchema": {
       "properties": {
         "namespace": {
@@ -243,7 +243,7 @@
       "readOnlyHint": false,
       "title": "Virtual Machine: Lifecycle"
     },
-    "description": "Manage KubeVirt VirtualMachine lifecycle: start, stop, restart, pause, or unpause a VM",
+    "description": "Manage OpenShift Virtualization VirtualMachine lifecycle: start, stop, restart, pause, or unpause a VM",
     "inputSchema": {
       "properties": {
         "action": {
