@@ -3,6 +3,8 @@ package netobserv
 import (
 	"slices"
 
+	"k8s.io/utils/ptr"
+
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/netobserv/internal/defaults"
@@ -22,11 +24,17 @@ func (t *Toolset) GetDescription() string {
 }
 
 func (t *Toolset) GetTools(_ api.FilteringProvider) []api.ServerTool {
-	return slices.Concat(
+	tools := slices.Concat(
 		netobservTools.InitListFlows(),
 		netobservTools.InitGetFlowMetrics(),
 		netobservTools.InitExportFlows(),
 	)
+	// NetObserv calls a single configured console plugin endpoint; cluster scope is not
+	// selected via the provider-level context parameter injected for core Kubernetes tools.
+	for i := range tools {
+		tools[i].ClusterAware = ptr.To(false)
+	}
+	return tools
 }
 
 func (t *Toolset) GetPrompts() []api.ServerPrompt {

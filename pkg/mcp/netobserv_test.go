@@ -12,6 +12,7 @@ import (
 	netobservToolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/netobserv"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/suite"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 type NetObservSuite struct {
@@ -123,6 +124,29 @@ func (s *NetObservSuite) TestGetFlowMetrics() {
 		s.Contains(toolResult.Content[0].(*mcp.TextContent).Text, "data")
 		s.NotNil(toolResult.StructuredContent)
 	})
+}
+
+func (s *NetObservSuite) TestNetObservToolsNotClusterAware() {
+	kubeconfig := s.mockServer.Kubeconfig()
+	for i := range 10 {
+		kubeconfig.Contexts[strconv.Itoa(i)] = clientcmdapi.NewContext()
+	}
+	s.Cfg.KubeConfig = test.KubeconfigFile(s.T(), kubeconfig)
+	s.InitMcpClient()
+
+	tools, err := s.ListTools()
+	s.Require().NoError(err)
+	s.Require().NotEmpty(tools.Tools)
+
+	for _, tool := range tools.Tools {
+		s.Run(tool.Name, func() {
+			schema, ok := tool.InputSchema.(map[string]any)
+			s.Require().True(ok, "expected InputSchema map for tool %s", tool.Name)
+			properties, ok := schema["properties"].(map[string]any)
+			s.Require().True(ok, "expected properties map for tool %s", tool.Name)
+			s.NotContains(properties, "context", "netobserv tool %s must not expose context parameter", tool.Name)
+		})
+	}
 }
 
 func TestNetObservMcp(t *testing.T) {
