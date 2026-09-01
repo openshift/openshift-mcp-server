@@ -10,4 +10,4 @@ e2e-ci-test: ## Run e2e tests against a CI-provisioned cluster
 	HELM_PATH=$(HELM) \
 	MCP_SERVER_IMAGE=$(MCP_SERVER_IMAGE) \
 	CHART_PATH=$(shell pwd)/charts/kubernetes-mcp-server \
-	go test -tags e2e -v -count=1 -timeout 20m ./test/e2e/ -run TestSmoke $(E2E_ARGS)
+	go test -tags e2e -v -count=1 -timeout 20m ./test/e2e/ $(E2E_ARGS)
