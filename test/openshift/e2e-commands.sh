@@ -17,5 +17,7 @@ unset KUBERNETES_SERVICE_HOST KUBERNETES_SERVICE_PORT
 
 export MCP_SERVER_IMAGE="${IMAGE_OPENSHIFT_MCP_SERVER}"
 
+bash test/openshift/keycloak-setup.sh
+
 make e2e-ci-setup
 make e2e-ci-test
