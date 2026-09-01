@@ -596,7 +596,7 @@ github.com/stretchr/testify/internal/difflib
 github.com/stretchr/testify/internal/spew
 github.com/stretchr/testify/require
 github.com/stretchr/testify/suite
-# github.com/tektoncd/pipeline v1.15.0
+# github.com/tektoncd/pipeline v1.15.1
 ## explicit; go 1.26.4
 github.com/tektoncd/pipeline/internal/artifactref
 github.com/tektoncd/pipeline/pkg/apis/config
