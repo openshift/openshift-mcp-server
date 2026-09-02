@@ -19,5 +19,11 @@ export MCP_SERVER_IMAGE="${IMAGE_OPENSHIFT_MCP_SERVER}"
 
 bash test/openshift/keycloak-setup.sh
 
+# Source Keycloak env vars if setup produced them (skipped on older clusters)
+if [[ -f /tmp/keycloak-env.sh ]]; then
+    # shellcheck disable=SC1091
+    source /tmp/keycloak-env.sh
+fi
+
 make e2e-ci-setup
 make e2e-ci-test
