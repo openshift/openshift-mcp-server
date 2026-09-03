@@ -31,6 +31,7 @@ Choose the guide that matches your needs:
 - **[NetObserv](NETOBSERV.md)** - Network observability flows, metrics, and alerts (Helm on OpenShift)
 - **[KubeVirt](kubevirt.md)** - KubeVirt virtual machine management tools
 - **[Tekton](tekton.md)** - Tekton PipelineRun, TaskRun, and troubleshooting tools
+- **[TNF](tnf.md)** - Two-Node Fencing diagnostics (pacemaker, STONITH, BMC health)
 
 ## Feature Specifications
 

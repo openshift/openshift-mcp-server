@@ -369,6 +369,7 @@ Toolsets group related tools together. Enable only the toolsets you need to redu
 | ossm                  | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                                                                         |         |
 | ovn-kubernetes        | OVN-Kubernetes CNI network troubleshooting tools                                                                                                                                                                                        |         |
 | tekton                | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, TaskRuns, and troubleshooting.                                                                                                                                     |         |
+| tnf                   | Two-Node Fencing (TNF) cluster diagnostics                                                                                                                                                                                              |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -404,6 +405,15 @@ toolsets = ["core", "config", "helm", "kubevirt"]
 - **must-gather-alertmanager-status** - AlertManager status from the must-gather archive
   - URI: `must-gather://current/alertmanager/status`
   - MIME Type: `text/plain`
+</details>
+
+<details>
+
+<summary>tnf</summary>
+
+- **tnf-fencing-domain-knowledge** - TNF two-node fencing domain knowledge: quorum rules, split-brain risk matrix, and recovery procedures
+  - URI: `tnf://domain-knowledge/fencing`
+  - MIME Type: `text/markdown`
 </details>
 
 
