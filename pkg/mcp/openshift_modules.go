@@ -6,6 +6,7 @@ import (
 	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/mustgather"
 	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/netedge"
 	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/oadp"
+	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/olm"
 	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/openshift"
 	_ "github.com/containers/kubernetes-mcp-server/pkg/toolsets/ovnkubernetes"
 	_ "github.com/rhobs/obs-mcp/pkg/toolset"

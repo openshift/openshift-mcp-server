@@ -303,6 +303,7 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 | observability/traces  | Distributed tracing tools for discovering Tempo instances, searching and retrieving traces, and exploring trace attributes.                                                                                                             |         |
 | openshift             | OpenShift-specific tools for cluster management and troubleshooting                                                                                                                                                                     |         |
 | openshift/mustgather  | Analyze OpenShift must-gather archives offline without a live cluster connection                                                                                                                                                        |         |
+| openshift/olm         | Read-only OpenShift Operator Lifecycle Manager tools for OLMv0 and OLMv1 resources, catalogs, status, and diagnostics                                                                                                                   |         |
 | ossm                  | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                                                                         |         |
 | ovn-kubernetes        | OVN-Kubernetes CNI network troubleshooting tools                                                                                                                                                                                        |         |
 | tekton                | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, TaskRuns, and troubleshooting.                                                                                                                                     |         |
@@ -1342,6 +1343,30 @@ Use tempo_search_tags to discover available tag names.
 
 - **mustgather_monitoring_prometheus_rules** - Get Prometheus alerting and recording rules from the must-gather archive
   - `type` (`string`) - Filter by rule type: alerting, recording (default: all)
+
+</details>
+
+<details>
+
+<summary>openshift/olm</summary>
+
+- **olm_list** - List installed OLMv0 operators and OLMv1 cluster extensions with their observed status
+  - `namespace` (`string`) - Optional namespace; empty means all namespaces where supported
+  - `version` (`string`) - OLM API generation to inspect; auto checks both generations
+
+- **olm_status** - Get detailed read-only status for an OLMv0 operator or OLMv1 ClusterExtension
+  - `name` (`string`) **(required)** - Name of the Subscription, CSV, or ClusterExtension
+  - `namespace` (`string`) - Optional namespace; empty means all namespaces where supported
+  - `version` (`string`) - OLM API generation to inspect; auto checks both generations
+
+- **olm_catalogs** - List OLMv0 CatalogSources and OLMv1 ClusterCatalogs with health conditions
+  - `namespace` (`string`) - Optional namespace; empty means all namespaces where supported
+  - `version` (`string`) - OLM API generation to inspect; auto checks both generations
+
+- **olm_diagnose** - Collect read-only OLM conditions, related workload health, and warning events for troubleshooting
+  - `name` (`string`) - Optional operator or extension name to narrow diagnostics
+  - `namespace` (`string`) - Optional namespace; empty means all namespaces where supported
+  - `version` (`string`) - OLM API generation to inspect; auto checks both generations
 
 </details>
 
