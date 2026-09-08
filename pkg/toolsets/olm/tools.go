@@ -20,6 +20,7 @@ var (
 	catalogSourceGVR    = schema.GroupVersionResource{Group: "operators.coreos.com", Version: "v1alpha1", Resource: "catalogsources"}
 	clusterExtensionGVR = schema.GroupVersionResource{Group: "olm.operatorframework.io", Version: "v1", Resource: "clusterextensions"}
 	clusterCatalogGVR   = schema.GroupVersionResource{Group: "olm.operatorframework.io", Version: "v1", Resource: "clustercatalogs"}
+	clusterObjectSetGVR = schema.GroupVersionResource{Group: "olm.operatorframework.io", Version: "v1", Resource: "clusterobjectsets"}
 	eventGVR            = schema.GroupVersionResource{Version: "v1", Resource: "events"}
 	podGVR              = schema.GroupVersionResource{Version: "v1", Resource: "pods"}
 	deploymentGVR       = schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
@@ -37,8 +38,27 @@ func inputSchema(properties map[string]*jsonschema.Schema, required ...string) *
 
 func outputSchema() *jsonschema.Schema {
 	return &jsonschema.Schema{Type: "object", Properties: map[string]*jsonschema.Schema{
-		"items":   {Type: "array", Items: &jsonschema.Schema{Type: "object"}},
 		"summary": {Type: "string"},
+		"items": {Type: "array", Items: &jsonschema.Schema{
+			Type: "object", Properties: map[string]*jsonschema.Schema{
+				"version":                  {Type: "string", Description: "OLM API version (v0, v1, or workload)"},
+				"resource":                 {Type: "string", Description: "Resource type (e.g., subscriptions, clusterextensions, events)"},
+				"name":                     {Type: "string", Description: "Resource name"},
+				"namespace":                {Type: "string", Description: "Resource namespace; empty for cluster-scoped resources"},
+				"status":                   {Type: "object", Description: "Resource status fields"},
+				"conditions":               {Type: "array", Description: "Status conditions array"},
+				"spec.package":             {Type: "string", Description: "Operator package name"},
+				"spec.bundleImage":         {Type: "string", Description: "Bundle image for ClusterObjectSet resources"},
+				"spec.sourceType":          {Type: "string", Description: "Source type"},
+				"spec.catalog.packageName": {Type: "string", Description: "Catalog package name"},
+				"status.currentCSV":        {Type: "string", Description: "Currently installed ClusterServiceVersion"},
+				"status.installedCSV":      {Type: "string", Description: "Installed ClusterServiceVersion"},
+				"status.phase":             {Type: "string", Description: "Operator phase"},
+				"errorType":                {Type: "string", Description: "Error type: error, access_denied, or not_found"},
+				"error":                    {Type: "string", Description: "Error message"},
+				"errorDetails":             {Type: "string", Description: "Additional error details"},
+			},
+		}},
 	}}
 }
 
@@ -50,13 +70,13 @@ func commonProperties() map[string]*jsonschema.Schema {
 }
 
 func newListTool(p api.FilteringProvider) api.ServerTool {
-	return api.ServerTool{Tool: api.Tool{Name: "olm_list", Description: "List installed OLMv0 operators and OLMv1 cluster extensions with their observed status", InputSchema: inputSchema(commonProperties()), OutputSchema: outputSchema(), Annotations: readOnly("OLM: List")}, Handler: listHandler, TargetCompatibilityFilters: []func() bool{hasAnyOLMAPI(p, SubscriptionGVK, ClusterExtensionGVK)}}
+	return api.ServerTool{Tool: api.Tool{Name: "olm_list", Description: "List installed OLMv0 operators and OLMv1 cluster extensions with their observed status", InputSchema: inputSchema(commonProperties()), OutputSchema: outputSchema(), Annotations: readOnly("OLM: List")}, Handler: listHandler, TargetCompatibilityFilters: []func() bool{hasAnyOLMAPI(p, SubscriptionGVK, CSVGVK, InstallPlanGVK, ClusterExtensionGVK, ClusterCatalogGVK, ClusterObjectSetGVK)}}
 }
 
 func newStatusTool(p api.FilteringProvider) api.ServerTool {
 	props := commonProperties()
 	props["name"] = &jsonschema.Schema{Type: "string", Description: "Name of the Subscription, CSV, or ClusterExtension"}
-	return api.ServerTool{Tool: api.Tool{Name: "olm_status", Description: "Get detailed read-only status for an OLMv0 operator or OLMv1 ClusterExtension", InputSchema: inputSchema(props, "name"), OutputSchema: outputSchema(), Annotations: readOnly("OLM: Status")}, Handler: statusHandler, TargetCompatibilityFilters: []func() bool{hasAnyOLMAPI(p, SubscriptionGVK, ClusterExtensionGVK)}}
+	return api.ServerTool{Tool: api.Tool{Name: "olm_status", Description: "Get detailed read-only status for an OLMv0 operator or OLMv1 ClusterExtension", InputSchema: inputSchema(props, "name"), OutputSchema: outputSchema(), Annotations: readOnly("OLM: Status")}, Handler: statusHandler, TargetCompatibilityFilters: []func() bool{hasAnyOLMAPI(p, SubscriptionGVK, CSVGVK, InstallPlanGVK, ClusterExtensionGVK)}}
 }
 
 func newCatalogsTool(p api.FilteringProvider) api.ServerTool {
@@ -66,7 +86,7 @@ func newCatalogsTool(p api.FilteringProvider) api.ServerTool {
 func newDiagnoseTool(p api.FilteringProvider) api.ServerTool {
 	props := commonProperties()
 	props["name"] = &jsonschema.Schema{Type: "string", Description: "Optional operator or extension name to narrow diagnostics"}
-	return api.ServerTool{Tool: api.Tool{Name: "olm_diagnose", Description: "Collect read-only OLM conditions, related workload health, and warning events for troubleshooting", InputSchema: inputSchema(props), OutputSchema: outputSchema(), Annotations: readOnly("OLM: Diagnose")}, Handler: diagnoseHandler, TargetCompatibilityFilters: []func() bool{hasAnyOLMAPI(p, SubscriptionGVK, ClusterExtensionGVK)}}
+	return api.ServerTool{Tool: api.Tool{Name: "olm_diagnose", Description: "Collect read-only OLM conditions, related workload health, and warning events for troubleshooting", InputSchema: inputSchema(props), OutputSchema: outputSchema(), Annotations: readOnly("OLM: Diagnose")}, Handler: diagnoseHandler, TargetCompatibilityFilters: []func() bool{hasAnyOLMAPI(p, SubscriptionGVK, CSVGVK, InstallPlanGVK, ClusterExtensionGVK, ClusterCatalogGVK, ClusterObjectSetGVK)}}
 }
 
 func readOnly(title string) api.ToolAnnotations {
@@ -183,6 +203,7 @@ func diagnoseHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) 
 	}
 	if version == "auto" || version == "v1" {
 		appendList(params, clusterExtensionGVR, "v1", "", &items)
+		appendList(params, clusterObjectSetGVR, "v1", "", &items)
 	}
 	if name != "" {
 		filtered := items[:0]
@@ -221,21 +242,50 @@ func appendEventDiagnostics(params api.ToolHandlerParams, namespace string, item
 		return
 	}
 	for i := range list.Items {
-		*items = append(*items, summarize(list.Items[i], "event", "events"))
+		event := list.Items[i]
+		// Only include events from operator-related resources
+		name := event.GetName()
+		if name == "" {
+			continue
+		}
+		// Check if event is from an OLM resource or operator-related
+		isOperatorEvent := strings.Contains(name, "operator") ||
+			strings.Contains(name, "subscription") ||
+			strings.Contains(name, "csv") ||
+			strings.Contains(name, "installplan") ||
+			strings.Contains(name, "catalog") ||
+			strings.Contains(name, "clusterextension") ||
+			strings.Contains(name, "clusterobjectset")
+		if !isOperatorEvent {
+			continue
+		}
+		*items = append(*items, summarize(event, "event", "events"))
 	}
 }
 
 func summarize(obj unstructured.Unstructured, version, resource string) map[string]any {
 	item := map[string]any{"version": version, "resource": resource, "name": obj.GetName(), "namespace": obj.GetNamespace()}
-	if status, found, _ := unstructured.NestedMap(obj.Object, "status"); found {
+	if status, found, _ := unstructured.NestedMap(obj.Object, "status"); found && status != nil {
 		item["status"] = status
 	}
 	if conditions, found, _ := unstructured.NestedSlice(obj.Object, "status", "conditions"); found {
-		item["conditions"] = conditions
+		if conditions != nil {
+			item["conditions"] = conditions
+		}
 	}
-	for _, path := range [][]string{{"spec", "package"}, {"spec", "source", "sourceType"}, {"spec", "source", "catalog", "packageName"}, {"status", "currentCSV"}, {"status", "installedCSV"}, {"status", "phase"}} {
-		if value, found, _ := unstructured.NestedString(obj.Object, path...); found && value != "" {
-			item[strings.Join(path, ".")] = value
+	for _, path := range [][]string{
+		{"spec", "package"},
+		{"spec", "bundleImage"}, // For ClusterObjectSet resources
+		{"spec", "source", "sourceType"},
+		{"spec", "source", "catalog", "packageName"},
+		{"status", "currentCSV"},
+		{"status", "installedCSV"},
+		{"status", "phase"},
+	} {
+		if value, found, _ := unstructured.NestedString(obj.Object, path...); found {
+			if value != "" {
+				item[strings.Join(path, ".")] = value
+			}
 		}
 	}
 	return item
@@ -243,10 +293,20 @@ func summarize(obj unstructured.Unstructured, version, resource string) map[stri
 
 func errorSummary(version, resource, name string, err error) map[string]any {
 	errorType := "error"
+	errorDetails := ""
 	if apierrors.IsForbidden(err) {
 		errorType = "access_denied"
+	} else if apierrors.IsNotFound(err) {
+		errorType = "not_found"
+		errorDetails = "resource not found"
+	} else if apierrors.IsServerTimeout(err) {
+		errorType = "timeout"
+		errorDetails = "request timed out"
 	}
 	item := map[string]any{"version": version, "resource": resource, "errorType": errorType, "error": err.Error()}
+	if errorDetails != "" {
+		item["errorDetails"] = errorDetails
+	}
 	if name != "" {
 		item["name"] = name
 	}

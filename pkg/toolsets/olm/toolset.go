@@ -16,6 +16,7 @@ var (
 	CatalogSourceGVK    = schema.GroupVersionKind{Group: "operators.coreos.com", Version: "v1alpha1", Kind: "CatalogSource"}
 	ClusterExtensionGVK = schema.GroupVersionKind{Group: "olm.operatorframework.io", Version: "v1", Kind: "ClusterExtension"}
 	ClusterCatalogGVK   = schema.GroupVersionKind{Group: "olm.operatorframework.io", Version: "v1", Kind: "ClusterCatalog"}
+	ClusterObjectSetGVK = schema.GroupVersionKind{Group: "olm.operatorframework.io", Version: "v1", Kind: "ClusterObjectSet"}
 )
 
 // Toolset provides read-only semantic OLMv0 and OLMv1 inspection tools.
