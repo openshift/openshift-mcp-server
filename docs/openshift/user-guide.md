@@ -21,10 +21,10 @@ The MCP server for Red Hat OpenShift includes several enterprise grade features
 
 ## Toolsets and Functionality
 
-By default the MCP server for Red Hat OpenShift enables only `core` and `config` tools in a read-only mode. In order to enable other available toolsets, like Kiali/OSSM or Kubevirt, those must be enabled in the `config.toml` file. In case of using `olm` or `kubevirt` toolsets there is a "config" section which needs to be updated, like:
+By default the MCP server for Red Hat OpenShift enables only `core` and `config` tools in a read-only mode. In order to enable other available toolsets, like Kiali/OSSM or Kubevirt, those must be enabled in the `config.toml` file. In case of using `ossm` or `kubevirt` toolsets there is a "config" section which needs to be updated, like:
 
 ```toml
-toolsets = ["core", "olm", "kubevirt"]
+toolsets = ["core", "ossm", "kubevirt"]
 ```
 
 ### Core
@@ -73,17 +73,23 @@ toolsets = ["core", "olm", "kubevirt"]
 | `nodes_stats_summary` | Get detailed resource usage statistics from a node via the kubelet's Summary API |
 | `nodes_top`           | List resource consumption (CPU and memory) for nodes via the Metrics Server      |
 
-### Kiali
+### OpenShift Service Mesh (OSSM)
+
+Tools for managing and diagnosing OpenShift Service Mesh (backed by Kiali). Enable via \`toolsets = ["core", "ossm"]\` and configure the \`[toolset_configs.kiali]\` section. See the [OSSM Documentation](../OSSM.md) for complete details.
 
 | Tool                           | Description                                                                                                                                                                                                  |
 | :----------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `kiali_mesh_graph`             | Returns the topology of specific namespaces, including health, status of the mesh, and a mesh health summary overview with aggregated counts of healthy, degraded, and failing apps, workloads, and services |
-| `kiali_get_resource_details`   | Gets lists or detailed info for Kubernetes resources (services, workloads) within the service mesh                                                                                                           |
-| `kiali_get_metrics`            | Gets metrics for a specific resource (service or workload) in a namespace, with configurable duration, step, rate interval, direction, reporter, and quantiles                                               |
-| `kiali_get_traces`             | Gets distributed traces for a specific resource (app, service, or workload) in a namespace, or retrieves detailed information for a specific trace by its ID                                                 |
-| `kiali_workload_logs`          | Gets logs for a specific workload's pods in a namespace, with automatic pod and container discovery and optional filtering by container name, time range, and line count                                     |
-| `kiali_manage_istio_config`    | Creates, patches, or deletes Istio configuration objects (Gateways, VirtualServices, DestinationRules, etc.)                                                                                                 |
-| `kiali_manage_istio_config_read` | Lists or gets Istio configuration objects (Gateways, VirtualServices, etc.) in a read-only manner                                                                                                          |
+| `ossm_get_mesh_traffic_graph`  | Returns service-to-service traffic topology, dependencies, and network metrics (throughput, response time, mTLS) for specified namespaces.                                                                    |
+| `ossm_get_mesh_status`         | Retrieves high-level health, topology, and environment details of the Istio service mesh.                                                                                                                    |
+| `ossm_get_resource_details`   | Gets lists or detailed info for mesh resources (applications, workloads, services) within the service mesh.                                                                                                   |
+| `ossm_get_metrics`            | Gets metrics for a specific resource (service or workload) in a namespace, with configurable duration, step, rate interval, direction, reporter, and quantiles.                                              |
+| `ossm_list_traces`             | Lists distributed traces for a service in a namespace.                                                                                                                                                       |
+| `ossm_get_trace_details`       | Fetches a single distributed trace by trace ID and returns its call hierarchy.                                                                                                                               |
+| `ossm_get_pod_performance`     | Returns a human-readable summary comparing Pod CPU/memory usage to requests and limits.                                                                                                                      |
+| `ossm_get_logs`                | Gets logs for a specific workload's pods in a namespace, with automatic pod and container discovery and optional filtering.                                                                                |
+| `ossm_list_mesh_clusters`      | Returns the list of Istio mesh clusters accessible by Kiali/OSSM.                                                                                                                                            |
+| `ossm_manage_istio_config`     | Creates, patches, or deletes Istio, Gateway API, and Inference API configuration objects (Gateways, VirtualServices, etc.).                                                                                  |
+| `ossm_manage_istio_config_read`| Lists or gets Istio, Gateway API, and Inference API configuration objects in a read-only manner.                                                                                                              |
 
 ### Kubevirt
 
@@ -95,10 +101,20 @@ toolsets = ["core", "olm", "kubevirt"]
 
 ### Netedge
 
+Network Ingress and DNS troubleshooting tools. Enable via \`toolsets = ["core", "netedge"]\`. See the [NetEdge Documentation](NETEDGE.md) for full details.
+
 | Tool                       | Description                                                                                                                                                                                                                                                                                                                                                                          |
 | :------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `netedge_query_prometheus` | Executes specialized diagnostic queries for specific NetEdge components. Accepts a `diagnostic_target` parameter: `ingress` (error rate, active connections, reloads, top error routes), `dns` (request rate, NXDOMAIN rate, SERVFAIL rate, panic recovery, error breakdown, rewrite count), or `operators` (active firing alerts and operator up status in ingress/DNS namespaces). |
-| `get_coredns_config`       | Retrieves the current CoreDNS configuration (Corefile) from the cluster by reading the `dns-default` ConfigMap in the `openshift-dns` namespace.                                                                                                                                                                                                                                     |
+| `netedge_query_prometheus` | Executes specialized diagnostic queries for specific NetEdge components (\`ingress\`, \`dns\`, or \`operators\`).                                                                                                                                                                                                                                                                    |
+| `inspect_route`            | Inspects an OpenShift Route for configuration issues, TLS certificates, backend services, and ingress status.                                                                                                                                                                                                                                                                       |
+| `get_router_config`        | Retrieves the HAProxy router configuration (haproxy.config) from an IngressController pod.                                                                                                                                                                                                                                                                                           |
+| `get_router_info`          | Retrieves runtime info from HAProxy router pods (version, uptime, process statistics).                                                                                                                                                                                                                                                                                               |
+| `get_router_sessions`      | Retrieves active session counts and connection statistics from HAProxy router pods.                                                                                                                                                                                                                                                                                                  |
+| `get_coredns_config`       | Retrieves the current CoreDNS configuration (Corefile) from the cluster by reading the \`dns-default\` ConfigMap in the \`openshift-dns\` namespace.                                                                                                                                                                                                                                     |
+| `get_service_endpoints`    | Retrieves endpoints and endpoint slices for a service to verify backend pod availability.                                                                                                                                                                                                                                                                                            |
+| `exec_dns_in_pod`          | Executes DNS resolution commands inside an ephemeral debug pod on a specific node.                                                                                                                                                                                                                                                                                                   |
+| `probe_dns_local`          | Performs DNS lookup from the local MCP server environment.                                                                                                                                                                                                                                                                                                                           |
+| `probe_http`               | Performs HTTP/HTTPS requests to verify route and ingress endpoints.                                                                                                                                                                                                                                                                                                                   |
 
 ### Observability
 
@@ -113,6 +129,15 @@ Observability query tools are provided by [obs-mcp](https://github.com/rhobs/obs
 | `get_silences`           | `observability/metrics` | Queries silences from Alertmanager (requires `alertmanager_url`), with label matcher filtering.                                                                                                               |
 | `loki_query_range`       | `observability/logs`    | Executes a Loki LogQL range query and returns matching log streams and lines.                                                                                                                                 |
 | `tempo_search_traces`    | `observability/traces`  | Searches distributed traces in Tempo using TraceQL.                                                                                                                                                           |
+
+### Additional OpenShift Toolsets
+
+The downstream OpenShift distribution provides additional specialized toolsets:
+
+- **OpenShift Core (`openshift`)**: OpenShift project management (`projects_list`, `project_get`, etc.) and the `plan_mustgather` diagnostic prompt. See the [OpenShift Documentation](../OPENSHIFT.md).
+- **CNI Diagnostics & OVN-Kubernetes (`cni-diagnostics`, `ovn-kubernetes`)**: Comprehensive networking and OVN-Kubernetes troubleshooting tools. See the [CNI Diagnostics Guide](cni-diagnostics.md) and [OVN-Kubernetes Guide](ovn-kubernetes.md).
+- **OpenShift API for Data Protection (`oadp`)**: Backup, restore, and snapshot management tools. See the [OADP Documentation](../OADP.md).
+- **Advanced Cluster Management (`acm`)**: Multi-cluster management across OpenShift fleets. See the [ACM Support Guide](acm.md) and [ACM Setup Guide](acm_setup.md).
 
 ## Bring Your Own Model
 
