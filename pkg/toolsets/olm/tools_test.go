@@ -35,7 +35,7 @@ func TestToolsetMetadata(t *testing.T) {
 		ClusterExtensionGVK: true,
 		ClusterCatalogGVK:   true,
 	}})
-	require.Len(t, tools, 4)
+	require.Len(t, tools, 8)
 	for _, tool := range tools {
 		require.Equal(t, "object", tool.Tool.InputSchema.Type)
 		require.NotNil(t, tool.Tool.OutputSchema)

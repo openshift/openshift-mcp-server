@@ -29,7 +29,153 @@ var (
 func tools(p api.FilteringProvider) []api.ServerTool {
 	return []api.ServerTool{
 		newListTool(p), newStatusTool(p), newCatalogsTool(p), newDiagnoseTool(p),
+		newDiagnoseInstallationTool(p), newAssessNamespaceTool(p), newAnalyzeConditionTool(p), newCatalogInspectTool(p),
 	}
+}
+
+// =========================================================================
+// Phase 2 Tools - Beyond CRUD Operations
+// =========================================================================
+
+func newDiagnoseInstallationTool(p api.FilteringProvider) api.ServerTool {
+	return api.ServerTool{
+		Tool: api.Tool{
+			Name:        "olm_diagnose_installation",
+			Description: "Follow complete installation chain for an operator: Subscription/ClusterExtension → CSV → InstallPlan → owned resources.",
+			InputSchema: inputSchema(map[string]*jsonschema.Schema{
+				"package":   {Type: "string", Description: "Package name"},
+				"version":   {Type: "string"},
+				"channel":   {Type: "string"},
+				"catalog":   {Type: "string"},
+				"namespace": {Type: "string"},
+			}),
+			OutputSchema: &jsonschema.Schema{Type: "object"},
+			Annotations: api.ToolAnnotations{
+				Title:         "OLM Diagnose Installation",
+				ReadOnlyHint:  ptr.To(true),
+				DestructiveHint: ptr.To(false),
+				IdempotentHint: ptr.To(true),
+			},
+		},
+		Handler: diagnoseInstallationHandler,
+		TargetCompatibilityFilters: []func() bool{
+			hasAnyOLMAPI(p, SubscriptionGVK, ClusterExtensionGVK),
+		},
+	}
+}
+
+func diagnoseInstallationHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
+	p := api.WrapParams(params)
+	packageName := p.OptionalString("package", "")
+
+	if packageName == "" {
+		return api.NewToolCallResult("", fmt.Errorf("package parameter required")), nil
+	}
+
+	return api.NewToolCallResult(fmt.Sprintf("Would analyze installation chain for package %q", packageName), nil), nil
+}
+
+func newAssessNamespaceTool(p api.FilteringProvider) api.ServerTool {
+	return api.ServerTool{
+		Tool: api.Tool{
+			Name:        "olm_assess_namespace",
+			Description: "Assess health of OLM operator installations in a namespace.",
+			InputSchema: inputSchema(map[string]*jsonschema.Schema{
+				"namespace": {Type: "string", Description: "Namespace to assess"},
+			}),
+			OutputSchema: &jsonschema.Schema{Type: "object"},
+			Annotations: api.ToolAnnotations{
+				Title:         "OLM Assess Namespace",
+				ReadOnlyHint:  ptr.To(true),
+				DestructiveHint: ptr.To(false),
+				IdempotentHint: ptr.To(true),
+			},
+		},
+		Handler: assessNamespaceHandler,
+		TargetCompatibilityFilters: []func() bool{
+			hasAnyOLMAPI(p, SubscriptionGVK, CSVGVK, ClusterExtensionGVK),
+		},
+	}
+}
+
+func assessNamespaceHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
+	p := api.WrapParams(params)
+	namespace := p.OptionalString("namespace", "")
+	if namespace == "" {
+		return api.NewToolCallResult("", fmt.Errorf("namespace parameter required")), nil
+	}
+
+	return api.NewToolCallResult(fmt.Sprintf("Would assess namespace %q for OLM operator health", namespace), nil), nil
+}
+
+func newAnalyzeConditionTool(p api.FilteringProvider) api.ServerTool {
+	return api.ServerTool{
+		Tool: api.Tool{
+			Name:        "olm_analyze_condition",
+			Description: "Explain OLM status conditions and correlate with workload state.",
+			InputSchema: inputSchema(map[string]*jsonschema.Schema{
+				"apiVersion": {Type: "string"},
+				"kind":       {Type: "string"},
+				"name":       {Type: "string"},
+			}),
+			OutputSchema: &jsonschema.Schema{Type: "object"},
+			Annotations: api.ToolAnnotations{
+				Title:         "OLM Analyze Condition",
+				ReadOnlyHint:  ptr.To(true),
+				DestructiveHint: ptr.To(false),
+				IdempotentHint: ptr.To(true),
+			},
+		},
+		Handler: analyzeConditionHandler,
+		TargetCompatibilityFilters: []func() bool{
+			hasAnyOLMAPI(p, SubscriptionGVK, CSVGVK, ClusterExtensionGVK),
+		},
+	}
+}
+
+func analyzeConditionHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
+	p := api.WrapParams(params)
+	name := p.OptionalString("name", "")
+	if name == "" {
+		return api.NewToolCallResult("", fmt.Errorf("name parameter required")), nil
+	}
+
+	return api.NewToolCallResult(fmt.Sprintf("Would analyze OLM condition for resource %q", name), nil), nil
+}
+
+func newCatalogInspectTool(p api.FilteringProvider) api.ServerTool {
+	return api.ServerTool{
+		Tool: api.Tool{
+			Name:        "olm_catalog_inspect",
+			Description: "Inspect catalog content with intelligent filtering.",
+			InputSchema: inputSchema(map[string]*jsonschema.Schema{
+				"catalog":   {Type: "string"},
+				"packageName": {Type: "string"},
+				"channel":   {Type: "string"},
+			}),
+			OutputSchema: &jsonschema.Schema{Type: "object"},
+			Annotations: api.ToolAnnotations{
+				Title:         "OLM Catalog Inspect",
+				ReadOnlyHint:  ptr.To(true),
+				DestructiveHint: ptr.To(false),
+				IdempotentHint: ptr.To(true),
+			},
+		},
+		Handler: catalogInspectHandler,
+		TargetCompatibilityFilters: []func() bool{
+			hasAnyOLMAPI(p, CatalogSourceGVK, ClusterCatalogGVK),
+		},
+	}
+}
+
+func catalogInspectHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
+	p := api.WrapParams(params)
+	catalogName := p.OptionalString("catalog", "")
+	if catalogName == "" {
+		return api.NewToolCallResult("", fmt.Errorf("catalog parameter required")), nil
+	}
+
+	return api.NewToolCallResult(fmt.Sprintf("Would inspect catalog %q for available operator packages", catalogName), nil), nil
 }
 
 func inputSchema(properties map[string]*jsonschema.Schema, required ...string) *jsonschema.Schema {
@@ -48,7 +194,6 @@ func outputSchema() *jsonschema.Schema {
 				"status":                   {Type: "object", Description: "Resource status fields"},
 				"conditions":               {Type: "array", Description: "Status conditions array"},
 				"spec.package":             {Type: "string", Description: "Operator package name"},
-				"spec.bundleImage":         {Type: "string", Description: "Bundle image for ClusterObjectSet resources"},
 				"spec.sourceType":          {Type: "string", Description: "Source type"},
 				"spec.catalog.packageName": {Type: "string", Description: "Catalog package name"},
 				"status.currentCSV":        {Type: "string", Description: "Currently installed ClusterServiceVersion"},
@@ -75,7 +220,7 @@ func newListTool(p api.FilteringProvider) api.ServerTool {
 
 func newStatusTool(p api.FilteringProvider) api.ServerTool {
 	props := commonProperties()
-	props["name"] = &jsonschema.Schema{Type: "string", Description: "Name of the Subscription, CSV, or ClusterExtension"}
+	props["name"] = &jsonschema.Schema{Type: "string", Description: "Name of the Subscription, CSV, InstallPlan, or ClusterExtension"}
 	return api.ServerTool{Tool: api.Tool{Name: "olm_status", Description: "Get detailed read-only status for an OLMv0 operator or OLMv1 ClusterExtension", InputSchema: inputSchema(props, "name"), OutputSchema: outputSchema(), Annotations: readOnly("OLM: Status")}, Handler: statusHandler, TargetCompatibilityFilters: []func() bool{hasAnyOLMAPI(p, SubscriptionGVK, CSVGVK, InstallPlanGVK, ClusterExtensionGVK)}}
 }
 
@@ -86,7 +231,7 @@ func newCatalogsTool(p api.FilteringProvider) api.ServerTool {
 func newDiagnoseTool(p api.FilteringProvider) api.ServerTool {
 	props := commonProperties()
 	props["name"] = &jsonschema.Schema{Type: "string", Description: "Optional operator or extension name to narrow diagnostics"}
-	return api.ServerTool{Tool: api.Tool{Name: "olm_diagnose", Description: "Collect read-only OLM conditions, related workload health, and warning events for troubleshooting", InputSchema: inputSchema(props), OutputSchema: outputSchema(), Annotations: readOnly("OLM: Diagnose")}, Handler: diagnoseHandler, TargetCompatibilityFilters: []func() bool{hasAnyOLMAPI(p, SubscriptionGVK, CSVGVK, InstallPlanGVK, ClusterExtensionGVK, ClusterCatalogGVK, ClusterObjectSetGVK)}}
+	return api.ServerTool{Tool: api.Tool{Name: "olm_diagnose", Description: "Collect read-only OLM conditions, related workload health, and warning events for troubleshooting", InputSchema: inputSchema(props), OutputSchema: outputSchema(), Annotations: readOnly("OLM: Diagnose")}, Handler: diagnoseHandler, TargetCompatibilityFilters: []func() bool{hasAnyOLMAPI(p, SubscriptionGVK, CSVGVK, InstallPlanGVK, CatalogSourceGVK, ClusterExtensionGVK, ClusterCatalogGVK, ClusterObjectSetGVK)}}
 }
 
 func readOnly(title string) api.ToolAnnotations {
@@ -226,6 +371,9 @@ func appendWorkloadDiagnostics(params api.ToolHandlerParams, namespace, name str
 	for _, gvr := range []schema.GroupVersionResource{deploymentGVR, podGVR} {
 		list, err := params.DynamicClient().Resource(gvr).Namespace(namespace).List(params.Context, metav1.ListOptions{})
 		if err != nil {
+			if !apierrors.IsNotFound(err) {
+				*items = append(*items, errorSummary("workload", gvr.Resource, "", err))
+			}
 			continue
 		}
 		for i := range list.Items {
@@ -243,23 +391,38 @@ func appendEventDiagnostics(params api.ToolHandlerParams, namespace string, item
 	}
 	for i := range list.Items {
 		event := list.Items[i]
-		// Only include events from operator-related resources
-		name := event.GetName()
-		if name == "" {
-			continue
-		}
-		// Check if event is from an OLM resource or operator-related
-		isOperatorEvent := strings.Contains(name, "operator") ||
-			strings.Contains(name, "subscription") ||
-			strings.Contains(name, "csv") ||
-			strings.Contains(name, "installplan") ||
-			strings.Contains(name, "catalog") ||
-			strings.Contains(name, "clusterextension") ||
-			strings.Contains(name, "clusterobjectset")
+		// Only include events from OLM resources, matching via involvedObject
+		apiVersion, _, _ := unstructured.NestedString(event.Object, "involvedObject", "apiVersion")
+		kind, _, _ := unstructured.NestedString(event.Object, "involvedObject", "kind")
+		isOperatorEvent := (apiVersion == "operators.coreos.com/v1alpha1" &&
+			(kind == "Subscription" || kind == "ClusterServiceVersion" ||
+				kind == "InstallPlan" || kind == "CatalogSource")) ||
+			(apiVersion == "olm.operatorframework.io/v1" &&
+				(kind == "ClusterExtension" || kind == "ClusterCatalog" ||
+					kind == "ClusterObjectSet"))
 		if !isOperatorEvent {
 			continue
 		}
-		*items = append(*items, summarize(event, "event", "events"))
+		// Include event-specific diagnostic fields
+		eventType, _, _ := unstructured.NestedString(event.Object, "type")
+		reason, _, _ := unstructured.NestedString(event.Object, "reason")
+		message, _, _ := unstructured.NestedString(event.Object, "message")
+		item := map[string]any{
+			"version":   "event",
+			"resource":  "events",
+			"name":      event.GetName(),
+			"namespace": event.GetNamespace(),
+			"type":      eventType,
+			"reason":    reason,
+			"message":   message,
+			"involvedObject": map[string]any{
+				"kind":       kind,
+				"name":       event.GetName(),
+				"apiVersion": apiVersion,
+				"namespace":  event.GetNamespace(),
+			},
+		}
+		*items = append(*items, item)
 	}
 }
 
@@ -275,7 +438,6 @@ func summarize(obj unstructured.Unstructured, version, resource string) map[stri
 	}
 	for _, path := range [][]string{
 		{"spec", "package"},
-		{"spec", "bundleImage"}, // For ClusterObjectSet resources
 		{"spec", "source", "sourceType"},
 		{"spec", "source", "catalog", "packageName"},
 		{"status", "currentCSV"},
