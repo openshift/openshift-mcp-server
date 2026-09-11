@@ -371,7 +371,7 @@ Toolsets group related tools together. Enable only the toolsets you need to redu
 | observability/otelcol | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                                                                              |         |
 | observability/traces  | Distributed tracing tools for discovering Tempo instances, searching and retrieving traces, and exploring trace attributes.                                                                                                             |         |
 | openshift             | OpenShift-specific tools for cluster management and troubleshooting                                                                                                                                                                     |         |
-| openshift/mustgather  | Analyze OpenShift must-gather archives offline without a live cluster connection                                                                                                                                                        |         |
+| openshift/mustgather  | Analyze OpenShift must-gather archives offline without a live cluster connection. Call mustgather_list first to discover available archives and their must_gather_archive_id, then pass that ID to the other mustgather_* tools.        |         |
 | ossm                  | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                                                                         |         |
 | ovn-kubernetes        | OVN-Kubernetes CNI network troubleshooting tools                                                                                                                                                                                        |         |
 | tekton                | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, TaskRuns, and troubleshooting.                                                                                                                                     |         |
@@ -387,30 +387,6 @@ toolsets = ["core", "config", "helm", "kubevirt"]
 **Available Resources:**
 
 <!-- AVAILABLE-TOOLSETS-RESOURCES-START -->
-
-<details>
-
-<summary>openshift/mustgather</summary>
-
-- **must-gather** - Loaded must-gather archive metadata
-  - URI: `must-gather://current`
-  - MIME Type: `text/plain`
-- **must-gather-namespaces** - List of all namespaces in the must-gather archive
-  - URI: `must-gather://current/namespaces`
-  - MIME Type: `text/plain`
-- **must-gather-etcd-members** - ETCD cluster member list from the must-gather archive
-  - URI: `must-gather://current/etcd/members`
-  - MIME Type: `application/json`
-- **must-gather-etcd-endpoint-status** - ETCD endpoint status from the must-gather archive
-  - URI: `must-gather://current/etcd/endpoint-status`
-  - MIME Type: `application/json`
-- **must-gather-prometheus-config** - Prometheus configuration summary from the must-gather archive
-  - URI: `must-gather://current/prometheus/config`
-  - MIME Type: `text/plain`
-- **must-gather-alertmanager-status** - AlertManager status from the must-gather archive
-  - URI: `must-gather://current/alertmanager/status`
-  - MIME Type: `text/plain`
-</details>
 
 
 <!-- AVAILABLE-TOOLSETS-RESOURCES-END -->
