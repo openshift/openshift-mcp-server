@@ -19,6 +19,7 @@ Choose the guide that matches your needs:
 ## Configuration
 
 - **[Configuration Reference](configuration.md)** - Complete reference for TOML configuration files, including all options, drop-in configuration, and dynamic reload
+- **[Configuration Changes](configuration-changes.md)** - Versioned record of configuration migrations between releases
 
 ## Toolset Guides
 
@@ -51,6 +52,5 @@ Living documentation for implemented and planned features:
 ## Reference
 
 - **[Main README](../README.md)** - Project overview and general information
-
 
 
