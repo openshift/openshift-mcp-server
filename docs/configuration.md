@@ -154,7 +154,6 @@ The server will:
 | `require_tls` | boolean | `false` | When `true`, enforces TLS for all connections. Server refuses to start without TLS certificates, and outbound connections to non-HTTPS endpoints (e.g., Kiali) are rejected. |
 | `tls_min_version` | string | `""` | Minimum TLS version (e.g., `"1.2"`, `"1.3"`; `"1.0"` and `"1.1"` are accepted for operator parity but not recommended). Defaults to TLS 1.2 if not set. Can be overridden by `TLS_MIN_VERSION`. Applies to inbound HTTPS and outbound clients (Kiali, NetObserv, OAuth, token exchange, well-known metadata). |
 | `tls_cipher_suites` | array | `[]` | TLS 1.2 cipher suites (TLS 1.3 cipher suites are not configurable). If empty, Go's defaults are used. Can be overridden by `TLS_CIPHER_SUITES` (comma-separated). Applies to inbound HTTPS and outbound clients. |
-
 **Example:**
 ```toml
 log_level = 2
@@ -367,7 +366,7 @@ Toolsets group related tools together. Enable only the toolsets you need to redu
 | observability/otelcol | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                                                                              |         |
 | observability/traces  | Distributed tracing tools for discovering Tempo instances, searching and retrieving traces, and exploring trace attributes.                                                                                                             |         |
 | openshift             | OpenShift-specific tools for cluster management and troubleshooting                                                                                                                                                                     |         |
-| openshift/mustgather  | Analyze OpenShift must-gather archives offline without a live cluster connection                                                                                                                                                        |         |
+| openshift/mustgather  | Analyze OpenShift must-gather archives offline without a live cluster connection. Call mustgather_list first to discover available archives and their archive_id, then pass that ID to the other mustgather_* tools.                    |         |
 | ossm                  | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                                                                         |         |
 | ovn-kubernetes        | OVN-Kubernetes CNI network troubleshooting tools                                                                                                                                                                                        |         |
 | tekton                | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, TaskRuns, and troubleshooting.                                                                                                                                     |         |
@@ -384,30 +383,6 @@ toolsets = ["core", "config", "helm", "kubevirt"]
 
 <!-- AVAILABLE-TOOLSETS-RESOURCES-START -->
 
-<details>
-
-<summary>openshift/mustgather</summary>
-
-- **must-gather** - Loaded must-gather archive metadata
-  - URI: `must-gather://current`
-  - MIME Type: `text/plain`
-- **must-gather-namespaces** - List of all namespaces in the must-gather archive
-  - URI: `must-gather://current/namespaces`
-  - MIME Type: `text/plain`
-- **must-gather-etcd-members** - ETCD cluster member list from the must-gather archive
-  - URI: `must-gather://current/etcd/members`
-  - MIME Type: `application/json`
-- **must-gather-etcd-endpoint-status** - ETCD endpoint status from the must-gather archive
-  - URI: `must-gather://current/etcd/endpoint-status`
-  - MIME Type: `application/json`
-- **must-gather-prometheus-config** - Prometheus configuration summary from the must-gather archive
-  - URI: `must-gather://current/prometheus/config`
-  - MIME Type: `text/plain`
-- **must-gather-alertmanager-status** - AlertManager status from the must-gather archive
-  - URI: `must-gather://current/alertmanager/status`
-  - MIME Type: `text/plain`
-</details>
-
 
 <!-- AVAILABLE-TOOLSETS-RESOURCES-END -->
 
@@ -419,8 +394,26 @@ toolsets = ["core", "config", "helm", "kubevirt"]
 
 <summary>openshift/mustgather</summary>
 
+- **must-gather** - Loaded must-gather archive metadata. Use the archive_id from mustgather_list.
+  - URI Template: `must-gather://local/{archive_id}`
+  - MIME Type: `text/plain`
+- **must-gather-namespaces** - List of all namespaces in the must-gather archive
+  - URI Template: `must-gather://local/{archive_id}/namespaces`
+  - MIME Type: `text/plain`
+- **must-gather-etcd-members** - ETCD cluster member list from the must-gather archive
+  - URI Template: `must-gather://local/{archive_id}/etcd/members`
+  - MIME Type: `application/json`
+- **must-gather-etcd-endpoint-status** - ETCD endpoint status from the must-gather archive
+  - URI Template: `must-gather://local/{archive_id}/etcd/endpoint-status`
+  - MIME Type: `application/json`
+- **must-gather-prometheus-config** - Prometheus configuration summary from the must-gather archive
+  - URI Template: `must-gather://local/{archive_id}/prometheus/config`
+  - MIME Type: `text/plain`
+- **must-gather-alertmanager-status** - AlertManager status from the must-gather archive
+  - URI Template: `must-gather://local/{archive_id}/alertmanager/status`
+  - MIME Type: `text/plain`
 - **must-gather-resource** - A specific Kubernetes resource from the must-gather archive as YAML. Use '-' for empty group (core API) or cluster-scoped namespace.
-  - URI Template: `must-gather://current/resources/{group}/{version}/{kind}/{namespace}/{name}`
+  - URI Template: `must-gather://local/{archive_id}/resources/{group}/{version}/{kind}/{namespace}/{name}`
   - MIME Type: `text/yaml`
 </details>
 
@@ -766,6 +759,12 @@ allowed_registries = ["oci://ghcr.io/myorg", "https://charts.example.com"]
 storage_driver = "configmap"
 ```
 
+**Example (OpenShift Must-Gather):**
+```toml
+[toolset_configs."openshift/mustgather"]
+mustgather_dirs = ["/var/data/must-gather", "/home/user/downloads/must-gather.local.123"]
+```
+
 #### Helm Configuration
 
 | Field | Type | Description |
@@ -775,6 +774,12 @@ storage_driver = "configmap"
 
 The Helm toolset supports an optional `allowed_registries` allowlist to restrict which registries
 `helm_install` can fetch charts from.
+
+#### OpenShift Must-Gather Configuration
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mustgather_dirs` | string array | Directories the `openshift/mustgather` toolset scans for must-gather archives. Each entry may be a directory containing must-gather archives as sub-directories, or a directory that is itself an archive. Archives are addressed by the stable `archive_id` returned by `mustgather_list`. |
 
 **Behavior:**
 
@@ -906,6 +911,10 @@ url = "https://kiali.example.com"
 # [toolset_configs."observability/logs"]
 # [toolset_configs."observability/traces"]
 # [toolset_configs."observability/otelcol"]
+
+# OpenShift must-gather toolset — directories scanned for must-gather archives
+# [toolset_configs."openshift/mustgather"]
+# mustgather_dirs = ["/var/data/must-gather"]
 
 [toolset_configs.helm]
 allowed_registries = ["oci://ghcr.io/myorg", "https://charts.example.com"]

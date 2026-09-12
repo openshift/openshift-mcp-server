@@ -14,6 +14,7 @@ import (
 )
 
 const maxScanLineSize = 1024 * 1024 // 1 MB
+const maxOutputSize = 10 * 1024 * 1024
 
 func initPodLogs() []api.ServerTool {
 	return []api.ServerTool{
@@ -28,13 +29,14 @@ func initPodLogs() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
-						"namespace": {Type: "string", Description: "Pod namespace"},
-						"pod":       {Type: "string", Description: "Pod name"},
-						"container": {Type: "string", Description: "Container name (uses first container if not specified)"},
-						"previous":  {Type: "boolean", Description: "Get previous container logs (from crash/restart)"},
-						"tail":      {Type: "integer", Description: "Number of lines from end of logs (0 for all)"},
+						"archive_id": archiveIDProperty(),
+						"namespace":  {Type: "string", Description: "Pod namespace"},
+						"pod":        {Type: "string", Description: "Pod name"},
+						"container":  {Type: "string", Description: "Container name (uses first container if not specified)"},
+						"previous":   {Type: "boolean", Description: "Get previous container logs (from crash/restart)"},
+						"tail":       {Type: "integer", Description: "Number of lines from end of logs (0 for all)"},
 					},
-					Required: []string{"namespace", "pod"},
+					Required: []string{"archive_id", "namespace", "pod"},
 				},
 			},
 			Handler:      mustgatherPodLogsGet,
@@ -51,6 +53,7 @@ func initPodLogs() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
+						"archive_id":      archiveIDProperty(),
 						"namespace":       {Type: "string", Description: "Pod namespace"},
 						"pod":             {Type: "string", Description: "Pod name"},
 						"container":       {Type: "string", Description: "Container name (uses first container if not specified)"},
@@ -59,7 +62,7 @@ func initPodLogs() []api.ServerTool {
 						"tail":            {Type: "integer", Description: "Maximum number of matching lines to return (0 for all)"},
 						"caseInsensitive": {Type: "boolean", Description: "Perform case-insensitive search (default: false)"},
 					},
-					Required: []string{"namespace", "pod", "filter"},
+					Required: []string{"archive_id", "namespace", "pod", "filter"},
 				},
 			},
 			Handler:      mustgatherPodLogsGrep,
@@ -76,15 +79,16 @@ func initPodLogs() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
-						"namespace": {Type: "string", Description: "Pod namespace"},
-						"pod":       {Type: "string", Description: "Pod name"},
-						"container": {Type: "string", Description: "Container name (uses first container if not specified)"},
-						"since":     {Type: "string", Description: "Start time in RFC3339 format (e.g. 2026-01-15T10:00:00Z)"},
-						"until":     {Type: "string", Description: "End time in RFC3339 format (e.g. 2026-01-15T12:00:00Z)"},
-						"previous":  {Type: "boolean", Description: "Search previous container logs (from crash/restart)"},
-						"limit":     {Type: "integer", Description: "Maximum number of lines to return (default: 500)"},
+						"archive_id": archiveIDProperty(),
+						"namespace":  {Type: "string", Description: "Pod namespace"},
+						"pod":        {Type: "string", Description: "Pod name"},
+						"container":  {Type: "string", Description: "Container name (uses first container if not specified)"},
+						"since":      {Type: "string", Description: "Start time in RFC3339 format (e.g. 2026-01-15T10:00:00Z)"},
+						"until":      {Type: "string", Description: "End time in RFC3339 format (e.g. 2026-01-15T12:00:00Z)"},
+						"previous":   {Type: "boolean", Description: "Search previous container logs (from crash/restart)"},
+						"limit":      {Type: "integer", Description: "Maximum number of lines to return (default: 500)"},
 					},
-					Required: []string{"namespace", "pod", "since"},
+					Required: []string{"archive_id", "namespace", "pod", "since"},
 				},
 			},
 			Handler:      mustgatherPodLogsByTime,
@@ -94,12 +98,13 @@ func initPodLogs() []api.ServerTool {
 }
 
 func mustgatherPodLogsGet(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	args := params.GetArguments()
+	id := getString(args, "archive_id", "")
+	p, err := providerForArchive(id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
 
-	args := params.GetArguments()
 	namespace := getString(args, "namespace", "")
 	pod := getString(args, "pod", "")
 	container := getString(args, "container", "")
@@ -115,15 +120,68 @@ func mustgatherPodLogsGet(params api.ToolHandlerParams) (*api.ToolCallResult, er
 		logType = mg.LogTypePrevious
 	}
 
-	logs, err := p.GetPodLog(mg.PodLogOptions{
+	logPath, err := p.GetPodLogPath(mg.PodLogOptions{
 		Namespace: namespace,
 		Pod:       pod,
 		Container: container,
 		LogType:   logType,
-		TailLines: tail,
 	})
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get pod logs: %w", err)), nil
+	}
+
+	f, err := os.Open(logPath)
+	if err != nil {
+		return api.NewToolCallResult("", fmt.Errorf("failed to open log file: %w", err)), nil
+	}
+	defer func() { _ = f.Close() }()
+
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), maxScanLineSize)
+
+	var logs string
+	if tail > 0 {
+		ring := make([]string, 0, tail)
+		var ringIdx int
+		for scanner.Scan() {
+			if len(ring) < tail {
+				ring = append(ring, scanner.Text())
+			} else {
+				ring[ringIdx] = scanner.Text()
+				ringIdx = (ringIdx + 1) % tail
+			}
+		}
+		if len(ring) == tail {
+			ordered := make([]string, tail)
+			for i := range tail {
+				ordered[i] = ring[(ringIdx+i)%tail]
+			}
+			ring = ordered
+		}
+		logs = strings.Join(ring, "\n")
+	} else {
+		var sb strings.Builder
+		lineCount := 0
+		truncated := false
+		for scanner.Scan() {
+			line := scanner.Text()
+			if sb.Len()+len(line)+1 > maxOutputSize {
+				sb.WriteString("\n... [output truncated at 10 MB, use 'tail' parameter to limit]")
+				truncated = true
+				break
+			}
+			if lineCount > 0 {
+				sb.WriteByte('\n')
+			}
+			sb.WriteString(line)
+			lineCount++
+		}
+		_ = truncated
+		logs = sb.String()
+	}
+
+	if err := scanner.Err(); err != nil {
+		return api.NewToolCallResult("", fmt.Errorf("failed to read log file: %w", err)), nil
 	}
 
 	header := fmt.Sprintf("Logs for pod %s/%s", namespace, pod)
@@ -142,12 +200,13 @@ func mustgatherPodLogsGet(params api.ToolHandlerParams) (*api.ToolCallResult, er
 }
 
 func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	args := params.GetArguments()
+	id := getString(args, "archive_id", "")
+	p, err := providerForArchive(id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
 
-	args := params.GetArguments()
 	namespace := getString(args, "namespace", "")
 	pod := getString(args, "pod", "")
 	container := getString(args, "container", "")
@@ -251,12 +310,13 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 }
 
 func mustgatherPodLogsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	args := params.GetArguments()
+	id := getString(args, "archive_id", "")
+	p, err := providerForArchive(id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
 
-	args := params.GetArguments()
 	namespace := getString(args, "namespace", "")
 	pod := getString(args, "pod", "")
 	container := getString(args, "container", "")

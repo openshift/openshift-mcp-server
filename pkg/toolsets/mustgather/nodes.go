@@ -23,11 +23,12 @@ func initNodes() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
+						"archive_id":  archiveIDProperty(),
 						"node":        {Type: "string", Description: "Node name"},
 						"include":     {Type: "string", Description: "Comma-separated diagnostics to include: kubelet,sysinfo,cpu,irq,pods,podresources,lscpu,lspci,dmesg,cmdline (default: all)"},
 						"kubeletTail": {Type: "integer", Description: "Number of lines from end of kubelet log (0 for all, default: 100)"},
 					},
-					Required: []string{"node"},
+					Required: []string{"archive_id", "node"},
 				},
 			},
 			Handler:      mustgatherNodeDiagnosticsGet,
@@ -44,10 +45,11 @@ func initNodes() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
-						"node": {Type: "string", Description: "Node name"},
-						"tail": {Type: "integer", Description: "Number of lines from end (0 for all)"},
+						"archive_id": archiveIDProperty(),
+						"node":       {Type: "string", Description: "Node name"},
+						"tail":       {Type: "integer", Description: "Number of lines from end (0 for all)"},
 					},
-					Required: []string{"node"},
+					Required: []string{"archive_id", "node"},
 				},
 			},
 			Handler:      mustgatherNodeKubeletLogs,
@@ -64,12 +66,13 @@ func initNodes() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
+						"archive_id":      archiveIDProperty(),
 						"node":            {Type: "string", Description: "Node name"},
 						"filter":          {Type: "string", Description: "String to search for in log lines"},
 						"tail":            {Type: "integer", Description: "Maximum number of matching lines to return (0 for all)"},
 						"caseInsensitive": {Type: "boolean", Description: "Perform case-insensitive search (default: false)"},
 					},
-					Required: []string{"node", "filter"},
+					Required: []string{"archive_id", "node", "filter"},
 				},
 			},
 			Handler:      mustgatherNodeKubeletLogsGrep,
@@ -79,12 +82,13 @@ func initNodes() []api.ServerTool {
 }
 
 func mustgatherNodeDiagnosticsGet(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	args := params.GetArguments()
+	id := getString(args, "archive_id", "")
+	p, err := providerForArchive(id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
 
-	args := params.GetArguments()
 	node := getString(args, "node", "")
 	include := getString(args, "include", "all")
 	kubeletTail := getInt(args, "kubeletTail", 100)
@@ -146,12 +150,13 @@ func mustgatherNodeDiagnosticsGet(params api.ToolHandlerParams) (*api.ToolCallRe
 }
 
 func mustgatherNodeKubeletLogs(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	args := params.GetArguments()
+	id := getString(args, "archive_id", "")
+	p, err := providerForArchive(id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
 
-	args := params.GetArguments()
 	node := getString(args, "node", "")
 	tail := getInt(args, "tail", 0)
 
@@ -183,12 +188,13 @@ func mustgatherNodeKubeletLogs(params api.ToolHandlerParams) (*api.ToolCallResul
 }
 
 func mustgatherNodeKubeletLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	p, err := getProvider()
+	args := params.GetArguments()
+	id := getString(args, "archive_id", "")
+	p, err := providerForArchive(id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
 
-	args := params.GetArguments()
 	node := getString(args, "node", "")
 	filter := getString(args, "filter", "")
 	tail := getInt(args, "tail", 0)
