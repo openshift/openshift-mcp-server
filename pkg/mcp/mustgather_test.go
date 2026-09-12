@@ -1,15 +1,16 @@
 package mcp
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/BurntSushi/toml"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
 )
 
@@ -67,10 +68,19 @@ message: sample event
 	s.archiveID, err = mg.ArchiveIDFromPath(abs)
 	s.Require().NoError(err)
 
-	s.Require().NoError(toml.Unmarshal([]byte(`
+	// toolset_configs requires the two-phase parsing performed by config.ReadToml,
+	// so we replace s.Cfg and restore the runtime fields the suite already set.
+	kubeConfig := s.Cfg.KubeConfig
+	listOutput := s.Cfg.ListOutput
+	cfg, err := config.ReadToml([]byte(fmt.Sprintf(`
 		toolsets = [ "openshift/mustgather" ]
-	`), s.Cfg), "Expected to parse toolsets config")
-	s.Cfg.MustGatherDirs = []string{root}
+		[toolset_configs."openshift/mustgather"]
+		mustgather_dirs = [ "%s" ]
+	`, root)))
+	s.Require().NoError(err, "Expected to parse toolset config")
+	s.Cfg = cfg
+	s.Cfg.KubeConfig = kubeConfig
+	s.Cfg.ListOutput = listOutput
 }
 
 func (s *MustGatherSuite) TestList() {

@@ -84,7 +84,7 @@ func initNodes() []api.ServerTool {
 func mustgatherNodeDiagnosticsGet(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	id := getString(args, "archive_id", "")
-	p, err := providerForArchive(params, id)
+	p, err := providerForArchive(id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -152,7 +152,7 @@ func mustgatherNodeDiagnosticsGet(params api.ToolHandlerParams) (*api.ToolCallRe
 func mustgatherNodeKubeletLogs(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	id := getString(args, "archive_id", "")
-	p, err := providerForArchive(params, id)
+	p, err := providerForArchive(id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -190,7 +190,7 @@ func mustgatherNodeKubeletLogs(params api.ToolHandlerParams) (*api.ToolCallResul
 func mustgatherNodeKubeletLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	id := getString(args, "archive_id", "")
-	p, err := providerForArchive(params, id)
+	p, err := providerForArchive(id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}

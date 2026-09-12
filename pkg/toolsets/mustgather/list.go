@@ -40,10 +40,10 @@ func initList() []api.ServerTool {
 	}
 }
 
-func mustgatherList(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	dirs := params.GetMustGatherDirs()
+func mustgatherList(_ api.ToolHandlerParams) (*api.ToolCallResult, error) {
+	dirs := toolsetDirs()
 	if len(dirs) == 0 {
-		return api.NewToolCallResult("", fmt.Errorf("no must-gather directories configured; set --mustgather-dirs (or mustgather_dirs in config) to a directory containing must-gather archives")), nil
+		return api.NewToolCallResult("", fmt.Errorf("no must-gather directories configured; set mustgather_dirs in the [toolset_configs.\"openshift/mustgather\"] section of the config file to a directory containing must-gather archives")), nil
 	}
 
 	archives := discoverArchives(dirs)

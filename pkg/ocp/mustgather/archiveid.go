@@ -27,12 +27,12 @@ func ArchiveIDFromPath(path string) (string, error) {
 		return "", fmt.Errorf("cannot derive archive ID from empty path")
 	}
 
-	parent, leaf := trimmed, ""
+	var parent, leaf string
 	if i := strings.LastIndex(trimmed, "/"); i >= 0 {
 		parent, leaf = trimmed[:i], trimmed[i+1:]
 	} else {
 		// No separator: the whole string is the leaf, parent is empty.
-		parent, leaf = "", trimmed
+		leaf = trimmed
 	}
 
 	return fmt.Sprintf("mg-%s-%s", shortHash(parent)[:4], shortHash(leaf)), nil

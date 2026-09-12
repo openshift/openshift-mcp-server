@@ -56,7 +56,7 @@ func initEtcd() []api.ServerTool {
 func mustgatherETCDHealth(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	id := getString(args, "archive_id", "")
-	p, err := providerForArchive(params, id)
+	p, err := providerForArchive(id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -93,7 +93,7 @@ func mustgatherETCDHealth(params api.ToolHandlerParams) (*api.ToolCallResult, er
 func mustgatherETCDObjectCount(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	id := getString(args, "archive_id", "")
-	p, err := providerForArchive(params, id)
+	p, err := providerForArchive(id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}

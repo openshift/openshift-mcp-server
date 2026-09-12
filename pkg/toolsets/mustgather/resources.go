@@ -45,7 +45,7 @@ func initResources() []api.ServerTool {
 func mustgatherResourcesList(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	id := getString(args, "archive_id", "")
-	p, err := providerForArchive(params, id)
+	p, err := providerForArchive(id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}

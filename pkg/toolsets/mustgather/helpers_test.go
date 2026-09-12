@@ -28,7 +28,7 @@ func (s *RegistrySuite) SetupTest() {
 }
 
 func (s *RegistrySuite) TearDownTest() {
-	os.RemoveAll(s.archiveDir)
+	_ = os.RemoveAll(s.archiveDir)
 }
 
 func (s *RegistrySuite) TestLazyInit() {
@@ -56,7 +56,7 @@ func (s *RegistrySuite) TestMultipleArchives() {
 	s.Run("loads different providers for different paths", func() {
 		dir2, err := os.MkdirTemp("", "mustgather-test2-*")
 		s.Require().NoError(err)
-		defer os.RemoveAll(dir2)
+		defer func() { _ = os.RemoveAll(dir2) }()
 
 		p1, err := loadProvider(s.archiveDir)
 		s.Require().NoError(err)
@@ -107,18 +107,14 @@ func (s *RegistrySuite) TestEmptyArchive() {
 
 func (s *RegistrySuite) TestProviderForArchive() {
 	s.Run("returns error when id is empty", func() {
-		_, err := providerForArchive(&stubDirsConfig{dirs: []string{s.archiveDir}}, "")
+		current.Store(&Config{MustGatherDirs: []string{s.archiveDir}})
+		defer current.Store(nil)
+
+		_, err := providerForArchive("")
 		s.Error(err)
 		s.Contains(err.Error(), "archive_id is required")
 	})
 }
-
-// stubDirsConfig is a minimal api.MustGatherDirsProvider for unit tests.
-type stubDirsConfig struct {
-	dirs []string
-}
-
-func (s *stubDirsConfig) GetMustGatherDirs() []string { return s.dirs }
 
 func TestRegistry(t *testing.T) {
 	suite.Run(t, new(RegistrySuite))

@@ -86,8 +86,8 @@ func discoverArchives(dirs []string) []ArchiveInfo {
 
 // discoveryCache caches ID→path resolutions for a short window so that repeated
 // tool calls don't re-scan the filesystem on every request. The cache is keyed
-// by the directory set it was built from, so a different --mustgather-dirs never
-// yields stale results.
+// by the directory set it was built from, so a different mustgather_dirs
+// never yields stale results.
 type discoveryCache struct {
 	mu     sync.Mutex
 	scanAt time.Time
@@ -122,7 +122,7 @@ func resolveArchivePath(dirs []string, id string) (string, error) {
 		return "", err
 	}
 	if len(dirs) == 0 {
-		return "", fmt.Errorf("no must-gather directories configured; set --mustgather-dirs (or mustgather_dirs in config) to a directory containing must-gather archives")
+		return "", fmt.Errorf("no must-gather directories configured; set mustgather_dirs in the [toolset_configs.\"openshift/mustgather\"] section of the config file to a directory containing must-gather archives")
 	}
 
 	scanCache.mu.Lock()

@@ -154,8 +154,6 @@ The server will:
 | `require_tls` | boolean | `false` | When `true`, enforces TLS for all connections. Server refuses to start without TLS certificates, and outbound connections to non-HTTPS endpoints (e.g., Kiali) are rejected. |
 | `tls_min_version` | string | `""` | Minimum TLS version (e.g., `"1.2"`, `"1.3"`; `"1.0"` and `"1.1"` are accepted for operator parity but not recommended). Defaults to TLS 1.2 if not set. Can be overridden by `TLS_MIN_VERSION`. Applies to inbound HTTPS and outbound clients (Kiali, NetObserv, OAuth, token exchange, well-known metadata). |
 | `tls_cipher_suites` | array | `[]` | TLS 1.2 cipher suites (TLS 1.3 cipher suites are not configurable). If empty, Go's defaults are used. Can be overridden by `TLS_CIPHER_SUITES` (comma-separated). Applies to inbound HTTPS and outbound clients. |
-| `mustgather_dirs` | array | `[]` | Directories the `openshift/mustgather` toolset scans for must-gather archives. Each entry may be a directory containing must-gather archives as sub-directories, or a directory that is itself an archive. Archives are addressed by the stable `archive_id` returned by `mustgather_list`. |
-
 **Example:**
 ```toml
 log_level = 2
@@ -164,9 +162,6 @@ port = "8080"
 metrics_port = "9090"  # Separate port for metrics/stats (e.g. for network policy isolation)
 list_output = "yaml"
 stateless = true
-
-# Directories scanned for must-gather archives (openshift/mustgather toolset)
-mustgather_dirs = ["/var/data/must-gather", "/home/user/downloads/must-gather.local.123"]
 
 # Enable TLS for HTTPS
 tls_cert = "/etc/tls/tls.crt"
@@ -764,6 +759,12 @@ allowed_registries = ["oci://ghcr.io/myorg", "https://charts.example.com"]
 storage_driver = "configmap"
 ```
 
+**Example (OpenShift Must-Gather):**
+```toml
+[toolset_configs."openshift/mustgather"]
+mustgather_dirs = ["/var/data/must-gather", "/home/user/downloads/must-gather.local.123"]
+```
+
 #### Helm Configuration
 
 | Field | Type | Description |
@@ -773,6 +774,12 @@ storage_driver = "configmap"
 
 The Helm toolset supports an optional `allowed_registries` allowlist to restrict which registries
 `helm_install` can fetch charts from.
+
+#### OpenShift Must-Gather Configuration
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mustgather_dirs` | string array | Directories the `openshift/mustgather` toolset scans for must-gather archives. Each entry may be a directory containing must-gather archives as sub-directories, or a directory that is itself an archive. Archives are addressed by the stable `archive_id` returned by `mustgather_list`. |
 
 **Behavior:**
 
@@ -824,7 +831,6 @@ The following options can be set via command-line arguments. CLI arguments overr
 | `--tls-cert` | Path to TLS certificate file for HTTPS (must be used with `--tls-key`) |
 | `--tls-key` | Path to TLS private key file for HTTPS (must be used with `--tls-cert`) |
 | `--require-tls` | Enforce TLS for server and all outbound connections |
-| `--mustgather-dirs` | Directories the `openshift/mustgather` toolset scans for must-gather archives (repeatable or comma-separated) |
 
 ## Complete Example
 
@@ -905,6 +911,10 @@ url = "https://kiali.example.com"
 # [toolset_configs."observability/logs"]
 # [toolset_configs."observability/traces"]
 # [toolset_configs."observability/otelcol"]
+
+# OpenShift must-gather toolset — directories scanned for must-gather archives
+# [toolset_configs."openshift/mustgather"]
+# mustgather_dirs = ["/var/data/must-gather"]
 
 [toolset_configs.helm]
 allowed_registries = ["oci://ghcr.io/myorg", "https://charts.example.com"]

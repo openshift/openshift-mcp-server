@@ -133,10 +133,8 @@ type ResourceContent struct {
 
 // ResourceHandler is called when a client reads a resource.
 // Session state (auth, request context) is available on ctx via sessionInjectionMiddleware.
-// cfg is the live server configuration snapshot, giving handlers access to
-// settings such as the must-gather directories.
 // Handlers should return a ResourceContent with exactly one of Text or Blob set.
-type ResourceHandler func(ctx context.Context, cfg BaseConfig) (*ResourceContent, error)
+type ResourceHandler func(ctx context.Context) (*ResourceContent, error)
 
 // ServerResource represents a resource that can be registered with the MCP server.
 type ServerResource struct {
@@ -154,11 +152,9 @@ type ResourceTemplate struct {
 
 // ResourceTemplateHandler is called when a client reads a resource matching a template.
 // Session state (auth, request context) is available on ctx via sessionInjectionMiddleware.
-// cfg is the live server configuration snapshot, giving handlers access to
-// settings such as the must-gather directories.
 // The uri parameter is the actual resource URI that matches the template.
 // Handlers should return a ResourceContent with exactly one of Text or Blob set.
-type ResourceTemplateHandler func(ctx context.Context, cfg BaseConfig, uri string) (*ResourceContent, error)
+type ResourceTemplateHandler func(ctx context.Context, uri string) (*ResourceContent, error)
 
 // ServerResourceTemplate represents a resource template that can be registered with the MCP server.
 type ServerResourceTemplate struct {

@@ -5,7 +5,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
 
 	"golang.org/x/sync/singleflight"
@@ -49,14 +48,14 @@ func loadProvider(path string) (*mg.Provider, error) {
 	return result.(*mg.Provider), nil
 }
 
-// providerForArchive resolves a must-gather archive ID to its provider using the
-// directories configured via --mustgather-dirs. It is the stateless entry point
-// shared by all mustgather_* tool handlers.
-func providerForArchive(cfg api.MustGatherDirsProvider, id string) (*mg.Provider, error) {
+// providerForArchive resolves a must-gather archive ID to its provider using
+// the directories from the mustgather_dirs toolset config. It is the stateless
+// entry point shared by all mustgather_* tool and resource handlers.
+func providerForArchive(id string) (*mg.Provider, error) {
 	if id == "" {
 		return nil, fmt.Errorf("archive_id is required; call mustgather_list to discover available archives")
 	}
-	path, err := resolveArchivePath(cfg.GetMustGatherDirs(), id)
+	path, err := resolveArchivePath(toolsetDirs(), id)
 	if err != nil {
 		return nil, err
 	}

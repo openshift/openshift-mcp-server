@@ -100,7 +100,7 @@ func initPodLogs() []api.ServerTool {
 func mustgatherPodLogsGet(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	id := getString(args, "archive_id", "")
-	p, err := providerForArchive(params, id)
+	p, err := providerForArchive(id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -202,7 +202,7 @@ func mustgatherPodLogsGet(params api.ToolHandlerParams) (*api.ToolCallResult, er
 func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	id := getString(args, "archive_id", "")
-	p, err := providerForArchive(params, id)
+	p, err := providerForArchive(id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -312,7 +312,7 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 func mustgatherPodLogsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	id := getString(args, "archive_id", "")
-	p, err := providerForArchive(params, id)
+	p, err := providerForArchive(id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
