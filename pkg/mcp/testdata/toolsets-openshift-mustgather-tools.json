@@ -8,13 +8,13 @@
     "description": "Get ETCD cluster health status including endpoint health and active alarms from the must-gather archive",
     "inputSchema": {
       "properties": {
-        "must_gather_archive_id": {
+        "archive_id": {
           "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         }
       },
       "required": [
-        "must_gather_archive_id"
+        "archive_id"
       ],
       "type": "object"
     },
@@ -30,17 +30,17 @@
     "description": "Get ETCD object counts by resource type from the must-gather archive",
     "inputSchema": {
       "properties": {
+        "archive_id": {
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "type": "string"
+        },
         "limit": {
           "description": "Maximum number of resource types to show (default: 50, sorted by count descending)",
           "type": "integer"
-        },
-        "must_gather_archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
-          "type": "string"
         }
       },
       "required": [
-        "must_gather_archive_id"
+        "archive_id"
       ],
       "type": "object"
     },
@@ -56,12 +56,12 @@
     "description": "Get all events related to a specific Kubernetes resource from the must-gather archive",
     "inputSchema": {
       "properties": {
-        "kind": {
-          "description": "Resource kind (optional, narrows search)",
+        "archive_id": {
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
-        "must_gather_archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+        "kind": {
+          "description": "Resource kind (optional, narrows search)",
           "type": "string"
         },
         "name": {
@@ -74,7 +74,7 @@
         }
       },
       "required": [
-        "must_gather_archive_id",
+        "archive_id",
         "name"
       ],
       "type": "object"
@@ -91,13 +91,13 @@
     "description": "List Kubernetes events from the must-gather archive within a specific time range, sorted chronologically",
     "inputSchema": {
       "properties": {
+        "archive_id": {
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "type": "string"
+        },
         "limit": {
           "description": "Maximum number of events to return (default: 200)",
           "type": "integer"
-        },
-        "must_gather_archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
-          "type": "string"
         },
         "namespace": {
           "description": "Filter by namespace",
@@ -122,7 +122,7 @@
         }
       },
       "required": [
-        "must_gather_archive_id",
+        "archive_id",
         "since"
       ],
       "type": "object"
@@ -139,13 +139,13 @@
     "description": "List Kubernetes events from the must-gather archive with optional filtering by type, namespace, resource, and reason",
     "inputSchema": {
       "properties": {
+        "archive_id": {
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "type": "string"
+        },
         "limit": {
           "description": "Maximum number of events to return (default: 100)",
           "type": "integer"
-        },
-        "must_gather_archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
-          "type": "string"
         },
         "namespace": {
           "description": "Filter by namespace",
@@ -170,7 +170,7 @@
         }
       },
       "required": [
-        "must_gather_archive_id"
+        "archive_id"
       ],
       "type": "object"
     },
@@ -183,7 +183,7 @@
       "readOnlyHint": true,
       "title": "List Must-Gather Archives"
     },
-    "description": "List the must-gather archives discovered under the configured directories. Returns each archive's must_gather_archive_id, which must be passed to the other mustgather_* tools.",
+    "description": "List the must-gather archives discovered under the configured directories. Returns each archive's archive_id, which must be passed to the other mustgather_* tools.",
     "inputSchema": {
       "properties": {},
       "type": "object"
@@ -200,7 +200,7 @@
     "description": "Get active Prometheus alerts from the must-gather archive",
     "inputSchema": {
       "properties": {
-        "must_gather_archive_id": {
+        "archive_id": {
           "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
@@ -210,7 +210,7 @@
         }
       },
       "required": [
-        "must_gather_archive_id"
+        "archive_id"
       ],
       "type": "object"
     },
@@ -226,7 +226,7 @@
     "description": "Get Prometheus alerting and recording rules from the must-gather archive",
     "inputSchema": {
       "properties": {
-        "must_gather_archive_id": {
+        "archive_id": {
           "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
@@ -236,7 +236,7 @@
         }
       },
       "required": [
-        "must_gather_archive_id"
+        "archive_id"
       ],
       "type": "object"
     },
@@ -252,7 +252,7 @@
     "description": "Get Prometheus TSDB and runtime status from the must-gather archive",
     "inputSchema": {
       "properties": {
-        "must_gather_archive_id": {
+        "archive_id": {
           "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
@@ -262,7 +262,7 @@
         }
       },
       "required": [
-        "must_gather_archive_id"
+        "archive_id"
       ],
       "type": "object"
     },
@@ -278,12 +278,12 @@
     "description": "Get Prometheus scrape targets and their health status from the must-gather archive",
     "inputSchema": {
       "properties": {
-        "health": {
-          "description": "Filter by health status: up, down, unknown (default: all)",
+        "archive_id": {
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
-        "must_gather_archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+        "health": {
+          "description": "Filter by health status: up, down, unknown (default: all)",
           "type": "string"
         },
         "replica": {
@@ -292,7 +292,7 @@
         }
       },
       "required": [
-        "must_gather_archive_id"
+        "archive_id"
       ],
       "type": "object"
     },
@@ -308,13 +308,13 @@
     "description": "Get detailed Prometheus TSDB statistics including top metrics by series count and label cardinality",
     "inputSchema": {
       "properties": {
+        "archive_id": {
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "type": "string"
+        },
         "limit": {
           "description": "Number of top entries to show per category (default: 10)",
           "type": "integer"
-        },
-        "must_gather_archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
-          "type": "string"
         },
         "replica": {
           "description": "Prometheus replica (0, 1, or all). Default: 0",
@@ -322,7 +322,7 @@
         }
       },
       "required": [
-        "must_gather_archive_id"
+        "archive_id"
       ],
       "type": "object"
     },
@@ -338,6 +338,10 @@
     "description": "Get comprehensive diagnostic information for a specific node including kubelet logs, system info, CPU/IRQ affinities, and hardware details",
     "inputSchema": {
       "properties": {
+        "archive_id": {
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "type": "string"
+        },
         "include": {
           "description": "Comma-separated diagnostics to include: kubelet,sysinfo,cpu,irq,pods,podresources,lscpu,lspci,dmesg,cmdline (default: all)",
           "type": "string"
@@ -346,17 +350,13 @@
           "description": "Number of lines from end of kubelet log (0 for all, default: 100)",
           "type": "integer"
         },
-        "must_gather_archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
-          "type": "string"
-        },
         "node": {
           "description": "Node name",
           "type": "string"
         }
       },
       "required": [
-        "must_gather_archive_id",
+        "archive_id",
         "node"
       ],
       "type": "object"
@@ -373,7 +373,7 @@
     "description": "Get kubelet logs for a specific node (decompressed from .gz file)",
     "inputSchema": {
       "properties": {
-        "must_gather_archive_id": {
+        "archive_id": {
           "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
@@ -387,7 +387,7 @@
         }
       },
       "required": [
-        "must_gather_archive_id",
+        "archive_id",
         "node"
       ],
       "type": "object"
@@ -404,16 +404,16 @@
     "description": "Filter kubelet logs for a specific node by a search string. Returns only matching lines.",
     "inputSchema": {
       "properties": {
+        "archive_id": {
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "type": "string"
+        },
         "caseInsensitive": {
           "description": "Perform case-insensitive search (default: false)",
           "type": "boolean"
         },
         "filter": {
           "description": "String to search for in log lines",
-          "type": "string"
-        },
-        "must_gather_archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
         "node": {
@@ -426,7 +426,7 @@
         }
       },
       "required": [
-        "must_gather_archive_id",
+        "archive_id",
         "node",
         "filter"
       ],
@@ -444,6 +444,10 @@
     "description": "Get pod container logs within a specific time range. Each log line is expected to have an RFC3339Nano timestamp prefix (from kubectl logs --timestamps).",
     "inputSchema": {
       "properties": {
+        "archive_id": {
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "type": "string"
+        },
         "container": {
           "description": "Container name (uses first container if not specified)",
           "type": "string"
@@ -451,10 +455,6 @@
         "limit": {
           "description": "Maximum number of lines to return (default: 500)",
           "type": "integer"
-        },
-        "must_gather_archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
-          "type": "string"
         },
         "namespace": {
           "description": "Pod namespace",
@@ -478,7 +478,7 @@
         }
       },
       "required": [
-        "must_gather_archive_id",
+        "archive_id",
         "namespace",
         "pod",
         "since"
@@ -497,12 +497,12 @@
     "description": "Get container logs for a specific pod from the must-gather archive. Returns current or previous logs.",
     "inputSchema": {
       "properties": {
-        "container": {
-          "description": "Container name (uses first container if not specified)",
+        "archive_id": {
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
-        "must_gather_archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+        "container": {
+          "description": "Container name (uses first container if not specified)",
           "type": "string"
         },
         "namespace": {
@@ -523,7 +523,7 @@
         }
       },
       "required": [
-        "must_gather_archive_id",
+        "archive_id",
         "namespace",
         "pod"
       ],
@@ -541,6 +541,10 @@
     "description": "Filter pod container logs by a search string. Returns only matching lines from the must-gather archive.",
     "inputSchema": {
       "properties": {
+        "archive_id": {
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "type": "string"
+        },
         "caseInsensitive": {
           "description": "Perform case-insensitive search (default: false)",
           "type": "boolean"
@@ -551,10 +555,6 @@
         },
         "filter": {
           "description": "String to search for in log lines",
-          "type": "string"
-        },
-        "must_gather_archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
         "namespace": {
@@ -575,7 +575,7 @@
         }
       },
       "required": [
-        "must_gather_archive_id",
+        "archive_id",
         "namespace",
         "pod",
         "filter"
@@ -598,6 +598,10 @@
           "description": "API version (default: v1)",
           "type": "string"
         },
+        "archive_id": {
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "type": "string"
+        },
         "fieldSelector": {
           "description": "Field selector (e.g., metadata.name=foo)",
           "type": "string"
@@ -614,17 +618,13 @@
           "description": "Maximum number of resources to return (0 for all)",
           "type": "integer"
         },
-        "must_gather_archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
-          "type": "string"
-        },
         "namespace": {
           "description": "Filter by namespace",
           "type": "string"
         }
       },
       "required": [
-        "must_gather_archive_id",
+        "archive_id",
         "kind"
       ],
       "type": "object"

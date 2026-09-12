@@ -89,8 +89,8 @@ func (s *MustGatherSuite) TestResourcesList() {
 	s.InitMcpClient()
 	s.Run("mustgather_resources_list resolves archive by ID", func() {
 		result, err := s.CallTool("mustgather_resources_list", map[string]interface{}{
-			"must_gather_archive_id": s.archiveID,
-			"kind":                   "ConfigMap",
+			"archive_id": s.archiveID,
+			"kind":       "ConfigMap",
 		})
 		s.Require().NoError(err)
 		s.Require().False(result.IsError, "expected resources_list not to be an error")
@@ -99,8 +99,8 @@ func (s *MustGatherSuite) TestResourcesList() {
 	})
 	s.Run("mustgather_resources_list errors on unknown archive ID", func() {
 		result, err := s.CallTool("mustgather_resources_list", map[string]interface{}{
-			"must_gather_archive_id": "mg-0000-00000000",
-			"kind":                   "ConfigMap",
+			"archive_id": "mg-0000-00000000",
+			"kind":       "ConfigMap",
 		})
 		s.Require().NoError(err)
 		s.True(result.IsError, "expected an error result for an unknown archive ID")
@@ -112,7 +112,7 @@ func (s *MustGatherSuite) TestEventsList() {
 	s.InitMcpClient()
 	s.Run("mustgather_events_list resolves archive by ID", func() {
 		result, err := s.CallTool("mustgather_events_list", map[string]interface{}{
-			"must_gather_archive_id": s.archiveID,
+			"archive_id": s.archiveID,
 		})
 		s.Require().NoError(err)
 		s.Require().False(result.IsError, "expected events_list not to be an error")

@@ -109,7 +109,7 @@ func (s *RegistrySuite) TestProviderForArchive() {
 	s.Run("returns error when id is empty", func() {
 		_, err := providerForArchive(&stubDirsConfig{dirs: []string{s.archiveDir}}, "")
 		s.Error(err)
-		s.Contains(err.Error(), "must_gather_archive_id is required")
+		s.Contains(err.Error(), "archive_id is required")
 	})
 }
 

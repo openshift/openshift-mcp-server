@@ -154,7 +154,7 @@ The server will:
 | `require_tls` | boolean | `false` | When `true`, enforces TLS for all connections. Server refuses to start without TLS certificates, and outbound connections to non-HTTPS endpoints (e.g., Kiali) are rejected. |
 | `tls_min_version` | string | `""` | Minimum TLS version (e.g., `"1.2"`, `"1.3"`; `"1.0"` and `"1.1"` are accepted for operator parity but not recommended). Defaults to TLS 1.2 if not set. Can be overridden by `TLS_MIN_VERSION`. Applies to inbound HTTPS and outbound clients (Kiali, NetObserv, OAuth, token exchange, well-known metadata). |
 | `tls_cipher_suites` | array | `[]` | TLS 1.2 cipher suites (TLS 1.3 cipher suites are not configurable). If empty, Go's defaults are used. Can be overridden by `TLS_CIPHER_SUITES` (comma-separated). Applies to inbound HTTPS and outbound clients. |
-| `mustgather_dirs` | array | `[]` | Directories the `openshift/mustgather` toolset scans for must-gather archives. Each entry may be a directory containing must-gather archives as sub-directories, or a directory that is itself an archive. Archives are addressed by the stable `must_gather_archive_id` returned by `mustgather_list`. |
+| `mustgather_dirs` | array | `[]` | Directories the `openshift/mustgather` toolset scans for must-gather archives. Each entry may be a directory containing must-gather archives as sub-directories, or a directory that is itself an archive. Archives are addressed by the stable `archive_id` returned by `mustgather_list`. |
 
 **Example:**
 ```toml
@@ -371,7 +371,7 @@ Toolsets group related tools together. Enable only the toolsets you need to redu
 | observability/otelcol | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                                                                              |         |
 | observability/traces  | Distributed tracing tools for discovering Tempo instances, searching and retrieving traces, and exploring trace attributes.                                                                                                             |         |
 | openshift             | OpenShift-specific tools for cluster management and troubleshooting                                                                                                                                                                     |         |
-| openshift/mustgather  | Analyze OpenShift must-gather archives offline without a live cluster connection. Call mustgather_list first to discover available archives and their must_gather_archive_id, then pass that ID to the other mustgather_* tools.        |         |
+| openshift/mustgather  | Analyze OpenShift must-gather archives offline without a live cluster connection. Call mustgather_list first to discover available archives and their archive_id, then pass that ID to the other mustgather_* tools.                    |         |
 | ossm                  | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                                                                         |         |
 | ovn-kubernetes        | OVN-Kubernetes CNI network troubleshooting tools                                                                                                                                                                                        |         |
 | tekton                | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, TaskRuns, and troubleshooting.                                                                                                                                     |         |
@@ -399,7 +399,7 @@ toolsets = ["core", "config", "helm", "kubevirt"]
 
 <summary>openshift/mustgather</summary>
 
-- **must-gather** - Loaded must-gather archive metadata. Use the must_gather_archive_id from mustgather_list as {archive_id}.
+- **must-gather** - Loaded must-gather archive metadata. Use the archive_id from mustgather_list.
   - URI Template: `must-gather://local/{archive_id}`
   - MIME Type: `text/plain`
 - **must-gather-namespaces** - List of all namespaces in the must-gather archive

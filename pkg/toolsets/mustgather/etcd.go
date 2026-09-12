@@ -22,9 +22,9 @@ func initEtcd() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
-						"must_gather_archive_id": archiveIDProperty(),
+						"archive_id": archiveIDProperty(),
 					},
-					Required: []string{"must_gather_archive_id"},
+					Required: []string{"archive_id"},
 				},
 			},
 			Handler:      mustgatherETCDHealth,
@@ -41,10 +41,10 @@ func initEtcd() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
-						"must_gather_archive_id": archiveIDProperty(),
-						"limit":                  {Type: "integer", Description: "Maximum number of resource types to show (default: 50, sorted by count descending)"},
+						"archive_id": archiveIDProperty(),
+						"limit":      {Type: "integer", Description: "Maximum number of resource types to show (default: 50, sorted by count descending)"},
 					},
-					Required: []string{"must_gather_archive_id"},
+					Required: []string{"archive_id"},
 				},
 			},
 			Handler:      mustgatherETCDObjectCount,
@@ -55,7 +55,7 @@ func initEtcd() []api.ServerTool {
 
 func mustgatherETCDHealth(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
-	id := getString(args, "must_gather_archive_id", "")
+	id := getString(args, "archive_id", "")
 	p, err := providerForArchive(params, id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
@@ -92,7 +92,7 @@ func mustgatherETCDHealth(params api.ToolHandlerParams) (*api.ToolCallResult, er
 
 func mustgatherETCDObjectCount(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
-	id := getString(args, "must_gather_archive_id", "")
+	id := getString(args, "archive_id", "")
 	p, err := providerForArchive(params, id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil

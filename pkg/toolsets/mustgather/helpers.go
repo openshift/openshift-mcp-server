@@ -54,7 +54,7 @@ func loadProvider(path string) (*mg.Provider, error) {
 // shared by all mustgather_* tool handlers.
 func providerForArchive(cfg api.MustGatherDirsProvider, id string) (*mg.Provider, error) {
 	if id == "" {
-		return nil, fmt.Errorf("must_gather_archive_id is required; call mustgather_list to discover available archives")
+		return nil, fmt.Errorf("archive_id is required; call mustgather_list to discover available archives")
 	}
 	path, err := resolveArchivePath(cfg.GetMustGatherDirs(), id)
 	if err != nil {

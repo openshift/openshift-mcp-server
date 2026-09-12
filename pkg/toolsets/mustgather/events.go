@@ -29,14 +29,14 @@ func initEvents() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
-						"must_gather_archive_id": archiveIDProperty(),
-						"type":                   {Type: "string", Description: "Event type filter: all, Warning, Normal", Enum: []any{"all", "Warning", "Normal"}},
-						"namespace":              {Type: "string", Description: "Filter by namespace"},
-						"resource":               {Type: "string", Description: "Filter by involved resource name (partial match)"},
-						"reason":                 {Type: "string", Description: "Filter by event reason (partial match)"},
-						"limit":                  {Type: "integer", Description: "Maximum number of events to return (default: 100)"},
+						"archive_id": archiveIDProperty(),
+						"type":       {Type: "string", Description: "Event type filter: all, Warning, Normal", Enum: []any{"all", "Warning", "Normal"}},
+						"namespace":  {Type: "string", Description: "Filter by namespace"},
+						"resource":   {Type: "string", Description: "Filter by involved resource name (partial match)"},
+						"reason":     {Type: "string", Description: "Filter by event reason (partial match)"},
+						"limit":      {Type: "integer", Description: "Maximum number of events to return (default: 100)"},
 					},
-					Required: []string{"must_gather_archive_id"},
+					Required: []string{"archive_id"},
 				},
 			},
 			Handler:      mustgatherEventsList,
@@ -53,12 +53,12 @@ func initEvents() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
-						"must_gather_archive_id": archiveIDProperty(),
-						"name":                   {Type: "string", Description: "Resource name"},
-						"namespace":              {Type: "string", Description: "Resource namespace"},
-						"kind":                   {Type: "string", Description: "Resource kind (optional, narrows search)"},
+						"archive_id": archiveIDProperty(),
+						"name":       {Type: "string", Description: "Resource name"},
+						"namespace":  {Type: "string", Description: "Resource namespace"},
+						"kind":       {Type: "string", Description: "Resource kind (optional, narrows search)"},
 					},
-					Required: []string{"must_gather_archive_id", "name"},
+					Required: []string{"archive_id", "name"},
 				},
 			},
 			Handler:      mustgatherEventsByResource,
@@ -75,14 +75,14 @@ func initEvents() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
-						"must_gather_archive_id": archiveIDProperty(),
-						"since":                  {Type: "string", Description: "Start time in RFC3339 format (e.g. 2026-01-15T10:00:00Z)"},
-						"until":                  {Type: "string", Description: "End time in RFC3339 format (e.g. 2026-01-15T12:00:00Z)"},
-						"namespace":              {Type: "string", Description: "Filter by namespace"},
-						"type":                   {Type: "string", Description: "Event type filter: all, Warning, Normal", Enum: []any{"all", "Warning", "Normal"}},
-						"limit":                  {Type: "integer", Description: "Maximum number of events to return (default: 200)"},
+						"archive_id": archiveIDProperty(),
+						"since":      {Type: "string", Description: "Start time in RFC3339 format (e.g. 2026-01-15T10:00:00Z)"},
+						"until":      {Type: "string", Description: "End time in RFC3339 format (e.g. 2026-01-15T12:00:00Z)"},
+						"namespace":  {Type: "string", Description: "Filter by namespace"},
+						"type":       {Type: "string", Description: "Event type filter: all, Warning, Normal", Enum: []any{"all", "Warning", "Normal"}},
+						"limit":      {Type: "integer", Description: "Maximum number of events to return (default: 200)"},
 					},
-					Required: []string{"must_gather_archive_id", "since"},
+					Required: []string{"archive_id", "since"},
 				},
 			},
 			Handler:      mustgatherEventsByTime,
@@ -93,7 +93,7 @@ func initEvents() []api.ServerTool {
 
 func mustgatherEventsList(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
-	id := getString(args, "must_gather_archive_id", "")
+	id := getString(args, "archive_id", "")
 	p, err := providerForArchive(params, id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
@@ -165,7 +165,7 @@ func mustgatherEventsList(params api.ToolHandlerParams) (*api.ToolCallResult, er
 
 func mustgatherEventsByResource(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
-	id := getString(args, "must_gather_archive_id", "")
+	id := getString(args, "archive_id", "")
 	p, err := providerForArchive(params, id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
@@ -222,7 +222,7 @@ func mustgatherEventsByResource(params api.ToolHandlerParams) (*api.ToolCallResu
 
 func mustgatherEventsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
-	id := getString(args, "must_gather_archive_id", "")
+	id := getString(args, "archive_id", "")
 	p, err := providerForArchive(params, id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil

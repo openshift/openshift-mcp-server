@@ -28,7 +28,7 @@ func initMCPResourceTemplates() []api.ServerResourceTemplate {
 			ResourceTemplate: api.ResourceTemplate{
 				URITemplate: "must-gather://local/{archive_id}",
 				Name:        "must-gather",
-				Description: "Loaded must-gather archive metadata. Use the must_gather_archive_id from mustgather_list as {archive_id}.",
+				Description: "Loaded must-gather archive metadata. Use the archive_id from mustgather_list.",
 				MIMEType:    "text/plain",
 			},
 			Handler: resourceCurrentArchive,

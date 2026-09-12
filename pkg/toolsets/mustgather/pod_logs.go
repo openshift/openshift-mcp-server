@@ -29,14 +29,14 @@ func initPodLogs() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
-						"must_gather_archive_id": archiveIDProperty(),
-						"namespace":              {Type: "string", Description: "Pod namespace"},
-						"pod":                    {Type: "string", Description: "Pod name"},
-						"container":              {Type: "string", Description: "Container name (uses first container if not specified)"},
-						"previous":               {Type: "boolean", Description: "Get previous container logs (from crash/restart)"},
-						"tail":                   {Type: "integer", Description: "Number of lines from end of logs (0 for all)"},
+						"archive_id": archiveIDProperty(),
+						"namespace":  {Type: "string", Description: "Pod namespace"},
+						"pod":        {Type: "string", Description: "Pod name"},
+						"container":  {Type: "string", Description: "Container name (uses first container if not specified)"},
+						"previous":   {Type: "boolean", Description: "Get previous container logs (from crash/restart)"},
+						"tail":       {Type: "integer", Description: "Number of lines from end of logs (0 for all)"},
 					},
-					Required: []string{"must_gather_archive_id", "namespace", "pod"},
+					Required: []string{"archive_id", "namespace", "pod"},
 				},
 			},
 			Handler:      mustgatherPodLogsGet,
@@ -53,16 +53,16 @@ func initPodLogs() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
-						"must_gather_archive_id": archiveIDProperty(),
-						"namespace":              {Type: "string", Description: "Pod namespace"},
-						"pod":                    {Type: "string", Description: "Pod name"},
-						"container":              {Type: "string", Description: "Container name (uses first container if not specified)"},
-						"filter":                 {Type: "string", Description: "String to search for in log lines"},
-						"previous":               {Type: "boolean", Description: "Search previous container logs (from crash/restart)"},
-						"tail":                   {Type: "integer", Description: "Maximum number of matching lines to return (0 for all)"},
-						"caseInsensitive":        {Type: "boolean", Description: "Perform case-insensitive search (default: false)"},
+						"archive_id":      archiveIDProperty(),
+						"namespace":       {Type: "string", Description: "Pod namespace"},
+						"pod":             {Type: "string", Description: "Pod name"},
+						"container":       {Type: "string", Description: "Container name (uses first container if not specified)"},
+						"filter":          {Type: "string", Description: "String to search for in log lines"},
+						"previous":        {Type: "boolean", Description: "Search previous container logs (from crash/restart)"},
+						"tail":            {Type: "integer", Description: "Maximum number of matching lines to return (0 for all)"},
+						"caseInsensitive": {Type: "boolean", Description: "Perform case-insensitive search (default: false)"},
 					},
-					Required: []string{"must_gather_archive_id", "namespace", "pod", "filter"},
+					Required: []string{"archive_id", "namespace", "pod", "filter"},
 				},
 			},
 			Handler:      mustgatherPodLogsGrep,
@@ -79,16 +79,16 @@ func initPodLogs() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
-						"must_gather_archive_id": archiveIDProperty(),
-						"namespace":              {Type: "string", Description: "Pod namespace"},
-						"pod":                    {Type: "string", Description: "Pod name"},
-						"container":              {Type: "string", Description: "Container name (uses first container if not specified)"},
-						"since":                  {Type: "string", Description: "Start time in RFC3339 format (e.g. 2026-01-15T10:00:00Z)"},
-						"until":                  {Type: "string", Description: "End time in RFC3339 format (e.g. 2026-01-15T12:00:00Z)"},
-						"previous":               {Type: "boolean", Description: "Search previous container logs (from crash/restart)"},
-						"limit":                  {Type: "integer", Description: "Maximum number of lines to return (default: 500)"},
+						"archive_id": archiveIDProperty(),
+						"namespace":  {Type: "string", Description: "Pod namespace"},
+						"pod":        {Type: "string", Description: "Pod name"},
+						"container":  {Type: "string", Description: "Container name (uses first container if not specified)"},
+						"since":      {Type: "string", Description: "Start time in RFC3339 format (e.g. 2026-01-15T10:00:00Z)"},
+						"until":      {Type: "string", Description: "End time in RFC3339 format (e.g. 2026-01-15T12:00:00Z)"},
+						"previous":   {Type: "boolean", Description: "Search previous container logs (from crash/restart)"},
+						"limit":      {Type: "integer", Description: "Maximum number of lines to return (default: 500)"},
 					},
-					Required: []string{"must_gather_archive_id", "namespace", "pod", "since"},
+					Required: []string{"archive_id", "namespace", "pod", "since"},
 				},
 			},
 			Handler:      mustgatherPodLogsByTime,
@@ -99,7 +99,7 @@ func initPodLogs() []api.ServerTool {
 
 func mustgatherPodLogsGet(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
-	id := getString(args, "must_gather_archive_id", "")
+	id := getString(args, "archive_id", "")
 	p, err := providerForArchive(params, id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
@@ -201,7 +201,7 @@ func mustgatherPodLogsGet(params api.ToolHandlerParams) (*api.ToolCallResult, er
 
 func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
-	id := getString(args, "must_gather_archive_id", "")
+	id := getString(args, "archive_id", "")
 	p, err := providerForArchive(params, id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
@@ -311,7 +311,7 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 
 func mustgatherPodLogsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
-	id := getString(args, "must_gather_archive_id", "")
+	id := getString(args, "archive_id", "")
 	p, err := providerForArchive(params, id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil

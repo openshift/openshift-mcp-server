@@ -15,7 +15,7 @@ func (t *Toolset) GetName() string {
 }
 
 func (t *Toolset) GetDescription() string {
-	return "Analyze OpenShift must-gather archives offline without a live cluster connection. Call mustgather_list first to discover available archives and their must_gather_archive_id, then pass that ID to the other mustgather_* tools."
+	return "Analyze OpenShift must-gather archives offline without a live cluster connection. Call mustgather_list first to discover available archives and their archive_id, then pass that ID to the other mustgather_* tools."
 }
 
 func (t *Toolset) GetTools(_ api.FilteringProvider) []api.ServerTool {

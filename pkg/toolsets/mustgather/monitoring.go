@@ -23,10 +23,10 @@ func initMonitoring() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
-						"must_gather_archive_id": archiveIDProperty(),
-						"replica":                {Type: "string", Description: "Prometheus replica (0, 1, or all). Default: all"},
+						"archive_id": archiveIDProperty(),
+						"replica":    {Type: "string", Description: "Prometheus replica (0, 1, or all). Default: all"},
 					},
-					Required: []string{"must_gather_archive_id"},
+					Required: []string{"archive_id"},
 				},
 			},
 			Handler:      mustgatherMonitoringPrometheusStatus,
@@ -43,11 +43,11 @@ func initMonitoring() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
-						"must_gather_archive_id": archiveIDProperty(),
-						"replica":                {Type: "string", Description: "Prometheus replica (0, 1, or all). Default: 0"},
-						"health":                 {Type: "string", Description: "Filter by health status: up, down, unknown (default: all)"},
+						"archive_id": archiveIDProperty(),
+						"replica":    {Type: "string", Description: "Prometheus replica (0, 1, or all). Default: 0"},
+						"health":     {Type: "string", Description: "Filter by health status: up, down, unknown (default: all)"},
 					},
-					Required: []string{"must_gather_archive_id"},
+					Required: []string{"archive_id"},
 				},
 			},
 			Handler:      mustgatherMonitoringPrometheusTargets,
@@ -64,11 +64,11 @@ func initMonitoring() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
-						"must_gather_archive_id": archiveIDProperty(),
-						"replica":                {Type: "string", Description: "Prometheus replica (0, 1, or all). Default: 0"},
-						"limit":                  {Type: "integer", Description: "Number of top entries to show per category (default: 10)"},
+						"archive_id": archiveIDProperty(),
+						"replica":    {Type: "string", Description: "Prometheus replica (0, 1, or all). Default: 0"},
+						"limit":      {Type: "integer", Description: "Number of top entries to show per category (default: 10)"},
 					},
-					Required: []string{"must_gather_archive_id"},
+					Required: []string{"archive_id"},
 				},
 			},
 			Handler:      mustgatherMonitoringPrometheusTSDB,
@@ -85,10 +85,10 @@ func initMonitoring() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
-						"must_gather_archive_id": archiveIDProperty(),
-						"state":                  {Type: "string", Description: "Filter by alert state: firing, pending (default: all)"},
+						"archive_id": archiveIDProperty(),
+						"state":      {Type: "string", Description: "Filter by alert state: firing, pending (default: all)"},
 					},
-					Required: []string{"must_gather_archive_id"},
+					Required: []string{"archive_id"},
 				},
 			},
 			Handler:      mustgatherMonitoringPrometheusAlerts,
@@ -105,10 +105,10 @@ func initMonitoring() []api.ServerTool {
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
-						"must_gather_archive_id": archiveIDProperty(),
-						"type":                   {Type: "string", Description: "Filter by rule type: alerting, recording (default: all)"},
+						"archive_id": archiveIDProperty(),
+						"type":       {Type: "string", Description: "Filter by rule type: alerting, recording (default: all)"},
 					},
-					Required: []string{"must_gather_archive_id"},
+					Required: []string{"archive_id"},
 				},
 			},
 			Handler:      mustgatherMonitoringPrometheusRules,
@@ -119,7 +119,7 @@ func initMonitoring() []api.ServerTool {
 
 func mustgatherMonitoringPrometheusStatus(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
-	id := getString(args, "must_gather_archive_id", "")
+	id := getString(args, "archive_id", "")
 	p, err := providerForArchive(params, id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
@@ -167,7 +167,7 @@ func mustgatherMonitoringPrometheusStatus(params api.ToolHandlerParams) (*api.To
 
 func mustgatherMonitoringPrometheusTargets(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
-	id := getString(args, "must_gather_archive_id", "")
+	id := getString(args, "archive_id", "")
 	p, err := providerForArchive(params, id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
@@ -225,7 +225,7 @@ func mustgatherMonitoringPrometheusTargets(params api.ToolHandlerParams) (*api.T
 
 func mustgatherMonitoringPrometheusTSDB(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
-	id := getString(args, "must_gather_archive_id", "")
+	id := getString(args, "archive_id", "")
 	p, err := providerForArchive(params, id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
@@ -261,7 +261,7 @@ func mustgatherMonitoringPrometheusTSDB(params api.ToolHandlerParams) (*api.Tool
 
 func mustgatherMonitoringPrometheusAlerts(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
-	id := getString(args, "must_gather_archive_id", "")
+	id := getString(args, "archive_id", "")
 	p, err := providerForArchive(params, id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
@@ -330,7 +330,7 @@ func mustgatherMonitoringPrometheusAlerts(params api.ToolHandlerParams) (*api.To
 
 func mustgatherMonitoringPrometheusRules(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
-	id := getString(args, "must_gather_archive_id", "")
+	id := getString(args, "archive_id", "")
 	p, err := providerForArchive(params, id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil

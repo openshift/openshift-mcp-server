@@ -9,12 +9,12 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// archiveIDDescription is the shared description for the must_gather_archive_id
+// archiveIDDescription is the shared description for the archive_id
 // argument used by every mustgather_* tool.
 const archiveIDDescription = "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives."
 
 // archiveIDProperty returns the JSON schema property for the required
-// must_gather_archive_id argument.
+// archive_id argument.
 func archiveIDProperty() *jsonschema.Schema {
 	return &jsonschema.Schema{Type: "string", Description: archiveIDDescription}
 }
@@ -24,7 +24,7 @@ func initList() []api.ServerTool {
 		{
 			Tool: api.Tool{
 				Name:        "mustgather_list",
-				Description: "List the must-gather archives discovered under the configured directories. Returns each archive's must_gather_archive_id, which must be passed to the other mustgather_* tools.",
+				Description: "List the must-gather archives discovered under the configured directories. Returns each archive's archive_id, which must be passed to the other mustgather_* tools.",
 				Annotations: api.ToolAnnotations{
 					Title:        "List Must-Gather Archives",
 					ReadOnlyHint: ptr.To(true),
@@ -54,7 +54,7 @@ func mustgatherList(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Found %d must-gather archive(s):\n\n", len(archives))
 	for _, a := range archives {
-		fmt.Fprintf(&b, "- must_gather_archive_id: %s\n", a.ID)
+		fmt.Fprintf(&b, "- archive_id: %s\n", a.ID)
 		fmt.Fprintf(&b, "  path: local://%s\n", a.Path)
 		if a.Version != "" {
 			fmt.Fprintf(&b, "  version: %s\n", a.Version)
@@ -64,7 +64,7 @@ func mustgatherList(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		}
 		b.WriteString("\n")
 	}
-	b.WriteString("Pass the must_gather_archive_id value to the other mustgather_* tools (e.g. mustgather_resources_list, mustgather_pod_logs_get).\n")
+	b.WriteString("Pass the archive_id value to the other mustgather_* tools (e.g. mustgather_resources_list, mustgather_pod_logs_get).\n")
 
 	return api.NewToolCallResult(b.String(), nil), nil
 }
