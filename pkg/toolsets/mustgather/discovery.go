@@ -39,7 +39,7 @@ func discoverArchives(dirs []string) []ArchiveInfo {
 		if err != nil {
 			abs = path
 		}
-		id, err := mg.ArchiveIDFromPath(abs)
+		id, err := mg.ArchiveIDFromLocalPath(abs)
 		if err != nil || seen[id] {
 			return
 		}
@@ -118,7 +118,7 @@ func (c *discoveryCache) rescan(dirs []string) {
 // returned error lists the currently known IDs so the caller (LLM) can
 // self-correct.
 func resolveArchivePath(dirs []string, id string) (string, error) {
-	if _, _, err := mg.ParseArchiveID(id); err != nil {
+	if err := mg.IsValidArchiveID(id); err != nil {
 		return "", err
 	}
 	if len(dirs) == 0 {

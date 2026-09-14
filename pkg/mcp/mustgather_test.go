@@ -65,7 +65,7 @@ message: sample event
 	abs, err := filepath.Abs(archive)
 	s.Require().NoError(err)
 	s.archivePath = abs
-	s.archiveID, err = mg.ArchiveIDFromPath(abs)
+	s.archiveID, err = mg.ArchiveIDFromLocalPath(abs)
 	s.Require().NoError(err)
 
 	// toolset_configs requires the two-phase parsing performed by config.ReadToml,

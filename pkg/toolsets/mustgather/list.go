@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
 	"github.com/google/jsonschema-go/jsonschema"
 	"k8s.io/utils/ptr"
 )
@@ -55,7 +56,7 @@ func mustgatherList(_ api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	fmt.Fprintf(&b, "Found %d must-gather archive(s):\n\n", len(archives))
 	for _, a := range archives {
 		fmt.Fprintf(&b, "- archive_id: %s\n", a.ID)
-		fmt.Fprintf(&b, "  path: local://%s\n", a.Path)
+		fmt.Fprintf(&b, "  path: %s%s\n", mg.LocalURIPrefix, a.Path)
 		if a.Version != "" {
 			fmt.Fprintf(&b, "  version: %s\n", a.Version)
 		}

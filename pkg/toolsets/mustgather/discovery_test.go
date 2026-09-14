@@ -56,7 +56,7 @@ func (s *DiscoverySuite) TestDiscoverArchives() {
 		s.Equal("4.12", byPath[a1].Version)
 		s.Equal("2026-09-12T09:01:02Z", byPath[a2].Timestamp)
 		for _, a := range archives {
-			id, err := mg.ArchiveIDFromPath(a.Path)
+			id, err := mg.ArchiveIDFromLocalPath(a.Path)
 			s.Require().NoError(err)
 			s.Equal(id, a.ID)
 		}
@@ -98,7 +98,7 @@ func (s *DiscoverySuite) TestDiscoverArchives() {
 func (s *DiscoverySuite) TestResolveArchivePath() {
 	root := s.T().TempDir()
 	a1 := s.makeArchive(root, "must-gather.aaa", "4.12", "")
-	id1, err := mg.ArchiveIDFromPath(a1)
+	id1, err := mg.ArchiveIDFromLocalPath(a1)
 	s.Require().NoError(err)
 
 	s.Run("resolves a known ID", func() {
@@ -127,7 +127,7 @@ func (s *DiscoverySuite) TestResolveArchivePath() {
 	s.Run("re-scans when a cached archive is deleted", func() {
 		tmp := s.T().TempDir()
 		a := s.makeArchive(tmp, "must-gather.tmp", "4.9", "")
-		id, err := mg.ArchiveIDFromPath(a)
+		id, err := mg.ArchiveIDFromLocalPath(a)
 		s.Require().NoError(err)
 
 		path, err := resolveArchivePath([]string{tmp}, id)

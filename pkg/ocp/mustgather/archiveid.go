@@ -1,56 +1,59 @@
 package mustgather
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
-	"hash/fnv"
 	"regexp"
 	"strings"
 )
 
-// archiveIDPattern matches the canonical must-gather archive ID form:
-// "mg-" + 4 hex digits (parent hash) + "-" + 8 hex digits (leaf hash).
-var archiveIDPattern = regexp.MustCompile(`^mg-([0-9a-f]{4})-([0-9a-f]{8})$`)
+// MustGatherArchiveIDPattern matches the canonical must-gather archive ID form:
+// "mg-" + 12 hex digits (truncated SHA-256 of the archive URI).
+var MustGatherArchiveIDPattern = regexp.MustCompile(`^mg-[0-9a-f]{12}`)
 
-// ArchiveIDFromPath derives a compact, deterministic archive ID from a
-// filesystem path. Both the path's parent directory and its leaf name are
-// hashed with FNV-1a (32-bit); the parent contributes 16 bits (disambiguates
-// the containing directory) and the leaf 32 bits (identifies the archive):
+// LocalURIPrefix is the source-URI prefix for local-filesystem archives.
+// Archive IDs are derived from the full source URI so that remote sources
+// (e.g. gs://, s3://) can be added without changing the ID scheme.
+const LocalURIPrefix = "local://"
+
+// ArchiveIDFromURI derives a compact, deterministic archive ID from an
+// archive source URI (e.g. local:///data/archives/mg..., gs://bucket/mg...)
+// by truncating the SHA-256 of the full URI:
 //
-//	ID = "mg-" + shortHash(parent)[:4hex] + "-" + shortHash(leaf)
+//	ID = "mg-" + hex(sha256(uri))[:12]
 //
-// The raw path string is hashed as-is (only trailing slashes are trimmed); no
-// scheme normalization is performed, so callers must strip any "local://"-style
-// scheme before calling. An error is returned for an empty path.
-func ArchiveIDFromPath(path string) (string, error) {
+// The 12 hex digits (48 bits) give a collision probability of ~2^-48 between
+// any two distinct URIs. The URI is hashed as-is (only trailing slashes are
+// trimmed); no normalization is performed. An error is returned for an empty
+// URI.
+func ArchiveIDFromURI(uri string) (string, error) {
+	trimmed := strings.TrimRight(uri, "/")
+	if trimmed == "" {
+		return "", fmt.Errorf("cannot derive archive ID from empty URI")
+	}
+
+	sum := sha256.Sum256([]byte(trimmed))
+	h := hex.EncodeToString(sum[:6])
+	return fmt.Sprintf("mg-%s", h), nil
+}
+
+// ArchiveIDFromLocalPath derives an archive ID from a local filesystem path by
+// hashing its local:// source URI, i.e. ArchiveIDFromURI(LocalURIPrefix+path).
+// An error is returned for an empty path.
+func ArchiveIDFromLocalPath(path string) (string, error) {
 	trimmed := strings.TrimRight(path, "/")
 	if trimmed == "" {
 		return "", fmt.Errorf("cannot derive archive ID from empty path")
 	}
-
-	var parent, leaf string
-	if i := strings.LastIndex(trimmed, "/"); i >= 0 {
-		parent, leaf = trimmed[:i], trimmed[i+1:]
-	} else {
-		// No separator: the whole string is the leaf, parent is empty.
-		leaf = trimmed
-	}
-
-	return fmt.Sprintf("mg-%s-%s", shortHash(parent)[:4], shortHash(leaf)), nil
+	return ArchiveIDFromURI(LocalURIPrefix + trimmed)
 }
 
-// ParseArchiveID validates an archive ID and returns its parent and leaf hash
-// components. It returns an error if id is not of the form mg-XXXX-YYYYYYYY.
-func ParseArchiveID(id string) (parentHash, leafHash string, err error) {
-	m := archiveIDPattern.FindStringSubmatch(id)
-	if m == nil {
-		return "", "", fmt.Errorf("invalid must-gather archive ID %q: expected format mg-XXXX-YYYYYYYY (e.g. mg-3842-26d712f0)", id)
+// IsValidArchiveID validates an archive ID. It returns an error if id is not
+// of the form mg-XXXX-YYYYYYYY (12 hex digits).
+func IsValidArchiveID(id string) error {
+	if !MustGatherArchiveIDPattern.MatchString(id) {
+		return fmt.Errorf("invalid must-gather archive ID %q: expected format mg-XXXXYYYYYYYY (e.g. mg-384226d712f0)", id)
 	}
-	return m[1], m[2], nil
-}
-
-// shortHash returns the 8-hex-digit FNV-1a 32-bit hash of s.
-func shortHash(s string) string {
-	hash := fnv.New32a()
-	hash.Write([]byte(s))
-	return fmt.Sprintf("%08x", hash.Sum32())
+	return nil
 }
