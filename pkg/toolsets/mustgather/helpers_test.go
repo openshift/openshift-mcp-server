@@ -1,6 +1,7 @@
 package mustgather
 
 import (
+	"context"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -110,7 +111,7 @@ func (s *RegistrySuite) TestProviderForArchive() {
 		current.Store(&Config{MustGatherDirs: []string{s.archiveDir}})
 		defer current.Store(nil)
 
-		_, err := providerForArchive("")
+		_, err := providerForArchive(context.Background(), "")
 		s.Error(err)
 		s.Contains(err.Error(), "archive_id is required")
 	})

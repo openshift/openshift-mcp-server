@@ -109,7 +109,7 @@ func (s *MustGatherSuite) TestResourcesList() {
 	})
 	s.Run("mustgather_resources_list errors on unknown archive ID", func() {
 		result, err := s.CallTool("mustgather_resources_list", map[string]interface{}{
-			"archive_id": "mg-0000-00000000",
+			"archive_id": "mg-000000000000",
 			"kind":       "ConfigMap",
 		})
 		s.Require().NoError(err)

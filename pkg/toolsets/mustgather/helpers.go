@@ -1,6 +1,7 @@
 package mustgather
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -51,11 +52,11 @@ func loadProvider(path string) (*mg.Provider, error) {
 // providerForArchive resolves a must-gather archive ID to its provider using
 // the directories from the mustgather_dirs toolset config. It is the stateless
 // entry point shared by all mustgather_* tool and resource handlers.
-func providerForArchive(id string) (*mg.Provider, error) {
+func providerForArchive(ctx context.Context, id string) (*mg.Provider, error) {
 	if id == "" {
 		return nil, fmt.Errorf("archive_id is required; call mustgather_list to discover available archives")
 	}
-	path, err := resolveArchivePath(toolsetDirs(), id)
+	path, err := resolveArchivePath(ctx, toolsetDirs(), id)
 	if err != nil {
 		return nil, err
 	}

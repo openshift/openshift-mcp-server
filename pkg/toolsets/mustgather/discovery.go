@@ -1,6 +1,7 @@
 package mustgather
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 )
 
 // ArchiveInfo describes a discovered must-gather archive.
@@ -30,7 +32,8 @@ type ArchiveInfo struct {
 // A directory is treated as an archive if it contains a recognizable container
 // directory; otherwise its immediate children are inspected. Non-existent or
 // unreadable directories are skipped.
-func discoverArchives(dirs []string) []ArchiveInfo {
+func discoverArchives(ctx context.Context, dirs []string) []ArchiveInfo {
+	logger := klogutil.FromContext(ctx)
 	var archives []ArchiveInfo
 	seen := make(map[string]bool) // dedupe by ID (first-in-scan-order wins)
 
@@ -40,7 +43,12 @@ func discoverArchives(dirs []string) []ArchiveInfo {
 			abs = path
 		}
 		id, err := mg.ArchiveIDFromLocalPath(abs)
-		if err != nil || seen[id] {
+		if err != nil {
+			klogutil.LogWarn(logger, "skipping must-gather archive with undecidable ID", klogutil.Field("path", abs), klogutil.Err(err))
+			return
+		}
+		if seen[id] {
+			klogutil.LogWarn(logger, "skipping must-gather archive with duplicate ID (first match wins)", klogutil.Field("path", abs), klogutil.Field("archive_id", id))
 			return
 		}
 		seen[id] = true
@@ -100,8 +108,8 @@ const scanTTL = 30 * time.Second
 var scanCache = &discoveryCache{byID: make(map[string]string)}
 
 // rescan refreshes the cache for dirs. Caller must hold scanCache.mu.
-func (c *discoveryCache) rescan(dirs []string) {
-	archives := discoverArchives(dirs)
+func (c *discoveryCache) rescan(ctx context.Context, dirs []string) {
+	archives := discoverArchives(ctx, dirs)
 	byID := make(map[string]string, len(archives))
 	for _, a := range archives {
 		byID[a.ID] = a.Path
@@ -117,7 +125,7 @@ func (c *discoveryCache) rescan(dirs []string) {
 // exists on disk triggers a re-scan. When the ID still cannot be found, the
 // returned error lists the currently known IDs so the caller (LLM) can
 // self-correct.
-func resolveArchivePath(dirs []string, id string) (string, error) {
+func resolveArchivePath(ctx context.Context, dirs []string, id string) (string, error) {
 	if err := mg.IsValidArchiveID(id); err != nil {
 		return "", err
 	}
@@ -139,7 +147,7 @@ func resolveArchivePath(dirs []string, id string) (string, error) {
 	}
 
 	// Cold/stale cache, different dirs, or an ID miss: re-scan and retry once.
-	scanCache.rescan(dirs)
+	scanCache.rescan(ctx, dirs)
 	if path, ok := scanCache.byID[id]; ok {
 		return path, nil
 	}

@@ -1,6 +1,7 @@
 package mustgather
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -44,7 +45,7 @@ func (s *DiscoverySuite) TestDiscoverArchives() {
 		// A junk directory that is not an archive.
 		s.Require().NoError(os.MkdirAll(filepath.Join(root, "not-an-archive"), 0o755))
 
-		archives := discoverArchives([]string{root})
+		archives := discoverArchives(context.Background(), []string{root})
 		s.Require().Len(archives, 2)
 
 		byPath := map[string]ArchiveInfo{}
@@ -68,18 +69,18 @@ func (s *DiscoverySuite) TestDiscoverArchives() {
 		s.Require().NoError(os.MkdirAll(containerDir, 0o755))
 		s.Require().NoError(os.WriteFile(filepath.Join(containerDir, "version"), []byte("4.15"), 0o644))
 
-		archives := discoverArchives([]string{root})
+		archives := discoverArchives(context.Background(), []string{root})
 		s.Require().Len(archives, 1)
 		s.Equal("4.15", archives[0].Version)
 	})
 
 	s.Run("empty root returns nothing", func() {
-		archives := discoverArchives([]string{s.T().TempDir()})
+		archives := discoverArchives(context.Background(), []string{s.T().TempDir()})
 		s.Empty(archives)
 	})
 
 	s.Run("missing root is skipped", func() {
-		archives := discoverArchives([]string{filepath.Join(s.T().TempDir(), "does-not-exist")})
+		archives := discoverArchives(context.Background(), []string{filepath.Join(s.T().TempDir(), "does-not-exist")})
 		s.Empty(archives)
 	})
 
@@ -90,7 +91,7 @@ func (s *DiscoverySuite) TestDiscoverArchives() {
 		// absolute paths hash equal; here the absolute paths differ, so both show.
 		s.makeArchive(root1, "must-gather.x", "4.1", "")
 		s.makeArchive(root2, "must-gather.x", "4.2", "")
-		archives := discoverArchives([]string{root1, root2})
+		archives := discoverArchives(context.Background(), []string{root1, root2})
 		s.Len(archives, 2)
 	})
 }
@@ -102,24 +103,24 @@ func (s *DiscoverySuite) TestResolveArchivePath() {
 	s.Require().NoError(err)
 
 	s.Run("resolves a known ID", func() {
-		path, err := resolveArchivePath([]string{root}, id1)
+		path, err := resolveArchivePath(context.Background(), []string{root}, id1)
 		s.Require().NoError(err)
 		s.Equal(a1, path)
 	})
 
 	s.Run("unknown ID lists known IDs", func() {
-		_, err := resolveArchivePath([]string{root}, "mg-0000-00000000")
+		_, err := resolveArchivePath(context.Background(), []string{root}, "mg-000000000000")
 		s.Require().Error(err)
 		s.Contains(err.Error(), id1)
 	})
 
 	s.Run("invalid ID format errors", func() {
-		_, err := resolveArchivePath([]string{root}, "not-an-id")
+		_, err := resolveArchivePath(context.Background(), []string{root}, "not-an-id")
 		s.Error(err)
 	})
 
 	s.Run("no dirs configured errors", func() {
-		_, err := resolveArchivePath(nil, id1)
+		_, err := resolveArchivePath(context.Background(), nil, id1)
 		s.Require().Error(err)
 		s.Contains(err.Error(), "no must-gather directories configured")
 	})
@@ -130,13 +131,13 @@ func (s *DiscoverySuite) TestResolveArchivePath() {
 		id, err := mg.ArchiveIDFromLocalPath(a)
 		s.Require().NoError(err)
 
-		path, err := resolveArchivePath([]string{tmp}, id)
+		path, err := resolveArchivePath(context.Background(), []string{tmp}, id)
 		s.Require().NoError(err)
 		s.Equal(a, path)
 
 		// Delete the archive; the stale cache entry must not be returned.
 		s.Require().NoError(os.RemoveAll(a))
-		_, err = resolveArchivePath([]string{tmp}, id)
+		_, err = resolveArchivePath(context.Background(), []string{tmp}, id)
 		s.Error(err)
 	})
 }

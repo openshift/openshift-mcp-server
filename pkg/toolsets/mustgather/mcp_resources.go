@@ -108,16 +108,16 @@ func archiveIDFromURI(uri string) (string, error) {
 }
 
 // providerForURI resolves the provider for the archive addressed by uri.
-func providerForURI(uri string) (*mg.Provider, error) {
+func providerForURI(ctx context.Context, uri string) (*mg.Provider, error) {
 	id, err := archiveIDFromURI(uri)
 	if err != nil {
 		return nil, err
 	}
-	return providerForArchive(id)
+	return providerForArchive(ctx, id)
 }
 
-func resourceCurrentArchive(_ context.Context, uri string) (*api.ResourceContent, error) {
-	p, err := providerForURI(uri)
+func resourceCurrentArchive(ctx context.Context, uri string) (*api.ResourceContent, error) {
+	p, err := providerForURI(ctx, uri)
 	if err != nil {
 		return nil, err
 	}
@@ -128,8 +128,8 @@ func resourceCurrentArchive(_ context.Context, uri string) (*api.ResourceContent
 	return &api.ResourceContent{Text: content}, nil
 }
 
-func resourceNamespaces(_ context.Context, uri string) (*api.ResourceContent, error) {
-	p, err := providerForURI(uri)
+func resourceNamespaces(ctx context.Context, uri string) (*api.ResourceContent, error) {
+	p, err := providerForURI(ctx, uri)
 	if err != nil {
 		return nil, err
 	}
@@ -140,8 +140,8 @@ func resourceNamespaces(_ context.Context, uri string) (*api.ResourceContent, er
 	return &api.ResourceContent{Text: output}, nil
 }
 
-func resourceETCDMembers(_ context.Context, uri string) (*api.ResourceContent, error) {
-	p, err := providerForURI(uri)
+func resourceETCDMembers(ctx context.Context, uri string) (*api.ResourceContent, error) {
+	p, err := providerForURI(ctx, uri)
 	if err != nil {
 		return nil, err
 	}
@@ -152,8 +152,8 @@ func resourceETCDMembers(_ context.Context, uri string) (*api.ResourceContent, e
 	return &api.ResourceContent{Text: string(data)}, nil
 }
 
-func resourceETCDEndpointStatus(_ context.Context, uri string) (*api.ResourceContent, error) {
-	p, err := providerForURI(uri)
+func resourceETCDEndpointStatus(ctx context.Context, uri string) (*api.ResourceContent, error) {
+	p, err := providerForURI(ctx, uri)
 	if err != nil {
 		return nil, err
 	}
@@ -164,8 +164,8 @@ func resourceETCDEndpointStatus(_ context.Context, uri string) (*api.ResourceCon
 	return &api.ResourceContent{Text: string(data)}, nil
 }
 
-func resourcePrometheusConfig(_ context.Context, uri string) (*api.ResourceContent, error) {
-	p, err := providerForURI(uri)
+func resourcePrometheusConfig(ctx context.Context, uri string) (*api.ResourceContent, error) {
+	p, err := providerForURI(ctx, uri)
 	if err != nil {
 		return nil, err
 	}
@@ -211,8 +211,8 @@ func resourcePrometheusConfig(_ context.Context, uri string) (*api.ResourceConte
 	return &api.ResourceContent{Text: output}, nil
 }
 
-func resourceAlertManagerStatus(_ context.Context, uri string) (*api.ResourceContent, error) {
-	p, err := providerForURI(uri)
+func resourceAlertManagerStatus(ctx context.Context, uri string) (*api.ResourceContent, error) {
+	p, err := providerForURI(ctx, uri)
 	if err != nil {
 		return nil, err
 	}
@@ -244,12 +244,12 @@ func resourceAlertManagerStatus(_ context.Context, uri string) (*api.ResourceCon
 	return &api.ResourceContent{Text: output}, nil
 }
 
-func resourceGet(_ context.Context, uri string) (*api.ResourceContent, error) {
+func resourceGet(ctx context.Context, uri string) (*api.ResourceContent, error) {
 	id, err := archiveIDFromURI(uri)
 	if err != nil {
 		return nil, err
 	}
-	p, err := providerForArchive(id)
+	p, err := providerForArchive(ctx, id)
 	if err != nil {
 		return nil, err
 	}
