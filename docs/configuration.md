@@ -775,12 +775,6 @@ mustgather_dirs = ["/var/data/must-gather", "/home/user/downloads/must-gather.lo
 The Helm toolset supports an optional `allowed_registries` allowlist to restrict which registries
 `helm_install` can fetch charts from.
 
-#### OpenShift Must-Gather Configuration
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `mustgather_dirs` | string array | Directories the `openshift/mustgather` toolset scans for must-gather archives. Each entry may be a directory containing must-gather archives as sub-directories, or a directory that is itself an archive. Archives are addressed by the stable `archive_id` returned by `mustgather_list`. |
-
 **Behavior:**
 
 - `file://` and `http://` chart references are always blocked regardless of configuration.
@@ -788,6 +782,12 @@ The Helm toolset supports an optional `allowed_registries` allowlist to restrict
 - When `allowed_registries` **is configured**, chart references must be URL-based and prefix-match an entry in the list. Non-URL references (local paths, repo/chart names) are rejected.
 
 **Accepted risk:** bare filesystem paths (e.g. `/absolute/path`, `./relative/path`) are not blocked when no allowlist is configured, because they are indistinguishable from Helm repository references at the string level. When the server runs in a container, the blast radius is limited to the container filesystem. To fully restrict chart sources, configure `allowed_registries`.
+
+#### OpenShift Must-Gather Configuration
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mustgather_dirs` | string array | Directories the `openshift/mustgather` toolset scans for must-gather archives. Each entry may be a directory containing must-gather archives as sub-directories, or a directory that is itself an archive. Archives are addressed by the stable `archive_id` returned by `mustgather_list`. |
 
 Refer to individual toolset documentation for available options:
 - [Kiali Configuration](KIALI.md)

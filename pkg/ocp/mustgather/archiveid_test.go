@@ -101,7 +101,7 @@ func (s *ArchiveIDSuite) TestIsValidArchiveID() {
 		s.NoError(IsValidArchiveID("mg-384226d712f0"))
 	})
 	s.Run("invalid IDs return error", func() {
-		for _, id := range []string{"", "mg-38426d712f0", "mg-384226d712f", "384226d712f0", "mg-XYZW26d712f0", "must-gather"} {
+		for _, id := range []string{"", "mg-0000-00000000", "mg-38426d712f0", "mg-384226d712f", "384226d712f0", "mg-XYZW26d712f0", "must-gather"} {
 			s.Error(IsValidArchiveID(id), "expected error for %q", id)
 		}
 	})
