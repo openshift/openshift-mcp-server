@@ -763,6 +763,8 @@ storage_driver = "configmap"
 ```toml
 [toolset_configs."openshift/mustgather"]
 mustgather_dirs = ["/var/data/must-gather", "/home/user/downloads/must-gather.local.123"]
+tail_limit = 1000
+max_output_size = 1048576
 ```
 
 #### Helm Configuration
@@ -788,6 +790,8 @@ The Helm toolset supports an optional `allowed_registries` allowlist to restrict
 | Field | Type | Description |
 |-------|------|-------------|
 | `mustgather_dirs` | string array | Directories the `openshift/mustgather` toolset scans for must-gather archives. Each entry may be a directory containing must-gather archives as sub-directories, or a directory that is itself an archive. Archives are addressed by the stable `archive_id` returned by `mustgather_list`. |
+| `tail_limit` | integer | Maximum number of lines the pod-log tools keep when a caller requests tailing (the `tail` parameter). A larger `tail` is capped to this value, bounding the allocation for the tail buffer. Defaults to `1000` when unset. |
+| `max_output_size` | integer | Maximum aggregate size, in bytes, of log output returned by a single pod-log tool call. Output beyond this is truncated. Defaults to `1048576` (1 MiB) when unset. |
 
 Refer to individual toolset documentation for available options:
 - [Kiali Configuration](KIALI.md)

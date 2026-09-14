@@ -14,7 +14,30 @@ import (
 )
 
 const maxScanLineSize = 1024 * 1024 // 1 MB
-const maxOutputSize = 10 * 1024 * 1024
+
+// outputTruncatedNotice is the marker appended when aggregate log output is cut
+// off at the configured maximum size.
+func outputTruncatedNotice(maxOutputSize int) string {
+	return fmt.Sprintf("\n... [output truncated at %s, use 'tail' parameter to limit]", formatBytes(int64(maxOutputSize)))
+}
+
+// capOutput enforces maxOutputSize on an already-assembled string, trimming it
+// to the last full line that fits and appending a truncation notice. It is used
+// where the output is built up front (e.g. tailed lines joined together) rather
+// than streamed line by line.
+func capOutput(s string, maxOutputSize int) string {
+	if len(s) <= maxOutputSize {
+		return s
+	}
+	notice := outputTruncatedNotice(maxOutputSize)
+	budget := min(max(maxOutputSize-len(notice), 0), len(s))
+	trimmed := s[:budget]
+	// Avoid cutting mid-line when possible.
+	if idx := strings.LastIndexByte(trimmed, '\n'); idx >= 0 {
+		trimmed = trimmed[:idx]
+	}
+	return trimmed + notice
+}
 
 func initPodLogs() []api.ServerTool {
 	return []api.ServerTool{
@@ -115,6 +138,15 @@ func mustgatherPodLogsGet(params api.ToolHandlerParams) (*api.ToolCallResult, er
 		return api.NewToolCallResult("", fmt.Errorf("namespace and pod are required")), nil
 	}
 
+	tailLimit := toolsetTailLimit()
+	maxOutputSize := toolsetMaxOutputSize()
+	// Cap a tool-provided tail so it can't be used as an unbounded slice
+	// capacity. Values within the limit keep their normal tail behavior.
+	tailCapped := tail > tailLimit
+	if tailCapped {
+		tail = tailLimit
+	}
+
 	logType := mg.LogTypeCurrent
 	if previous {
 		logType = mg.LogTypePrevious
@@ -158,16 +190,14 @@ func mustgatherPodLogsGet(params api.ToolHandlerParams) (*api.ToolCallResult, er
 			}
 			ring = ordered
 		}
-		logs = strings.Join(ring, "\n")
+		logs = capOutput(strings.Join(ring, "\n"), maxOutputSize)
 	} else {
 		var sb strings.Builder
 		lineCount := 0
-		truncated := false
 		for scanner.Scan() {
 			line := scanner.Text()
 			if sb.Len()+len(line)+1 > maxOutputSize {
-				sb.WriteString("\n... [output truncated at 10 MB, use 'tail' parameter to limit]")
-				truncated = true
+				sb.WriteString(outputTruncatedNotice(maxOutputSize))
 				break
 			}
 			if lineCount > 0 {
@@ -176,7 +206,6 @@ func mustgatherPodLogsGet(params api.ToolHandlerParams) (*api.ToolCallResult, er
 			sb.WriteString(line)
 			lineCount++
 		}
-		_ = truncated
 		logs = sb.String()
 	}
 
@@ -193,6 +222,9 @@ func mustgatherPodLogsGet(params api.ToolHandlerParams) (*api.ToolCallResult, er
 	}
 	if tail > 0 {
 		header += fmt.Sprintf(" (last %d lines)", tail)
+		if tailCapped {
+			header += fmt.Sprintf(" (tail capped at %d)", tailLimit)
+		}
 	}
 	header += ":\n\n"
 
@@ -220,6 +252,13 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 	}
 	if filter == "" {
 		return api.NewToolCallResult("", fmt.Errorf("filter string is required")), nil
+	}
+
+	tailLimit := toolsetTailLimit()
+	maxOutputSize := toolsetMaxOutputSize()
+	tailCapped := tail > tailLimit
+	if tailCapped {
+		tail = tailLimit
 	}
 
 	logType := mg.LogTypeCurrent
@@ -299,6 +338,9 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 	}
 	if tail > 0 {
 		header += fmt.Sprintf(" (last %d matches)", tail)
+		if tailCapped {
+			header += fmt.Sprintf(" (tail capped at %d)", tailLimit)
+		}
 	}
 	header += fmt.Sprintf(":\n\nFound %d matching line(s)\n\n", totalMatches)
 
@@ -306,7 +348,7 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 		return api.NewToolCallResult(header+"No matching lines found.", nil), nil
 	}
 
-	return api.NewToolCallResult(header+strings.Join(matchingLines, "\n"), nil), nil
+	return api.NewToolCallResult(header+capOutput(strings.Join(matchingLines, "\n"), maxOutputSize), nil), nil
 }
 
 func mustgatherPodLogsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -416,5 +458,5 @@ func mustgatherPodLogsByTime(params api.ToolHandlerParams) (*api.ToolCallResult,
 		return api.NewToolCallResult(header+"No matching lines found.", nil), nil
 	}
 
-	return api.NewToolCallResult(header+strings.Join(matchingLines, "\n"), nil), nil
+	return api.NewToolCallResult(header+capOutput(strings.Join(matchingLines, "\n"), toolsetMaxOutputSize()), nil), nil
 }
