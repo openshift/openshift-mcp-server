@@ -10,7 +10,7 @@ import (
 
 // MustGatherArchiveIDPattern matches the canonical must-gather archive ID form:
 // "mg-" + 12 hex digits (truncated SHA-256 of the archive URI).
-var MustGatherArchiveIDPattern = regexp.MustCompile(`^mg-[0-9a-f]{12}`)
+var MustGatherArchiveIDPattern = regexp.MustCompile(`^mg-[0-9a-f]{12}$`)
 
 // LocalURIPrefix is the source-URI prefix for local-filesystem archives.
 // Archive IDs are derived from the full source URI so that remote sources
