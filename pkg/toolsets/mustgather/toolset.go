@@ -34,12 +34,17 @@ func (t *Toolset) GetPrompts() []api.ServerPrompt {
 	return nil
 }
 
+// GetResources returns no MCP resources. Resource handlers have no access to the
+// toolset configuration (GetToolsetConfig is not plumbed into MCP resources), so
+// they cannot resolve archives against the per-config registry. Must-gather data
+// is exposed through the mustgather_* tools instead; resources can be re-added
+// once resource handlers gain toolset-config access upstream.
 func (t *Toolset) GetResources() []api.ServerResource {
-	return initMCPResources()
+	return nil
 }
 
 func (t *Toolset) GetResourceTemplates() []api.ServerResourceTemplate {
-	return initMCPResourceTemplates()
+	return nil
 }
 
 func init() {

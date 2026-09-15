@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -127,24 +126,6 @@ func (s *MustGatherSuite) TestEventsList() {
 		s.Require().NoError(err)
 		s.Require().False(result.IsError, "expected events_list not to be an error")
 		s.Contains(result.Content[0].(*mcp.TextContent).Text, "FailedMount", "expected the event reason in the listing")
-	})
-}
-
-func (s *MustGatherSuite) TestResourceTemplates() {
-	s.InitMcpClient()
-	s.Run("reads namespaces via resource template", func() {
-		uri := "must-gather://local/" + s.archiveID + "/namespaces"
-		result, err := s.ReadResource(uri)
-		s.Require().NoError(err)
-		s.Require().NotEmpty(result.Contents)
-		s.Contains(result.Contents[0].Text, "openshift-config", "expected the namespace listed")
-	})
-	s.Run("reads a specific resource via resource template", func() {
-		uri := "must-gather://local/" + s.archiveID + "/resources/-/v1/ConfigMap/openshift-config/cluster-config-v1"
-		result, err := s.ReadResource(uri)
-		s.Require().NoError(err)
-		s.Require().NotEmpty(result.Contents)
-		s.True(strings.Contains(result.Contents[0].Text, "cluster-config-v1"), "expected the ConfigMap YAML")
 	})
 }
 

@@ -1883,33 +1883,6 @@ Example output:
 
 <!-- AVAILABLE-TOOLSETS-RESOURCES-TEMPLATES-START -->
 
-<details>
-
-<summary>openshift/mustgather</summary>
-
-- **must-gather** - Loaded must-gather archive metadata. Use the archive_id from mustgather_list.
-  - URI Template: `must-gather://local/{archive_id}`
-  - MIME Type: `text/plain`
-- **must-gather-namespaces** - List of all namespaces in the must-gather archive
-  - URI Template: `must-gather://local/{archive_id}/namespaces`
-  - MIME Type: `text/plain`
-- **must-gather-etcd-members** - ETCD cluster member list from the must-gather archive
-  - URI Template: `must-gather://local/{archive_id}/etcd/members`
-  - MIME Type: `application/json`
-- **must-gather-etcd-endpoint-status** - ETCD endpoint status from the must-gather archive
-  - URI Template: `must-gather://local/{archive_id}/etcd/endpoint-status`
-  - MIME Type: `application/json`
-- **must-gather-prometheus-config** - Prometheus configuration summary from the must-gather archive
-  - URI Template: `must-gather://local/{archive_id}/prometheus/config`
-  - MIME Type: `text/plain`
-- **must-gather-alertmanager-status** - AlertManager status from the must-gather archive
-  - URI Template: `must-gather://local/{archive_id}/alertmanager/status`
-  - MIME Type: `text/plain`
-- **must-gather-resource** - A specific Kubernetes resource from the must-gather archive as YAML. Use '-' for empty group (core API) or cluster-scoped namespace.
-  - URI Template: `must-gather://local/{archive_id}/resources/{group}/{version}/{kind}/{namespace}/{name}`
-  - MIME Type: `text/yaml`
-</details>
-
 
 <!-- AVAILABLE-TOOLSETS-RESOURCES-TEMPLATES-END -->
 
