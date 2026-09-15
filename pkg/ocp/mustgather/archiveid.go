@@ -50,7 +50,7 @@ func ArchiveIDFromLocalPath(path string) (string, error) {
 }
 
 // IsValidArchiveID validates an archive ID. It returns an error if id is not
-// of the form mg-XXXX-YYYYYYYY (12 hex digits).
+// of the form mg-XXXXYYYYYYYY (12 hex digits).
 func IsValidArchiveID(id string) error {
 	if !MustGatherArchiveIDPattern.MatchString(id) {
 		return fmt.Errorf("invalid must-gather archive ID %q: expected format mg-XXXXYYYYYYYY (e.g. mg-384226d712f0)", id)

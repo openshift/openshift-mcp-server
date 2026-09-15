@@ -9,7 +9,7 @@
     "inputSchema": {
       "properties": {
         "archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         }
       },
@@ -31,7 +31,7 @@
     "inputSchema": {
       "properties": {
         "archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
         "limit": {
@@ -57,7 +57,7 @@
     "inputSchema": {
       "properties": {
         "archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
         "kind": {
@@ -92,7 +92,7 @@
     "inputSchema": {
       "properties": {
         "archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
         "limit": {
@@ -140,7 +140,7 @@
     "inputSchema": {
       "properties": {
         "archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
         "limit": {
@@ -201,7 +201,7 @@
     "inputSchema": {
       "properties": {
         "archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
         "state": {
@@ -227,7 +227,7 @@
     "inputSchema": {
       "properties": {
         "archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
         "type": {
@@ -253,7 +253,7 @@
     "inputSchema": {
       "properties": {
         "archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
         "replica": {
@@ -279,7 +279,7 @@
     "inputSchema": {
       "properties": {
         "archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
         "health": {
@@ -309,7 +309,7 @@
     "inputSchema": {
       "properties": {
         "archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
         "limit": {
@@ -339,7 +339,7 @@
     "inputSchema": {
       "properties": {
         "archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
         "include": {
@@ -374,7 +374,7 @@
     "inputSchema": {
       "properties": {
         "archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
         "node": {
@@ -405,7 +405,7 @@
     "inputSchema": {
       "properties": {
         "archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
         "caseInsensitive": {
@@ -445,7 +445,7 @@
     "inputSchema": {
       "properties": {
         "archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
         "container": {
@@ -498,7 +498,7 @@
     "inputSchema": {
       "properties": {
         "archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
         "container": {
@@ -542,7 +542,7 @@
     "inputSchema": {
       "properties": {
         "archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
         "caseInsensitive": {
@@ -599,7 +599,7 @@
           "type": "string"
         },
         "archive_id": {
-          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.",
+          "description": "Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.",
           "type": "string"
         },
         "fieldSelector": {

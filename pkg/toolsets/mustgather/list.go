@@ -12,7 +12,7 @@ import (
 
 // archiveIDDescription is the shared description for the archive_id
 // argument used by every mustgather_* tool.
-const archiveIDDescription = "Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives."
+const archiveIDDescription = "Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives."
 
 // archiveIDProperty returns the JSON schema property for the required
 // archive_id argument.

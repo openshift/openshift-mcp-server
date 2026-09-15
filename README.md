@@ -1255,7 +1255,7 @@ Use tempo_search_tags to discover available tag names.
 
 - **mustgather_resources_list** - List Kubernetes resources from the must-gather archive with optional filtering by namespace, labels, and fields
   - `apiVersion` (`string`) - API version (default: v1)
-  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `fieldSelector` (`string`) - Field selector (e.g., metadata.name=foo)
   - `kind` (`string`) **(required)** - Resource kind (e.g., Pod, Deployment, Service)
   - `labelSelector` (`string`) - Label selector (e.g., app=nginx,tier=frontend)
@@ -1263,7 +1263,7 @@ Use tempo_search_tags to discover available tag names.
   - `namespace` (`string`) - Filter by namespace
 
 - **mustgather_events_list** - List Kubernetes events from the must-gather archive with optional filtering by type, namespace, resource, and reason
-  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `limit` (`integer`) - Maximum number of events to return (default: 100)
   - `namespace` (`string`) - Filter by namespace
   - `reason` (`string`) - Filter by event reason (partial match)
@@ -1271,13 +1271,13 @@ Use tempo_search_tags to discover available tag names.
   - `type` (`string`) - Event type filter: all, Warning, Normal
 
 - **mustgather_events_by_resource** - Get all events related to a specific Kubernetes resource from the must-gather archive
-  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `kind` (`string`) - Resource kind (optional, narrows search)
   - `name` (`string`) **(required)** - Resource name
   - `namespace` (`string`) - Resource namespace
 
 - **mustgather_events_by_time** - List Kubernetes events from the must-gather archive within a specific time range, sorted chronologically
-  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `limit` (`integer`) - Maximum number of events to return (default: 200)
   - `namespace` (`string`) - Filter by namespace
   - `since` (`string`) **(required)** - Start time in RFC3339 format (e.g. 2026-01-15T10:00:00Z)
@@ -1285,7 +1285,7 @@ Use tempo_search_tags to discover available tag names.
   - `until` (`string`) - End time in RFC3339 format (e.g. 2026-01-15T12:00:00Z)
 
 - **mustgather_pod_logs_get** - Get container logs for a specific pod from the must-gather archive. Returns current or previous logs.
-  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `container` (`string`) - Container name (uses first container if not specified)
   - `namespace` (`string`) **(required)** - Pod namespace
   - `pod` (`string`) **(required)** - Pod name
@@ -1293,7 +1293,7 @@ Use tempo_search_tags to discover available tag names.
   - `tail` (`integer`) - Number of lines from end of logs (0 for all)
 
 - **mustgather_pod_logs_grep** - Filter pod container logs by a search string. Returns only matching lines from the must-gather archive.
-  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `caseInsensitive` (`boolean`) - Perform case-insensitive search (default: false)
   - `container` (`string`) - Container name (uses first container if not specified)
   - `filter` (`string`) **(required)** - String to search for in log lines
@@ -1303,7 +1303,7 @@ Use tempo_search_tags to discover available tag names.
   - `tail` (`integer`) - Maximum number of matching lines to return (0 for all)
 
 - **mustgather_pod_logs_by_time** - Get pod container logs within a specific time range. Each log line is expected to have an RFC3339Nano timestamp prefix (from kubectl logs --timestamps).
-  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `container` (`string`) - Container name (uses first container if not specified)
   - `limit` (`integer`) - Maximum number of lines to return (default: 500)
   - `namespace` (`string`) **(required)** - Pod namespace
@@ -1313,50 +1313,50 @@ Use tempo_search_tags to discover available tag names.
   - `until` (`string`) - End time in RFC3339 format (e.g. 2026-01-15T12:00:00Z)
 
 - **mustgather_node_diagnostics_get** - Get comprehensive diagnostic information for a specific node including kubelet logs, system info, CPU/IRQ affinities, and hardware details
-  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `include` (`string`) - Comma-separated diagnostics to include: kubelet,sysinfo,cpu,irq,pods,podresources,lscpu,lspci,dmesg,cmdline (default: all)
   - `kubeletTail` (`integer`) - Number of lines from end of kubelet log (0 for all, default: 100)
   - `node` (`string`) **(required)** - Node name
 
 - **mustgather_node_kubelet_logs** - Get kubelet logs for a specific node (decompressed from .gz file)
-  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `node` (`string`) **(required)** - Node name
   - `tail` (`integer`) - Number of lines from end (0 for all)
 
 - **mustgather_node_kubelet_logs_grep** - Filter kubelet logs for a specific node by a search string. Returns only matching lines.
-  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `caseInsensitive` (`boolean`) - Perform case-insensitive search (default: false)
   - `filter` (`string`) **(required)** - String to search for in log lines
   - `node` (`string`) **(required)** - Node name
   - `tail` (`integer`) - Maximum number of matching lines to return (0 for all)
 
 - **mustgather_etcd_health** - Get ETCD cluster health status including endpoint health and active alarms from the must-gather archive
-  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
 
 - **mustgather_etcd_object_count** - Get ETCD object counts by resource type from the must-gather archive
-  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `limit` (`integer`) - Maximum number of resource types to show (default: 50, sorted by count descending)
 
 - **mustgather_monitoring_prometheus_status** - Get Prometheus TSDB and runtime status from the must-gather archive
-  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `replica` (`string`) - Prometheus replica (0, 1, or all). Default: all
 
 - **mustgather_monitoring_prometheus_targets** - Get Prometheus scrape targets and their health status from the must-gather archive
-  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `health` (`string`) - Filter by health status: up, down, unknown (default: all)
   - `replica` (`string`) - Prometheus replica (0, 1, or all). Default: 0
 
 - **mustgather_monitoring_prometheus_tsdb** - Get detailed Prometheus TSDB statistics including top metrics by series count and label cardinality
-  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `limit` (`integer`) - Number of top entries to show per category (default: 10)
   - `replica` (`string`) - Prometheus replica (0, 1, or all). Default: 0
 
 - **mustgather_monitoring_prometheus_alerts** - Get active Prometheus alerts from the must-gather archive
-  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `state` (`string`) - Filter by alert state: firing, pending (default: all)
 
 - **mustgather_monitoring_prometheus_rules** - Get Prometheus alerting and recording rules from the must-gather archive
-  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXX-YYYYYYYY, e.g. mg-3842-26d712f0). Call mustgather_list first to discover available archives.
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `type` (`string`) - Filter by rule type: alerting, recording (default: all)
 
 </details>
