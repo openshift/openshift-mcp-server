@@ -230,10 +230,19 @@ func (r *mgRegistry) loadProvider(path string) (*mg.Provider, error) {
 			return nil, fmt.Errorf("failed to load must-gather archive: %w", err)
 		}
 		r.mu.Lock()
+		defer r.mu.Unlock()
+		// singleflight only coalesces overlapping calls; a caller that arrives
+		// after a previous flight finished re-executes this loader. If another
+		// caller already cached a provider for this path (necessarily at the
+		// current generation, since a rescan clears the map), return that
+		// canonical instance instead of overwriting it, so all callers converge
+		// on one provider.
+		if existing, ok := r.providers[path]; ok {
+			return existing, nil
+		}
 		if r.gen == gen {
 			r.providers[path] = p
 		}
-		r.mu.Unlock()
 		return p, nil
 	})
 	if err != nil {
