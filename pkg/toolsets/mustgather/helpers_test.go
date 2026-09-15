@@ -3,6 +3,7 @@ package mustgather
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -27,7 +28,19 @@ func (s *RegistrySuite) SetupTest() {
 
 	dir, err := os.MkdirTemp("", "mustgather-test-*")
 	s.Require().NoError(err)
+	makeArchiveRoot(s.T(), dir)
 	s.archiveDir = dir
+}
+
+// makeArchiveRoot turns dir into a minimal must-gather archive root by creating
+// the container directory (recognized via the "sha256" marker) that Load
+// requires. The archive holds no resources.
+func makeArchiveRoot(t *testing.T, dir string) {
+	t.Helper()
+	containerDir := filepath.Join(dir, "quay-io-openshift-content-sha256-abc123")
+	if err := os.MkdirAll(containerDir, 0o755); err != nil {
+		t.Fatalf("failed to create container dir: %v", err)
+	}
 }
 
 func (s *RegistrySuite) TearDownTest() {
@@ -60,6 +73,7 @@ func (s *RegistrySuite) TestMultipleArchives() {
 		dir2, err := os.MkdirTemp("", "mustgather-test2-*")
 		s.Require().NoError(err)
 		defer func() { _ = os.RemoveAll(dir2) }()
+		makeArchiveRoot(s.T(), dir2)
 
 		p1, err := s.registry.loadProvider(s.archiveDir)
 		s.Require().NoError(err)

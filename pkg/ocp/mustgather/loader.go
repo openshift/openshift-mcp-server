@@ -17,12 +17,14 @@ type LoadResult struct {
 	Resources []*unstructured.Unstructured
 }
 
-// Load reads and parses a must-gather archive from the given path
+// Load reads and parses a must-gather archive from the given path. The path
+// must be an archive root, i.e. it must contain a recognizable container
+// directory (see FindContainerDir); a path that is itself the container
+// directory is not accepted, matching IsArchive.
 func Load(path string) (*LoadResult, error) {
 	containerDir, err := FindContainerDir(path)
 	if err != nil {
-		// If no container dir found, use the path directly
-		containerDir = path
+		return nil, err
 	}
 
 	metadata := MustGatherMetadata{
@@ -81,7 +83,7 @@ func FindContainerDir(basePath string) (string, error) {
 func ReadArchiveMetadata(path string) (version, timestamp string) {
 	containerDir, err := FindContainerDir(path)
 	if err != nil {
-		containerDir = path
+		return "", ""
 	}
 	var metadata MustGatherMetadata
 	loadMetadata(containerDir, &metadata)
