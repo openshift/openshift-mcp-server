@@ -27,7 +27,7 @@ func (s *MustGatherSuite) SetupTest() {
 	s.BaseMcpSuite.SetupTest()
 
 	root := s.T().TempDir()
-	archive := filepath.Join(root, "must-gather.local.test.20260911.abcd")
+	archive := filepath.Join(root, "must-gather.local.815268392211181210")
 	container := filepath.Join(archive, "quay-io-openshift-content-sha256-deadbeef")
 	s.Require().NoError(os.MkdirAll(container, 0o755))
 	s.Require().NoError(os.WriteFile(filepath.Join(container, "version"), []byte("4.16.0"), 0o644))
