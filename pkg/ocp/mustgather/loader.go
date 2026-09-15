@@ -77,17 +77,18 @@ func FindContainerDir(basePath string) (string, error) {
 }
 
 // ReadArchiveMetadata cheaply reads the version and timestamp of the archive at
-// path without indexing its resources. It returns ("", "") when the archive's
-// container directory or metadata files cannot be located. Used by discovery to
-// list archives without paying the full load cost.
-func ReadArchiveMetadata(path string) (version, timestamp string) {
+// path without indexing its resources. It returns an error when the archive's
+// container directory cannot be located (matching Load and IsArchive); the
+// version and timestamp are best-effort and may be empty even on success. Used
+// by discovery to list archives without paying the full load cost.
+func ReadArchiveMetadata(path string) (version, timestamp string, err error) {
 	containerDir, err := FindContainerDir(path)
 	if err != nil {
-		return "", ""
+		return "", "", err
 	}
 	var metadata MustGatherMetadata
 	loadMetadata(containerDir, &metadata)
-	return metadata.Version, metadata.Timestamp
+	return metadata.Version, metadata.Timestamp, nil
 }
 
 // IsArchive reports whether path looks like a must-gather archive, i.e. it

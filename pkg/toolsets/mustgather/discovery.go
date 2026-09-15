@@ -95,8 +95,12 @@ func discoverArchives(ctx context.Context, dirs []string) []ArchiveInfo {
 			klogutil.LogWarn(logger, "skipping must-gather archive with duplicate ID (first match wins)", klogutil.Field("path", path), klogutil.Field("archive_id", id))
 			continue
 		}
+		version, timestamp, err := mg.ReadArchiveMetadata(path)
+		if err != nil {
+			klogutil.LogWarn(logger, "skipping must-gather archive with unreadable metadata", klogutil.Field("path", path), klogutil.Err(err))
+			continue
+		}
 		seen[id] = true
-		version, timestamp := mg.ReadArchiveMetadata(path)
 		archives = append(archives, ArchiveInfo{
 			ID:        id,
 			Path:      path,
