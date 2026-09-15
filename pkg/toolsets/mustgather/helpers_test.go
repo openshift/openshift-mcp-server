@@ -19,6 +19,8 @@ type RegistrySuite struct {
 
 func (s *RegistrySuite) SetupTest() {
 	registry.mu.Lock()
+	registry.dirs = nil
+	registry.byID = make(map[string]string)
 	registry.providers = make(map[string]*mg.Provider)
 	registry.flight = singleflight.Group{}
 	registry.mu.Unlock()

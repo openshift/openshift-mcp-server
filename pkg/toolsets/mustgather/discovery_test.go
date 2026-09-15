@@ -5,10 +5,10 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
 	"github.com/stretchr/testify/suite"
+	"golang.org/x/sync/singleflight"
 )
 
 type DiscoverySuite struct {
@@ -16,11 +16,13 @@ type DiscoverySuite struct {
 }
 
 func (s *DiscoverySuite) SetupTest() {
-	// Reset the resolution cache so tests don't leak state into each other.
-	scanCache.mu.Lock()
-	scanCache.byID = make(map[string]string)
-	scanCache.scanAt = time.Time{}
-	scanCache.mu.Unlock()
+	// Reset the registry so tests don't leak state into each other.
+	registry.mu.Lock()
+	registry.dirs = nil
+	registry.byID = make(map[string]string)
+	registry.providers = make(map[string]*mg.Provider)
+	registry.flight = singleflight.Group{}
+	registry.mu.Unlock()
 }
 
 // makeArchive creates a minimal must-gather archive under parent/name and
@@ -140,6 +142,82 @@ func (s *DiscoverySuite) TestResolveArchivePath() {
 		_, err = resolveArchivePath(context.Background(), []string{tmp}, id)
 		s.Error(err)
 	})
+
+	s.Run("resolves without archive metadata files", func() {
+		// An archive whose container dir has neither version nor timestamp still
+		// resolves: ID resolution derives the ID from the path alone.
+		tmp := s.T().TempDir()
+		archive := filepath.Join(tmp, "must-gather.nometa")
+		s.Require().NoError(os.MkdirAll(filepath.Join(archive, "quay-io-content-sha256-nometa"), 0o755))
+		abs, err := filepath.Abs(archive)
+		s.Require().NoError(err)
+		id, err := mg.ArchiveIDFromLocalPath(abs)
+		s.Require().NoError(err)
+
+		path, err := resolveArchivePath(context.Background(), []string{tmp}, id)
+		s.Require().NoError(err)
+		s.Equal(abs, path)
+	})
+
+	s.Run("discovers a newly added archive on next resolve", func() {
+		tmp := s.T().TempDir()
+		a1 := s.makeArchive(tmp, "must-gather.first", "4.1", "")
+		id1, err := mg.ArchiveIDFromLocalPath(a1)
+		s.Require().NoError(err)
+		_, err = resolveArchivePath(context.Background(), []string{tmp}, id1)
+		s.Require().NoError(err)
+
+		// A brand-new archive appears after the first scan; a miss triggers a
+		// rescan that discovers it without any restart.
+		a2 := s.makeArchive(tmp, "must-gather.second", "4.2", "")
+		id2, err := mg.ArchiveIDFromLocalPath(a2)
+		s.Require().NoError(err)
+		path, err := resolveArchivePath(context.Background(), []string{tmp}, id2)
+		s.Require().NoError(err)
+		s.Equal(a2, path)
+	})
+}
+
+func (s *DiscoverySuite) TestRescanInvalidatesProviders() {
+	s.Run("a rescan clears every cached provider", func() {
+		root := s.T().TempDir()
+		a := s.makeArchive(root, "must-gather.aaa", "4.12", "")
+		id, err := mg.ArchiveIDFromLocalPath(a)
+		s.Require().NoError(err)
+
+		// Warm the provider cache via the full resolve+load path.
+		p1, err := providerForArchiveIn(context.Background(), []string{root}, id)
+		s.Require().NoError(err)
+
+		registry.mu.RLock()
+		_, cached := registry.providers[a]
+		registry.mu.RUnlock()
+		s.True(cached, "provider should be cached after load")
+
+		// Changing the dir-set forces a rescan, which must invalidate providers.
+		other := s.T().TempDir()
+		_, _ = resolveArchivePath(context.Background(), []string{other, root}, id)
+
+		registry.mu.RLock()
+		_, stillCached := registry.providers[a]
+		registry.mu.RUnlock()
+		s.False(stillCached, "rescan should have invalidated the cached provider")
+
+		// A subsequent load produces a fresh provider instance.
+		p2, err := providerForArchiveIn(context.Background(), []string{other, root}, id)
+		s.Require().NoError(err)
+		s.NotSame(p1, p2)
+	})
+}
+
+// providerForArchiveIn mirrors providerForArchive but with an explicit dir-set,
+// so tests need not touch the global toolset config.
+func providerForArchiveIn(ctx context.Context, dirs []string, id string) (*mg.Provider, error) {
+	path, err := resolveArchivePath(ctx, dirs, id)
+	if err != nil {
+		return nil, err
+	}
+	return loadProvider(path)
 }
 
 func TestDiscovery(t *testing.T) {

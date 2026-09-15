@@ -9,15 +9,16 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
-	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
 	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
+	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
+
+	"golang.org/x/sync/singleflight"
 )
 
 // ArchiveInfo describes a discovered must-gather archive.
 type ArchiveInfo struct {
-	// ID is the stable, compact identifier (mg-XXXX-YYYYYYYY) derived from Path.
+	// ID is the stable, compact identifier (mg-XXXXYYYYYYYY) derived from Path.
 	ID string
 	// Path is the absolute filesystem path to the archive directory.
 	Path string
@@ -27,40 +28,16 @@ type ArchiveInfo struct {
 	Timestamp string
 }
 
-// discoverArchives scans the configured directories and returns the archives
-// found, in a stable order (directories in config order, entries lexically).
-// A directory is treated as an archive if it contains a recognizable container
-// directory; otherwise its immediate children are inspected. Non-existent or
-// unreadable directories are skipped.
-func discoverArchives(ctx context.Context, dirs []string) []ArchiveInfo {
-	logger := klogutil.FromContext(ctx)
-	var archives []ArchiveInfo
-	seen := make(map[string]bool) // dedupe by ID (first-in-scan-order wins)
-
-	add := func(path string) {
-		abs, err := filepath.Abs(path)
-		if err != nil {
-			abs = path
-		}
-		id, err := mg.ArchiveIDFromLocalPath(abs)
-		if err != nil {
-			klogutil.LogWarn(logger, "skipping must-gather archive with undecidable ID", klogutil.Field("path", abs), klogutil.Err(err))
-			return
-		}
-		if seen[id] {
-			klogutil.LogWarn(logger, "skipping must-gather archive with duplicate ID (first match wins)", klogutil.Field("path", abs), klogutil.Field("archive_id", id))
-			return
-		}
-		seen[id] = true
-		version, timestamp := mg.ReadArchiveMetadata(abs)
-		archives = append(archives, ArchiveInfo{
-			ID:        id,
-			Path:      abs,
-			Version:   version,
-			Timestamp: timestamp,
-		})
-	}
-
+// walkArchives scans the configured directories and returns the absolute paths
+// of the must-gather archives found, in a stable order (directories in config
+// order, entries lexical). A directory is treated as an archive if it contains a
+// recognizable container directory; otherwise its immediate children are
+// inspected. Non-existent or unreadable directories are skipped.
+//
+// This is the minimal traversal shared by ID resolution and listing: it does no
+// metadata reads and computes no IDs, so it is cheap enough to run on demand.
+func walkArchives(dirs []string) []string {
+	var paths []string
 	for _, root := range dirs {
 		info, err := os.Stat(root)
 		if err != nil || !info.IsDir() {
@@ -68,7 +45,7 @@ func discoverArchives(ctx context.Context, dirs []string) []ArchiveInfo {
 		}
 		// A root that is itself an archive is not descended into.
 		if mg.IsArchive(root) {
-			add(root)
+			paths = append(paths, absOr(root))
 			continue
 		}
 		entries, err := os.ReadDir(root)
@@ -85,47 +62,106 @@ func discoverArchives(ctx context.Context, dirs []string) []ArchiveInfo {
 		for _, name := range names {
 			candidate := filepath.Join(root, name)
 			if mg.IsArchive(candidate) {
-				add(candidate)
+				paths = append(paths, absOr(candidate))
 			}
 		}
+	}
+	return paths
+}
+
+// absOr returns the absolute form of path, falling back to path itself if it
+// cannot be resolved.
+func absOr(path string) string {
+	if abs, err := filepath.Abs(path); err == nil {
+		return abs
+	}
+	return path
+}
+
+// discoverArchives returns the archives found under dirs, enriched with the
+// version/timestamp metadata used by mustgather_list. Archives are deduped by ID
+// (first-in-scan-order wins). Only this listing path pays for the metadata
+// reads; ID resolution uses the cheaper registry scan.
+func discoverArchives(ctx context.Context, dirs []string) []ArchiveInfo {
+	logger := klogutil.FromContext(ctx)
+	var archives []ArchiveInfo
+	seen := make(map[string]bool)
+	for _, path := range walkArchives(dirs) {
+		id, err := mg.ArchiveIDFromLocalPath(path)
+		if err != nil {
+			klogutil.LogWarn(logger, "skipping must-gather archive with undecidable ID", klogutil.Field("path", path), klogutil.Err(err))
+			continue
+		}
+		if seen[id] {
+			klogutil.LogWarn(logger, "skipping must-gather archive with duplicate ID (first match wins)", klogutil.Field("path", path), klogutil.Field("archive_id", id))
+			continue
+		}
+		seen[id] = true
+		version, timestamp := mg.ReadArchiveMetadata(path)
+		archives = append(archives, ArchiveInfo{
+			ID:        id,
+			Path:      path,
+			Version:   version,
+			Timestamp: timestamp,
+		})
 	}
 	return archives
 }
 
-// discoveryCache caches ID→path resolutions for a short window so that repeated
-// tool calls don't re-scan the filesystem on every request. The cache is keyed
-// by the directory set it was built from, so a different mustgather_dirs
-// never yields stale results.
-type discoveryCache struct {
-	mu     sync.Mutex
-	scanAt time.Time
-	dirs   []string          // directory set the cache was built from
-	byID   map[string]string // id -> absolute path
+// mgRegistry is the single process-global cache for the mustgather toolset. It
+// holds both the ID→path map produced by the last directory scan and the
+// lazily-loaded providers keyed by path.
+//
+// Immutability contract: a must-gather archive is a point-in-time snapshot and
+// is treated as immutable between scans. A loaded provider is therefore reused
+// until the next rescan, which clears every provider. The scan is the sole
+// cache-invalidation boundary, so a provider is never staler than the last scan.
+// Content changes to an existing archive at an unchanged path are not observed
+// until a rescan is triggered (see resolvePath).
+type mgRegistry struct {
+	mu        sync.RWMutex
+	dirs      []string                // dir-set the byID map was built from
+	byID      map[string]string       // id -> absolute path (from the last scan)
+	providers map[string]*mg.Provider // path -> loaded provider
+	flight    singleflight.Group      // coalesces concurrent expensive loads
 }
 
-const scanTTL = 30 * time.Second
+var registry = &mgRegistry{
+	byID:      make(map[string]string),
+	providers: make(map[string]*mg.Provider),
+}
 
-var scanCache = &discoveryCache{byID: make(map[string]string)}
-
-// rescan refreshes the cache for dirs. Caller must hold scanCache.mu.
-func (c *discoveryCache) rescan(ctx context.Context, dirs []string) {
-	archives := discoverArchives(ctx, dirs)
-	byID := make(map[string]string, len(archives))
-	for _, a := range archives {
-		byID[a.ID] = a.Path
+// rescan rebuilds byID from a fresh directory scan and invalidates every cached
+// provider. The caller must hold registry.mu for writing.
+func (r *mgRegistry) rescan(ctx context.Context, dirs []string) {
+	logger := klogutil.FromContext(ctx)
+	byID := make(map[string]string)
+	for _, path := range walkArchives(dirs) {
+		id, err := mg.ArchiveIDFromLocalPath(path)
+		if err != nil {
+			klogutil.LogWarn(logger, "skipping must-gather archive with undecidable ID", klogutil.Field("path", path), klogutil.Err(err))
+			continue
+		}
+		if _, dup := byID[id]; dup {
+			klogutil.LogWarn(logger, "skipping must-gather archive with duplicate ID (first match wins)", klogutil.Field("path", path), klogutil.Field("archive_id", id))
+			continue
+		}
+		byID[id] = path
 	}
-	c.byID = byID
-	c.dirs = append([]string(nil), dirs...)
-	c.scanAt = time.Now()
+	r.byID = byID
+	r.dirs = append([]string(nil), dirs...)
+	// Invalidate all cached providers: the scan is the sole cache-invalidation
+	// boundary (see the mgRegistry immutability contract).
+	r.providers = make(map[string]*mg.Provider)
 }
 
-// resolveArchivePath resolves an archive ID to its absolute filesystem path,
-// scanning dirs when the cache is cold, stale, built from a different directory
-// set, or missing the requested ID. A fresh-cache hit whose path no longer
-// exists on disk triggers a re-scan. When the ID still cannot be found, the
-// returned error lists the currently known IDs so the caller (LLM) can
-// self-correct.
-func resolveArchivePath(ctx context.Context, dirs []string, id string) (string, error) {
+// resolvePath resolves an archive ID to its absolute filesystem path. It rescans
+// (which also invalidates all cached providers) only when the configured dir-set
+// changed, when the ID is not in the current map, or when a cached path no
+// longer exists on disk. Between scans an ID→path hit is trusted without
+// re-reading the archive. When the ID still cannot be found, the returned error
+// lists the currently known IDs so the caller (LLM) can self-correct.
+func (r *mgRegistry) resolvePath(ctx context.Context, dirs []string, id string) (string, error) {
 	if err := mg.IsValidArchiveID(id); err != nil {
 		return "", err
 	}
@@ -133,27 +169,29 @@ func resolveArchivePath(ctx context.Context, dirs []string, id string) (string, 
 		return "", fmt.Errorf("no must-gather directories configured; set mustgather_dirs in the [toolset_configs.\"openshift/mustgather\"] section of the config file to a directory containing must-gather archives")
 	}
 
-	scanCache.mu.Lock()
-	defer scanCache.mu.Unlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	fresh := time.Since(scanCache.scanAt) < scanTTL && slices.Equal(scanCache.dirs, dirs)
-	if fresh {
-		if path, ok := scanCache.byID[id]; ok {
-			if _, err := os.Stat(path); err == nil {
-				return path, nil
-			}
-			// Cached path vanished (archive removed): re-scan below.
-		}
+	// A changed dir-set invalidates the previous scan.
+	if !slices.Equal(r.dirs, dirs) {
+		r.rescan(ctx, dirs)
 	}
 
-	// Cold/stale cache, different dirs, or an ID miss: re-scan and retry once.
-	scanCache.rescan(ctx, dirs)
-	if path, ok := scanCache.byID[id]; ok {
+	if path, ok := r.byID[id]; ok {
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		}
+		// Cached path vanished (archive removed/replaced): rescan below.
+	}
+
+	// ID miss or vanished path: rescan once and retry.
+	r.rescan(ctx, dirs)
+	if path, ok := r.byID[id]; ok {
 		return path, nil
 	}
 
-	known := make([]string, 0, len(scanCache.byID))
-	for k := range scanCache.byID {
+	known := make([]string, 0, len(r.byID))
+	for k := range r.byID {
 		known = append(known, k)
 	}
 	sort.Strings(known)
@@ -161,4 +199,43 @@ func resolveArchivePath(ctx context.Context, dirs []string, id string) (string, 
 		return "", fmt.Errorf("must-gather archive %q not found; no archives discovered under the configured directories. Call mustgather_list to see available archives", id)
 	}
 	return "", fmt.Errorf("must-gather archive %q not found. Known archive IDs: %s. Call mustgather_list to see available archives", id, strings.Join(known, ", "))
+}
+
+// loadProvider returns a provider for the given absolute path, lazily
+// initializing and caching it. Concurrent loads of the same path are coalesced
+// via singleflight. The cache is invalidated wholesale on the next rescan (see
+// the mgRegistry immutability contract).
+func (r *mgRegistry) loadProvider(path string) (*mg.Provider, error) {
+	r.mu.RLock()
+	if p, ok := r.providers[path]; ok {
+		r.mu.RUnlock()
+		return p, nil
+	}
+	r.mu.RUnlock()
+
+	result, err, _ := r.flight.Do(path, func() (interface{}, error) {
+		p, err := mg.NewProvider(path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load must-gather archive: %w", err)
+		}
+		r.mu.Lock()
+		r.providers[path] = p
+		r.mu.Unlock()
+		return p, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result.(*mg.Provider), nil
+}
+
+// resolveArchivePath resolves an archive ID to its absolute filesystem path
+// using the process-global registry.
+func resolveArchivePath(ctx context.Context, dirs []string, id string) (string, error) {
+	return registry.resolvePath(ctx, dirs, id)
+}
+
+// loadProvider returns a cached or freshly loaded provider for path.
+func loadProvider(path string) (*mg.Provider, error) {
+	return registry.loadProvider(path)
 }
