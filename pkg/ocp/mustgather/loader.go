@@ -103,7 +103,15 @@ func loadMetadata(containerDir string, metadata *MustGatherMetadata) {
 		metadata.Version = strings.TrimSpace(string(data))
 	}
 	if data, err := os.ReadFile(filepath.Join(containerDir, "timestamp")); err == nil {
-		metadata.Timestamp = strings.TrimSpace(string(data))
+		// The timestamp file accumulates one line per gather step; the first
+		// non-empty line marks when the must-gather started, which is the
+		// timestamp we report.
+		for line := range strings.SplitSeq(string(data), "\n") {
+			if line = strings.TrimSpace(line); line != "" {
+				metadata.Timestamp = line
+				break
+			}
+		}
 	}
 }
 
