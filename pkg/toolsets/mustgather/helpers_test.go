@@ -3,27 +3,27 @@ package mustgather
 import (
 	"context"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 
+	"github.com/containers/kubernetes-mcp-server/internal/test"
+	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
 	"github.com/stretchr/testify/suite"
-	"golang.org/x/sync/singleflight"
 )
 
 type RegistrySuite struct {
 	suite.Suite
+	registry   *mgRegistry
 	archiveDir string
 }
 
 func (s *RegistrySuite) SetupTest() {
-	registry.mu.Lock()
-	registry.dirs = nil
-	registry.byID = make(map[string]string)
-	registry.providers = make(map[string]*mg.Provider)
-	registry.flight = singleflight.Group{}
-	registry.mu.Unlock()
+	// A fresh registry per test, matching the per-config lifecycle.
+	s.registry = newRegistry()
 
 	dir, err := os.MkdirTemp("", "mustgather-test-*")
 	s.Require().NoError(err)
@@ -36,7 +36,7 @@ func (s *RegistrySuite) TearDownTest() {
 
 func (s *RegistrySuite) TestLazyInit() {
 	s.Run("loads provider on first call", func() {
-		p, err := loadProvider(s.archiveDir)
+		p, err := s.registry.loadProvider(s.archiveDir)
 		s.NoError(err)
 		s.NotNil(p)
 		s.Equal(s.archiveDir, p.GetMetadata().Path)
@@ -45,10 +45,10 @@ func (s *RegistrySuite) TestLazyInit() {
 
 func (s *RegistrySuite) TestCaching() {
 	s.Run("returns same provider on repeated calls", func() {
-		p1, err := loadProvider(s.archiveDir)
+		p1, err := s.registry.loadProvider(s.archiveDir)
 		s.Require().NoError(err)
 
-		p2, err := loadProvider(s.archiveDir)
+		p2, err := s.registry.loadProvider(s.archiveDir)
 		s.Require().NoError(err)
 
 		s.Same(p1, p2)
@@ -61,10 +61,10 @@ func (s *RegistrySuite) TestMultipleArchives() {
 		s.Require().NoError(err)
 		defer func() { _ = os.RemoveAll(dir2) }()
 
-		p1, err := loadProvider(s.archiveDir)
+		p1, err := s.registry.loadProvider(s.archiveDir)
 		s.Require().NoError(err)
 
-		p2, err := loadProvider(dir2)
+		p2, err := s.registry.loadProvider(dir2)
 		s.Require().NoError(err)
 
 		s.NotSame(p1, p2)
@@ -83,7 +83,7 @@ func (s *RegistrySuite) TestConcurrentSamePath() {
 			wg.Add(1)
 			go func(idx int) {
 				defer wg.Done()
-				p, err := loadProvider(s.archiveDir)
+				p, err := s.registry.loadProvider(s.archiveDir)
 				if err == nil {
 					results[idx] = p
 					atomic.AddInt32(&count, 1)
@@ -101,7 +101,7 @@ func (s *RegistrySuite) TestConcurrentSamePath() {
 
 func (s *RegistrySuite) TestEmptyArchive() {
 	s.Run("loads provider with zero resources for empty directory", func() {
-		p, err := loadProvider(s.archiveDir)
+		p, err := s.registry.loadProvider(s.archiveDir)
 		s.NoError(err)
 		s.NotNil(p)
 		s.Equal(0, p.GetMetadata().ResourceCount)
@@ -110,13 +110,38 @@ func (s *RegistrySuite) TestEmptyArchive() {
 
 func (s *RegistrySuite) TestProviderForArchive() {
 	s.Run("returns error when id is empty", func() {
-		current.Store(&Config{MustGatherDirs: []string{s.archiveDir}})
-		defer current.Store(nil)
-
-		_, err := providerForArchive(context.Background(), "")
+		params := paramsWithDirs(s.T(), s.archiveDir)
+		_, err := providerForArchive(params, "")
 		s.Error(err)
 		s.Contains(err.Error(), "archive_id is required")
 	})
+
+	s.Run("returns error when toolset is not configured", func() {
+		params := api.ToolHandlerParams{
+			Context:    context.Background(),
+			BaseConfig: test.Must(config.ReadToml([]byte(``))),
+		}
+		_, err := providerForArchive(params, "mg-000000000000")
+		s.Error(err)
+		s.Contains(err.Error(), "not configured")
+	})
+}
+
+// paramsWithDirs builds ToolHandlerParams whose toolset config points at the
+// given must-gather directories, so tests can exercise the config-driven
+// resolution path.
+func paramsWithDirs(t *testing.T, dirs ...string) api.ToolHandlerParams {
+	t.Helper()
+	quoted := make([]string, 0, len(dirs))
+	for _, d := range dirs {
+		quoted = append(quoted, `"`+d+`"`)
+	}
+	toml := "[toolset_configs.\"openshift/mustgather\"]\nmustgather_dirs = [" +
+		strings.Join(quoted, ", ") + "]\n"
+	return api.ToolHandlerParams{
+		Context:    context.Background(),
+		BaseConfig: test.Must(config.ReadToml([]byte(toml))),
+	}
 }
 
 func TestRegistry(t *testing.T) {

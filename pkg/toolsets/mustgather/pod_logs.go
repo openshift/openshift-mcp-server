@@ -123,7 +123,7 @@ func initPodLogs() []api.ServerTool {
 func mustgatherPodLogsGet(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	id := getString(args, "archive_id", "")
-	p, err := providerForArchive(params.Context, id)
+	p, err := providerForArchive(params, id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -138,8 +138,9 @@ func mustgatherPodLogsGet(params api.ToolHandlerParams) (*api.ToolCallResult, er
 		return api.NewToolCallResult("", fmt.Errorf("namespace and pod are required")), nil
 	}
 
-	tailLimit := toolsetTailLimit()
-	maxOutputSize := toolsetMaxOutputSize()
+	cfg := configFromParams(params)
+	tailLimit := cfg.tailLimit()
+	maxOutputSize := cfg.maxOutputSize()
 	// Cap a tool-provided tail so it can't be used as an unbounded slice
 	// capacity. Values within the limit keep their normal tail behavior.
 	tailCapped := tail > tailLimit
@@ -234,7 +235,7 @@ func mustgatherPodLogsGet(params api.ToolHandlerParams) (*api.ToolCallResult, er
 func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	id := getString(args, "archive_id", "")
-	p, err := providerForArchive(params.Context, id)
+	p, err := providerForArchive(params, id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -254,8 +255,9 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 		return api.NewToolCallResult("", fmt.Errorf("filter string is required")), nil
 	}
 
-	tailLimit := toolsetTailLimit()
-	maxOutputSize := toolsetMaxOutputSize()
+	cfg := configFromParams(params)
+	tailLimit := cfg.tailLimit()
+	maxOutputSize := cfg.maxOutputSize()
 	tailCapped := tail > tailLimit
 	if tailCapped {
 		tail = tailLimit
@@ -354,7 +356,7 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 func mustgatherPodLogsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	args := params.GetArguments()
 	id := getString(args, "archive_id", "")
-	p, err := providerForArchive(params.Context, id)
+	p, err := providerForArchive(params, id)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -458,5 +460,5 @@ func mustgatherPodLogsByTime(params api.ToolHandlerParams) (*api.ToolCallResult,
 		return api.NewToolCallResult(header+"No matching lines found.", nil), nil
 	}
 
-	return api.NewToolCallResult(header+capOutput(strings.Join(matchingLines, "\n"), toolsetMaxOutputSize()), nil), nil
+	return api.NewToolCallResult(header+capOutput(strings.Join(matchingLines, "\n"), configFromParams(params).maxOutputSize()), nil), nil
 }

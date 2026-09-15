@@ -42,7 +42,11 @@ func initList() []api.ServerTool {
 }
 
 func mustgatherList(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	dirs := toolsetDirs()
+	cfg := configFromParams(params)
+	var dirs []string
+	if cfg != nil {
+		dirs = cfg.MustGatherDirs
+	}
 	if len(dirs) == 0 {
 		return api.NewToolCallResult("", fmt.Errorf("no must-gather directories configured; set mustgather_dirs in the [toolset_configs.\"openshift/mustgather\"] section of the config file to a directory containing must-gather archives")), nil
 	}

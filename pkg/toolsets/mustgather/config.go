@@ -3,7 +3,6 @@ package mustgather
 import (
 	"context"
 	"errors"
-	"sync/atomic"
 
 	"github.com/BurntSushi/toml"
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
@@ -37,6 +36,13 @@ type Config struct {
 	// output returned by a single tool call. When unset (0),
 	// defaultMaxOutputSize is used.
 	MaxOutputSize int `toml:"max_output_size,omitempty"`
+
+	// registry is the archive cache scoped to this parsed configuration. The
+	// parser initializes a fresh, empty registry for every Config it produces,
+	// so a server reload (SIGHUP) that yields a new Config starts from a clean
+	// cache instead of carrying stale ID→path and provider entries built from
+	// the previous configuration.
+	registry *mgRegistry
 }
 
 var _ api.ExtendedConfig = (*Config)(nil)
@@ -49,40 +55,35 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// current holds the last parsed toolset configuration. mustgatherToolsetParser
-// updates it every time the server config is loaded or reloaded (SIGHUP), so
-// tool and resource handlers observe the live value. If the
-// [toolset_configs."openshift/mustgather"] section is removed on a reload, the
-// last parsed value remains until the section is loaded again.
-var current atomic.Pointer[Config]
-
-// toolsetDirs returns the directories scanned for must-gather archives, or
-// nil if the toolset is not configured.
-func toolsetDirs() []string {
-	if c := current.Load(); c != nil {
-		return c.MustGatherDirs
-	}
-	return nil
-}
-
-// toolsetTailLimit returns the configured cap on tail line counts, falling
-// back to defaultTailLimit when the toolset is unconfigured or the value is
+// tailLimit returns the configured cap on tail line counts, falling back to
+// defaultTailLimit when the toolset is unconfigured or the value is
 // unset/non-positive.
-func toolsetTailLimit() int {
-	if c := current.Load(); c != nil && c.TailLimit > 0 {
+func (c *Config) tailLimit() int {
+	if c != nil && c.TailLimit > 0 {
 		return c.TailLimit
 	}
 	return defaultTailLimit
 }
 
-// toolsetMaxOutputSize returns the configured cap on aggregate log output
-// size in bytes, falling back to defaultMaxOutputSize when the toolset is
-// unconfigured or the value is unset/non-positive.
-func toolsetMaxOutputSize() int {
-	if c := current.Load(); c != nil && c.MaxOutputSize > 0 {
+// maxOutputSize returns the configured cap on aggregate log output size in
+// bytes, falling back to defaultMaxOutputSize when the toolset is unconfigured
+// or the value is unset/non-positive.
+func (c *Config) maxOutputSize() int {
+	if c != nil && c.MaxOutputSize > 0 {
 		return c.MaxOutputSize
 	}
 	return defaultMaxOutputSize
+}
+
+// configFromParams returns the openshift/mustgather toolset configuration for
+// the current request, or nil if the toolset is not configured.
+func configFromParams(params api.ToolHandlerParams) *Config {
+	if c, ok := params.GetToolsetConfig("openshift/mustgather"); ok {
+		if mc, ok := c.(*Config); ok {
+			return mc
+		}
+	}
+	return nil
 }
 
 // mustgatherToolsetParser parses the openshift/mustgather toolset
@@ -92,7 +93,7 @@ func mustgatherToolsetParser(_ context.Context, primitive toml.Primitive, md tom
 	if err := md.PrimitiveDecode(primitive, &cfg); err != nil {
 		return nil, err
 	}
-	current.Store(&cfg)
+	cfg.registry = newRegistry()
 	return &cfg, nil
 }
 

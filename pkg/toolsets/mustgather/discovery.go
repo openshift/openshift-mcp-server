@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -108,9 +107,11 @@ func discoverArchives(ctx context.Context, dirs []string) []ArchiveInfo {
 	return archives
 }
 
-// mgRegistry is the single process-global cache for the mustgather toolset. It
-// holds both the ID→path map produced by the last directory scan and the
-// lazily-loaded providers keyed by path.
+// mgRegistry is the archive cache for a single parsed toolset configuration
+// (see Config.registry). It holds both the ID→path map produced by the last
+// directory scan and the lazily-loaded providers keyed by path. Because a fresh
+// registry is created per Config, a server reload starts from an empty cache;
+// within a registry the configured dir-set is fixed for its lifetime.
 //
 // Immutability contract: a must-gather archive is a point-in-time snapshot and
 // is treated as immutable between scans. A loaded provider is therefore reused
@@ -120,15 +121,18 @@ func discoverArchives(ctx context.Context, dirs []string) []ArchiveInfo {
 // until a rescan is triggered (see resolvePath).
 type mgRegistry struct {
 	mu        sync.RWMutex
-	dirs      []string                // dir-set the byID map was built from
+	gen       uint64                  // scan generation, bumped on every rescan
 	byID      map[string]string       // id -> absolute path (from the last scan)
 	providers map[string]*mg.Provider // path -> loaded provider
 	flight    singleflight.Group      // coalesces concurrent expensive loads
 }
 
-var registry = &mgRegistry{
-	byID:      make(map[string]string),
-	providers: make(map[string]*mg.Provider),
+// newRegistry returns an empty registry ready for use.
+func newRegistry() *mgRegistry {
+	return &mgRegistry{
+		byID:      make(map[string]string),
+		providers: make(map[string]*mg.Provider),
+	}
 }
 
 // rescan rebuilds byID from a fresh directory scan and invalidates every cached
@@ -149,18 +153,20 @@ func (r *mgRegistry) rescan(ctx context.Context, dirs []string) {
 		byID[id] = path
 	}
 	r.byID = byID
-	r.dirs = append([]string(nil), dirs...)
-	// Invalidate all cached providers: the scan is the sole cache-invalidation
-	// boundary (see the mgRegistry immutability contract).
+	// Bump the generation and invalidate all cached providers: the scan is the
+	// sole cache-invalidation boundary (see the mgRegistry immutability
+	// contract). The generation lets an in-flight provider load detect that it
+	// raced a rescan and must not repopulate the freshly cleared map.
+	r.gen++
 	r.providers = make(map[string]*mg.Provider)
 }
 
 // resolvePath resolves an archive ID to its absolute filesystem path. It rescans
-// (which also invalidates all cached providers) only when the configured dir-set
-// changed, when the ID is not in the current map, or when a cached path no
-// longer exists on disk. Between scans an ID→path hit is trusted without
-// re-reading the archive. When the ID still cannot be found, the returned error
-// lists the currently known IDs so the caller (LLM) can self-correct.
+// (which also invalidates all cached providers) when the ID is not in the
+// current map or when a cached path no longer exists on disk. Between scans an
+// ID→path hit is trusted without re-reading the archive. When the ID still
+// cannot be found, the returned error lists the currently known IDs so the
+// caller (LLM) can self-correct.
 func (r *mgRegistry) resolvePath(ctx context.Context, dirs []string, id string) (string, error) {
 	if err := mg.IsValidArchiveID(id); err != nil {
 		return "", err
@@ -171,11 +177,6 @@ func (r *mgRegistry) resolvePath(ctx context.Context, dirs []string, id string) 
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
-	// A changed dir-set invalidates the previous scan.
-	if !slices.Equal(r.dirs, dirs) {
-		r.rescan(ctx, dirs)
-	}
 
 	if path, ok := r.byID[id]; ok {
 		if _, err := os.Stat(path); err == nil {
@@ -205,21 +206,33 @@ func (r *mgRegistry) resolvePath(ctx context.Context, dirs []string, id string) 
 // initializing and caching it. Concurrent loads of the same path are coalesced
 // via singleflight. The cache is invalidated wholesale on the next rescan (see
 // the mgRegistry immutability contract).
+//
+// The scan generation is captured before the load and re-checked before the
+// built provider is committed: if a rescan cleared the providers map while the
+// load was in flight, the provider was built against a now-invalidated scan and
+// must not repopulate the fresh map. It is still returned to this caller (the
+// data is valid); it simply is not cached across the invalidation boundary. The
+// generation is also part of the singleflight key so loads from before and after
+// a rescan are never coalesced.
 func (r *mgRegistry) loadProvider(path string) (*mg.Provider, error) {
 	r.mu.RLock()
 	if p, ok := r.providers[path]; ok {
 		r.mu.RUnlock()
 		return p, nil
 	}
+	gen := r.gen
 	r.mu.RUnlock()
 
-	result, err, _ := r.flight.Do(path, func() (interface{}, error) {
+	key := fmt.Sprintf("%d\x00%s", gen, path)
+	result, err, _ := r.flight.Do(key, func() (interface{}, error) {
 		p, err := mg.NewProvider(path)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load must-gather archive: %w", err)
 		}
 		r.mu.Lock()
-		r.providers[path] = p
+		if r.gen == gen {
+			r.providers[path] = p
+		}
 		r.mu.Unlock()
 		return p, nil
 	})
@@ -227,15 +240,4 @@ func (r *mgRegistry) loadProvider(path string) (*mg.Provider, error) {
 		return nil, err
 	}
 	return result.(*mg.Provider), nil
-}
-
-// resolveArchivePath resolves an archive ID to its absolute filesystem path
-// using the process-global registry.
-func resolveArchivePath(ctx context.Context, dirs []string, id string) (string, error) {
-	return registry.resolvePath(ctx, dirs, id)
-}
-
-// loadProvider returns a cached or freshly loaded provider for path.
-func loadProvider(path string) (*mg.Provider, error) {
-	return registry.loadProvider(path)
 }
