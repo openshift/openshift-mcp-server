@@ -1,0 +1,48 @@
+kind: Task
+metadata:
+  labels:
+    suite: mustgather
+  name: resources-list-nodes
+  difficulty: easy
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      MG_DIR="/tmp/mustgather-eval"
+      rm -rf "${MG_DIR}"
+      mkdir -p "${MG_DIR}"
+      echo "Running oc adm must-gather..."
+      oc adm must-gather --dest-dir="${MG_DIR}" 2>&1
+      echo "Must-gather archive ready at ${MG_DIR}"
+      # Save a node name for verification
+      kubectl get nodes -o jsonpath='{.items[0].metadata.name}' > /tmp/mustgather-eval-node-name
+  verify:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      EXPECTED_NODE=$(cat /tmp/mustgather-eval-node-name)
+      echo "${EXPECTED_NODE}"
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      rm -rf /tmp/mustgather-eval /tmp/mustgather-eval-node-name
+  prompt:
+    inline: |
+      I have a must-gather archive extracted at /tmp/mustgather-eval. Please:
+      1. Load the must-gather archive from /tmp/mustgather-eval using the mustgather_use tool
+      2. List all Node resources from the archive using the mustgather_resources_list tool with kind "Node"
+      Report the node names and count.
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "mustgather_use"
+        args:
+          path: "/tmp/mustgather-eval"
+      - server: kubernetes
+        toolPattern: "mustgather_resources_list"
+        args:
+          kind: "Node"
+    minToolCalls: 2
+    maxToolCalls: 5

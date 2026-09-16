@@ -1,0 +1,80 @@
+kind: Task
+metadata:
+  labels:
+    suite: mustgather
+  name: diagnose-olm-catalog-empty
+  difficulty: hard
+steps:
+  setup:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      # Scale down CVO so it doesn't reconcile the operators back
+      oc scale deployment/cluster-version-operator -n openshift-cluster-version --replicas=0
+      echo "Scaled down CVO"
+
+      # Scale down OLM operator and packageserver
+      oc scale deployment/olm-operator -n openshift-operator-lifecycle-manager --replicas=0
+      oc scale deployment/packageserver -n openshift-operator-lifecycle-manager --replicas=0
+      echo "Scaled down OLM operator and packageserver"
+
+      # Wait for packageserver pods to terminate
+      oc wait --for=delete pod -l app=packageserver -n openshift-operator-lifecycle-manager --timeout=120s 2>/dev/null || true
+      echo "Packageserver pods terminated"
+
+      # Capture apiservice status for verification
+      oc get apiservice v1.packages.operators.coreos.com -o jsonpath='{.status.conditions[0].type}={.status.conditions[0].status}' > /tmp/mustgather-eval-apiservice-status
+      echo "APIService status captured"
+
+      # Collect must-gather from the broken cluster
+      MG_DIR="/tmp/mustgather-eval-olm"
+      rm -rf "${MG_DIR}"
+      mkdir -p "${MG_DIR}"
+      echo "Running oc adm must-gather..."
+      oc adm must-gather --dest-dir="${MG_DIR}" 2>&1
+      echo "Must-gather archive ready at ${MG_DIR}"
+  verify:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # The agent should identify that packageserver is scaled to 0 / not running
+      # and that the v1.packages.operators.coreos.com apiservice is unavailable
+      echo "packageserver"
+  cleanup:
+    inline: |-
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # Restore CVO so it reconciles everything back
+      oc scale deployment/cluster-version-operator -n openshift-cluster-version --replicas=1
+      echo "Restored CVO"
+      # Restore OLM components
+      oc scale deployment/olm-operator -n openshift-operator-lifecycle-manager --replicas=1
+      oc scale deployment/packageserver -n openshift-operator-lifecycle-manager --replicas=2
+      echo "Restored OLM operator and packageserver"
+      # Cleanup
+      rm -rf /tmp/mustgather-eval-olm /tmp/mustgather-eval-apiservice-status
+  prompt:
+    inline: |
+      I have an OpenShift cluster where no operators show up in the OperatorHub catalog
+      when browsing the OpenShift web console. The catalog page is completely empty.
+
+      I have already collected a must-gather archive at /tmp/mustgather-eval-olm.
+
+      Please:
+      1. Load the must-gather archive from /tmp/mustgather-eval-olm using the mustgather_use tool
+      2. Investigate the must-gather data to diagnose why the operator catalog is empty
+      3. Check the status of OLM-related components (deployments, pods, apiservices)
+      4. Identify the root cause and suggest a fix
+
+      Focus on the openshift-operator-lifecycle-manager namespace and the packageserver component.
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "mustgather_use"
+        args:
+          path: "/tmp/mustgather-eval-olm"
+      - server: kubernetes
+        toolPattern: "mustgather_resources_.*"
+    minToolCalls: 2
+    maxToolCalls: 15
