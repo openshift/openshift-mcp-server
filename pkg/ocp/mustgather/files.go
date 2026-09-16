@@ -48,3 +48,54 @@ func (p *Provider) ReadArchiveFile(relPath string) ([]byte, error) {
 
 	return os.ReadFile(full)
 }
+
+// ArchiveEntry describes a single entry found while walking an archive
+// directory. Path is relative to the directory that was listed (slash-separated).
+type ArchiveEntry struct {
+	Path  string
+	IsDir bool
+	Size  int64
+}
+
+// ListArchiveDir walks the subtree rooted at relDir (interpreted relative to the
+// archive container directory) and returns its entries, excluding the root
+// itself. relDir is guarded against directory traversal; a missing directory
+// returns an error.
+func (p *Provider) ListArchiveDir(relDir string) ([]ArchiveEntry, error) {
+	root, err := p.underContainerDir(relDir)
+	if err != nil {
+		return nil, err
+	}
+
+	info, err := os.Stat(root)
+	if err != nil {
+		return nil, fmt.Errorf("archive directory %s not found: %w", relDir, err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("%s is not a directory", relDir)
+	}
+
+	var entries []ArchiveEntry
+	walkErr := filepath.Walk(root, func(current string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return nil // skip unreadable entries
+		}
+		if current == root {
+			return nil
+		}
+		rel, relErr := filepath.Rel(root, current)
+		if relErr != nil {
+			return nil
+		}
+		entries = append(entries, ArchiveEntry{
+			Path:  filepath.ToSlash(rel),
+			IsDir: fi.IsDir(),
+			Size:  fi.Size(),
+		})
+		return nil
+	})
+	if walkErr != nil {
+		return nil, walkErr
+	}
+	return entries, nil
+}

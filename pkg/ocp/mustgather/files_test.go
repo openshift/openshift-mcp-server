@@ -79,6 +79,38 @@ func (s *FilesSuite) TestReadArchiveFile() {
 	})
 }
 
+func (s *FilesSuite) TestListArchiveDir() {
+	s.Run("lists nested entries relative to the directory", func() {
+		entries, err := s.provider.ListArchiveDir("host_service_logs")
+		s.Require().NoError(err)
+
+		byPath := map[string]ArchiveEntry{}
+		for _, e := range entries {
+			byPath[e.Path] = e
+		}
+		s.Contains(byPath, "masters")
+		s.True(byPath["masters"].IsDir, "masters should be reported as a directory")
+		s.Contains(byPath, "masters/kubelet_service.log")
+		s.False(byPath["masters/kubelet_service.log"].IsDir)
+		s.Equal(int64(len("kubelet started\nkubelet ready\n")), byPath["masters/kubelet_service.log"].Size)
+	})
+
+	s.Run("edge cases", func() {
+		s.Run("returns error for a missing directory", func() {
+			_, err := s.provider.ListArchiveDir("does_not_exist")
+			s.Error(err)
+		})
+		s.Run("returns error when the path is a file", func() {
+			_, err := s.provider.ListArchiveDir("version")
+			s.Error(err)
+		})
+		s.Run("rejects directory traversal", func() {
+			_, err := s.provider.ListArchiveDir("../..")
+			s.Error(err)
+		})
+	})
+}
+
 func TestFiles(t *testing.T) {
 	suite.Run(t, new(FilesSuite))
 }

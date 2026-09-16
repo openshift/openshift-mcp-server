@@ -93,55 +93,61 @@ func initMCPResourceTemplates() []api.ServerResourceTemplate {
 			ResourceTemplate: api.ResourceTemplate{
 				URITemplate: "must-gather://local/{archive_id}/audit_logs{/path*}",
 				Name:        "must-gather-audit-logs",
-				Description: "API server audit logs from the must-gather archive. Append a file path within audit_logs/ to read a file; .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
+				Description: "API server audit logs from the must-gather archive. Append a file path within audit_logs/ to read a file; the file path supports argument completion for discovering available files. .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
 				MIMEType:    "text/plain",
 			},
-			Handler: resourceArchiveDir("audit_logs"),
+			Handler:           resourceArchiveDir("audit_logs"),
+			CompletionHandler: completionArchiveDir("audit_logs"),
 		},
 		{
 			ResourceTemplate: api.ResourceTemplate{
 				URITemplate: "must-gather://local/{archive_id}/host_service_logs{/path*}",
 				Name:        "must-gather-host-service-logs",
-				Description: "Host systemd service logs (kubelet, crio, NetworkManager, etc.) from the must-gather archive. Append a file path within host_service_logs/ to read a file; .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
+				Description: "Host systemd service logs (kubelet, crio, NetworkManager, etc.) from the must-gather archive. Append a file path within host_service_logs/ to read a file; the file path supports argument completion for discovering available files. .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
 				MIMEType:    "text/plain",
 			},
-			Handler: resourceArchiveDir("host_service_logs"),
+			Handler:           resourceArchiveDir("host_service_logs"),
+			CompletionHandler: completionArchiveDir("host_service_logs"),
 		},
 		{
 			ResourceTemplate: api.ResourceTemplate{
 				URITemplate: "must-gather://local/{archive_id}/network_logs{/path*}",
 				Name:        "must-gather-network-logs",
-				Description: "Network (OVN-Kubernetes) logs and diagnostics from the must-gather archive. Append a file path within network_logs/ to read a file; .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
+				Description: "Network (OVN-Kubernetes) logs and diagnostics from the must-gather archive. Append a file path within network_logs/ to read a file; the file path supports argument completion for discovering available files. .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
 				MIMEType:    "text/plain",
 			},
-			Handler: resourceArchiveDir("network_logs"),
+			Handler:           resourceArchiveDir("network_logs"),
+			CompletionHandler: completionArchiveDir("network_logs"),
 		},
 		{
 			ResourceTemplate: api.ResourceTemplate{
 				URITemplate: "must-gather://local/{archive_id}/static-pods{/path*}",
 				Name:        "must-gather-static-pods",
-				Description: "Static pod termination logs (kube-apiserver, etcd, etc.) from the must-gather archive. Append a file path within static-pods/ to read a file; .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
+				Description: "Static pod termination logs (kube-apiserver, etcd, etc.) from the must-gather archive. Append a file path within static-pods/ to read a file; the file path supports argument completion for discovering available files. .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
 				MIMEType:    "text/plain",
 			},
-			Handler: resourceArchiveDir("static-pods"),
+			Handler:           resourceArchiveDir("static-pods"),
+			CompletionHandler: completionArchiveDir("static-pods"),
 		},
 		{
 			ResourceTemplate: api.ResourceTemplate{
 				URITemplate: "must-gather://local/{archive_id}/pod_network_connectivity_check{/path*}",
 				Name:        "must-gather-pod-network-connectivity-check",
-				Description: "Pod network connectivity check results from the must-gather archive. Append a file path within pod_network_connectivity_check/ to read a file; .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
+				Description: "Pod network connectivity check results from the must-gather archive. Append a file path within pod_network_connectivity_check/ to read a file; the file path supports argument completion for discovering available files. .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
 				MIMEType:    "text/plain",
 			},
-			Handler: resourceArchiveDir("pod_network_connectivity_check"),
+			Handler:           resourceArchiveDir("pod_network_connectivity_check"),
+			CompletionHandler: completionArchiveDir("pod_network_connectivity_check"),
 		},
 		{
 			ResourceTemplate: api.ResourceTemplate{
 				URITemplate: "must-gather://local/{archive_id}/monitoring/metrics{/path*}",
 				Name:        "must-gather-monitoring-metrics",
-				Description: "Cluster monitoring metrics (e.g. metrics.openmetrics) from the must-gather archive. Append a file path within monitoring/metrics/ to read a file; .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
+				Description: "Cluster monitoring metrics (e.g. metrics.openmetrics) from the must-gather archive. Append a file path within monitoring/metrics/ to read a file; the file path supports argument completion for discovering available files. .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
 				MIMEType:    "text/plain",
 			},
-			Handler: resourceArchiveDir("monitoring/metrics"),
+			Handler:           resourceArchiveDir("monitoring/metrics"),
+			CompletionHandler: completionArchiveDir("monitoring/metrics"),
 		},
 	}
 }
@@ -180,6 +186,41 @@ func resourceArchiveDir(rootDir string) api.ResourceTemplateHandler {
 			return &api.ResourceContent{Text: string(data)}, nil
 		}
 		return &api.ResourceContent{Blob: data, MIMEType: "application/octet-stream"}, nil
+	}
+}
+
+// completionArchiveDir returns an argument-completion handler bound to a fixed
+// top-level directory within the archive. It completes the "path" variable of
+// the directory's resource template by listing the files and subdirectories
+// under rootDir (subdirs included so a client can drill down), filtered by the
+// partial value typed so far. Discovery is best-effort: any resolution failure
+// yields no suggestions rather than an error.
+func completionArchiveDir(rootDir string) api.ArgumentCompletionHandler {
+	return func(ctx context.Context, argument, value string, resolved map[string]string) ([]string, error) {
+		if argument != "path" {
+			return nil, nil
+		}
+		id := resolved["archive_id"]
+		if id == "" {
+			return nil, nil
+		}
+		p, err := providerForArchiveContext(ctx, id)
+		if err != nil {
+			return nil, nil //nolint:nilerr // completion is advisory; no archive => no suggestions
+		}
+		entries, err := p.ListArchiveDir(rootDir)
+		if err != nil {
+			return nil, nil //nolint:nilerr // completion is advisory; unreadable dir => no suggestions
+		}
+
+		var matches []string
+		for _, e := range entries {
+			if strings.HasPrefix(e.Path, value) {
+				matches = append(matches, e.Path)
+			}
+		}
+		sort.Strings(matches)
+		return matches, nil
 	}
 }
 

@@ -415,22 +415,22 @@ toolsets = ["core", "config", "helm", "kubevirt"]
 - **must-gather-resource** - A specific Kubernetes resource from the must-gather archive as YAML. Use '-' for empty group (core API) or cluster-scoped namespace.
   - URI Template: `must-gather://local/{archive_id}/resources/{group}/{version}/{kind}/{namespace}/{name}`
   - MIME Type: `text/yaml`
-- **must-gather-audit-logs** - API server audit logs from the must-gather archive. Append a file path within audit_logs/ to read a file; .gz files are decompressed automatically. Use the archive_id from mustgather_list.
+- **must-gather-audit-logs** - API server audit logs from the must-gather archive. Append a file path within audit_logs/ to read a file; the file path supports argument completion for discovering available files. .gz files are decompressed automatically. Use the archive_id from mustgather_list.
   - URI Template: `must-gather://local/{archive_id}/audit_logs{/path*}`
   - MIME Type: `text/plain`
-- **must-gather-host-service-logs** - Host systemd service logs (kubelet, crio, NetworkManager, etc.) from the must-gather archive. Append a file path within host_service_logs/ to read a file; .gz files are decompressed automatically. Use the archive_id from mustgather_list.
+- **must-gather-host-service-logs** - Host systemd service logs (kubelet, crio, NetworkManager, etc.) from the must-gather archive. Append a file path within host_service_logs/ to read a file; the file path supports argument completion for discovering available files. .gz files are decompressed automatically. Use the archive_id from mustgather_list.
   - URI Template: `must-gather://local/{archive_id}/host_service_logs{/path*}`
   - MIME Type: `text/plain`
-- **must-gather-network-logs** - Network (OVN-Kubernetes) logs and diagnostics from the must-gather archive. Append a file path within network_logs/ to read a file; .gz files are decompressed automatically. Use the archive_id from mustgather_list.
+- **must-gather-network-logs** - Network (OVN-Kubernetes) logs and diagnostics from the must-gather archive. Append a file path within network_logs/ to read a file; the file path supports argument completion for discovering available files. .gz files are decompressed automatically. Use the archive_id from mustgather_list.
   - URI Template: `must-gather://local/{archive_id}/network_logs{/path*}`
   - MIME Type: `text/plain`
-- **must-gather-static-pods** - Static pod termination logs (kube-apiserver, etcd, etc.) from the must-gather archive. Append a file path within static-pods/ to read a file; .gz files are decompressed automatically. Use the archive_id from mustgather_list.
+- **must-gather-static-pods** - Static pod termination logs (kube-apiserver, etcd, etc.) from the must-gather archive. Append a file path within static-pods/ to read a file; the file path supports argument completion for discovering available files. .gz files are decompressed automatically. Use the archive_id from mustgather_list.
   - URI Template: `must-gather://local/{archive_id}/static-pods{/path*}`
   - MIME Type: `text/plain`
-- **must-gather-pod-network-connectivity-check** - Pod network connectivity check results from the must-gather archive. Append a file path within pod_network_connectivity_check/ to read a file; .gz files are decompressed automatically. Use the archive_id from mustgather_list.
+- **must-gather-pod-network-connectivity-check** - Pod network connectivity check results from the must-gather archive. Append a file path within pod_network_connectivity_check/ to read a file; the file path supports argument completion for discovering available files. .gz files are decompressed automatically. Use the archive_id from mustgather_list.
   - URI Template: `must-gather://local/{archive_id}/pod_network_connectivity_check{/path*}`
   - MIME Type: `text/plain`
-- **must-gather-monitoring-metrics** - Cluster monitoring metrics (e.g. metrics.openmetrics) from the must-gather archive. Append a file path within monitoring/metrics/ to read a file; .gz files are decompressed automatically. Use the archive_id from mustgather_list.
+- **must-gather-monitoring-metrics** - Cluster monitoring metrics (e.g. metrics.openmetrics) from the must-gather archive. Append a file path within monitoring/metrics/ to read a file; the file path supports argument completion for discovering available files. .gz files are decompressed automatically. Use the archive_id from mustgather_list.
   - URI Template: `must-gather://local/{archive_id}/monitoring/metrics{/path*}`
   - MIME Type: `text/plain`
 </details>
