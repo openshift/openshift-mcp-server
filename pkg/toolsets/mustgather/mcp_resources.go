@@ -113,7 +113,7 @@ func providerForURI(ctx context.Context, uri string) (*mg.Provider, error) {
 	if err != nil {
 		return nil, err
 	}
-	return providerForArchive(ctx, id)
+	return providerForArchiveContext(ctx, id)
 }
 
 func resourceCurrentArchive(ctx context.Context, uri string) (*api.ResourceContent, error) {
@@ -249,7 +249,7 @@ func resourceGet(ctx context.Context, uri string) (*api.ResourceContent, error) 
 	if err != nil {
 		return nil, err
 	}
-	p, err := providerForArchive(ctx, id)
+	p, err := providerForArchiveContext(ctx, id)
 	if err != nil {
 		return nil, err
 	}

@@ -311,6 +311,13 @@ func (s *Server) applyToolsets(ctx context.Context, cfg *Configuration) error {
 	// the commit phase above; the store makes the new *Configuration
 	// observable to lock-free readers in one indivisible step.
 	s.configuration.Store(cfg)
+	// Publish committed toolset configs to their live state now that cfg is
+	// installed. This backs handlers that cannot reach the request-scoped
+	// toolset config (MCP resource handlers, whose signature carries only a
+	// context). Committers run only on an accepted config, so a rejected reload
+	// (which returns before this point) leaves prior state untouched, and a
+	// reload that drops a toolset's section clears its stale state.
+	config.CommitToolsetConfigs(cfg.StaticConfig)
 	// Update the enabledX bookkeeping under mu. Readers of these fields
 	// (GetEnabledX) only read enabledX, never combined with cfg, so there
 	// is no need to keep the cfg store and the enabledX writes inside the
