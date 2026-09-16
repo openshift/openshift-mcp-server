@@ -3,8 +3,10 @@ package mustgather
 import (
 	"context"
 	"fmt"
+	"path"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
@@ -87,6 +89,97 @@ func initMCPResourceTemplates() []api.ServerResourceTemplate {
 			},
 			Handler: resourceGet,
 		},
+		{
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/audit_logs{/path*}",
+				Name:        "must-gather-audit-logs",
+				Description: "API server audit logs from the must-gather archive. Append a file path within audit_logs/ to read a file; .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
+				MIMEType:    "text/plain",
+			},
+			Handler: resourceArchiveDir("audit_logs"),
+		},
+		{
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/host_service_logs{/path*}",
+				Name:        "must-gather-host-service-logs",
+				Description: "Host systemd service logs (kubelet, crio, NetworkManager, etc.) from the must-gather archive. Append a file path within host_service_logs/ to read a file; .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
+				MIMEType:    "text/plain",
+			},
+			Handler: resourceArchiveDir("host_service_logs"),
+		},
+		{
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/network_logs{/path*}",
+				Name:        "must-gather-network-logs",
+				Description: "Network (OVN-Kubernetes) logs and diagnostics from the must-gather archive. Append a file path within network_logs/ to read a file; .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
+				MIMEType:    "text/plain",
+			},
+			Handler: resourceArchiveDir("network_logs"),
+		},
+		{
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/static-pods{/path*}",
+				Name:        "must-gather-static-pods",
+				Description: "Static pod termination logs (kube-apiserver, etcd, etc.) from the must-gather archive. Append a file path within static-pods/ to read a file; .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
+				MIMEType:    "text/plain",
+			},
+			Handler: resourceArchiveDir("static-pods"),
+		},
+		{
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/pod_network_connectivity_check{/path*}",
+				Name:        "must-gather-pod-network-connectivity-check",
+				Description: "Pod network connectivity check results from the must-gather archive. Append a file path within pod_network_connectivity_check/ to read a file; .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
+				MIMEType:    "text/plain",
+			},
+			Handler: resourceArchiveDir("pod_network_connectivity_check"),
+		},
+		{
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/monitoring/metrics{/path*}",
+				Name:        "must-gather-monitoring-metrics",
+				Description: "Cluster monitoring metrics (e.g. metrics.openmetrics) from the must-gather archive. Append a file path within monitoring/metrics/ to read a file; .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
+				MIMEType:    "text/plain",
+			},
+			Handler: resourceArchiveDir("monitoring/metrics"),
+		},
+	}
+}
+
+// resourceArchiveDir returns a resource-template handler bound to a fixed
+// top-level directory within the archive (relative to the container dir). The
+// handler reads the file addressed by the URI tail after
+// must-gather://local/{archive_id}/{rootDir}/. .gz files are decompressed by
+// the provider; non-UTF-8 content is returned as a binary blob.
+func resourceArchiveDir(rootDir string) api.ResourceTemplateHandler {
+	return func(ctx context.Context, uri string) (*api.ResourceContent, error) {
+		id, err := archiveIDFromURI(uri)
+		if err != nil {
+			return nil, err
+		}
+		p, err := providerForArchiveContext(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+
+		prefix := archiveURIPrefix + id + "/" + rootDir
+		if !strings.HasPrefix(uri, prefix) {
+			return nil, fmt.Errorf("invalid %s resource URI: %s", rootDir, uri)
+		}
+		rel := strings.TrimPrefix(strings.TrimPrefix(uri, prefix), "/")
+		if rel == "" {
+			return nil, fmt.Errorf("specify a file path within %s/ (e.g. %s/<file>)", rootDir, prefix)
+		}
+
+		data, err := p.ReadArchiveFile(path.Join(rootDir, rel))
+		if err != nil {
+			return nil, err
+		}
+
+		if utf8.Valid(data) {
+			return &api.ResourceContent{Text: string(data)}, nil
+		}
+		return &api.ResourceContent{Blob: data, MIMEType: "application/octet-stream"}, nil
 	}
 }
 
