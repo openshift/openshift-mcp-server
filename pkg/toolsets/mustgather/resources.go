@@ -36,6 +36,7 @@ func initResources() []api.ServerTool {
 					Required: []string{"archive_id", "kind"},
 				},
 			},
+			RBAC:         api.RBACNone(),
 			Handler:      mustgatherResourcesList,
 			ClusterAware: ptr.To(false),
 		},
