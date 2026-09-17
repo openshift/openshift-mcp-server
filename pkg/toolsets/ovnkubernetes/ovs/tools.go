@@ -129,7 +129,23 @@ Example output:
 				ReadOnlyHint:  ptr.To(true),
 				OpenWorldHint: ptr.To(true),
 			},
-		}, Handler: ovsVsctl},
+		}, RBAC: api.RBACBounded(
+			api.RBACRequirement{
+				Verbs:        []string{"get"},
+				Target:       api.RBACTarget{Resource: &api.RBACResourceTarget{Resource: "pods"}},
+				Namespace:    &api.RBACNamespace{Argument: "namespace"},
+				ResourceName: &api.RBACResourceName{Argument: "name"},
+			},
+			api.RBACRequirement{
+				Verbs: []string{"get", "create"},
+				Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+					Resource:    "pods",
+					Subresource: "exec",
+				}},
+				Namespace:    &api.RBACNamespace{Argument: "namespace"},
+				ResourceName: &api.RBACResourceName{Argument: "name"},
+			},
+		), Handler: ovsVsctl},
 
 		{Tool: api.Tool{
 			Name: "ovs_ofctl",
@@ -196,7 +212,23 @@ Example output:
 				ReadOnlyHint:  ptr.To(true),
 				OpenWorldHint: ptr.To(true),
 			},
-		}, Handler: ovsOfctl},
+		}, RBAC: api.RBACBounded(
+			api.RBACRequirement{
+				Verbs:        []string{"get"},
+				Target:       api.RBACTarget{Resource: &api.RBACResourceTarget{Resource: "pods"}},
+				Namespace:    &api.RBACNamespace{Argument: "namespace"},
+				ResourceName: &api.RBACResourceName{Argument: "name"},
+			},
+			api.RBACRequirement{
+				Verbs: []string{"get", "create"},
+				Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+					Resource:    "pods",
+					Subresource: "exec",
+				}},
+				Namespace:    &api.RBACNamespace{Argument: "namespace"},
+				ResourceName: &api.RBACResourceName{Argument: "name"},
+			},
+		), Handler: ovsOfctl},
 
 		{Tool: api.Tool{
 			Name: "ovs_appctl",
@@ -298,7 +330,23 @@ Example output:
 				ReadOnlyHint:  ptr.To(true),
 				OpenWorldHint: ptr.To(true),
 			},
-		}, Handler: ovsAppctl},
+		}, RBAC: api.RBACBounded(
+			api.RBACRequirement{
+				Verbs:        []string{"get"},
+				Target:       api.RBACTarget{Resource: &api.RBACResourceTarget{Resource: "pods"}},
+				Namespace:    &api.RBACNamespace{Argument: "namespace"},
+				ResourceName: &api.RBACResourceName{Argument: "name"},
+			},
+			api.RBACRequirement{
+				Verbs: []string{"get", "create"},
+				Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+					Resource:    "pods",
+					Subresource: "exec",
+				}},
+				Namespace:    &api.RBACNamespace{Argument: "namespace"},
+				ResourceName: &api.RBACResourceName{Argument: "name"},
+			},
+		), Handler: ovsAppctl},
 	}
 }
 

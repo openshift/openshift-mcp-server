@@ -72,7 +72,23 @@ Example output for nbdb:
 				IdempotentHint:  ptr.To(true),
 				OpenWorldHint:   ptr.To(true),
 			},
-		}, Handler: ovnShow},
+		}, RBAC: api.RBACBounded(
+			api.RBACRequirement{
+				Verbs:        []string{"get"},
+				Target:       api.RBACTarget{Resource: &api.RBACResourceTarget{Resource: "pods"}},
+				Namespace:    &api.RBACNamespace{Argument: "namespace"},
+				ResourceName: &api.RBACResourceName{Argument: "name"},
+			},
+			api.RBACRequirement{
+				Verbs: []string{"get", "create"},
+				Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+					Resource:    "pods",
+					Subresource: "exec",
+				}},
+				Namespace:    &api.RBACNamespace{Argument: "namespace"},
+				ResourceName: &api.RBACResourceName{Argument: "name"},
+			},
+		), Handler: ovnShow},
 		{Tool: api.Tool{
 			Name: "ovn_get",
 			Description: `Query records from an OVN database table with flexible filtering.
@@ -166,7 +182,23 @@ Example getting specific columns:
 				IdempotentHint:  ptr.To(true),
 				OpenWorldHint:   ptr.To(true),
 			},
-		}, Handler: ovnGet},
+		}, RBAC: api.RBACBounded(
+			api.RBACRequirement{
+				Verbs:        []string{"get"},
+				Target:       api.RBACTarget{Resource: &api.RBACResourceTarget{Resource: "pods"}},
+				Namespace:    &api.RBACNamespace{Argument: "namespace"},
+				ResourceName: &api.RBACResourceName{Argument: "name"},
+			},
+			api.RBACRequirement{
+				Verbs: []string{"get", "create"},
+				Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+					Resource:    "pods",
+					Subresource: "exec",
+				}},
+				Namespace:    &api.RBACNamespace{Argument: "namespace"},
+				ResourceName: &api.RBACResourceName{Argument: "name"},
+			},
+		), Handler: ovnGet},
 		{Tool: api.Tool{
 			Name: "ovn_lflow_list",
 			Description: `List logical flows from the OVN Southbound database.
@@ -225,7 +257,23 @@ Example output:
 				IdempotentHint:  ptr.To(true),
 				OpenWorldHint:   ptr.To(true),
 			},
-		}, Handler: ovnLFlowList},
+		}, RBAC: api.RBACBounded(
+			api.RBACRequirement{
+				Verbs:        []string{"get"},
+				Target:       api.RBACTarget{Resource: &api.RBACResourceTarget{Resource: "pods"}},
+				Namespace:    &api.RBACNamespace{Argument: "namespace"},
+				ResourceName: &api.RBACResourceName{Argument: "name"},
+			},
+			api.RBACRequirement{
+				Verbs: []string{"get", "create"},
+				Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+					Resource:    "pods",
+					Subresource: "exec",
+				}},
+				Namespace:    &api.RBACNamespace{Argument: "namespace"},
+				ResourceName: &api.RBACResourceName{Argument: "name"},
+			},
+		), Handler: ovnLFlowList},
 		{Tool: api.Tool{
 			Name: "ovn_trace",
 			Description: `Trace a packet through the OVN logical network.
@@ -298,7 +346,23 @@ Example output:
 				IdempotentHint:  ptr.To(true),
 				OpenWorldHint:   ptr.To(true),
 			},
-		}, Handler: ovnTrace},
+		}, RBAC: api.RBACBounded(
+			api.RBACRequirement{
+				Verbs:        []string{"get"},
+				Target:       api.RBACTarget{Resource: &api.RBACResourceTarget{Resource: "pods"}},
+				Namespace:    &api.RBACNamespace{Argument: "namespace"},
+				ResourceName: &api.RBACResourceName{Argument: "name"},
+			},
+			api.RBACRequirement{
+				Verbs: []string{"get", "create"},
+				Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+					Resource:    "pods",
+					Subresource: "exec",
+				}},
+				Namespace:    &api.RBACNamespace{Argument: "namespace"},
+				ResourceName: &api.RBACResourceName{Argument: "name"},
+			},
+		), Handler: ovnTrace},
 	}
 }
 
