@@ -72,6 +72,33 @@ func Prompts() []api.ServerPrompt {
 				},
 			},
 		},
+		RBAC: api.RBACBounded(
+			api.RBACRequirement{
+				Verbs:  []string{"get"},
+				Target: api.RBACTarget{Resource: &api.RBACResourceTarget{Resource: "namespaces"}},
+			},
+			api.RBACRequirement{
+				Verbs: []string{"create"},
+				Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+					APIGroup: "authorization.k8s.io",
+					Resource: "selfsubjectaccessreviews",
+				}},
+			},
+			api.RBACRequirement{
+				Verbs: []string{"list"},
+				Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+					APIGroup: "config.openshift.io",
+					Resource: "clusteroperators",
+				}},
+			},
+			api.RBACRequirement{
+				Verbs: []string{"list"},
+				Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+					APIGroup: "operators.coreos.com",
+					Resource: "clusterserviceversions",
+				}},
+			},
+		),
 		Handler: planMustGatherHandler,
 	}}
 }
