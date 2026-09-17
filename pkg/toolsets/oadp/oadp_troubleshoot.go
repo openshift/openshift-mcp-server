@@ -42,6 +42,76 @@ func initOADPTroubleshoot() []api.ServerPrompt {
 					},
 				},
 			},
+			RBAC: api.RBACBounded(
+				api.RBACRequirement{
+					Verbs: []string{"list"},
+					Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+						APIGroup: "oadp.openshift.io",
+						Resource: "dataprotectionapplications",
+					}},
+					Namespace: &api.RBACNamespace{Argument: "namespace"},
+				},
+				api.RBACRequirement{
+					Verbs: []string{"list"},
+					Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+						APIGroup: "velero.io",
+						Resource: "backupstoragelocations",
+					}},
+					Namespace: &api.RBACNamespace{Argument: "namespace"},
+				},
+				api.RBACRequirement{
+					Verbs: []string{"list"},
+					Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+						APIGroup: "velero.io",
+						Resource: "backups",
+					}},
+					Namespace: &api.RBACNamespace{Argument: "namespace"},
+				},
+				api.RBACRequirement{
+					Verbs: []string{"get"},
+					Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+						APIGroup: "velero.io",
+						Resource: "backups",
+					}},
+					Namespace:    &api.RBACNamespace{Argument: "namespace"},
+					ResourceName: &api.RBACResourceName{Argument: "backup"},
+				},
+				api.RBACRequirement{
+					Verbs: []string{"list"},
+					Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+						APIGroup: "velero.io",
+						Resource: "restores",
+					}},
+					Namespace: &api.RBACNamespace{Argument: "namespace"},
+				},
+				api.RBACRequirement{
+					Verbs: []string{"get"},
+					Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+						APIGroup: "velero.io",
+						Resource: "restores",
+					}},
+					Namespace:    &api.RBACNamespace{Argument: "namespace"},
+					ResourceName: &api.RBACResourceName{Argument: "restore"},
+				},
+				api.RBACRequirement{
+					Verbs:     []string{"list"},
+					Target:    api.RBACTarget{Resource: &api.RBACResourceTarget{Resource: "pods"}},
+					Namespace: &api.RBACNamespace{Argument: "namespace"},
+				},
+				api.RBACRequirement{
+					Verbs: []string{"get"},
+					Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+						Resource:    "pods",
+						Subresource: "log",
+					}},
+					Namespace: &api.RBACNamespace{Argument: "namespace"},
+				},
+				api.RBACRequirement{
+					Verbs:     []string{"list"},
+					Target:    api.RBACTarget{Resource: &api.RBACResourceTarget{Resource: "events"}},
+					Namespace: &api.RBACNamespace{Argument: "namespace"},
+				},
+			),
 			Handler: oadpTroubleshootHandler,
 		},
 	}
