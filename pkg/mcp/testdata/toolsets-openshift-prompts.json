@@ -1,5 +1,57 @@
 [
   {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "bounded": {
+          "requirements": [
+            {
+              "target": {
+                "resource": {
+                  "resource": "namespaces"
+                }
+              },
+              "verbs": [
+                "get"
+              ]
+            },
+            {
+              "target": {
+                "resource": {
+                  "apiGroup": "authorization.k8s.io",
+                  "resource": "selfsubjectaccessreviews"
+                }
+              },
+              "verbs": [
+                "create"
+              ]
+            },
+            {
+              "target": {
+                "resource": {
+                  "apiGroup": "config.openshift.io",
+                  "resource": "clusteroperators"
+                }
+              },
+              "verbs": [
+                "list"
+              ]
+            },
+            {
+              "target": {
+                "resource": {
+                  "apiGroup": "operators.coreos.com",
+                  "resource": "clusterserviceversions"
+                }
+              },
+              "verbs": [
+                "list"
+              ]
+            }
+          ]
+        },
+        "version": "v1alpha1"
+      }
+    },
     "arguments": [
       {
         "name": "node_name",

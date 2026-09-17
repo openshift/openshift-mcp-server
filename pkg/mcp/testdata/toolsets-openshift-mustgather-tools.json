@@ -1,5 +1,11 @@
 [
   {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "none": {},
+        "version": "v1alpha1"
+      }
+    },
     "annotations": {
       "idempotentHint": false,
       "readOnlyHint": true,
@@ -22,6 +28,12 @@
     "title": "ETCD Health"
   },
   {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "none": {},
+        "version": "v1alpha1"
+      }
+    },
     "annotations": {
       "idempotentHint": false,
       "readOnlyHint": true,
@@ -48,6 +60,12 @@
     "title": "ETCD Object Count"
   },
   {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "none": {},
+        "version": "v1alpha1"
+      }
+    },
     "annotations": {
       "idempotentHint": false,
       "readOnlyHint": true,
@@ -83,6 +101,12 @@
     "title": "Events by Resource"
   },
   {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "none": {},
+        "version": "v1alpha1"
+      }
+    },
     "annotations": {
       "idempotentHint": false,
       "readOnlyHint": true,
@@ -131,6 +155,12 @@
     "title": "Events by Time"
   },
   {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "none": {},
+        "version": "v1alpha1"
+      }
+    },
     "annotations": {
       "idempotentHint": false,
       "readOnlyHint": true,
@@ -178,6 +208,12 @@
     "title": "List Events"
   },
   {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "none": {},
+        "version": "v1alpha1"
+      }
+    },
     "annotations": {
       "idempotentHint": false,
       "readOnlyHint": true,
@@ -192,6 +228,12 @@
     "title": "List Must-Gather Archives"
   },
   {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "none": {},
+        "version": "v1alpha1"
+      }
+    },
     "annotations": {
       "idempotentHint": false,
       "readOnlyHint": true,
@@ -218,6 +260,12 @@
     "title": "Prometheus Alerts"
   },
   {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "none": {},
+        "version": "v1alpha1"
+      }
+    },
     "annotations": {
       "idempotentHint": false,
       "readOnlyHint": true,
@@ -244,6 +292,12 @@
     "title": "Prometheus Rules"
   },
   {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "none": {},
+        "version": "v1alpha1"
+      }
+    },
     "annotations": {
       "idempotentHint": false,
       "readOnlyHint": true,
@@ -270,6 +324,12 @@
     "title": "Prometheus Status"
   },
   {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "none": {},
+        "version": "v1alpha1"
+      }
+    },
     "annotations": {
       "idempotentHint": false,
       "readOnlyHint": true,
@@ -300,6 +360,12 @@
     "title": "Prometheus Targets"
   },
   {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "none": {},
+        "version": "v1alpha1"
+      }
+    },
     "annotations": {
       "idempotentHint": false,
       "readOnlyHint": true,
@@ -330,6 +396,12 @@
     "title": "Prometheus TSDB"
   },
   {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "none": {},
+        "version": "v1alpha1"
+      }
+    },
     "annotations": {
       "idempotentHint": false,
       "readOnlyHint": true,
@@ -365,6 +437,12 @@
     "title": "Node Diagnostics"
   },
   {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "none": {},
+        "version": "v1alpha1"
+      }
+    },
     "annotations": {
       "idempotentHint": false,
       "readOnlyHint": true,
@@ -396,6 +474,12 @@
     "title": "Kubelet Logs"
   },
   {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "none": {},
+        "version": "v1alpha1"
+      }
+    },
     "annotations": {
       "idempotentHint": false,
       "readOnlyHint": true,
@@ -436,6 +520,12 @@
     "title": "Kubelet Logs Grep"
   },
   {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "none": {},
+        "version": "v1alpha1"
+      }
+    },
     "annotations": {
       "idempotentHint": false,
       "readOnlyHint": true,
@@ -489,6 +579,12 @@
     "title": "Pod Logs by Time"
   },
   {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "none": {},
+        "version": "v1alpha1"
+      }
+    },
     "annotations": {
       "idempotentHint": false,
       "readOnlyHint": true,
@@ -533,6 +629,12 @@
     "title": "Get Pod Logs"
   },
   {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "none": {},
+        "version": "v1alpha1"
+      }
+    },
     "annotations": {
       "idempotentHint": false,
       "readOnlyHint": true,
@@ -586,6 +688,12 @@
     "title": "Pod Logs Grep"
   },
   {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "none": {},
+        "version": "v1alpha1"
+      }
+    },
     "annotations": {
       "idempotentHint": false,
       "readOnlyHint": true,
