@@ -35,6 +35,7 @@ func initList() []api.ServerTool {
 					Properties: map[string]*jsonschema.Schema{},
 				},
 			},
+			RBAC:         api.RBACNone(),
 			Handler:      mustgatherList,
 			ClusterAware: ptr.To(false),
 		},

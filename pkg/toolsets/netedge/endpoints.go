@@ -39,6 +39,14 @@ func initEndpoints() []api.ServerTool {
 					OpenWorldHint:   ptr.To(true),
 				},
 			},
+			RBAC: api.RBACBounded(api.RBACRequirement{
+				Verbs: []string{"list"},
+				Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+					APIGroup: "discovery.k8s.io",
+					Resource: "endpointslices",
+				}},
+				Namespace: &api.RBACNamespace{Argument: "namespace"},
+			}),
 			Handler: getServiceEndpoints,
 		},
 	}

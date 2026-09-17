@@ -55,6 +55,7 @@ func InitNodes() []api.ServerTool {
 					OpenWorldHint:   ptr.To(true),
 				},
 			},
+			RBAC:    nodesdebug.NodeDebugRBAC("node", "namespace"),
 			Handler: nodesDebugExec,
 		},
 	}

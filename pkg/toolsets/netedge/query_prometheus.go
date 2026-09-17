@@ -57,6 +57,15 @@ func InitQueryPrometheus() []api.ServerTool {
 					OpenWorldHint:   ptr.To(true),
 				},
 			},
+			RBAC: api.RBACBounded(api.RBACRequirement{
+				Verbs: []string{"get"},
+				Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+					APIGroup: "route.openshift.io",
+					Resource: "routes",
+				}},
+				Namespace:    &api.RBACNamespace{Name: defaultMonitoringNamespace},
+				ResourceName: &api.RBACResourceName{Name: thanosQuerierRoute},
+			}),
 			Handler: queryPrometheusHandler,
 		},
 	}
