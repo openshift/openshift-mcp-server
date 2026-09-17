@@ -68,6 +68,21 @@ func initRouter() []api.ServerTool {
 					OpenWorldHint:   ptr.To(true),
 				},
 			},
+			RBAC: api.RBACBounded(
+				api.RBACRequirement{
+					Verbs:     []string{"get", "list"},
+					Target:    api.RBACTarget{Resource: &api.RBACResourceTarget{Resource: "pods"}},
+					Namespace: &api.RBACNamespace{Name: ingressNamespace},
+				},
+				api.RBACRequirement{
+					Verbs: []string{"get", "create"},
+					Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+						Resource:    "pods",
+						Subresource: "exec",
+					}},
+					Namespace: &api.RBACNamespace{Name: ingressNamespace},
+				},
+			),
 			Handler: getRouterConfig,
 		},
 		{
@@ -90,6 +105,21 @@ func initRouter() []api.ServerTool {
 					OpenWorldHint:   ptr.To(true),
 				},
 			},
+			RBAC: api.RBACBounded(
+				api.RBACRequirement{
+					Verbs:     []string{"get", "list"},
+					Target:    api.RBACTarget{Resource: &api.RBACResourceTarget{Resource: "pods"}},
+					Namespace: &api.RBACNamespace{Name: ingressNamespace},
+				},
+				api.RBACRequirement{
+					Verbs: []string{"get", "create"},
+					Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+						Resource:    "pods",
+						Subresource: "exec",
+					}},
+					Namespace: &api.RBACNamespace{Name: ingressNamespace},
+				},
+			),
 			Handler: getRouterInfo,
 		},
 		{
@@ -122,6 +152,21 @@ func initRouter() []api.ServerTool {
 					OpenWorldHint:   ptr.To(true),
 				},
 			},
+			RBAC: api.RBACBounded(
+				api.RBACRequirement{
+					Verbs:     []string{"get", "list"},
+					Target:    api.RBACTarget{Resource: &api.RBACResourceTarget{Resource: "pods"}},
+					Namespace: &api.RBACNamespace{Name: ingressNamespace},
+				},
+				api.RBACRequirement{
+					Verbs: []string{"get", "create"},
+					Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+						Resource:    "pods",
+						Subresource: "exec",
+					}},
+					Namespace: &api.RBACNamespace{Name: ingressNamespace},
+				},
+			),
 			Handler: getRouterSessions,
 		},
 	}

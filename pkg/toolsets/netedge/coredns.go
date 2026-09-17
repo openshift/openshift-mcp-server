@@ -27,6 +27,14 @@ func initCoreDNS() []api.ServerTool {
 					OpenWorldHint:   ptr.To(true),
 				},
 			},
+			RBAC: api.RBACBounded(api.RBACRequirement{
+				Verbs: []string{"get"},
+				Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+					Resource: "configmaps",
+				}},
+				Namespace:    &api.RBACNamespace{Name: "openshift-dns"},
+				ResourceName: &api.RBACResourceName{Name: "dns-default"},
+			}),
 			Handler: getCoreDNSConfig,
 		},
 	}

@@ -150,6 +150,21 @@ func initExecDNSInPodWith(executor podExecutor) []api.ServerTool {
 					OpenWorldHint:   ptr.To(true),
 				},
 			},
+			RBAC: api.RBACBounded(
+				api.RBACRequirement{
+					Verbs:     []string{"create", "get", "delete"},
+					Target:    api.RBACTarget{Resource: &api.RBACResourceTarget{Resource: "pods"}},
+					Namespace: &api.RBACNamespace{Argument: "namespace"},
+				},
+				api.RBACRequirement{
+					Verbs: []string{"get"},
+					Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+						Resource:    "pods",
+						Subresource: "log",
+					}},
+					Namespace: &api.RBACNamespace{Argument: "namespace"},
+				},
+			),
 			Handler: makeExecDNSInPodHandler(executor),
 		},
 	}
