@@ -22,7 +22,6 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kiali"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt"
 	mgToolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/mustgather"
-	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/openshift"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/ovnkubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/tekton"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -281,30 +280,12 @@ func (s *ToolsetsSuite) TestGranularToolsetsTools() {
 	}
 }
 
-func (s *ToolsetsSuite) TestOpenShiftToolset() {
-	s.Run("OpenShift toolset in OpenShift cluster", func() {
+func (s *ToolsetsSuite) TestOpenShiftMustGatherToolsetPrompts() {
+	s.Run("OpenShift must-gather toolset prompts", func() {
 		s.Handle(test.NewInOpenShiftHandler())
 		toolsets.Clear()
-		toolsets.Register(&openshift.Toolset{})
-		s.Cfg.Toolsets = []string{"openshift"}
-		s.InitMcpClient()
-		tools, err := s.ListTools()
-		s.Run("ListTools returns tools", func() {
-			s.NotNil(tools, "Expected tools from ListTools")
-			s.NoError(err, "Expected no error from ListTools")
-		})
-		s.Run("ListTools returns correct Tool metadata", func() {
-			s.assertJsonSnapshot("toolsets-openshift-tools.json", tools.Tools)
-		})
-	})
-}
-
-func (s *ToolsetsSuite) TestOpenShiftToolsetPrompts() {
-	s.Run("OpenShift toolset prompts in OpenShift cluster", func() {
-		s.Handle(test.NewInOpenShiftHandler())
-		toolsets.Clear()
-		toolsets.Register(&openshift.Toolset{})
-		s.Cfg.Toolsets = []string{"openshift"}
+		toolsets.Register(&mgToolset.Toolset{})
+		s.Cfg.Toolsets = []string{"openshift/mustgather"}
 		s.InitMcpClient()
 		prompts, err := s.ListPrompts()
 		s.Run("ListPrompts returns prompts", func() {
@@ -312,7 +293,7 @@ func (s *ToolsetsSuite) TestOpenShiftToolsetPrompts() {
 			s.NoError(err, "Expected no error from ListPrompts")
 		})
 		s.Run("ListPrompts returns correct Prompt metadata", func() {
-			s.assertJsonSnapshot("toolsets-openshift-prompts.json", prompts.Prompts)
+			s.assertJsonSnapshot("toolsets-openshift-mustgather-prompts.json", prompts.Prompts)
 		})
 	})
 }

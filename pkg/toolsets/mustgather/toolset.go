@@ -31,7 +31,7 @@ func (t *Toolset) GetTools(_ api.FilteringProvider) []api.ServerTool {
 }
 
 func (t *Toolset) GetPrompts() []api.ServerPrompt {
-	return nil
+	return Prompts()
 }
 
 // GetResources returns no MCP resources. Resource handlers have no access to the
