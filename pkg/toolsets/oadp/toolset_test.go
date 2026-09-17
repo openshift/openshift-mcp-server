@@ -52,15 +52,6 @@ func (s *ToolsetSuite) TestGetPrompts() {
 		s.Len(prompts[0].Prompt.Arguments, 3)
 	})
 
-	s.Run("all prompt arguments are optional", func() {
-		t := &Toolset{}
-		prompts := t.GetPrompts()
-		s.Require().Len(prompts, 1)
-		for _, arg := range prompts[0].Prompt.Arguments {
-			s.False(arg.Required)
-		}
-	})
-
 	s.Run("prompt has a handler", func() {
 		t := &Toolset{}
 		prompts := t.GetPrompts()

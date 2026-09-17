@@ -27,8 +27,8 @@ func initOADPTroubleshoot() []api.ServerPrompt {
 				Arguments: []api.PromptArgument{
 					{
 						Name:        "namespace",
-						Description: "The OADP namespace (default: openshift-adp)",
-						Required:    false,
+						Description: "The OADP namespace",
+						Required:    true,
 					},
 					{
 						Name:        "backup",
@@ -122,7 +122,7 @@ func oadpTroubleshootHandler(params api.PromptHandlerParams) (*api.PromptCallRes
 	args := params.GetArguments()
 	namespace := args["namespace"]
 	if namespace == "" {
-		namespace = oadp.DefaultOADPNamespace
+		return nil, fmt.Errorf("namespace is required")
 	}
 	backupName := args["backup"]
 	restoreName := args["restore"]
