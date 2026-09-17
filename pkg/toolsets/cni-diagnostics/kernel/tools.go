@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/cluster-diagnostics/nodesdebug"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/cni-diagnostics/utils"
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -63,6 +64,7 @@ func initConntrackTool() api.ServerTool {
 			},
 			Annotations: utils.ReadOnlyAnnotations("CNI-Diagnostics: Kernel Connection Tracking", true),
 		},
+		RBAC:    nodesdebug.NodeDebugRBAC("node", "namespace"),
 		Handler: conntrackHandler,
 	}
 }
@@ -172,6 +174,7 @@ func initIPtablesTool() api.ServerTool {
 			},
 			Annotations: utils.ReadOnlyAnnotations("CNI-Diagnostics: Kernel IPtables", true),
 		},
+		RBAC:    nodesdebug.NodeDebugRBAC("node", "namespace"),
 		Handler: iptablesHandler,
 	}
 }
@@ -279,6 +282,7 @@ func initNFTTool() api.ServerTool {
 			},
 			Annotations: utils.ReadOnlyAnnotations("CNI-Diagnostics: Kernel NFtables", true),
 		},
+		RBAC:    nodesdebug.NodeDebugRBAC("node", "namespace"),
 		Handler: nftHandler,
 	}
 }
@@ -390,6 +394,7 @@ func initIPTool() api.ServerTool {
 			},
 			Annotations: utils.ReadOnlyAnnotations("CNI-Diagnostics: Kernel IP Command", true),
 		},
+		RBAC:    nodesdebug.NodeDebugRBAC("node", "namespace"),
 		Handler: ipHandler,
 	}
 }
