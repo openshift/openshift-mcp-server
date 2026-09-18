@@ -31,7 +31,7 @@ func (s *ProviderACMHubTestSuite) SetupTest() {
 		return s.mockServer.Config(), nil
 	}
 
-	cfg := test.Must(config.ReadToml([]byte(`
+	cfg := test.Must(config.ReadToml(s.T().Context(), []byte(`
 		cluster_provider_strategy = "acm"
 		[cluster_provider_configs.acm]
 		cluster_proxy_addon_host = "proxy.example.com"

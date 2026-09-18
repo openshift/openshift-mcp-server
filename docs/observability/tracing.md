@@ -79,16 +79,14 @@ List known values for one fully qualified tag (e.g. `resource.service.name`).
 
 ## Enable the Toolset
 
-### Command line
-
-```bash
-kubernetes-mcp-server --toolsets core,observability/traces
-```
-
-### Configuration file (TOML)
+The traces toolset is not enabled by default. Enable it in a TOML configuration file:
 
 ```toml
 toolsets = ["core", "observability/traces"]
+```
+
+```bash
+kubernetes-mcp-server --config /path/to/config.toml
 ```
 
 ### MCP client configuration
@@ -98,7 +96,7 @@ toolsets = ["core", "observability/traces"]
   "mcpServers": {
     "kubernetes": {
       "command": "npx",
-      "args": ["-y", "kubernetes-mcp-server@latest", "--toolsets", "core,observability/traces"]
+      "args": ["-y", "kubernetes-mcp-server@latest", "--config", "/path/to/config.toml"]
     }
   }
 }

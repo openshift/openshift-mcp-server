@@ -1,0 +1,81 @@
+package mustgather
+
+import (
+	"testing"
+
+	"github.com/containers/kubernetes-mcp-server/internal/test"
+	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/stretchr/testify/suite"
+)
+
+type ConfigSuite struct {
+	suite.Suite
+}
+
+func (s *ConfigSuite) TestConfigParser_ParsesDirs() {
+	cfg := test.Must(config.ReadToml(s.T().Context(), []byte(`
+		[toolset_configs."openshift/mustgather"]
+		mustgather_dirs = ["/var/data/must-gather", "/home/user/downloads/must-gather.local.123"]
+	`)))
+
+	mgCfg, ok := cfg.GetToolsetConfig("openshift/mustgather")
+	s.Require().True(ok, "mustgather config should be present")
+	mgc, ok := mgCfg.(*Config)
+	s.Require().True(ok, "mustgather config should be of type *Config")
+	s.Equal([]string{"/var/data/must-gather", "/home/user/downloads/must-gather.local.123"}, mgc.MustGatherDirs)
+	s.Require().NotNil(mgc.registry, "the parser should initialize an empty registry for every Config")
+}
+
+func (s *ConfigSuite) TestConfigParser_EmptySection() {
+	cfg := test.Must(config.ReadToml(s.T().Context(), []byte(`
+		[toolset_configs."openshift/mustgather"]
+	`)))
+
+	mgCfg, ok := cfg.GetToolsetConfig("openshift/mustgather")
+	s.Require().True(ok, "mustgather config should be present")
+	mgc, ok := mgCfg.(*Config)
+	s.Require().True(ok, "mustgather config should be of type *Config")
+	s.Empty(mgc.MustGatherDirs, "no directories should be configured for an empty section")
+	s.Require().NotNil(mgc.registry, "the parser should initialize an empty registry even for an empty section")
+}
+
+func (s *ConfigSuite) TestConfigParser_FreshRegistryPerParse() {
+	// Every parse (e.g. a server reload) must yield a distinct registry so a
+	// reload starts from a clean cache instead of reusing the previous one.
+	first := test.Must(config.ReadToml(s.T().Context(), []byte(`
+		[toolset_configs."openshift/mustgather"]
+		mustgather_dirs = ["/var/data/must-gather"]
+	`)))
+	second := test.Must(config.ReadToml(s.T().Context(), []byte(`
+		[toolset_configs."openshift/mustgather"]
+		mustgather_dirs = ["/var/data/must-gather"]
+	`)))
+
+	c1, _ := first.GetToolsetConfig("openshift/mustgather")
+	c2, _ := second.GetToolsetConfig("openshift/mustgather")
+	s.NotSame(c1.(*Config).registry, c2.(*Config).registry, "each parsed config should own a fresh registry")
+}
+
+func (s *ConfigSuite) TestLimitDefaults() {
+	s.Run("nil config falls back to defaults", func() {
+		var c *Config
+		s.Equal(defaultTailLimit, c.tailLimit())
+		s.Equal(defaultMaxOutputSize, c.maxOutputSize())
+	})
+
+	s.Run("unset values fall back to defaults", func() {
+		c := &Config{}
+		s.Equal(defaultTailLimit, c.tailLimit())
+		s.Equal(defaultMaxOutputSize, c.maxOutputSize())
+	})
+
+	s.Run("configured values are honored", func() {
+		c := &Config{TailLimit: 42, MaxOutputSize: 4096}
+		s.Equal(42, c.tailLimit())
+		s.Equal(4096, c.maxOutputSize())
+	})
+}
+
+func TestConfig(t *testing.T) {
+	suite.Run(t, new(ConfigSuite))
+}

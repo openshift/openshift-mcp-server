@@ -72,13 +72,16 @@ func InitManageIstioConfigRead() []api.ServerTool {
 				IdempotentHint:  ptr.To(true),
 				OpenWorldHint:   ptr.To(true),
 			},
-		}, Handler: istioConfigHandlerRead,
+		}, RBAC: api.RBACUnbounded("Kubernetes API access is delegated to Kiali and its permissions cannot be derived from this capability's arguments"), Handler: istioConfigHandlerRead,
 	})
 	return ret
 }
 
 func istioConfigHandlerRead(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	kiali := kialiclient.NewKiali(params, params.RESTConfig())
+	kiali, err := kialiclient.NewKiali(params.Config, params.RESTConfig())
+	if err != nil {
+		return api.NewToolCallResult("", err), nil
+	}
 	arguments := params.GetArguments()
 	content, err := kiali.ExecuteRequest(params.Context, KialiManageIstioConfigReadEndpoint, remapMeshCluster(arguments))
 	if err != nil {

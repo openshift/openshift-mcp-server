@@ -60,6 +60,38 @@ type NodeDebug struct {
 	NodeDebugClient
 }
 
+// NodeDebugRBAC returns the Kubernetes permissions required by NodesDebugExec.
+func NodeDebugRBAC(nodeArgument, namespaceArgument string) *api.RBACMetadata {
+	return api.RBACBounded(
+		api.RBACRequirement{
+			Verbs:        []string{"get"},
+			Target:       api.RBACTarget{Resource: &api.RBACResourceTarget{Resource: "nodes"}},
+			ResourceName: &api.RBACResourceName{Argument: nodeArgument},
+		},
+		api.RBACRequirement{
+			Verbs:     []string{"create", "get", "delete"},
+			Target:    api.RBACTarget{Resource: &api.RBACResourceTarget{Resource: "pods"}},
+			Namespace: &api.RBACNamespace{Argument: namespaceArgument},
+		},
+		api.RBACRequirement{
+			Verbs: []string{"get", "create"},
+			Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+				Resource:    "pods",
+				Subresource: "exec",
+			}},
+			Namespace: &api.RBACNamespace{Argument: namespaceArgument},
+		},
+		api.RBACRequirement{
+			Verbs: []string{"get"},
+			Target: api.RBACTarget{Resource: &api.RBACResourceTarget{
+				Resource:    "pods",
+				Subresource: "log",
+			}},
+			Namespace: &api.RBACNamespace{Argument: namespaceArgument},
+		},
+	)
+}
+
 // NewNodeDebug creates a new NodeDebug client from an api.KubernetesClient.
 func NewNodeDebug(k api.KubernetesClient) *NodeDebug {
 	return &NodeDebug{NodeDebugClient: NewNodeDebugClient(k)}

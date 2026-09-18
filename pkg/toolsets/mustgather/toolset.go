@@ -15,12 +15,12 @@ func (t *Toolset) GetName() string {
 }
 
 func (t *Toolset) GetDescription() string {
-	return "Analyze OpenShift must-gather archives offline without a live cluster connection"
+	return "Analyze OpenShift must-gather archives offline without a live cluster connection. Call mustgather_list first to discover available archives and their archive_id, then pass that ID to the other mustgather_* tools."
 }
 
 func (t *Toolset) GetTools(_ api.FilteringProvider) []api.ServerTool {
 	return slices.Concat(
-		initUse(),
+		initList(),
 		initResources(),
 		initEvents(),
 		initPodLogs(),
@@ -31,15 +31,20 @@ func (t *Toolset) GetTools(_ api.FilteringProvider) []api.ServerTool {
 }
 
 func (t *Toolset) GetPrompts() []api.ServerPrompt {
+	return Prompts()
+}
+
+// GetResources returns no MCP resources. Resource handlers have no access to the
+// toolset configuration (GetToolsetConfig is not plumbed into MCP resources), so
+// they cannot resolve archives against the per-config registry. Must-gather data
+// is exposed through the mustgather_* tools instead; resources can be re-added
+// once resource handlers gain toolset-config access upstream.
+func (t *Toolset) GetResources() []api.ServerResource {
 	return nil
 }
 
-func (t *Toolset) GetResources() []api.ServerResource {
-	return initMCPResources()
-}
-
 func (t *Toolset) GetResourceTemplates() []api.ServerResourceTemplate {
-	return initMCPResourceTemplates()
+	return nil
 }
 
 func init() {

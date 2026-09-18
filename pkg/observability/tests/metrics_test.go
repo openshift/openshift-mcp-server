@@ -94,13 +94,13 @@ func (s *MetricsE2ESuite) SetupSuite() {
 func (s *MetricsE2ESuite) discoverTestMetric() string {
 	cfg := s.buildConfig()
 
-	provider, err := internalk8s.NewProvider(cfg)
+	provider, err := internalk8s.NewProvider(s.T().Context(), cfg)
 	if err != nil {
 		s.T().Logf("Could not create provider for metric discovery: %v", err)
 		return ""
 	}
 
-	server, err := mcpserver.NewServer(mcpserver.Configuration{StaticConfig: cfg}, provider)
+	server, err := mcpserver.NewServer(s.T().Context(), mcpserver.Configuration{Config: cfg}, provider)
 	if err != nil {
 		s.T().Logf("Could not create server for metric discovery: %v", err)
 		return ""
@@ -174,7 +174,7 @@ func (s *MetricsE2ESuite) discoverRoutes() map[string]string {
 	return result
 }
 
-func (s *MetricsE2ESuite) buildConfig() *config.StaticConfig {
+func (s *MetricsE2ESuite) buildConfig() *config.Config {
 	tomlCfg := fmt.Sprintf(`
 		toolsets = ["observability/metrics"]
 		[toolset_configs."observability/metrics"]
@@ -184,11 +184,11 @@ func (s *MetricsE2ESuite) buildConfig() *config.StaticConfig {
 		guardrails = "none"
 	`, s.prometheusURL, s.alertmanagerURL)
 
-	cfg, err := config.ReadToml([]byte(tomlCfg))
+	cfg, err := config.ReadToml(s.T().Context(), []byte(tomlCfg))
 	s.Require().NoError(err, "Failed to parse test config")
 
 	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
-		cfg.KubeConfig = kubeconfig
+		cfg.KubeConfig.SetForTest(kubeconfig)
 	}
 	return cfg
 }
@@ -196,10 +196,10 @@ func (s *MetricsE2ESuite) buildConfig() *config.StaticConfig {
 func (s *MetricsE2ESuite) SetupTest() {
 	cfg := s.buildConfig()
 
-	provider, err := internalk8s.NewProvider(cfg)
+	provider, err := internalk8s.NewProvider(s.T().Context(), cfg)
 	s.Require().NoError(err, "Failed to create k8s provider")
 
-	s.server, err = mcpserver.NewServer(mcpserver.Configuration{StaticConfig: cfg}, provider)
+	s.server, err = mcpserver.NewServer(s.T().Context(), mcpserver.Configuration{Config: cfg}, provider)
 	s.Require().NoError(err, "Failed to create MCP server")
 
 	s.McpClient = test.NewMcpClient(s.T(), s.server.ServeHTTP())

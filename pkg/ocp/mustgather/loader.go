@@ -17,12 +17,14 @@ type LoadResult struct {
 	Resources []*unstructured.Unstructured
 }
 
-// Load reads and parses a must-gather archive from the given path
+// Load reads and parses a must-gather archive from the given path. The path
+// must be an archive root, i.e. it must contain a recognizable container
+// directory (see FindContainerDir); a path that is itself the container
+// directory is not accepted, matching IsArchive.
 func Load(path string) (*LoadResult, error) {
 	containerDir, err := FindContainerDir(path)
 	if err != nil {
-		// If no container dir found, use the path directly
-		containerDir = path
+		return nil, err
 	}
 
 	metadata := MustGatherMetadata{
@@ -74,12 +76,42 @@ func FindContainerDir(basePath string) (string, error) {
 	return "", fmt.Errorf("container directory not found in %s", basePath)
 }
 
+// ReadArchiveMetadata cheaply reads the version and timestamp of the archive at
+// path without indexing its resources. It returns an error when the archive's
+// container directory cannot be located (matching Load and IsArchive); the
+// version and timestamp are best-effort and may be empty even on success. Used
+// by discovery to list archives without paying the full load cost.
+func ReadArchiveMetadata(path string) (version, timestamp string, err error) {
+	containerDir, err := FindContainerDir(path)
+	if err != nil {
+		return "", "", err
+	}
+	var metadata MustGatherMetadata
+	loadMetadata(containerDir, &metadata)
+	return metadata.Version, metadata.Timestamp, nil
+}
+
+// IsArchive reports whether path looks like a must-gather archive, i.e. it
+// contains a recognizable container directory.
+func IsArchive(path string) bool {
+	_, err := FindContainerDir(path)
+	return err == nil
+}
+
 func loadMetadata(containerDir string, metadata *MustGatherMetadata) {
 	if data, err := os.ReadFile(filepath.Join(containerDir, "version")); err == nil {
 		metadata.Version = strings.TrimSpace(string(data))
 	}
 	if data, err := os.ReadFile(filepath.Join(containerDir, "timestamp")); err == nil {
-		metadata.Timestamp = strings.TrimSpace(string(data))
+		// The timestamp file accumulates one line per gather step; the first
+		// non-empty line marks when the must-gather started, which is the
+		// timestamp we report.
+		for line := range strings.SplitSeq(string(data), "\n") {
+			if line = strings.TrimSpace(line); line != "" {
+				metadata.Timestamp = line
+				break
+			}
+		}
 	}
 }
 

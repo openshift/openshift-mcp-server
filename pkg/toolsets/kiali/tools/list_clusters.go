@@ -29,13 +29,16 @@ func InitListMeshClusters() []api.ServerTool {
 				IdempotentHint:  ptr.To(true),
 				OpenWorldHint:   ptr.To(true),
 			},
-		}, Handler: listMeshClustersHandler,
+		}, RBAC: api.RBACUnbounded("Kubernetes API access is delegated to Kiali and its permissions cannot be derived from this capability's arguments"), Handler: listMeshClustersHandler,
 	})
 	return ret
 }
 
 func listMeshClustersHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	kiali := kialiclient.NewKiali(params, params.RESTConfig())
+	kiali, err := kialiclient.NewKiali(params.Config, params.RESTConfig())
+	if err != nil {
+		return api.NewToolCallResult("", err), nil
+	}
 	content, err := kiali.ExecuteRequest(params.Context, KialiListClustersEndpoint, nil)
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to list mesh clusters: %w", err)), nil

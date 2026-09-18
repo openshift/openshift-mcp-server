@@ -73,6 +73,7 @@ func initProbeHTTPWith(client httpDoer) []api.ServerTool {
 					OpenWorldHint:   ptr.To(true),
 				},
 			},
+			RBAC:         api.RBACNone(),
 			ClusterAware: ptr.To(false),
 			Handler:      makeProbeHTTPHandler(client),
 		},

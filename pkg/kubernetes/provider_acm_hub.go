@@ -19,7 +19,6 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/BurntSushi/toml"
-	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes/watcher"
@@ -89,7 +88,7 @@ func (c *ACMKubeConfigProviderConfig) Validate() error {
 	return err
 }
 
-func parseAcmConfig(ctx context.Context, primitive toml.Primitive, md toml.MetaData) (api.ExtendedConfig, error) {
+func parseAcmConfig(ctx context.Context, primitive toml.Primitive, md toml.MetaData) (config.ExtendedConfig, error) {
 	cfg := &ACMProviderConfig{}
 	if err := md.PrimitiveDecode(primitive, cfg); err != nil {
 		return nil, err
@@ -100,7 +99,7 @@ func parseAcmConfig(ctx context.Context, primitive toml.Primitive, md toml.MetaD
 	return cfg, nil
 }
 
-func parseAcmKubeConfigConfig(ctx context.Context, primitive toml.Primitive, md toml.MetaData) (api.ExtendedConfig, error) {
+func parseAcmKubeConfigConfig(ctx context.Context, primitive toml.Primitive, md toml.MetaData) (config.ExtendedConfig, error) {
 	cfg := &ACMKubeConfigProviderConfig{}
 	if err := md.PrimitiveDecode(primitive, &cfg); err != nil {
 		return nil, err
@@ -112,13 +111,12 @@ func parseAcmKubeConfigConfig(ctx context.Context, primitive toml.Primitive, md 
 }
 
 type acmHubClusterProvider struct {
+	cfg                *config.Config
 	hubManager         *Manager // for the main "hub" cluster
 	clusterProxyHost   string
 	skipTLSVerify      bool
 	clusterProxyCAFile string
 	watchKubeConfig    bool // whether or not the kubeconfig should be watched for changes
-
-	api.TargetCompatibilityToolFiltersEnabledProvider
 
 	// config for token exchange
 	targetTokenConfigs map[string]*tokenexchange.TargetTokenExchangeConfig
@@ -134,7 +132,7 @@ type acmHubClusterProvider struct {
 	// initialResourceVersion is set during init and passed to watchManagedClusters
 	initialResourceVersion string
 
-	// mu protects clusterManagers, hubClusterName, and watchStarted
+	// mu protects cfg, clusterManagers, hubClusterName, and watchStarted
 	mu              sync.RWMutex
 	clusterManagers map[string]*Manager
 	hubClusterName  string
@@ -178,7 +176,7 @@ func (m *Manager) IsACMHub(ctx context.Context) bool {
 	return false
 }
 
-func newACMHubClusterProvider(ctx context.Context, cfg api.BaseConfig) (Provider, error) {
+func newACMHubClusterProvider(ctx context.Context, cfg *config.Config) (Provider, error) {
 	m, err := NewInClusterManager(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create in-cluster Kubernetes Manager for acm-hub cluster provider strategy: %w", err)
@@ -192,7 +190,7 @@ func newACMHubClusterProvider(ctx context.Context, cfg api.BaseConfig) (Provider
 	return newACMClusterProvider(ctx, m, providerCfg.(*ACMProviderConfig), false, cfg)
 }
 
-func newACMKubeConfigClusterProvider(ctx context.Context, cfg api.BaseConfig) (Provider, error) {
+func newACMKubeConfigClusterProvider(ctx context.Context, cfg *config.Config) (Provider, error) {
 	providerCfg, ok := cfg.GetProviderConfig(ClusterProviderACMKubeConfig)
 	if !ok {
 		return nil, fmt.Errorf("missing required config for strategy '%s'", ClusterProviderACMKubeConfig)
@@ -251,7 +249,7 @@ func discoverClusterProxyHost(ctx context.Context, m *Manager, isClusterProvider
 	return "", fmt.Errorf("failed to auto-discover cluster-proxy host: route and service not found")
 }
 
-func newACMClusterProvider(ctx context.Context, m *Manager, cfg *ACMProviderConfig, watchKubeConfig bool, baseCfg api.BaseConfig) (Provider, error) {
+func newACMClusterProvider(ctx context.Context, m *Manager, cfg *ACMProviderConfig, watchKubeConfig bool, baseCfg *config.Config) (Provider, error) {
 	logger := klog.FromContext(ctx)
 
 	if !m.IsACMHub(ctx) {
@@ -273,6 +271,7 @@ func newACMClusterProvider(ctx context.Context, m *Manager, cfg *ACMProviderConf
 	watchCtx, watchCancel := context.WithCancel(context.Background())
 
 	provider := &acmHubClusterProvider{
+		cfg:                baseCfg,
 		hubManager:         m,
 		clusterManagers:    make(map[string]*Manager),
 		targetTokenConfigs: cfg.Clusters,
@@ -283,9 +282,13 @@ func newACMClusterProvider(ctx context.Context, m *Manager, cfg *ACMProviderConf
 		clusterProxyHost:   clusterProxyHost,
 		clusterProxyCAFile: cfg.ClusterProxyAddonCAFile,
 		skipTLSVerify:      cfg.ClusterProxyAddonSkipTLSVerify,
-		kubeConfigWatcher:  watcher.NewKubeconfig(ctx, m.kubernetes.clientCmdConfig),
-		clusterWatcher:     watcher.NewClusterState(ctx, m.kubernetes.DiscoveryClient()),
-		TargetCompatibilityToolFiltersEnabledProvider: baseCfg,
+		kubeConfigWatcher:  watcher.NewKubeconfig(ctx, m.kubernetes.clientCmdConfig, baseCfg.KubeconfigDebounceWindow.Get()),
+		clusterWatcher: watcher.NewClusterState(
+			ctx,
+			m.kubernetes.DiscoveryClient(),
+			baseCfg.ClusterStatePollInterval.Get(),
+			baseCfg.ClusterStateDebounceWindow.Get(),
+		),
 	}
 
 	resourceVersion, err := provider.refreshClusters(ctx)
@@ -300,6 +303,12 @@ func newACMClusterProvider(ctx context.Context, m *Manager, cfg *ACMProviderConf
 
 func (p *acmHubClusterProvider) AnyTargetHasGVKs(_ context.Context, _ []schema.GroupVersionKind) bool {
 	return true // TODO: implement this properly
+}
+
+func (p *acmHubClusterProvider) IsTargetCompatibilityToolFiltersEnabled() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.cfg.EnableTargetCompatibilityToolFilters.Get()
 }
 
 func (p *acmHubClusterProvider) IsMultiTarget() bool {
@@ -347,18 +356,43 @@ func (p *acmHubClusterProvider) GetTargetParameterName() string {
 	return ACMHubTargetParameterName
 }
 
-func (p *acmHubClusterProvider) WatchTargets(ctx context.Context, reload McpReload) {
+func (p *acmHubClusterProvider) WatchTargets(ctx context.Context, reload McpReloader) {
+	onTargetsChanged := reload.ClusterStateCallback()
 	if p.watchKubeConfig {
-		p.kubeConfigWatcher.Watch(ctx, reload)
+		p.kubeConfigWatcher.Watch(ctx, onTargetsChanged)
 	}
 
-	p.clusterWatcher.Watch(ctx, reload)
+	p.clusterWatcher.Watch(ctx, onTargetsChanged)
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if !p.watchStarted {
 		p.watchStarted = true
-		go p.watchManagedClusters(p.initialResourceVersion, reload)
+		go p.watchManagedClusters(p.initialResourceVersion, onTargetsChanged)
+	}
+}
+
+func (p *acmHubClusterProvider) ReloadConfig(_ context.Context, cfg *config.Config) error {
+	if cfg == nil {
+		return errors.New("config cannot be nil")
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.cfg = cfg
+	return nil
+}
+
+func (p *acmHubClusterProvider) PublishKubernetesConfig(cfg *config.Config) {
+	if cfg == nil {
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.hubManager.SetConfig(cfg)
+	for _, manager := range p.clusterManagers {
+		if manager != nil {
+			manager.SetConfig(cfg)
+		}
 	}
 }
 
@@ -567,6 +601,7 @@ func (p *acmHubClusterProvider) removeCluster(name string) {
 func (p *acmHubClusterProvider) managerForCluster(ctx context.Context, cluster string) (*Manager, error) {
 	p.mu.RLock()
 	manager, exists := p.clusterManagers[cluster]
+	cfg := p.cfg
 	p.mu.RUnlock()
 
 	if exists && manager != nil {
@@ -618,7 +653,7 @@ func (p *acmHubClusterProvider) managerForCluster(ctx context.Context, cluster s
 	}
 
 	proxyClientCmdConfig := clientcmd.NewDefaultClientConfig(*proxyRawConfig, nil)
-	newManager, err := NewManager(ctx, p.hubManager.config, proxyConfig, proxyClientCmdConfig)
+	newManager, err := NewManager(ctx, cfg, proxyConfig, proxyClientCmdConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create manager for cluster %s: %w", cluster, err)
 	}

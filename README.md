@@ -190,22 +190,13 @@ uvx kubernetes-mcp-server@latest --help
 
 ### Configuration Options
 
-| Option                    | Description                                                                                                                                                                                                                                                                                   |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--port`                  | Starts the MCP server in Streamable HTTP mode (path /mcp) and listens on the specified port.                                                                                                                                                                                                   |
-| `--log-level`             | Sets the logging level (values [from 0-9](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-instrumentation/logging.md)). Similar to [kubectl logging levels](https://kubernetes.io/docs/reference/kubectl/quick-reference/#kubectl-output-verbosity-and-debugging). |
-| `--config`                | (Optional) Path to the main TOML configuration file. See [Configuration Reference](docs/configuration.md) for details.                                                                                                                                                                        |
-| `--config-dir`            | (Optional) Path to drop-in configuration directory. Files are loaded in lexical (alphabetical) order. Defaults to `conf.d` relative to the main config file if `--config` is specified. See [Configuration Reference](docs/configuration.md) for details.                                     |
-| `--kubeconfig`            | Path to the Kubernetes configuration file. If not provided, it will try to resolve the configuration (in-cluster, default location, etc.).                                                                                                                                                    |
-| `--list-output`           | Output format for resource list operations (one of: yaml, table) (default "table")                                                                                                                                                                                                            |
-| `--read-only`             | If set, the MCP server will run in read-only mode, meaning it will not allow any write operations (create, update, delete) on the Kubernetes cluster. This is useful for debugging or inspecting the cluster without making changes.                                                          |
-| `--disable-destructive`   | If set, the MCP server will disable all destructive operations (delete, update, etc.) on the Kubernetes cluster. This is useful for debugging or inspecting the cluster without accidentally making changes. This option has no effect when `--read-only` is used.                            |
-| `--stateless`             | If set, the MCP server will run in stateless mode, disabling tool and prompt change notifications. This is useful for container deployments, load balancing, and serverless environments where maintaining client state is not desired.                                                       |
-| `--toolsets`              | Comma-separated list of toolsets to enable. Check the [🛠️ Tools and Functionalities](#tools-and-functionalities) section for more information.                                                                                                                                                |
-| `--disable-multi-cluster` | If set, the MCP server will disable multi-cluster support and will only use the current context from the kubeconfig file. This is useful if you want to restrict the MCP server to a single cluster.                                                                                          |
-| `--cluster-provider`      | Cluster provider strategy to use (one of: kubeconfig, in-cluster, kcp, disabled). If not set, the server will auto-detect based on the environment.                                                                                                                                           |
+| Option         | Description |
+| -------------- | ----------- |
+| `--version`    | Print version information and quit. |
+| `--config`     | Path to the main TOML configuration file. See [Configuration Reference](docs/configuration.md) for all options (port, toolsets, read_only, kubeconfig, …). |
+| `--config-dir` | Directory of lexical `.toml` files. Usable alone or with `--config`. Omitted means no drop-ins. Relative paths are resolved against the working directory. |
 
-> **Note**: Most CLI options have equivalent TOML configuration fields. The `--disable-multi-cluster` flag is equivalent to setting `cluster_provider_strategy = "disabled"` in TOML. See the [Configuration Reference](docs/configuration.md) for all TOML options.
+> **Note**: Runtime settings are TOML (or existing env names), not CLI flags. See [Configuration Changes](docs/configuration-changes.md) for the flag-to-TOML mapping.
 
 ### TOML Configuration Files
 
@@ -254,7 +245,7 @@ See the **[MCP Logging Guide](docs/logging.md)**.
 
 ## 🛠️ Tools and Functionalities <a id="tools-and-functionalities"></a>
 
-The Kubernetes MCP server supports enabling or disabling specific groups of tools and functionalities (tools, resources, prompts, and so on) via the `--toolsets` command-line flag or `toolsets` configuration option.
+The Kubernetes MCP server supports enabling or disabling specific groups of tools and functionalities (tools, resources, prompts, and so on) via the `toolsets` configuration option.
 This allows you to control which Kubernetes functionalities are available to your AI tools.
 Enabling only the toolsets you need can help reduce the context size and improve the LLM's tool selection accuracy.
 
@@ -301,8 +292,7 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 | observability/metrics | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                                                                           |         |
 | observability/otelcol | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                                                                              |         |
 | observability/traces  | Distributed tracing tools for discovering Tempo instances, searching and retrieving traces, and exploring trace attributes.                                                                                                             |         |
-| openshift             | OpenShift-specific tools for cluster management and troubleshooting                                                                                                                                                                     |         |
-| openshift/mustgather  | Analyze OpenShift must-gather archives offline without a live cluster connection                                                                                                                                                        |         |
+| openshift/mustgather  | Analyze OpenShift must-gather archives offline without a live cluster connection. Call mustgather_list first to discover available archives and their archive_id, then pass that ID to the other mustgather_* tools.                    |         |
 | ossm                  | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                                                                         |         |
 | ovn-kubernetes        | OVN-Kubernetes CNI network troubleshooting tools                                                                                                                                                                                        |         |
 | tekton                | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, TaskRuns, and troubleshooting.                                                                                                                                     |         |
@@ -1243,19 +1233,13 @@ Use tempo_search_tags to discover available tag names.
 
 <details>
 
-<summary>openshift</summary>
-
-</details>
-
-<details>
-
 <summary>openshift/mustgather</summary>
 
-- **mustgather_use** - Load a must-gather archive from a given filesystem path for analysis. Must be called before any other mustgather_* tools.
-  - `path` (`string`) **(required)** - Absolute path to the must-gather archive directory
+- **mustgather_list** - List the must-gather archives discovered under the configured directories. Returns each archive's archive_id, which must be passed to the other mustgather_* tools.
 
 - **mustgather_resources_list** - List Kubernetes resources from the must-gather archive with optional filtering by namespace, labels, and fields
   - `apiVersion` (`string`) - API version (default: v1)
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `fieldSelector` (`string`) - Field selector (e.g., metadata.name=foo)
   - `kind` (`string`) **(required)** - Resource kind (e.g., Pod, Deployment, Service)
   - `labelSelector` (`string`) - Label selector (e.g., app=nginx,tier=frontend)
@@ -1263,6 +1247,7 @@ Use tempo_search_tags to discover available tag names.
   - `namespace` (`string`) - Filter by namespace
 
 - **mustgather_events_list** - List Kubernetes events from the must-gather archive with optional filtering by type, namespace, resource, and reason
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `limit` (`integer`) - Maximum number of events to return (default: 100)
   - `namespace` (`string`) - Filter by namespace
   - `reason` (`string`) - Filter by event reason (partial match)
@@ -1270,11 +1255,13 @@ Use tempo_search_tags to discover available tag names.
   - `type` (`string`) - Event type filter: all, Warning, Normal
 
 - **mustgather_events_by_resource** - Get all events related to a specific Kubernetes resource from the must-gather archive
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `kind` (`string`) - Resource kind (optional, narrows search)
   - `name` (`string`) **(required)** - Resource name
   - `namespace` (`string`) - Resource namespace
 
 - **mustgather_events_by_time** - List Kubernetes events from the must-gather archive within a specific time range, sorted chronologically
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `limit` (`integer`) - Maximum number of events to return (default: 200)
   - `namespace` (`string`) - Filter by namespace
   - `since` (`string`) **(required)** - Start time in RFC3339 format (e.g. 2026-01-15T10:00:00Z)
@@ -1282,6 +1269,7 @@ Use tempo_search_tags to discover available tag names.
   - `until` (`string`) - End time in RFC3339 format (e.g. 2026-01-15T12:00:00Z)
 
 - **mustgather_pod_logs_get** - Get container logs for a specific pod from the must-gather archive. Returns current or previous logs.
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `container` (`string`) - Container name (uses first container if not specified)
   - `namespace` (`string`) **(required)** - Pod namespace
   - `pod` (`string`) **(required)** - Pod name
@@ -1289,6 +1277,7 @@ Use tempo_search_tags to discover available tag names.
   - `tail` (`integer`) - Number of lines from end of logs (0 for all)
 
 - **mustgather_pod_logs_grep** - Filter pod container logs by a search string. Returns only matching lines from the must-gather archive.
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `caseInsensitive` (`boolean`) - Perform case-insensitive search (default: false)
   - `container` (`string`) - Container name (uses first container if not specified)
   - `filter` (`string`) **(required)** - String to search for in log lines
@@ -1298,6 +1287,7 @@ Use tempo_search_tags to discover available tag names.
   - `tail` (`integer`) - Maximum number of matching lines to return (0 for all)
 
 - **mustgather_pod_logs_by_time** - Get pod container logs within a specific time range. Each log line is expected to have an RFC3339Nano timestamp prefix (from kubectl logs --timestamps).
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `container` (`string`) - Container name (uses first container if not specified)
   - `limit` (`integer`) - Maximum number of lines to return (default: 500)
   - `namespace` (`string`) **(required)** - Pod namespace
@@ -1307,40 +1297,50 @@ Use tempo_search_tags to discover available tag names.
   - `until` (`string`) - End time in RFC3339 format (e.g. 2026-01-15T12:00:00Z)
 
 - **mustgather_node_diagnostics_get** - Get comprehensive diagnostic information for a specific node including kubelet logs, system info, CPU/IRQ affinities, and hardware details
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `include` (`string`) - Comma-separated diagnostics to include: kubelet,sysinfo,cpu,irq,pods,podresources,lscpu,lspci,dmesg,cmdline (default: all)
   - `kubeletTail` (`integer`) - Number of lines from end of kubelet log (0 for all, default: 100)
   - `node` (`string`) **(required)** - Node name
 
 - **mustgather_node_kubelet_logs** - Get kubelet logs for a specific node (decompressed from .gz file)
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `node` (`string`) **(required)** - Node name
   - `tail` (`integer`) - Number of lines from end (0 for all)
 
 - **mustgather_node_kubelet_logs_grep** - Filter kubelet logs for a specific node by a search string. Returns only matching lines.
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `caseInsensitive` (`boolean`) - Perform case-insensitive search (default: false)
   - `filter` (`string`) **(required)** - String to search for in log lines
   - `node` (`string`) **(required)** - Node name
   - `tail` (`integer`) - Maximum number of matching lines to return (0 for all)
 
 - **mustgather_etcd_health** - Get ETCD cluster health status including endpoint health and active alarms from the must-gather archive
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
 
 - **mustgather_etcd_object_count** - Get ETCD object counts by resource type from the must-gather archive
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `limit` (`integer`) - Maximum number of resource types to show (default: 50, sorted by count descending)
 
 - **mustgather_monitoring_prometheus_status** - Get Prometheus TSDB and runtime status from the must-gather archive
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `replica` (`string`) - Prometheus replica (0, 1, or all). Default: all
 
 - **mustgather_monitoring_prometheus_targets** - Get Prometheus scrape targets and their health status from the must-gather archive
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `health` (`string`) - Filter by health status: up, down, unknown (default: all)
   - `replica` (`string`) - Prometheus replica (0, 1, or all). Default: 0
 
 - **mustgather_monitoring_prometheus_tsdb** - Get detailed Prometheus TSDB statistics including top metrics by series count and label cardinality
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `limit` (`integer`) - Number of top entries to show per category (default: 10)
   - `replica` (`string`) - Prometheus replica (0, 1, or all). Default: 0
 
 - **mustgather_monitoring_prometheus_alerts** - Get active Prometheus alerts from the must-gather archive
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `state` (`string`) - Filter by alert state: firing, pending (default: all)
 
 - **mustgather_monitoring_prometheus_rules** - Get Prometheus alerting and recording rules from the must-gather archive
+  - `archive_id` (`string`) **(required)** - Must-gather archive ID as returned by mustgather_list (format: mg-XXXXYYYYYYYY, e.g. mg-384226d712f0). Call mustgather_list first to discover available archives.
   - `type` (`string`) - Filter by rule type: alerting, recording (default: all)
 
 </details>
@@ -1778,7 +1778,7 @@ Example output:
 <summary>oadp</summary>
 
 - **oadp-troubleshoot** - Generate a step-by-step troubleshooting guide for diagnosing OADP backup and restore issues
-  - `namespace` (`string`) - The OADP namespace (default: openshift-adp)
+  - `namespace` (`string`) **(required)** - The OADP namespace
   - `backup` (`string`) - The name of a specific backup to troubleshoot
   - `restore` (`string`) - The name of a specific restore to troubleshoot
 
@@ -1786,7 +1786,7 @@ Example output:
 
 <details>
 
-<summary>openshift</summary>
+<summary>openshift/mustgather</summary>
 
 - **plan_mustgather** - Plan for collecting a must-gather archive from an OpenShift cluster. Must-gather is a tool for collecting cluster data related to debugging and troubleshooting like logs, kubernetes resources, etc.
   - `node_name` (`string`) - Specific node name to run must-gather pod on
@@ -1860,45 +1860,12 @@ Example output:
 
 <!-- AVAILABLE-TOOLSETS-RESOURCES-START -->
 
-<details>
-
-<summary>openshift/mustgather</summary>
-
-- **must-gather** - Loaded must-gather archive metadata
-  - URI: `must-gather://current`
-  - MIME Type: `text/plain`
-- **must-gather-namespaces** - List of all namespaces in the must-gather archive
-  - URI: `must-gather://current/namespaces`
-  - MIME Type: `text/plain`
-- **must-gather-etcd-members** - ETCD cluster member list from the must-gather archive
-  - URI: `must-gather://current/etcd/members`
-  - MIME Type: `application/json`
-- **must-gather-etcd-endpoint-status** - ETCD endpoint status from the must-gather archive
-  - URI: `must-gather://current/etcd/endpoint-status`
-  - MIME Type: `application/json`
-- **must-gather-prometheus-config** - Prometheus configuration summary from the must-gather archive
-  - URI: `must-gather://current/prometheus/config`
-  - MIME Type: `text/plain`
-- **must-gather-alertmanager-status** - AlertManager status from the must-gather archive
-  - URI: `must-gather://current/alertmanager/status`
-  - MIME Type: `text/plain`
-</details>
-
 
 <!-- AVAILABLE-TOOLSETS-RESOURCES-END -->
 
 ### Resource Templates
 
 <!-- AVAILABLE-TOOLSETS-RESOURCES-TEMPLATES-START -->
-
-<details>
-
-<summary>openshift/mustgather</summary>
-
-- **must-gather-resource** - A specific Kubernetes resource from the must-gather archive as YAML. Use '-' for empty group (core API) or cluster-scoped namespace.
-  - URI Template: `must-gather://current/resources/{group}/{version}/{kind}/{namespace}/{name}`
-  - MIME Type: `text/yaml`
-</details>
 
 
 <!-- AVAILABLE-TOOLSETS-RESOURCES-TEMPLATES-END -->

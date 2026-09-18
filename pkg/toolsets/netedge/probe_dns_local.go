@@ -72,6 +72,7 @@ func initProbeDNSLocalWith(client dnsExchange) []api.ServerTool {
 					OpenWorldHint:   ptr.To(true),
 				},
 			},
+			RBAC:         api.RBACNone(),
 			ClusterAware: ptr.To(false),
 			Handler:      makeProbeDNSLocalHandler(client),
 		},

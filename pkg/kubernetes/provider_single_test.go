@@ -1,6 +1,7 @@
 package kubernetes
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/containers/kubernetes-mcp-server/internal/test"
@@ -27,7 +28,7 @@ func (s *ProviderSingleTestSuite) SetupTest() {
 	InClusterConfig = func() (*rest.Config, error) {
 		return s.mockServer.Config(), nil
 	}
-	provider, err := NewProvider(s.T().Context(), &config.StaticConfig{})
+	provider, err := NewProvider(s.T().Context(), config.New())
 	s.Require().NoError(err, "Expected no error creating provider")
 	s.provider = provider
 }
@@ -96,6 +97,25 @@ func (s *ProviderSingleTestSuite) TestGetDefaultTarget() {
 
 func (s *ProviderSingleTestSuite) TestGetTargetParameterName() {
 	s.Empty(s.provider.GetTargetParameterName(), "Expected empty string as target parameter name")
+}
+
+func (s *ProviderSingleTestSuite) TestReloadConfigDoesNotRebuild() {
+	k8s, err := s.provider.GetDerivedKubernetes(s.T().Context(), "")
+	s.Require().NoError(err)
+	s.Require().NotNil(k8s)
+
+	InClusterConfig = func() (*rest.Config, error) {
+		return nil, errors.New("in-cluster config unavailable")
+	}
+	s.Run("reload publishes config without rebuilding managers", func() {
+		err := s.provider.ReloadConfig(s.T().Context(), config.New())
+		s.NoError(err)
+	})
+	s.Run("previous manager still serves after reload", func() {
+		k8s, err := s.provider.GetDerivedKubernetes(s.T().Context(), "")
+		s.NoError(err)
+		s.NotNil(k8s)
+	})
 }
 
 func TestProviderSingle(t *testing.T) {

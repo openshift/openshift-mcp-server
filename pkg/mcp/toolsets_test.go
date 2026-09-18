@@ -22,7 +22,6 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kiali"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt"
 	mgToolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/mustgather"
-	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/openshift"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/ovnkubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/tekton"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -38,7 +37,7 @@ type ToolsetsSuite struct {
 	originalToolsets []api.Toolset
 	*test.MockServer
 	*test.McpClient
-	Cfg        *configuration.StaticConfig
+	Cfg        *configuration.Config
 	mcpServer  *Server
 	updateJson bool
 }
@@ -49,7 +48,8 @@ func (s *ToolsetsSuite) SetupTest() {
 	// Set up default discovery handler for non-OpenShift cluster
 	s.Handle(test.NewDiscoveryClientHandler())
 	s.Cfg = configuration.BaseDefault()
-	s.Cfg.KubeConfig = s.KubeconfigFile(s.T())
+	s.Cfg.KubeConfig.SetForTest(s.KubeconfigFile(s.T()))
+	test.ApplyEnvtestClientLimits(s.Cfg)
 	s.updateJson = os.Getenv(updateJsonEnvVar) != ""
 }
 
@@ -73,7 +73,7 @@ func (s *ToolsetsSuite) TearDownSubTest() {
 func (s *ToolsetsSuite) TestNoToolsets() {
 	s.Run("No toolsets registered", func() {
 		toolsets.Clear()
-		s.Cfg.Toolsets = []string{}
+		s.Cfg.Toolsets.SetForTest([]string{})
 		s.InitMcpClient()
 		tools, err := s.ListTools()
 		s.Run("ListTools returns no tools", func() {
@@ -117,7 +117,7 @@ func (s *ToolsetsSuite) TestDefaultToolsetsToolsInOpenShift() {
 
 func (s *ToolsetsSuite) TestDefaultToolsetsToolsWithFilteringEnabled() {
 	s.Run("Default configuration toolsets with filtering enabled on non-OpenShift", func() {
-		s.Cfg.EnableTargetCompatibilityToolFilters = true
+		s.Cfg.EnableTargetCompatibilityToolFilters.SetForTest(true)
 		s.InitMcpClient()
 		tools, err := s.ListTools()
 		s.Run("ListTools returns tools", func() {
@@ -148,7 +148,7 @@ func (s *ToolsetsSuite) TestMetricsToolsPresentWithFilteringEnabled() {
 				{Name: "pods", Kind: "PodMetrics", Namespaced: true, Verbs: metav1.Verbs{"get", "list"}},
 			},
 		}))
-		s.Cfg.EnableTargetCompatibilityToolFilters = true
+		s.Cfg.EnableTargetCompatibilityToolFilters.SetForTest(true)
 		s.InitMcpClient()
 		tools, err := s.ListTools()
 		s.Require().NoError(err, "Expected no error from ListTools")
@@ -167,8 +167,8 @@ func (s *ToolsetsSuite) TestMetricsToolsPresentWithFilteringEnabled() {
 
 func (s *ToolsetsSuite) TestKubevirtToolsFilteredWithoutCRDs() {
 	s.Run("Kubevirt tools are filtered out when VirtualMachine GVK is not present", func() {
-		s.Cfg.Toolsets = []string{"kubevirt"}
-		s.Cfg.EnableTargetCompatibilityToolFilters = true
+		s.Cfg.Toolsets.SetForTest([]string{"kubevirt"})
+		s.Cfg.EnableTargetCompatibilityToolFilters.SetForTest(true)
 		s.InitMcpClient()
 		tools, err := s.ListTools()
 		s.Run("ListTools returns tools", func() {
@@ -193,7 +193,7 @@ func (s *ToolsetsSuite) TestDefaultToolsetsToolsInMultiCluster() {
 			// Add multiple fake contexts to force multi-cluster behavior
 			kubeconfig.Contexts[strconv.Itoa(i)] = clientcmdapi.NewContext()
 		}
-		s.Cfg.KubeConfig = test.KubeconfigFile(s.T(), kubeconfig)
+		s.Cfg.KubeConfig.SetForTest(test.KubeconfigFile(s.T(), kubeconfig))
 		s.InitMcpClient()
 		tools, err := s.ListTools()
 		s.Run("ListTools returns tools", func() {
@@ -237,7 +237,7 @@ func (s *ToolsetsSuite) TestDefaultToolsetsPromptsInMultiCluster() {
 			// Add multiple fake contexts to force multi-cluster behavior
 			kubeconfig.Contexts[strconv.Itoa(i)] = clientcmdapi.NewContext()
 		}
-		s.Cfg.KubeConfig = test.KubeconfigFile(s.T(), kubeconfig)
+		s.Cfg.KubeConfig.SetForTest(test.KubeconfigFile(s.T(), kubeconfig))
 		s.InitMcpClient()
 		prompts, err := s.ListPrompts()
 		s.Run("ListPrompts returns prompts", func() {
@@ -267,7 +267,7 @@ func (s *ToolsetsSuite) TestGranularToolsetsTools() {
 		s.Run("Toolset "+testCase.GetName(), func() {
 			toolsets.Clear()
 			toolsets.Register(testCase)
-			s.Cfg.Toolsets = []string{testCase.GetName()}
+			s.Cfg.Toolsets.SetForTest([]string{testCase.GetName()})
 			s.InitMcpClient()
 			tools, err := s.ListTools()
 			s.Run("ListTools returns tools", func() {
@@ -281,30 +281,12 @@ func (s *ToolsetsSuite) TestGranularToolsetsTools() {
 	}
 }
 
-func (s *ToolsetsSuite) TestOpenShiftToolset() {
-	s.Run("OpenShift toolset in OpenShift cluster", func() {
+func (s *ToolsetsSuite) TestOpenShiftMustGatherToolsetPrompts() {
+	s.Run("OpenShift must-gather toolset prompts", func() {
 		s.Handle(test.NewInOpenShiftHandler())
 		toolsets.Clear()
-		toolsets.Register(&openshift.Toolset{})
-		s.Cfg.Toolsets = []string{"openshift"}
-		s.InitMcpClient()
-		tools, err := s.ListTools()
-		s.Run("ListTools returns tools", func() {
-			s.NotNil(tools, "Expected tools from ListTools")
-			s.NoError(err, "Expected no error from ListTools")
-		})
-		s.Run("ListTools returns correct Tool metadata", func() {
-			s.assertJsonSnapshot("toolsets-openshift-tools.json", tools.Tools)
-		})
-	})
-}
-
-func (s *ToolsetsSuite) TestOpenShiftToolsetPrompts() {
-	s.Run("OpenShift toolset prompts in OpenShift cluster", func() {
-		s.Handle(test.NewInOpenShiftHandler())
-		toolsets.Clear()
-		toolsets.Register(&openshift.Toolset{})
-		s.Cfg.Toolsets = []string{"openshift"}
+		toolsets.Register(&mgToolset.Toolset{})
+		s.Cfg.Toolsets.SetForTest([]string{"openshift/mustgather"})
 		s.InitMcpClient()
 		prompts, err := s.ListPrompts()
 		s.Run("ListPrompts returns prompts", func() {
@@ -312,7 +294,7 @@ func (s *ToolsetsSuite) TestOpenShiftToolsetPrompts() {
 			s.NoError(err, "Expected no error from ListPrompts")
 		})
 		s.Run("ListPrompts returns correct Prompt metadata", func() {
-			s.assertJsonSnapshot("toolsets-openshift-prompts.json", prompts.Prompts)
+			s.assertJsonSnapshot("toolsets-openshift-mustgather-prompts.json", prompts.Prompts)
 		})
 	})
 }
@@ -321,7 +303,7 @@ func (s *ToolsetsSuite) TestOpenShiftMustGatherToolset() {
 	s.Run("OpenShift must-gather toolset", func() {
 		toolsets.Clear()
 		toolsets.Register(&mgToolset.Toolset{})
-		s.Cfg.Toolsets = []string{"openshift/mustgather"}
+		s.Cfg.Toolsets.SetForTest([]string{"openshift/mustgather"})
 		s.InitMcpClient()
 		tools, err := s.ListTools()
 		s.Run("ListTools returns tools", func() {
@@ -369,11 +351,11 @@ func (s *ToolsetsSuite) TestInputSchemaEdgeCases() {
 		toolsets.Register(&config.Toolset{})
 		toolsets.Register(&helm.Toolset{})
 		toolsets.Register(&kcp.Toolset{})
-		s.Cfg.Toolsets = []string{"core", "config", "helm", "kcp"}
+		s.Cfg.Toolsets.SetForTest([]string{"core", "config", "helm", "kcp"})
 		// Enable multi-cluster mode to include configuration_contexts_list tool
 		kubeconfig := s.Kubeconfig()
 		kubeconfig.Contexts["extra-cluster"] = clientcmdapi.NewContext()
-		s.Cfg.KubeConfig = test.KubeconfigFile(s.T(), kubeconfig)
+		s.Cfg.KubeConfig.SetForTest(test.KubeconfigFile(s.T(), kubeconfig))
 		s.InitMcpClient()
 		tools, err := s.ListTools()
 		s.Require().NoError(err, "Expected no error from ListTools")
@@ -395,7 +377,7 @@ func (s *ToolsetsSuite) TestInputSchemaEdgeCases() {
 func (s *ToolsetsSuite) InitMcpClient() {
 	provider, err := kubernetes.NewProvider(s.T().Context(), s.Cfg)
 	s.Require().NoError(err, "Expected no error creating kubernetes target provider")
-	s.mcpServer, err = NewServer(s.T().Context(), Configuration{StaticConfig: s.Cfg}, provider)
+	s.mcpServer, err = NewServer(s.T().Context(), Configuration{Config: s.Cfg}, provider)
 	s.Require().NoError(err, "Expected no error creating MCP server")
 	s.McpClient = test.NewMcpClient(s.T(), s.mcpServer.ServeHTTP())
 }

@@ -75,16 +75,14 @@ Validate a component configuration against its JSON schema.
 
 ## Enable the Toolset
 
-### Command line
-
-```bash
-kubernetes-mcp-server --toolsets core,observability/otelcol
-```
-
-### Configuration file (TOML)
+The otelcol toolset is not enabled by default. Enable it in a TOML configuration file:
 
 ```toml
 toolsets = ["core", "observability/otelcol"]
+```
+
+```bash
+kubernetes-mcp-server --config /path/to/config.toml
 ```
 
 ### MCP client configuration
@@ -94,7 +92,7 @@ toolsets = ["core", "observability/otelcol"]
   "mcpServers": {
     "kubernetes": {
       "command": "npx",
-      "args": ["-y", "kubernetes-mcp-server@latest", "--toolsets", "core,observability/otelcol"]
+      "args": ["-y", "kubernetes-mcp-server@latest", "--config", "/path/to/config.toml"]
     }
   }
 }

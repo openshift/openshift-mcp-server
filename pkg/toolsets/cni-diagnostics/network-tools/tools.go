@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/cluster-diagnostics/nodesdebug"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/cni-diagnostics/utils"
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -72,6 +73,7 @@ func initTcpdumpTool() api.ServerTool {
 			},
 			Annotations: utils.ReadOnlyAnnotations("CNI-Diagnostics: Network Packet Capture", false),
 		},
+		RBAC:    nodesdebug.NodeDebugRBAC("name", "namespace"),
 		Handler: tcpdumpHandler,
 	}
 }
@@ -193,6 +195,7 @@ func initPwruTool() api.ServerTool {
 			},
 			Annotations: utils.ReadOnlyAnnotations("CNI-Diagnostics: Network eBPF Packet Tracing", false),
 		},
+		RBAC:    nodesdebug.NodeDebugRBAC("node_name", "node_pod_namespace"),
 		Handler: pwruHandler,
 	}
 }
