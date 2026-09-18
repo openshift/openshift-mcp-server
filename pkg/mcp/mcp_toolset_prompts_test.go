@@ -3,11 +3,12 @@ package mcp
 import (
 	"testing"
 
-	"github.com/BurntSushi/toml"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/containers/kubernetes-mcp-server/pkg/config/configtest"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
 )
 
@@ -37,10 +38,10 @@ func (s *McpToolsetPromptsSuite) TestToolsetReturningPrompts() {
 		description: "Test toolset with prompts",
 		prompts: []api.ServerPrompt{
 			{
-				Prompt: api.Prompt{
+				Prompt: config.Prompt{
 					Name:        "toolset-prompt",
 					Description: "A prompt from a toolset",
-					Arguments: []api.PromptArgument{
+					Arguments: []config.PromptArgument{
 						{Name: "arg1", Description: "Test argument", Required: true},
 					},
 				},
@@ -63,7 +64,7 @@ func (s *McpToolsetPromptsSuite) TestToolsetReturningPrompts() {
 
 	toolsets.Clear()
 	toolsets.Register(testToolset)
-	s.Cfg.Toolsets = []string{"test-toolset"}
+	s.Cfg.Toolsets.SetForTest([]string{"test-toolset"})
 
 	s.InitMcpClient()
 
@@ -116,7 +117,7 @@ func (s *McpToolsetPromptsSuite) TestToolsetReturningNilPrompts() {
 
 	toolsets.Clear()
 	toolsets.Register(testToolset)
-	s.Cfg.Toolsets = []string{"empty-toolset"}
+	s.Cfg.Toolsets.SetForTest([]string{"empty-toolset"})
 
 	s.InitMcpClient()
 
@@ -142,7 +143,7 @@ func (s *McpToolsetPromptsSuite) TestToolsetReturningEmptyPrompts() {
 
 	toolsets.Clear()
 	toolsets.Register(testToolset)
-	s.Cfg.Toolsets = []string{"empty-slice-toolset"}
+	s.Cfg.Toolsets.SetForTest([]string{"empty-slice-toolset"})
 
 	s.InitMcpClient()
 
@@ -165,7 +166,7 @@ func (s *McpToolsetPromptsSuite) TestMultipleToolsetsPromptCollection() {
 		description: "First toolset",
 		prompts: []api.ServerPrompt{
 			{
-				Prompt: api.Prompt{
+				Prompt: config.Prompt{
 					Name:        "prompt1",
 					Description: "Prompt from toolset1",
 				},
@@ -181,7 +182,7 @@ func (s *McpToolsetPromptsSuite) TestMultipleToolsetsPromptCollection() {
 		description: "Second toolset",
 		prompts: []api.ServerPrompt{
 			{
-				Prompt: api.Prompt{
+				Prompt: config.Prompt{
 					Name:        "prompt2",
 					Description: "Prompt from toolset2",
 				},
@@ -195,7 +196,7 @@ func (s *McpToolsetPromptsSuite) TestMultipleToolsetsPromptCollection() {
 	toolsets.Clear()
 	toolsets.Register(toolset1)
 	toolsets.Register(toolset2)
-	s.Cfg.Toolsets = []string{"toolset1", "toolset2"}
+	s.Cfg.Toolsets.SetForTest([]string{"toolset1", "toolset2"})
 
 	s.InitMcpClient()
 
@@ -224,7 +225,7 @@ func (s *McpToolsetPromptsSuite) TestConfigPromptsOverrideToolsetPrompts() {
 		description: "Test toolset",
 		prompts: []api.ServerPrompt{
 			{
-				Prompt: api.Prompt{
+				Prompt: config.Prompt{
 					Name:        "shared-prompt",
 					Description: "Toolset version",
 				},
@@ -247,7 +248,7 @@ func (s *McpToolsetPromptsSuite) TestConfigPromptsOverrideToolsetPrompts() {
 	toolsets.Register(testToolset)
 
 	// Add config prompt with same name
-	s.Require().NoError(toml.Unmarshal([]byte(`
+	configtest.OverlayTOML(s.T(), &s.Cfg, `
 toolsets = ["test-toolset"]
 
 [[prompts]]
@@ -257,7 +258,7 @@ description = "Config version"
 [[prompts.messages]]
 role = "user"
 content = "From config"
-	`), s.Cfg), "Expected to parse config")
+	`)
 
 	s.InitMcpClient()
 
@@ -294,7 +295,7 @@ func (s *McpToolsetPromptsSuite) TestPromptsNotExposedWhenToolsetDisabled() {
 		description: "Enabled toolset",
 		prompts: []api.ServerPrompt{
 			{
-				Prompt: api.Prompt{
+				Prompt: config.Prompt{
 					Name:        "enabled-prompt",
 					Description: "From enabled toolset",
 				},
@@ -310,7 +311,7 @@ func (s *McpToolsetPromptsSuite) TestPromptsNotExposedWhenToolsetDisabled() {
 		description: "Disabled toolset",
 		prompts: []api.ServerPrompt{
 			{
-				Prompt: api.Prompt{
+				Prompt: config.Prompt{
 					Name:        "disabled-prompt",
 					Description: "From disabled toolset",
 				},
@@ -325,7 +326,7 @@ func (s *McpToolsetPromptsSuite) TestPromptsNotExposedWhenToolsetDisabled() {
 	toolsets.Register(enabledToolset)
 	toolsets.Register(disabledToolset)
 	// Only enable one toolset
-	s.Cfg.Toolsets = []string{"enabled-toolset"}
+	s.Cfg.Toolsets.SetForTest([]string{"enabled-toolset"})
 
 	s.InitMcpClient()
 

@@ -71,7 +71,7 @@ message: sample event
 	// so we replace s.Cfg and restore the runtime fields the suite already set.
 	kubeConfig := s.Cfg.KubeConfig
 	listOutput := s.Cfg.ListOutput
-	cfg, err := config.ReadToml([]byte(fmt.Sprintf(`
+	cfg, err := config.ReadToml(s.T().Context(), []byte(fmt.Sprintf(`
 		toolsets = [ "openshift/mustgather" ]
 		[toolset_configs."openshift/mustgather"]
 		mustgather_dirs = [ "%s" ]

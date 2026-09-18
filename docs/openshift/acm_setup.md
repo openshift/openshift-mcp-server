@@ -96,6 +96,7 @@ production-east    true           https://api.prod-east.example.com:6443   True 
 Start the MCP Server with your ACM configuration
 
 ```toml
+port = "8080"
 cluster_provider_strategy = "acm-kubeconfig"
 kubeconfig = "/tmp/acm-hub-kubeconfig.yaml"
 
@@ -106,7 +107,7 @@ cluster_proxy_addon_ca_file = "./openshift-ca.crt"
 Save this configuration as `acm-config.toml` and run the MCP Server:
 
 ```bash
-./kubernetes-mcp-server --config acm-config.toml --port 8080
+./kubernetes-mcp-server --config acm-config.toml
 ```
 
 The MCP Server will:

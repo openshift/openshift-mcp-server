@@ -11,6 +11,7 @@ import (
 	"k8s.io/client-go/dynamic"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/oadp"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
@@ -20,11 +21,11 @@ import (
 func initOADPTroubleshoot() []api.ServerPrompt {
 	return []api.ServerPrompt{
 		{
-			Prompt: api.Prompt{
+			Prompt: config.Prompt{
 				Name:        "oadp-troubleshoot",
 				Title:       "OADP Troubleshoot",
 				Description: "Generate a step-by-step troubleshooting guide for diagnosing OADP backup and restore issues",
-				Arguments: []api.PromptArgument{
+				Arguments: []config.PromptArgument{
 					{
 						Name:        "namespace",
 						Description: "The OADP namespace",

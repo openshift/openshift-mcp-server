@@ -23,26 +23,24 @@ Use the oadp-troubleshoot prompt with namespace=openshift-adp and backup=my-fail
 
 ## Enable the OADP Toolset
 
-### Option 1: Command Line
-
-```bash
-kubernetes-mcp-server --toolsets core,config,oadp
-```
-
-### Option 2: Configuration File
+The OADP toolset is not enabled by default. Enable it in a TOML configuration file:
 
 ```toml
 toolsets = ["core", "config", "oadp"]
 ```
 
-### Option 3: MCP Client Configuration
+```bash
+kubernetes-mcp-server --config /path/to/config.toml
+```
+
+### MCP client configuration
 
 ```json
 {
   "mcpServers": {
     "kubernetes": {
       "command": "npx",
-      "args": ["-y", "kubernetes-mcp-server@latest", "--toolsets", "core,config,oadp"]
+      "args": ["-y", "kubernetes-mcp-server@latest", "--config", "/path/to/config.toml"]
     }
   }
 }

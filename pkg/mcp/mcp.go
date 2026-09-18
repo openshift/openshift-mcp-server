@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -29,7 +30,7 @@ import (
 )
 
 type Configuration struct {
-	*config.StaticConfig
+	*config.Config
 	// SDKLogger is the slog.Logger handed to the underlying MCP SDK for its
 	// server-activity logs. When nil (e.g. in tests) it falls back to a
 	// klog-backed logger.
@@ -40,7 +41,7 @@ type Configuration struct {
 
 func (c *Configuration) Toolsets() []api.Toolset {
 	if c.toolsets == nil {
-		for _, toolset := range c.StaticConfig.Toolsets {
+		for _, toolset := range c.Config.Toolsets.Get() {
 			c.toolsets = append(c.toolsets, toolsets.ToolsetFromString(toolset))
 		}
 	}
@@ -49,7 +50,7 @@ func (c *Configuration) Toolsets() []api.Toolset {
 
 func (c *Configuration) ListOutput() output.Output {
 	if c.listOutput == nil {
-		c.listOutput = output.FromString(c.StaticConfig.ListOutput)
+		c.listOutput = output.FromString(c.Config.ListOutput.Get())
 	}
 	return c.listOutput
 }
@@ -66,19 +67,19 @@ func (c *Configuration) warmCaches() {
 }
 
 func (c *Configuration) isToolApplicable(tool api.ServerTool) bool {
-	if c.ReadOnly && !ptr.Deref(tool.Tool.Annotations.ReadOnlyHint, false) {
+	if c.ReadOnly.Get() && !ptr.Deref(tool.Tool.Annotations.ReadOnlyHint, false) {
 		return false
 	}
-	if c.DisableDestructive && ptr.Deref(tool.Tool.Annotations.DestructiveHint, false) {
+	if c.DisableDestructive.Get() && ptr.Deref(tool.Tool.Annotations.DestructiveHint, false) {
 		return false
 	}
-	if c.EnabledTools != nil && !slices.Contains(c.EnabledTools, tool.Tool.Name) {
+	if c.EnabledTools.Get() != nil && !slices.Contains(c.EnabledTools.Get(), tool.Tool.Name) {
 		return false
 	}
-	if c.DisabledTools != nil && slices.Contains(c.DisabledTools, tool.Tool.Name) {
+	if c.DisabledTools.Get() != nil && slices.Contains(c.DisabledTools.Get(), tool.Tool.Name) {
 		return false
 	}
-	if c.EnableTargetCompatibilityToolFilters {
+	if c.EnableTargetCompatibilityToolFilters.Get() {
 		for _, filter := range tool.TargetCompatibilityFilters {
 			if !filter() {
 				return false
@@ -92,11 +93,9 @@ type Server struct {
 	// mu protects the enabledX bookkeeping. The configuration is held in
 	// an atomic.Pointer (see below) and does NOT require mu for reads.
 	mu sync.RWMutex
-	// reloadMu serializes applyToolsets calls. WatchTargets (kubeconfig +
-	// cluster-state watchers) and ReloadConfiguration can all fire reloads
-	// concurrently; without this lock, two reloads can interleave their SDK
-	// Add/Remove operations and their enabledX writes, leaving the SDK and
-	// the bookkeeping divergent.
+	// reloadMu serializes applyToolsets, ReloadConfig, and watcher resets.
+	// WatchTargets (kubeconfig + cluster-state) and ReloadConfiguration
+	// all take this lock so SDK Add/Remove and manager rebuild cannot interleave.
 	reloadMu sync.Mutex
 	// configuration is the live server configuration. It's an
 	// atomic.Pointer so that handlers (which read s.configuration on every
@@ -133,12 +132,12 @@ func NewServer(ctx context.Context, configuration Configuration, targetProvider 
 			},
 			&mcp.ServerOptions{
 				Capabilities: &mcp.ServerCapabilities{
-					Resources: &mcp.ResourceCapabilities{ListChanged: !configuration.Stateless},
-					Prompts:   &mcp.PromptCapabilities{ListChanged: !configuration.Stateless},
-					Tools:     &mcp.ToolCapabilities{ListChanged: !configuration.Stateless},
+					Resources: &mcp.ResourceCapabilities{ListChanged: !configuration.Stateless.Get()},
+					Prompts:   &mcp.PromptCapabilities{ListChanged: !configuration.Stateless.Get()},
+					Tools:     &mcp.ToolCapabilities{ListChanged: !configuration.Stateless.Get()},
 					Logging:   &mcp.LoggingCapabilities{}, //nolint:staticcheck // MCP logging deprecated (SEP-2577)
 				},
-				Instructions: configuration.ServerInstructions,
+				Instructions: configuration.ServerInstructions.Get(),
 				Logger:       sdkLogger,
 			}),
 		p: targetProvider,
@@ -163,8 +162,8 @@ func NewServer(ctx context.Context, configuration Configuration, targetProvider 
 	s.server.AddReceivingMiddleware(
 		rateLimitingMiddleware(s.rateLimitDone, func() (rate.Limit, int) {
 			cfg := s.configuration.Load()
-			rps := cfg.HTTP.RateLimitRPS
-			burst := cfg.HTTP.RateLimitBurst
+			rps := cfg.HTTP.RateLimitRPS.Get()
+			burst := cfg.HTTP.RateLimitBurst.Get()
 			if burst == 0 {
 				burst = config.DefaultRateLimitBurst
 			}
@@ -185,7 +184,7 @@ func NewServer(ctx context.Context, configuration Configuration, targetProvider 
 	if err != nil {
 		return nil, err
 	}
-	s.p.WatchTargets(ctx, s.reapplyToolsets)
+	s.p.WatchTargets(ctx, s.mcpReloader())
 
 	return s, nil
 }
@@ -200,7 +199,21 @@ func NewServer(ctx context.Context, configuration Configuration, targetProvider 
 func (s *Server) reapplyToolsets() error {
 	// TODO: context.Background is likely correct here, but let's verify when we add otel traces on SIGHUP path
 	// We want to make sure all the logs get correlated correctly through handling a SIGHUP signal
-	return s.applyToolsets(context.Background(), nil)
+	return s.withReloadLock(func() error {
+		return s.applyToolsetsLocked(context.Background(), nil)
+	})
+}
+
+func (s *Server) withReloadLock(fn func() error) error {
+	s.reloadMu.Lock()
+	defer s.reloadMu.Unlock()
+	return fn()
+}
+
+func (s *Server) mcpReloader() internalk8s.McpReloader {
+	return internalk8s.NewMcpReloader(s.withReloadLock, func() error {
+		return s.applyToolsetsLocked(context.Background(), nil)
+	})
 }
 
 // applyToolsets recomputes the SDK's tool/prompt/resource/template surface
@@ -217,14 +230,18 @@ func (s *Server) reapplyToolsets() error {
 // On error s.configuration, the SDK, and the enabled-X bookkeeping all stay
 // at their prior consistent values.
 func (s *Server) applyToolsets(ctx context.Context, cfg *Configuration) error {
+	return s.withReloadLock(func() error {
+		return s.applyToolsetsLocked(ctx, cfg)
+	})
+}
+
+func (s *Server) applyToolsetsLocked(_ context.Context, cfg *Configuration) error {
 	// TODO: No option to perform a full replacement of tools.
 	// s.server.SetTools(tools...)
 
-	// Serialize reloads: WatchTargets and ReloadConfiguration can both fire
-	// concurrently, and their SDK Add/Remove operations would otherwise
-	// interleave and leave SDK state divergent from enabledX.
-	s.reloadMu.Lock()
-	defer s.reloadMu.Unlock()
+	// Caller holds reloadMu. WatchTargets (kubeconfig + cluster-state)
+	// and ReloadConfiguration serialize here so SDK Add/Remove and
+	// kubeconfig WatchTargets reset cannot interleave.
 
 	// If the caller didn't pin a candidate cfg, re-apply whatever is
 	// currently installed. Reading inside the reloadMu critical section
@@ -306,6 +323,14 @@ func (s *Server) applyToolsets(ctx context.Context, cfg *Configuration) error {
 	// can observe cfg with un-warmed caches.
 	cfg.warmCaches()
 
+	// Publish Kubernetes live config immediately before the MCP snapshot so
+	// a concurrent tool call cannot observe new tools with old access-control
+	// (fail-open on added denied_resources). The remaining window is new
+	// k8s AC with the previous MCP snapshot — fail-closed on tightening.
+	if cfg.Config != nil {
+		s.p.PublishKubernetesConfig(cfg.Config)
+	}
+
 	// Publish cfg to readers (handlers, rate-limit closure, ServeHTTP, the
 	// next re-apply) via an atomic store. The SDK already reflects cfg from
 	// the commit phase above; the store makes the new *Configuration
@@ -322,8 +347,6 @@ func (s *Server) applyToolsets(ctx context.Context, cfg *Configuration) error {
 	s.enabledResourceTemplates = newResourceTemplates
 	s.mu.Unlock()
 
-	// Start new watch
-	s.p.WatchTargets(ctx, s.reapplyToolsets)
 	return nil
 }
 
@@ -392,7 +415,7 @@ func (s *Server) collectApplicableTools(cfg *Configuration) []api.ServerTool {
 	mutator := ComposeMutators(
 		WithTargetParameter(s.p.GetDefaultTarget(), s.p.GetTargetParameterName(), s.p.IsMultiTarget()),
 		WithTargetListTool(s.p.GetDefaultTarget(), s.p.GetTargetParameterName(), s.p),
-		WithToolOverrides(cfg.ToolOverrides),
+		WithToolOverrides(cfg.ToolOverrides.Get()),
 	)
 
 	tools := make([]api.ServerTool, 0)
@@ -417,7 +440,7 @@ func (s *Server) collectApplicablePrompts(cfg *Configuration) []api.ServerPrompt
 			toolsetPrompts = append(toolsetPrompts, mutator(prompt))
 		}
 	}
-	configPrompts := prompts.ToServerPrompts(cfg.Prompts)
+	configPrompts := prompts.ToServerPrompts(cfg.Prompts.Get())
 	return prompts.MergePrompts(toolsetPrompts, configPrompts)
 }
 
@@ -500,7 +523,7 @@ func (s *Server) ServeHTTP() *mcp.StreamableHTTPHandler {
 		// balancing, and serverless environments where maintaining client state
 		// is not desired or possible.
 		// https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#listening-for-messages-from-the-server
-		Stateless: s.configuration.Load().Stateless,
+		Stateless: s.configuration.Load().Stateless.Get(),
 	})
 }
 
@@ -539,34 +562,60 @@ func (s *Server) GetEnabledResourceTemplates() []string {
 	return s.enabledResourceTemplates
 }
 
+// ErrReloadRejected is returned when ReloadConfiguration refuses a config that
+// fails Validate. The SIGHUP handler treats this as fatal.
+var ErrReloadRejected = errors.New("configuration reload rejected")
+
 // ReloadConfiguration reloads the configuration and reinitializes the server.
 // This is intended to be called by the server lifecycle manager when
 // configuration changes are detected.
 //
-// The reload is fully transactional: s.configuration is not mutated until
-// applyToolsets has successfully recomputed and committed the SDK surface
-// against the candidate config. A rejected reload leaves s.configuration, the
-// SDK, and the enabled-X bookkeeping at their previous consistent values, so
-// concurrent readers (rate-limit closure, confirmation rules, list output...)
-// can never observe a new-but-rejected configuration.
-func (s *Server) ReloadConfiguration(ctx context.Context, newConfig *config.StaticConfig) error {
+// p.cfg is swapped first so collectApplicableTools sees updated filter flags.
+// Live Kubernetes access-control is published only at the applyToolsets
+// commit, immediately before s.configuration, so a rejected convert does
+// not change clients. On apply failure, p.cfg is rolled back.
+//
+// applyToolsets is transactional: s.configuration is not mutated until the
+// SDK surface has been recomputed against the candidate config. A rejected
+// convert leaves s.configuration, the SDK, and the enabled-X bookkeeping at
+// their previous consistent values.
+func (s *Server) ReloadConfiguration(ctx context.Context, newConfig *config.Config) error {
 	logger := klogutil.FromContext(ctx)
 	logger.V(1).Info("Reloading MCP server configuration...")
 
 	// Validate config-level invariants (same checks as startup)
-	if err := newConfig.
-		WithProviderStrategies(internalk8s.GetRegisteredStrategies()).
-		WithTokenExchangeStrategies(tokenexchange.GetRegisteredStrategies()).
-		Validate(ctx); err != nil {
-		return fmt.Errorf("configuration reload rejected: %w", err)
+	if err := errors.Join(
+		toolsets.Validate(newConfig.Toolsets.Get()),
+		newConfig.
+			WithProviderStrategies(internalk8s.GetRegisteredStrategies()).
+			WithTokenExchangeStrategies(tokenexchange.GetRegisteredStrategies()).
+			Validate(ctx),
+	); err != nil {
+		return fmt.Errorf("%w: %w", ErrReloadRejected, err)
 	}
 
-	// Build a candidate Configuration view. applyToolsets will install it
-	// atomically only if the convert phase succeeds.
-	candidate := &Configuration{StaticConfig: newConfig}
+	if err := s.withReloadLock(func() error {
+		if err := s.p.ReloadConfig(ctx, newConfig); err != nil {
+			return fmt.Errorf("failed to reload kubernetes provider: %w", err)
+		}
 
-	if err := s.applyToolsets(ctx, candidate); err != nil {
-		return fmt.Errorf("failed to reload toolsets: %w", err)
+		// Build a candidate Configuration view. applyToolsets will install it
+		// atomically only if the convert phase succeeds.
+		candidate := &Configuration{Config: newConfig}
+		if prev := s.configuration.Load(); prev != nil {
+			candidate.SDKLogger = prev.SDKLogger
+		}
+		if err := s.applyToolsetsLocked(ctx, candidate); err != nil {
+			if prev := s.configuration.Load(); prev != nil && prev.Config != nil {
+				if rbErr := s.p.ReloadConfig(ctx, prev.Config); rbErr != nil {
+					logger.Error(rbErr, "Failed to roll back kubernetes provider config after toolset reload failure")
+				}
+			}
+			return fmt.Errorf("failed to reload toolsets: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	logger.V(1).Info("MCP server configuration reloaded successfully")

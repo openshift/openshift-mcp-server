@@ -44,7 +44,7 @@ func (s *OADPSuite) TearDownSuite() {
 
 func (s *OADPSuite) SetupTest() {
 	s.BaseMcpSuite.SetupTest()
-	s.Cfg.Toolsets = append(s.Cfg.Toolsets, (&oadpToolset.Toolset{}).GetName())
+	s.Cfg.Toolsets.SetForTest(append(s.Cfg.Toolsets.Get(), (&oadpToolset.Toolset{}).GetName()))
 	s.InitMcpClient()
 }
 
@@ -144,7 +144,7 @@ func (s *OADPSuite) TestTroubleshootPromptWithBackup() {
 
 		result, err := s.GetPrompt("oadp-troubleshoot", map[string]string{
 			"namespace": "openshift-adp",
-			"backup": "test-backup",
+			"backup":    "test-backup",
 		})
 		s.Require().NoError(err)
 		s.Require().NotNil(result)
@@ -155,7 +155,7 @@ func (s *OADPSuite) TestTroubleshootPromptWithBackup() {
 	s.Run("with non-existent backup", func() {
 		result, err := s.GetPrompt("oadp-troubleshoot", map[string]string{
 			"namespace": "openshift-adp",
-			"backup": "non-existent",
+			"backup":    "non-existent",
 		})
 		s.Require().NoError(err)
 		s.Require().NotNil(result)
@@ -168,7 +168,7 @@ func (s *OADPSuite) TestTroubleshootPromptWithRestore() {
 	s.Run("with non-existent restore", func() {
 		result, err := s.GetPrompt("oadp-troubleshoot", map[string]string{
 			"namespace": "openshift-adp",
-			"restore": "non-existent",
+			"restore":   "non-existent",
 		})
 		s.Require().NoError(err)
 		s.Require().NotNil(result)

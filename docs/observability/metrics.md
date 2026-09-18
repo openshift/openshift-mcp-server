@@ -123,16 +123,14 @@ Query silences from Alertmanager. Requires `alertmanager_url` to be configured.
 
 ## Enable the Toolset
 
-### Command line
-
-```bash
-kubernetes-mcp-server --toolsets core,observability/metrics
-```
-
-### Configuration file (TOML)
+The metrics toolset is not enabled by default. Enable it in a TOML configuration file:
 
 ```toml
 toolsets = ["core", "observability/metrics"]
+```
+
+```bash
+kubernetes-mcp-server --config /path/to/config.toml
 ```
 
 ### MCP client configuration
@@ -142,7 +140,7 @@ toolsets = ["core", "observability/metrics"]
   "mcpServers": {
     "kubernetes": {
       "command": "npx",
-      "args": ["-y", "kubernetes-mcp-server@latest", "--toolsets", "core,observability/metrics"]
+      "args": ["-y", "kubernetes-mcp-server@latest", "--config", "/path/to/config.toml"]
     }
   }
 }

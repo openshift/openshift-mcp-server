@@ -4,17 +4,18 @@ import (
 	"strings"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
 )
 
 // Prompts returns the ServerPrompt definitions for must-gather operations.
 func Prompts() []api.ServerPrompt {
 	return []api.ServerPrompt{{
-		Prompt: api.Prompt{
+		Prompt: config.Prompt{
 			Name:        "plan_mustgather",
 			Title:       "Plan a must-gather collection",
 			Description: "Plan for collecting a must-gather archive from an OpenShift cluster. Must-gather is a tool for collecting cluster data related to debugging and troubleshooting like logs, kubernetes resources, etc.",
-			Arguments: []api.PromptArgument{
+			Arguments: []config.PromptArgument{
 				{
 					Name:        "node_name",
 					Description: "Specific node name to run must-gather pod on",
