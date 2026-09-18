@@ -301,7 +301,6 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 | observability/metrics | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                                                                           |         |
 | observability/otelcol | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                                                                              |         |
 | observability/traces  | Distributed tracing tools for discovering Tempo instances, searching and retrieving traces, and exploring trace attributes.                                                                                                             |         |
-| openshift             | OpenShift-specific tools for cluster management and troubleshooting                                                                                                                                                                     |         |
 | openshift/mustgather  | Analyze OpenShift must-gather archives offline without a live cluster connection. Call mustgather_list first to discover available archives and their archive_id, then pass that ID to the other mustgather_* tools.                    |         |
 | ossm                  | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                                                                         |         |
 | ovn-kubernetes        | OVN-Kubernetes CNI network troubleshooting tools                                                                                                                                                                                        |         |
@@ -1243,12 +1242,6 @@ Use tempo_search_tags to discover available tag names.
 
 <details>
 
-<summary>openshift</summary>
-
-</details>
-
-<details>
-
 <summary>openshift/mustgather</summary>
 
 - **mustgather_list** - List the must-gather archives discovered under the configured directories. Returns each archive's archive_id, which must be passed to the other mustgather_* tools.
@@ -1794,7 +1787,7 @@ Example output:
 <summary>oadp</summary>
 
 - **oadp-troubleshoot** - Generate a step-by-step troubleshooting guide for diagnosing OADP backup and restore issues
-  - `namespace` (`string`) - The OADP namespace (default: openshift-adp)
+  - `namespace` (`string`) **(required)** - The OADP namespace
   - `backup` (`string`) - The name of a specific backup to troubleshoot
   - `restore` (`string`) - The name of a specific restore to troubleshoot
 
@@ -1802,7 +1795,7 @@ Example output:
 
 <details>
 
-<summary>openshift</summary>
+<summary>openshift/mustgather</summary>
 
 - **plan_mustgather** - Plan for collecting a must-gather archive from an OpenShift cluster. Must-gather is a tool for collecting cluster data related to debugging and troubleshooting like logs, kubernetes resources, etc.
   - `node_name` (`string`) - Specific node name to run must-gather pod on
