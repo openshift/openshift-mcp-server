@@ -202,7 +202,7 @@ ca_file = "_output/production-east-keycloak-ca.crt"
 Start the MCP server with the generated configuration:
 
 ```bash
-./kubernetes-mcp-server --config _output/acm-kubeconfig.toml --port 8080
+./kubernetes-mcp-server --config _output/acm-kubeconfig.toml
 ```
 
 The MCP server will:

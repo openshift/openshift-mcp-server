@@ -138,16 +138,14 @@ Send an HTTP(S) request from the MCP server host to verify reachability and insp
 
 ## Enable the Toolset
 
-### Command line
-
-```bash
-kubernetes-mcp-server --toolsets core,netedge
-```
-
-### Configuration file (TOML)
+The netedge toolset is not enabled by default. Enable it in a TOML configuration file:
 
 ```toml
 toolsets = ["core", "netedge"]
+```
+
+```bash
+kubernetes-mcp-server --config /path/to/config.toml
 ```
 
 ### MCP client configuration
@@ -157,7 +155,7 @@ toolsets = ["core", "netedge"]
   "mcpServers": {
     "kubernetes": {
       "command": "npx",
-      "args": ["-y", "kubernetes-mcp-server@latest", "--toolsets", "core,netedge"]
+      "args": ["-y", "kubernetes-mcp-server@latest", "--config", "/path/to/config.toml"]
     }
   }
 }

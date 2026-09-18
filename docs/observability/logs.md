@@ -67,16 +67,14 @@ Execute a Loki LogQL range query and return matching log streams and lines.
 
 ## Enable the Toolset
 
-### Command line
-
-```bash
-kubernetes-mcp-server --toolsets core,observability/logs
-```
-
-### Configuration file (TOML)
+The logs toolset is not enabled by default. Enable it in a TOML configuration file:
 
 ```toml
 toolsets = ["core", "observability/logs"]
+```
+
+```bash
+kubernetes-mcp-server --config /path/to/config.toml
 ```
 
 ### MCP client configuration
@@ -86,7 +84,7 @@ toolsets = ["core", "observability/logs"]
   "mcpServers": {
     "kubernetes": {
       "command": "npx",
-      "args": ["-y", "kubernetes-mcp-server@latest", "--toolsets", "core,observability/logs"]
+      "args": ["-y", "kubernetes-mcp-server@latest", "--config", "/path/to/config.toml"]
     }
   }
 }
