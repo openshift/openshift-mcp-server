@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
 	"github.com/google/jsonschema-go/jsonschema"
 )
@@ -167,12 +168,23 @@ type ServerResourceTemplate struct {
 
 type ToolHandlerParams struct {
 	context.Context
-	BaseConfig
+	Config                  *config.Config
+	ClusterProviderStrategy string
 	KubernetesClient
 	FilteringProvider FilteringProvider
 	ToolCallRequest
 	ListOutput output.Output
 	Elicitor
+}
+
+// ExtendedConfig is configuration owned by a provider or toolset.
+//
+// Deprecated: use config.ExtendedConfig directly in new code.
+type ExtendedConfig = config.ExtendedConfig
+
+// GetToolsetConfig returns the parsed configuration for a toolset.
+func (p ToolHandlerParams) GetToolsetConfig(name string) (config.ExtendedConfig, bool) {
+	return p.Config.GetToolsetConfig(name)
 }
 
 type ToolHandlerFunc func(params ToolHandlerParams) (*ToolCallResult, error)
