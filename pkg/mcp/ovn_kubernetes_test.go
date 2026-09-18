@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/BurntSushi/toml"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/suite"
 	v1 "k8s.io/api/core/v1"
@@ -31,10 +30,8 @@ func (s *OVNKubernetesSuite) SetupTest() {
 	s.BaseMcpSuite.SetupTest()
 	s.mockServer = test.NewMockServer()
 	s.mockServer.Handle(test.NewDiscoveryClientHandler())
-	s.Cfg.KubeConfig = s.mockServer.KubeconfigFile(s.T())
-	s.Require().NoError(toml.Unmarshal([]byte(`
-		toolsets = [ "ovn-kubernetes" ]
-	`), s.Cfg), "Expected to parse toolsets config")
+	s.Cfg.KubeConfig.SetForTest(s.mockServer.KubeconfigFile(s.T()))
+	s.Cfg.Toolsets.SetForTest([]string{"ovn-kubernetes"})
 	s.setupPodHandler()
 }
 

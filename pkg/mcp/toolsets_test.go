@@ -286,7 +286,7 @@ func (s *ToolsetsSuite) TestOpenShiftMustGatherToolsetPrompts() {
 		s.Handle(test.NewInOpenShiftHandler())
 		toolsets.Clear()
 		toolsets.Register(&mgToolset.Toolset{})
-		s.Cfg.Toolsets = []string{"openshift/mustgather"}
+		s.Cfg.Toolsets.SetForTest([]string{"openshift/mustgather"})
 		s.InitMcpClient()
 		prompts, err := s.ListPrompts()
 		s.Run("ListPrompts returns prompts", func() {
@@ -303,7 +303,7 @@ func (s *ToolsetsSuite) TestOpenShiftMustGatherToolset() {
 	s.Run("OpenShift must-gather toolset", func() {
 		toolsets.Clear()
 		toolsets.Register(&mgToolset.Toolset{})
-		s.Cfg.Toolsets = []string{"openshift/mustgather"}
+		s.Cfg.Toolsets.SetForTest([]string{"openshift/mustgather"})
 		s.InitMcpClient()
 		tools, err := s.ListTools()
 		s.Run("ListTools returns tools", func() {

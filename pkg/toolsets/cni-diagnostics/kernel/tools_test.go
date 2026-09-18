@@ -29,7 +29,7 @@ func (m *mockToolCallRequest) GetArguments() map[string]any {
 func (s *ToolsSuite) handlerParams(args map[string]any) api.ToolHandlerParams {
 	return api.ToolHandlerParams{
 		Context:         context.Background(),
-		BaseConfig:      config.BaseDefault(),
+		Config:          config.BaseDefault(),
 		ToolCallRequest: &mockToolCallRequest{args: args},
 	}
 }

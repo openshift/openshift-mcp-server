@@ -13,7 +13,7 @@ type ConfigSuite struct {
 }
 
 func (s *ConfigSuite) TestConfigParser_ParsesDirs() {
-	cfg := test.Must(config.ReadToml([]byte(`
+	cfg := test.Must(config.ReadToml(s.T().Context(), []byte(`
 		[toolset_configs."openshift/mustgather"]
 		mustgather_dirs = ["/var/data/must-gather", "/home/user/downloads/must-gather.local.123"]
 	`)))
@@ -27,7 +27,7 @@ func (s *ConfigSuite) TestConfigParser_ParsesDirs() {
 }
 
 func (s *ConfigSuite) TestConfigParser_EmptySection() {
-	cfg := test.Must(config.ReadToml([]byte(`
+	cfg := test.Must(config.ReadToml(s.T().Context(), []byte(`
 		[toolset_configs."openshift/mustgather"]
 	`)))
 
@@ -42,11 +42,11 @@ func (s *ConfigSuite) TestConfigParser_EmptySection() {
 func (s *ConfigSuite) TestConfigParser_FreshRegistryPerParse() {
 	// Every parse (e.g. a server reload) must yield a distinct registry so a
 	// reload starts from a clean cache instead of reusing the previous one.
-	first := test.Must(config.ReadToml([]byte(`
+	first := test.Must(config.ReadToml(s.T().Context(), []byte(`
 		[toolset_configs."openshift/mustgather"]
 		mustgather_dirs = ["/var/data/must-gather"]
 	`)))
-	second := test.Must(config.ReadToml([]byte(`
+	second := test.Must(config.ReadToml(s.T().Context(), []byte(`
 		[toolset_configs."openshift/mustgather"]
 		mustgather_dirs = ["/var/data/must-gather"]
 	`)))

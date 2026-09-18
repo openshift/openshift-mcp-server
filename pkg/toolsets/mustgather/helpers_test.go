@@ -1,7 +1,6 @@
 package mustgather
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -132,8 +131,8 @@ func (s *RegistrySuite) TestProviderForArchive() {
 
 	s.Run("returns error when toolset is not configured", func() {
 		params := api.ToolHandlerParams{
-			Context:    context.Background(),
-			BaseConfig: test.Must(config.ReadToml([]byte(``))),
+			Context: s.T().Context(),
+			Config:  test.Must(config.ReadToml(s.T().Context(), []byte(``))),
 		}
 		_, err := providerForArchive(params, "mg-000000000000")
 		s.Error(err)
@@ -153,8 +152,8 @@ func paramsWithDirs(t *testing.T, dirs ...string) api.ToolHandlerParams {
 	toml := "[toolset_configs.\"openshift/mustgather\"]\nmustgather_dirs = [" +
 		strings.Join(quoted, ", ") + "]\n"
 	return api.ToolHandlerParams{
-		Context:    context.Background(),
-		BaseConfig: test.Must(config.ReadToml([]byte(toml))),
+		Context: t.Context(),
+		Config:  test.Must(config.ReadToml(t.Context(), []byte(toml))),
 	}
 }
 
