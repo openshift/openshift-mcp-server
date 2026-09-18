@@ -158,11 +158,23 @@ type ResourceTemplate struct {
 // Handlers should return a ResourceContent with exactly one of Text or Blob set.
 type ResourceTemplateHandler func(ctx context.Context, uri string) (*ResourceContent, error)
 
+// ArgumentCompletionHandler completes one argument of a resource template (and,
+// symmetrically in future, a prompt) for the MCP completion/complete endpoint.
+// argument is the argument/variable name being completed (e.g. "path"); value is
+// the partial value typed so far; resolved holds already-resolved
+// arguments/variables from the request context (e.g. the archive_id preceding a
+// path variable). Returning (nil, nil) means "no suggestions" — it is not an error.
+type ArgumentCompletionHandler func(ctx context.Context, argument, value string, resolved map[string]string) ([]string, error)
+
 // ServerResourceTemplate represents a resource template that can be registered with the MCP server.
 type ServerResourceTemplate struct {
 	ResourceTemplate ResourceTemplate
 	RBAC             *RBACMetadata
 	Handler          ResourceTemplateHandler
+	// CompletionHandler optionally supplies argument completions for this
+	// template's variables via the MCP completion/complete endpoint. Optional;
+	// leave nil to advertise no completions for the template.
+	CompletionHandler ArgumentCompletionHandler
 }
 
 type ToolHandlerParams struct {

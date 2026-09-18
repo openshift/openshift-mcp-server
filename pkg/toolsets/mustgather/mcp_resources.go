@@ -1,0 +1,429 @@
+package mustgather
+
+import (
+	"context"
+	"fmt"
+	"path"
+	"sort"
+	"strings"
+	"unicode/utf8"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
+	"sigs.k8s.io/yaml"
+)
+
+// archiveURIPrefix is the fixed prefix of every must-gather resource URI. The
+// path segment immediately after it is the archive ID (mg-XXXX-YYYYYYYY).
+const archiveURIPrefix = "must-gather://local/"
+
+// initMCPResources returns no static resources: because every archive is
+// addressed by ID, all resources are exposed as templates (see
+// initMCPResourceTemplates).
+func initMCPResources() []api.ServerResource {
+	return nil
+}
+
+func initMCPResourceTemplates() []api.ServerResourceTemplate {
+	return []api.ServerResourceTemplate{
+		{
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}",
+				Name:        "must-gather",
+				Description: "Loaded must-gather archive metadata. Use the archive_id from mustgather_list.",
+				MIMEType:    "text/plain",
+			},
+			Handler: resourceCurrentArchive,
+		},
+		{
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/namespaces",
+				Name:        "must-gather-namespaces",
+				Description: "List of all namespaces in the must-gather archive",
+				MIMEType:    "text/plain",
+			},
+			Handler: resourceNamespaces,
+		},
+		{
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/etcd/members",
+				Name:        "must-gather-etcd-members",
+				Description: "ETCD cluster member list from the must-gather archive",
+				MIMEType:    "application/json",
+			},
+			Handler: resourceETCDMembers,
+		},
+		{
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/etcd/endpoint-status",
+				Name:        "must-gather-etcd-endpoint-status",
+				Description: "ETCD endpoint status from the must-gather archive",
+				MIMEType:    "application/json",
+			},
+			Handler: resourceETCDEndpointStatus,
+		},
+		{
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/prometheus/config",
+				Name:        "must-gather-prometheus-config",
+				Description: "Prometheus configuration summary from the must-gather archive",
+				MIMEType:    "text/plain",
+			},
+			Handler: resourcePrometheusConfig,
+		},
+		{
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/alertmanager/status",
+				Name:        "must-gather-alertmanager-status",
+				Description: "AlertManager status from the must-gather archive",
+				MIMEType:    "text/plain",
+			},
+			Handler: resourceAlertManagerStatus,
+		},
+		{
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/resources/{group}/{version}/{kind}/{namespace}/{name}",
+				Name:        "must-gather-resource",
+				Description: "A specific Kubernetes resource from the must-gather archive as YAML. Use '-' for empty group (core API) or cluster-scoped namespace.",
+				MIMEType:    "text/yaml",
+			},
+			Handler: resourceGet,
+		},
+		{
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/audit_logs{/path*}",
+				Name:        "must-gather-audit-logs",
+				Description: "API server audit logs from the must-gather archive. Append a file path within audit_logs/ to read a file; the file path supports argument completion for discovering available files. .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
+				MIMEType:    "text/plain",
+			},
+			Handler:           resourceArchiveDir("audit_logs"),
+			CompletionHandler: completionArchiveDir("audit_logs"),
+		},
+		{
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/host_service_logs{/path*}",
+				Name:        "must-gather-host-service-logs",
+				Description: "Host systemd service logs (kubelet, crio, NetworkManager, etc.) from the must-gather archive. Append a file path within host_service_logs/ to read a file; the file path supports argument completion for discovering available files. .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
+				MIMEType:    "text/plain",
+			},
+			Handler:           resourceArchiveDir("host_service_logs"),
+			CompletionHandler: completionArchiveDir("host_service_logs"),
+		},
+		{
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/network_logs{/path*}",
+				Name:        "must-gather-network-logs",
+				Description: "Network (OVN-Kubernetes) logs and diagnostics from the must-gather archive. Append a file path within network_logs/ to read a file; the file path supports argument completion for discovering available files. .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
+				MIMEType:    "text/plain",
+			},
+			Handler:           resourceArchiveDir("network_logs"),
+			CompletionHandler: completionArchiveDir("network_logs"),
+		},
+		{
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/static-pods{/path*}",
+				Name:        "must-gather-static-pods",
+				Description: "Static pod termination logs (kube-apiserver, etcd, etc.) from the must-gather archive. Append a file path within static-pods/ to read a file; the file path supports argument completion for discovering available files. .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
+				MIMEType:    "text/plain",
+			},
+			Handler:           resourceArchiveDir("static-pods"),
+			CompletionHandler: completionArchiveDir("static-pods"),
+		},
+		{
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/pod_network_connectivity_check{/path*}",
+				Name:        "must-gather-pod-network-connectivity-check",
+				Description: "Pod network connectivity check results from the must-gather archive. Append a file path within pod_network_connectivity_check/ to read a file; the file path supports argument completion for discovering available files. .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
+				MIMEType:    "text/plain",
+			},
+			Handler:           resourceArchiveDir("pod_network_connectivity_check"),
+			CompletionHandler: completionArchiveDir("pod_network_connectivity_check"),
+		},
+		{
+			ResourceTemplate: api.ResourceTemplate{
+				URITemplate: "must-gather://local/{archive_id}/monitoring/metrics{/path*}",
+				Name:        "must-gather-monitoring-metrics",
+				Description: "Cluster monitoring metrics (e.g. metrics.openmetrics) from the must-gather archive. Append a file path within monitoring/metrics/ to read a file; the file path supports argument completion for discovering available files. .gz files are decompressed automatically. Use the archive_id from mustgather_list.",
+				MIMEType:    "text/plain",
+			},
+			Handler:           resourceArchiveDir("monitoring/metrics"),
+			CompletionHandler: completionArchiveDir("monitoring/metrics"),
+		},
+	}
+}
+
+// resourceArchiveDir returns a resource-template handler bound to a fixed
+// top-level directory within the archive (relative to the container dir). The
+// handler reads the file addressed by the URI tail after
+// must-gather://local/{archive_id}/{rootDir}/. .gz files are decompressed by
+// the provider; non-UTF-8 content is returned as a binary blob.
+func resourceArchiveDir(rootDir string) api.ResourceTemplateHandler {
+	return func(ctx context.Context, uri string) (*api.ResourceContent, error) {
+		id, err := archiveIDFromURI(uri)
+		if err != nil {
+			return nil, err
+		}
+		p, err := providerForArchiveContext(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+
+		prefix := archiveURIPrefix + id + "/" + rootDir
+		if !strings.HasPrefix(uri, prefix) {
+			return nil, fmt.Errorf("invalid %s resource URI: %s", rootDir, uri)
+		}
+		rel := strings.TrimPrefix(strings.TrimPrefix(uri, prefix), "/")
+		if rel == "" {
+			return nil, fmt.Errorf("specify a file path within %s/ (e.g. %s/<file>)", rootDir, prefix)
+		}
+
+		data, err := p.ReadArchiveFile(path.Join(rootDir, rel))
+		if err != nil {
+			return nil, err
+		}
+
+		if utf8.Valid(data) {
+			return &api.ResourceContent{Text: string(data)}, nil
+		}
+		return &api.ResourceContent{Blob: data, MIMEType: "application/octet-stream"}, nil
+	}
+}
+
+// completionArchiveDir returns an argument-completion handler bound to a fixed
+// top-level directory within the archive. It completes the "path" variable of
+// the directory's resource template by listing the files and subdirectories
+// under rootDir (subdirs included so a client can drill down), filtered by the
+// partial value typed so far. Discovery is best-effort: any resolution failure
+// yields no suggestions rather than an error.
+func completionArchiveDir(rootDir string) api.ArgumentCompletionHandler {
+	return func(ctx context.Context, argument, value string, resolved map[string]string) ([]string, error) {
+		if argument != "path" {
+			return nil, nil
+		}
+		id := resolved["archive_id"]
+		if id == "" {
+			return nil, nil
+		}
+		p, err := providerForArchiveContext(ctx, id)
+		if err != nil {
+			return nil, nil //nolint:nilerr // completion is advisory; no archive => no suggestions
+		}
+		entries, err := p.ListArchiveDir(rootDir)
+		if err != nil {
+			return nil, nil //nolint:nilerr // completion is advisory; unreadable dir => no suggestions
+		}
+
+		var matches []string
+		for _, e := range entries {
+			if strings.HasPrefix(e.Path, value) {
+				matches = append(matches, e.Path)
+			}
+		}
+		sort.Strings(matches)
+		return matches, nil
+	}
+}
+
+// archiveIDFromURI extracts the archive ID (the first path segment after the
+// must-gather://local/ prefix) from a resource URI.
+func archiveIDFromURI(uri string) (string, error) {
+	if !strings.HasPrefix(uri, archiveURIPrefix) {
+		return "", fmt.Errorf("invalid must-gather resource URI: %s", uri)
+	}
+	rest := strings.TrimPrefix(uri, archiveURIPrefix)
+	id := rest
+	if i := strings.Index(rest, "/"); i >= 0 {
+		id = rest[:i]
+	}
+	if id == "" {
+		return "", fmt.Errorf("must-gather resource URI missing archive ID: %s", uri)
+	}
+	return id, nil
+}
+
+// providerForURI resolves the provider for the archive addressed by uri.
+func providerForURI(ctx context.Context, uri string) (*mg.Provider, error) {
+	id, err := archiveIDFromURI(uri)
+	if err != nil {
+		return nil, err
+	}
+	return providerForArchiveContext(ctx, id)
+}
+
+func resourceCurrentArchive(ctx context.Context, uri string) (*api.ResourceContent, error) {
+	p, err := providerForURI(ctx, uri)
+	if err != nil {
+		return nil, err
+	}
+	metadata := p.GetMetadata()
+	content := fmt.Sprintf("Must-Gather Archive\nPath: %s\nVersion: %s\nTimestamp: %s\nResources: %d\nNamespaces: %d\n",
+		metadata.Path, metadata.Version, metadata.Timestamp,
+		metadata.ResourceCount, metadata.NamespaceCount)
+	return &api.ResourceContent{Text: content}, nil
+}
+
+func resourceNamespaces(ctx context.Context, uri string) (*api.ResourceContent, error) {
+	p, err := providerForURI(ctx, uri)
+	if err != nil {
+		return nil, err
+	}
+	namespaces := p.ListNamespaces()
+	sort.Strings(namespaces)
+	output := fmt.Sprintf("Found %d namespaces:\n\n", len(namespaces))
+	output += strings.Join(namespaces, "\n") + "\n"
+	return &api.ResourceContent{Text: output}, nil
+}
+
+func resourceETCDMembers(ctx context.Context, uri string) (*api.ResourceContent, error) {
+	p, err := providerForURI(ctx, uri)
+	if err != nil {
+		return nil, err
+	}
+	data, err := p.ReadETCDFile("member_list.json")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read ETCD member list: %w", err)
+	}
+	return &api.ResourceContent{Text: string(data)}, nil
+}
+
+func resourceETCDEndpointStatus(ctx context.Context, uri string) (*api.ResourceContent, error) {
+	p, err := providerForURI(ctx, uri)
+	if err != nil {
+		return nil, err
+	}
+	data, err := p.ReadETCDFile("endpoint_status.json")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read ETCD endpoint status: %w", err)
+	}
+	return &api.ResourceContent{Text: string(data)}, nil
+}
+
+func resourcePrometheusConfig(ctx context.Context, uri string) (*api.ResourceContent, error) {
+	p, err := providerForURI(ctx, uri)
+	if err != nil {
+		return nil, err
+	}
+
+	output := "## Prometheus Configuration Summary\n\n"
+
+	config, err := p.GetPrometheusConfig()
+	if err != nil {
+		output += fmt.Sprintf("Config not available: %v\n\n", err)
+	} else {
+		configYAML := config.YAML
+		lines := strings.Split(configYAML, "\n")
+		if len(lines) > 100 {
+			output += fmt.Sprintf("Configuration (%d lines, showing first 100):\n\n", len(lines))
+			output += strings.Join(lines[:100], "\n") + "\n...\n\n"
+		} else {
+			output += "Configuration:\n\n" + configYAML + "\n\n"
+		}
+	}
+
+	flags, err := p.GetPrometheusFlags()
+	if err != nil {
+		output += fmt.Sprintf("Flags not available: %v\n\n", err)
+	} else {
+		output += "### Key Flags\n\n"
+		keyFlags := []string{
+			"storage.tsdb.retention.time",
+			"storage.tsdb.retention.size",
+			"storage.tsdb.path",
+			"web.listen-address",
+			"web.external-url",
+			"rules.alert.for-outage-tolerance",
+			"rules.alert.for-grace-period",
+		}
+		for _, key := range keyFlags {
+			if val, ok := flags[key]; ok {
+				output += fmt.Sprintf("%-40s %s\n", key, val)
+			}
+		}
+		output += "\n"
+	}
+
+	return &api.ResourceContent{Text: output}, nil
+}
+
+func resourceAlertManagerStatus(ctx context.Context, uri string) (*api.ResourceContent, error) {
+	p, err := providerForURI(ctx, uri)
+	if err != nil {
+		return nil, err
+	}
+
+	status, err := p.GetAlertManagerStatus()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get AlertManager status: %w", err)
+	}
+
+	output := "## AlertManager Status\n\n"
+	output += fmt.Sprintf("Cluster Status: %s\n", healthSymbol(status.Cluster.Status))
+	output += fmt.Sprintf("Uptime: %s\n\n", status.Uptime)
+
+	output += "### Version\n\n"
+	output += fmt.Sprintf("Version:    %s\n", status.VersionInfo.Version)
+	output += fmt.Sprintf("Revision:   %s\n", status.VersionInfo.Revision)
+	output += fmt.Sprintf("Branch:     %s\n", status.VersionInfo.Branch)
+	output += fmt.Sprintf("Build Date: %s\n", status.VersionInfo.BuildDate)
+	output += fmt.Sprintf("Go Version: %s\n\n", status.VersionInfo.GoVersion)
+
+	if len(status.Cluster.Peers) > 0 {
+		output += "### Cluster Peers\n\n"
+		for _, peer := range status.Cluster.Peers {
+			output += fmt.Sprintf("- %s (%s)\n", peer.Name, peer.Address)
+		}
+		output += "\n"
+	}
+
+	return &api.ResourceContent{Text: output}, nil
+}
+
+func resourceGet(ctx context.Context, uri string) (*api.ResourceContent, error) {
+	id, err := archiveIDFromURI(uri)
+	if err != nil {
+		return nil, err
+	}
+	p, err := providerForArchiveContext(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse URI: must-gather://local/{archive_id}/resources/{group}/{version}/{kind}/{namespace}/{name}
+	prefix := archiveURIPrefix + id + "/resources/"
+	if !strings.HasPrefix(uri, prefix) {
+		return nil, fmt.Errorf("invalid resource URI: %s", uri)
+	}
+	parts := strings.SplitN(strings.TrimPrefix(uri, prefix), "/", 5)
+	if len(parts) != 5 {
+		return nil, fmt.Errorf("resource URI must have format: must-gather://local/{archive_id}/resources/{group}/{version}/{kind}/{namespace}/{name}")
+	}
+	group, version, kind, namespace, name := parts[0], parts[1], parts[2], parts[3], parts[4]
+
+	// "-" represents empty group (core API) or cluster-scoped resources (no namespace)
+	if group == "-" {
+		group = ""
+	}
+	if namespace == "-" {
+		namespace = ""
+	}
+
+	gvk := parseGVK(apiVersionFromGroupVersion(group, version), kind)
+	obj := p.GetResource(gvk, name, namespace)
+	if obj == nil {
+		return nil, fmt.Errorf("resource %s/%s not found", kind, name)
+	}
+
+	yamlBytes, err := yaml.Marshal(obj.Object)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal resource: %w", err)
+	}
+
+	return &api.ResourceContent{Text: string(yamlBytes)}, nil
+}
+
+func apiVersionFromGroupVersion(group, version string) string {
+	if group == "" {
+		return version
+	}
+	return group + "/" + version
+}

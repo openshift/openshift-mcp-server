@@ -3,6 +3,7 @@ package mustgather
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 
 	"github.com/BurntSushi/toml"
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
@@ -86,6 +87,36 @@ func configFromParams(params api.ToolHandlerParams) *Config {
 	return nil
 }
 
+// current holds the committed toolset configuration for handlers that cannot
+// reach the request-scoped config. Tool handlers read the config from
+// api.ToolHandlerParams (see configFromParams); MCP resource handlers get only
+// a context, so they read current instead (see configFromContext).
+var current atomic.Pointer[Config]
+
+// configFromContext returns the committed openshift/mustgather toolset
+// configuration for handlers that only receive a context (MCP resource
+// handlers), or nil if the toolset is not configured.
+func configFromContext(_ context.Context) *Config {
+	return current.Load()
+}
+
+// commit publishes the must-gather toolset configuration from an accepted
+// server configuration to the live current pointer read by the MCP resource
+// handlers. It is registered as a config.ToolsetConfigCommitter and invoked
+// only after the configuration has been committed (initial load and every
+// successful reload), never for a candidate config that may still be rejected.
+func commit(cfg api.BaseConfig) {
+	if cfg != nil {
+		if ec, ok := cfg.GetToolsetConfig("openshift/mustgather"); ok {
+			if mgc, ok := ec.(*Config); ok {
+				current.Store(mgc)
+				return
+			}
+		}
+	}
+	current.Store(nil)
+}
+
 // mustgatherToolsetParser parses the openshift/mustgather toolset
 // configuration from TOML.
 func mustgatherToolsetParser(_ context.Context, primitive toml.Primitive, md toml.MetaData) (api.ExtendedConfig, error) {
@@ -99,4 +130,5 @@ func mustgatherToolsetParser(_ context.Context, primitive toml.Primitive, md tom
 
 func init() {
 	config.RegisterToolsetConfig("openshift/mustgather", mustgatherToolsetParser)
+	config.CommitToolsetConfig(commit)
 }

@@ -106,7 +106,12 @@ type Server struct {
 	// once at the top of its critical section and read all fields off that
 	// snapshot — otherwise a mid-handler reload could split fields across
 	// two configs.
-	configuration            atomic.Pointer[Configuration]
+	configuration atomic.Pointer[Configuration]
+	// completions holds the live argument-completion registry, published as an
+	// atomic.Pointer so handleComplete (on the completion/complete hot path) can
+	// read it without a lock and so a reload's swap installs the rebuilt registry
+	// in one indivisible step, in lockstep with the resource-template surface.
+	completions              atomic.Pointer[completionRegistry]
 	server                   *mcp.Server
 	enabledTools             []string
 	enabledPrompts           []string
@@ -123,26 +128,32 @@ func NewServer(ctx context.Context, configuration Configuration, targetProvider 
 	if sdkLogger == nil {
 		sdkLogger = slog.New(logr.ToSlogHandler(klogutil.FromContext(ctx)))
 	}
-	s := &Server{
-		server: mcp.NewServer(
-			&mcp.Implementation{
-				Name:       version.BinaryName,
-				Title:      version.BinaryName,
-				Version:    version.Version,
-				WebsiteURL: version.WebsiteURL,
+	// Build the Server first so s.handleComplete (the completion/complete
+	// dispatcher) can be wired into ServerOptions as a method value. Seed an
+	// empty completion registry before that wiring so an early request can't
+	// observe a nil pointer; applyToolsets republishes it on every reload.
+	s := &Server{p: targetProvider}
+	s.completions.Store(buildCompletionRegistry(nil))
+	s.server = mcp.NewServer(
+		&mcp.Implementation{
+			Name:       version.BinaryName,
+			Title:      version.BinaryName,
+			Version:    version.Version,
+			WebsiteURL: version.WebsiteURL,
+		},
+		&mcp.ServerOptions{
+			Capabilities: &mcp.ServerCapabilities{
+				Resources: &mcp.ResourceCapabilities{ListChanged: !configuration.Stateless},
+				Prompts:   &mcp.PromptCapabilities{ListChanged: !configuration.Stateless},
+				Tools:     &mcp.ToolCapabilities{ListChanged: !configuration.Stateless},
+				Logging:   &mcp.LoggingCapabilities{}, //nolint:staticcheck // MCP logging deprecated (SEP-2577)
 			},
-			&mcp.ServerOptions{
-				Capabilities: &mcp.ServerCapabilities{
-					Resources: &mcp.ResourceCapabilities{ListChanged: !configuration.Stateless},
-					Prompts:   &mcp.PromptCapabilities{ListChanged: !configuration.Stateless},
-					Tools:     &mcp.ToolCapabilities{ListChanged: !configuration.Stateless},
-					Logging:   &mcp.LoggingCapabilities{}, //nolint:staticcheck // MCP logging deprecated (SEP-2577)
-				},
-				Instructions: configuration.ServerInstructions,
-				Logger:       sdkLogger,
-			}),
-		p: targetProvider,
-	}
+			Instructions: configuration.ServerInstructions,
+			Logger:       sdkLogger,
+			// Completion capability is auto-inferred by the SDK from a non-nil
+			// CompletionHandler (Capabilities.Completions is left unset above).
+			CompletionHandler: s.handleComplete,
+		})
 	s.configuration.Store(&configuration)
 
 	// Initialize metrics system
@@ -311,6 +322,18 @@ func (s *Server) applyToolsets(ctx context.Context, cfg *Configuration) error {
 	// the commit phase above; the store makes the new *Configuration
 	// observable to lock-free readers in one indivisible step.
 	s.configuration.Store(cfg)
+	// Republish the completion registry rebuilt from the just-committed resource
+	// templates, in lockstep with the SDK surface and cfg. Doing it here (only on
+	// an accepted reload) means a rejected reload never installs a partial
+	// registry, and dropping a toolset clears its completions.
+	s.completions.Store(buildCompletionRegistry(applicableResourceTemplates))
+	// Publish committed toolset configs to their live state now that cfg is
+	// installed. This backs handlers that cannot reach the request-scoped
+	// toolset config (MCP resource handlers, whose signature carries only a
+	// context). Committers run only on an accepted config, so a rejected reload
+	// (which returns before this point) leaves prior state untouched, and a
+	// reload that drops a toolset's section clears its stale state.
+	config.CommitToolsetConfigs(cfg.StaticConfig)
 	// Update the enabledX bookkeeping under mu. Readers of these fields
 	// (GetEnabledX) only read enabledX, never combined with cfg, so there
 	// is no need to keep the cfg store and the enabledX writes inside the
