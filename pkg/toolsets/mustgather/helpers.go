@@ -1,6 +1,7 @@
 package mustgather
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -8,22 +9,36 @@ import (
 	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
 )
 
-// providerForArchive resolves a must-gather archive ID to its provider using
-// the directories and per-config registry from the openshift/mustgather toolset
-// config. It is the entry point shared by all mustgather_* tool handlers.
-func providerForArchive(params api.ToolHandlerParams, id string) (*mg.Provider, error) {
-	cfg := configFromParams(params)
+// providerForConfig resolves a must-gather archive ID to its provider using the
+// directories and per-config registry from the given toolset config. It is the
+// shared core behind the tool (params-based) and MCP resource (context-based)
+// entry points.
+func providerForConfig(ctx context.Context, cfg *Config, id string) (*mg.Provider, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("openshift/mustgather toolset is not configured; set the [toolset_configs.\"openshift/mustgather\"] section of the config file with mustgather_dirs pointing at a directory containing must-gather archives")
 	}
 	if id == "" {
 		return nil, fmt.Errorf("archive_id is required; call mustgather_list to discover available archives")
 	}
-	path, err := cfg.registry.resolvePath(params.Context, cfg.MustGatherDirs, id)
+	path, err := cfg.registry.resolvePath(ctx, cfg.MustGatherDirs, id)
 	if err != nil {
 		return nil, err
 	}
 	return cfg.registry.loadProvider(path)
+}
+
+// providerForArchive resolves a must-gather archive ID to its provider using
+// the toolset config carried by the tool-call params. It is the entry point
+// shared by all mustgather_* tool handlers.
+func providerForArchive(params api.ToolHandlerParams, id string) (*mg.Provider, error) {
+	return providerForConfig(params.Context, configFromParams(params), id)
+}
+
+// providerForArchiveContext resolves a must-gather archive ID to its provider
+// for MCP resource handlers, which receive only a context and read the
+// committed toolset config from the package-global current pointer.
+func providerForArchiveContext(ctx context.Context, id string) (*mg.Provider, error) {
+	return providerForConfig(ctx, configFromContext(ctx), id)
 }
 
 // getString extracts a string argument with a default
