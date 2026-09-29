@@ -6,8 +6,8 @@ readonly DEVELOPERS=("alice" "bob" "charlie")
 readonly DEV_NAMESPACES=("dev-alice" "dev-bob" "dev-charlie")
 readonly ALL_NAMESPACES=("${DEV_NAMESPACES[@]}" "dev-shared" "staging" "prod")
 readonly TEST_LABEL="app=verification-test"
-# Default matches generic K8s; slower environments can override via
-# VERIFY_TIMEOUT without changing the default for everyone else.
+# Default matches generic K8s; environments with other needs can
+# override via VERIFY_TIMEOUT without changing the default for everyone else.
 readonly TEST_POD_TIMEOUT="${VERIFY_TIMEOUT:-60s}"
 
 # --- Cleanup Function ---
@@ -193,21 +193,10 @@ metadata:
   labels:
     ${selector_key}: ${selector_value}
 spec:
-  securityContext:
-    runAsNonRoot: true
-    seccompProfile:
-      type: RuntimeDefault
   containers:
   - name: curl
     image: quay.io/curl/curl:8.11.1
     command: ["sleep", "3600"]
-    securityContext:
-      allowPrivilegeEscalation: false
-      capabilities:
-        drop: ["ALL"]
-      runAsNonRoot: true
-      seccompProfile:
-        type: RuntimeDefault
     resources:
         limits:
             cpu: "100m"

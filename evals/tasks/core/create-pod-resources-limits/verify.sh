@@ -6,9 +6,9 @@ if ! kubectl get namespace limits-test &>/dev/null; then
     exit 1
 fi
 
-# Wait for pod to be ready. Default matches generic K8s; slower environments
-# (e.g. OpenShift SCC/PSS admission overhead) can override via VERIFY_TIMEOUT
-# without changing the default for everyone else.
+# Wait for pod to be ready. Default matches generic K8s; environments
+# with other needs can override via VERIFY_TIMEOUT without
+# changing the default for everyone else.
 TIMEOUT="${VERIFY_TIMEOUT:-120s}"
 if ! kubectl wait --for=condition=Ready pod/resource-limits-pod -n limits-test --timeout=$TIMEOUT; then
     echo "Pod 'resource-limits-pod' is not ready in namespace 'limits-test'"

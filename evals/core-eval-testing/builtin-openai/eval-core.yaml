@@ -22,7 +22,7 @@ config:
           - server: kubernetes
             toolPattern: ".*"
         minToolCalls: 1
-        maxToolCalls: 25
+        maxToolCalls: 20
     - glob: ../../tasks/*/*/*.yaml
       labelSelector:
         suite: config

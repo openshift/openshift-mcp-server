@@ -5,9 +5,9 @@ set -euo pipefail
 NAMESPACE="statefulset-test"
 STS_NAME="db"
 EXPECTED_CONTENT="initial_data"
-# Defaults match generic K8s; slower environments (e.g. cloud OCP PVC binding
-# lag) can override via VERIFY_TIMEOUT without changing the default for
-# everyone else.
+# Defaults match generic K8s; environments with other needs can
+# override via VERIFY_TIMEOUT without changing the default
+# for everyone else.
 DELETE_TIMEOUT="${VERIFY_TIMEOUT:-120s}"
 READY_TIMEOUT="${VERIFY_TIMEOUT:-120s}"
 
@@ -38,7 +38,8 @@ if [[ "${replicas}" -ne 1 ]]; then
 fi
 echo "StatefulSet is running with 1 replicas"
 
-# On cloud OCP, PVC binding can lag; wait for db-0 Ready before reading data
+# Wait for db-0 to become Ready before reading data; uses READY_TIMEOUT
+# (derived from VERIFY_TIMEOUT) so environments can adjust as needed.
 echo "Waiting for pod db-0 to become Ready"
 if ! kubectl wait --for=condition=Ready "pod/db-0" -n "${NAMESPACE}" --timeout="${READY_TIMEOUT}"; then
   echo "Pod db-0 not Ready in time"

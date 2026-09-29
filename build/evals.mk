@@ -75,7 +75,9 @@ claude-agent-acp: ## Install the claude-agent-acp adapter for the acp-anthropic 
 .PHONY: run-evals
 run-evals: mcpchecker jq $(if $(filter acp-anthropic,$(AGENT)),claude-agent-acp) ## Run mcpchecker evals (knobs: SUITE, AGENT, MODEL; see evals/README.md)
 	@# Prefer MCP_EVAL_KUBECONFIG when KUBECONFIG is unset so setup/verify kubectl
-	@# targets the same cluster as make run-server (avoids alabama/.kube/config).
+	@# targets the same cluster as make run-server.
+	@# TODO: mcpchecker kubernetes extension should respect KUBECONFIG directly
+	@# (upstream issue: mcpchecker doesn't properly propagate KUBECONFIG to extensions).
 	@if [ -z "$${KUBECONFIG:-}" ] && [ -n "$(MCP_EVAL_KUBECONFIG)" ]; then \
 		export KUBECONFIG="$(MCP_EVAL_KUBECONFIG)"; \
 	fi; \
@@ -106,9 +108,7 @@ diff-evals: mcpchecker ## Diff latest mcpchecker results against baseline
 .PHONY: run-server
 run-server: build ## Start MCP server in background and wait for health check
 	@echo "Starting MCP server on port $(MCP_PORT)..."
-	@# When MCP_EVAL_KUBECONFIG is set (OCP CI / local evals), force the kubeconfig
-	@# provider so in-cluster env cannot steal traffic and cause RBAC denials.
-	./$(BINARY_NAME) --port $(MCP_PORT) $(if $(TOOLSETS),--toolsets "$(TOOLSETS)") --config-dir $(MCP_CONFIG_DIR) $(if $(MCP_EVAL_KUBECONFIG),--kubeconfig "$(MCP_EVAL_KUBECONFIG)" --cluster-provider kubeconfig) & echo $$! > .mcp-server.pid
+	./$(BINARY_NAME) --port $(MCP_PORT) $(if $(TOOLSETS),--toolsets "$(TOOLSETS)") --config-dir $(MCP_CONFIG_DIR) $(if $(MCP_EVAL_KUBECONFIG),--kubeconfig "$(MCP_EVAL_KUBECONFIG)") & echo $$! > .mcp-server.pid
 	@echo "MCP server started with PID $$(cat .mcp-server.pid)"
 	@echo "Waiting for MCP server to be ready..."
 	@elapsed=0; \
