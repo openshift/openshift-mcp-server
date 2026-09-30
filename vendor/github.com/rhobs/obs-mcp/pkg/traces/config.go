@@ -10,6 +10,8 @@ import (
 
 	"github.com/rhobs/obs-mcp/pkg/auth"
 	"github.com/rhobs/obs-mcp/pkg/instrumentation"
+	"github.com/rhobs/obs-mcp/pkg/openshift"
+	"github.com/rhobs/obs-mcp/pkg/traces/discovery"
 )
 
 func init() {
@@ -29,7 +31,17 @@ type Config struct {
 	TempoURL string `toml:"tempo_url,omitempty"`
 
 	// UseRoute controls whether to use OpenShift Routes for discovering Tempo endpoints.
+	//
+	// When true and Resolver is nil, an OpenShift RouteClient is installed
+	// automatically during TOML parse and Validate (before handlers run). Prefer
+	// setting Resolver directly for custom discovery; UseRoute remains for
+	// backward-compatible TOML/flag parsing.
 	UseRoute bool `toml:"use_route,omitempty"`
+
+	// Resolver performs cluster-based endpoint discovery (e.g., OpenShift Routes).
+	// When nil, plain service DNS is used. Not exposed in TOML; set programmatically
+	// or via UseRoute.
+	Resolver discovery.EndpointResolver `toml:"-"`
 
 	// ClientMetrics holds HTTP client metrics for instrumenting outbound requests.
 	ClientMetrics *instrumentation.ClientMetrics `toml:"-"`
@@ -45,6 +57,9 @@ func (c *Config) Validate() error {
 	if c.AuthMode != "" && c.AuthMode != auth.AuthModeHeader && c.AuthMode != auth.AuthModeKubeConfig {
 		return fmt.Errorf("invalid auth_mode: %q (valid options: %q, %q)", c.AuthMode, auth.AuthModeHeader, auth.AuthModeKubeConfig)
 	}
+	// Install resolver at validation time so programmatic Config{UseRoute: true}
+	// is ready before concurrent handlers run (no lazy init in getToolsetConfig).
+	c.applyUseRouteResolver()
 	return nil
 }
 
@@ -55,11 +70,22 @@ func (c *Config) GetAuthMode() auth.AuthMode {
 	return c.AuthMode
 }
 
+// applyUseRouteResolver installs the OpenShift route resolver when UseRoute is
+// set and no Resolver has been provided yet. Call only during config setup
+// (parser/Validate), not from concurrent request handlers.
+func (c *Config) applyUseRouteResolver() {
+	if c == nil || !c.UseRoute || c.Resolver != nil {
+		return
+	}
+	c.Resolver = &openshift.RouteClient{}
+}
+
 func tempoToolsetParser(_ context.Context, primitive toml.Primitive, md toml.MetaData) (api.ExtendedConfig, error) {
 	var cfg Config
 	if err := md.PrimitiveDecode(primitive, &cfg); err != nil {
 		return nil, err
 	}
+	cfg.applyUseRouteResolver()
 	return &cfg, nil
 }
 
