@@ -8,10 +8,11 @@ import (
 	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
 )
 
-// providerForArchive resolves a must-gather archive ID to its provider using
+// ProviderForArchive resolves a must-gather archive ID to its provider using
 // the directories and per-config registry from the openshift/mustgather toolset
-// config. It is the entry point shared by all mustgather_* tool handlers.
-func providerForArchive(params api.ToolHandlerParams, id string) (*mg.Provider, error) {
+// config. Other toolsets use it to read a selected archive without shared
+// session state.
+func ProviderForArchive(params api.ToolHandlerParams, id string) (*mg.Provider, error) {
 	cfg := configFromParams(params)
 	if cfg == nil {
 		return nil, fmt.Errorf("openshift/mustgather toolset is not configured; set the [toolset_configs.\"openshift/mustgather\"] section of the config file with mustgather_dirs pointing at a directory containing must-gather archives")
@@ -24,6 +25,11 @@ func providerForArchive(params api.ToolHandlerParams, id string) (*mg.Provider, 
 		return nil, err
 	}
 	return cfg.registry.loadProvider(path)
+}
+
+// providerForArchive is the entry point used by mustgather_* tool handlers.
+func providerForArchive(params api.ToolHandlerParams, id string) (*mg.Provider, error) {
+	return ProviderForArchive(params, id)
 }
 
 // getString extracts a string argument with a default

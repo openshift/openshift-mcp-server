@@ -5,7 +5,6 @@ import (
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
-	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/mustgather"
 	"github.com/google/jsonschema-go/jsonschema"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -19,7 +18,7 @@ func initEndpoints() []api.ServerTool {
 		{
 			Tool: api.Tool{
 				Name:        "get_service_endpoints",
-				Description: "Return EndpointSlice objects for a Service to verify backend pod availability.",
+				Description: "Return EndpointSlices for a Service from the live cluster or a selected must-gather archive. Set archive_id for offline analysis.",
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
@@ -31,6 +30,7 @@ func initEndpoints() []api.ServerTool {
 							Type:        "string",
 							Description: "Service name",
 						},
+						"archive_id": {Type: "string", Description: "Must-gather archive ID from mustgather_list. Omit for the live cluster."},
 					},
 					Required: []string{"namespace", "service"},
 				},
@@ -75,20 +75,18 @@ func getServiceEndpoints(params api.ToolHandlerParams) (*api.ToolCallResult, err
 
 	var items []unstructured.Unstructured
 
-	if p, mgErr := mustgather.GetProvider(); mgErr == nil && p != nil {
+	p, err := selectedArchive(params)
+	if err != nil {
+		return api.NewToolCallResult("", err), nil
+	}
+	if p != nil {
 		gvk := schema.GroupVersionKind{Group: "discovery.k8s.io", Version: "v1", Kind: "EndpointSlice"}
-		list, err := p.ListResources(params.Context, gvk, namespace, mg.ListOptions{})
+		list, err := p.ListResources(params.Context, gvk, namespace, mg.ListOptions{LabelSelector: labelSelector})
 		if err != nil {
 			return api.NewToolCallResult("", fmt.Errorf("failed to list EndpointSlices for service %s/%s from must-gather: %w", namespace, serviceName, err)), nil
 		}
 
-		// Filter by label selector
-		for _, item := range list.Items {
-			labels := item.GetLabels()
-			if labels != nil && labels["kubernetes.io/service-name"] == serviceName {
-				items = append(items, item)
-			}
-		}
+		items = list.Items
 	} else {
 		list, err := params.DynamicClient().Resource(gvr).Namespace(namespace).List(params.Context, metav1.ListOptions{
 			LabelSelector: labelSelector,

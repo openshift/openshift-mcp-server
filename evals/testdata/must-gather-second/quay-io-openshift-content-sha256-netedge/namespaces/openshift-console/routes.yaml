@@ -1,0 +1,13 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: console
+  namespace: openshift-console
+spec:
+  host: console-second.apps.example.com
+  tls:
+    termination: edge
+    key: second-archive-private-key
+  to:
+    kind: Service
+    name: console-second
