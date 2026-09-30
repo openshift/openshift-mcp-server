@@ -1,0 +1,583 @@
+[
+  {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "bounded": {
+          "requirements": [
+            {
+              "namespace": {
+                "argument": "namespace"
+              },
+              "target": {
+                "resource": {
+                  "resource": "pods"
+                }
+              },
+              "verbs": [
+                "create",
+                "get",
+                "delete"
+              ]
+            },
+            {
+              "namespace": {
+                "argument": "namespace"
+              },
+              "target": {
+                "resource": {
+                  "resource": "pods",
+                  "subresource": "log"
+                }
+              },
+              "verbs": [
+                "get"
+              ]
+            }
+          ]
+        },
+        "version": "v1alpha1"
+      }
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": "Exec DNS in Pod"
+    },
+    "description": "Spin up a temporary pod in the cluster to execute a DNS lookup using dig, verifying internal cluster networking and DNS path.",
+    "inputSchema": {
+      "properties": {
+        "namespace": {
+          "description": "Namespace to run the ephemeral pod in.",
+          "type": "string"
+        },
+        "record_type": {
+          "default": "A",
+          "description": "DNS record type (A, AAAA, etc.). Defaults to A.",
+          "type": "string"
+        },
+        "target_name": {
+          "description": "DNS name to query (e.g. kubernetes.default.svc.cluster.local).",
+          "type": "string"
+        },
+        "target_server": {
+          "description": "DNS server IP to query (e.g. 172.30.0.10).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "namespace",
+        "target_server",
+        "target_name"
+      ],
+      "type": "object"
+    },
+    "name": "exec_dns_in_pod",
+    "title": "Exec DNS in Pod"
+  },
+  {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "bounded": {
+          "requirements": [
+            {
+              "namespace": {
+                "name": "openshift-dns"
+              },
+              "resourceName": {
+                "name": "dns-default"
+              },
+              "target": {
+                "resource": {
+                  "resource": "configmaps"
+                }
+              },
+              "verbs": [
+                "get"
+              ]
+            }
+          ]
+        },
+        "version": "v1alpha1"
+      }
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "Get CoreDNS Config"
+    },
+    "description": "Retrieve the CoreDNS Corefile from the live cluster or a selected must-gather archive. Set archive_id for offline analysis.",
+    "inputSchema": {
+      "properties": {
+        "archive_id": {
+          "description": "Must-gather archive ID from mustgather_list. Omit for the live cluster.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "get_coredns_config",
+    "title": "Get CoreDNS Config"
+  },
+  {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "bounded": {
+          "requirements": [
+            {
+              "namespace": {
+                "name": "openshift-ingress"
+              },
+              "target": {
+                "resource": {
+                  "resource": "pods"
+                }
+              },
+              "verbs": [
+                "get",
+                "list"
+              ]
+            },
+            {
+              "namespace": {
+                "name": "openshift-ingress"
+              },
+              "target": {
+                "resource": {
+                  "resource": "pods",
+                  "subresource": "exec"
+                }
+              },
+              "verbs": [
+                "get",
+                "create"
+              ]
+            }
+          ]
+        },
+        "version": "v1alpha1"
+      }
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "Get Router Config"
+    },
+    "description": "Retrieve the current router's HAProxy configuration from the cluster. Supports filtering by section type (global/defaults/frontend/backend), substring filter on section headers, and line-count limiting via tail_lines.",
+    "inputSchema": {
+      "properties": {
+        "filter": {
+          "description": "Substring filter applied to section headers (e.g. a route or backend name). Only sections whose header contains this string are returned.",
+          "type": "string"
+        },
+        "pod": {
+          "description": "Router pod name (optional, chooses any existing if not provided)",
+          "type": "string"
+        },
+        "section": {
+          "description": "Filter to a specific HAProxy config section type",
+          "enum": [
+            "global",
+            "defaults",
+            "frontend",
+            "backend",
+            "listen"
+          ],
+          "type": "string"
+        },
+        "tail_lines": {
+          "default": 200,
+          "description": "Maximum number of lines to return from the end of the config output (default: 200)",
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "name": "get_router_config",
+    "title": "Get Router Config"
+  },
+  {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "bounded": {
+          "requirements": [
+            {
+              "namespace": {
+                "name": "openshift-ingress"
+              },
+              "target": {
+                "resource": {
+                  "resource": "pods"
+                }
+              },
+              "verbs": [
+                "get",
+                "list"
+              ]
+            },
+            {
+              "namespace": {
+                "name": "openshift-ingress"
+              },
+              "target": {
+                "resource": {
+                  "resource": "pods",
+                  "subresource": "exec"
+                }
+              },
+              "verbs": [
+                "get",
+                "create"
+              ]
+            }
+          ]
+        },
+        "version": "v1alpha1"
+      }
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "Get Router Info"
+    },
+    "description": "Retrieve HAProxy runtime information from the router.",
+    "inputSchema": {
+      "properties": {
+        "pod": {
+          "description": "Router pod name (optional, chooses any existing if not provided)",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "get_router_info",
+    "title": "Get Router Info"
+  },
+  {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "bounded": {
+          "requirements": [
+            {
+              "namespace": {
+                "name": "openshift-ingress"
+              },
+              "target": {
+                "resource": {
+                  "resource": "pods"
+                }
+              },
+              "verbs": [
+                "get",
+                "list"
+              ]
+            },
+            {
+              "namespace": {
+                "name": "openshift-ingress"
+              },
+              "target": {
+                "resource": {
+                  "resource": "pods",
+                  "subresource": "exec"
+                }
+              },
+              "verbs": [
+                "get",
+                "create"
+              ]
+            }
+          ]
+        },
+        "version": "v1alpha1"
+      }
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "Get Router Sessions"
+    },
+    "description": "Retrieve active sessions from the router. Supports limiting the number of sessions returned and filtering by substring (e.g. backend name or source IP).",
+    "inputSchema": {
+      "properties": {
+        "filter": {
+          "description": "Substring filter applied to each session block. Only sessions containing this string are returned (e.g. a backend name or source IP).",
+          "type": "string"
+        },
+        "limit": {
+          "default": 50,
+          "description": "Maximum number of session blocks to return (default: 50)",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "pod": {
+          "description": "Router pod name (optional, chooses any existing if not provided)",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "get_router_sessions",
+    "title": "Get Router Sessions"
+  },
+  {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "bounded": {
+          "requirements": [
+            {
+              "namespace": {
+                "argument": "namespace"
+              },
+              "target": {
+                "resource": {
+                  "apiGroup": "discovery.k8s.io",
+                  "resource": "endpointslices"
+                }
+              },
+              "verbs": [
+                "list"
+              ]
+            }
+          ]
+        },
+        "version": "v1alpha1"
+      }
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "Get Service Endpoints"
+    },
+    "description": "Return EndpointSlices for a Service from the live cluster or a selected must-gather archive. Set archive_id for offline analysis.",
+    "inputSchema": {
+      "properties": {
+        "archive_id": {
+          "description": "Must-gather archive ID from mustgather_list. Omit for the live cluster.",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Service namespace",
+          "type": "string"
+        },
+        "service": {
+          "description": "Service name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "namespace",
+        "service"
+      ],
+      "type": "object"
+    },
+    "name": "get_service_endpoints",
+    "title": "Get Service Endpoints"
+  },
+  {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "bounded": {
+          "requirements": [
+            {
+              "namespace": {
+                "argument": "namespace"
+              },
+              "resourceName": {
+                "argument": "route"
+              },
+              "target": {
+                "resource": {
+                  "apiGroup": "route.openshift.io",
+                  "resource": "routes"
+                }
+              },
+              "verbs": [
+                "get"
+              ]
+            }
+          ]
+        },
+        "version": "v1alpha1"
+      }
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "Inspect Route"
+    },
+    "description": "Inspect an OpenShift Route in the live cluster or a selected must-gather archive. Set archive_id for offline analysis.",
+    "inputSchema": {
+      "properties": {
+        "archive_id": {
+          "description": "Must-gather archive ID from mustgather_list. Omit for the live cluster.",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Route namespace",
+          "type": "string"
+        },
+        "route": {
+          "description": "Route name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "namespace",
+        "route"
+      ],
+      "type": "object"
+    },
+    "name": "inspect_route",
+    "title": "Inspect Route"
+  },
+  {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "bounded": {
+          "requirements": [
+            {
+              "namespace": {
+                "name": "openshift-monitoring"
+              },
+              "resourceName": {
+                "name": "thanos-querier"
+              },
+              "target": {
+                "resource": {
+                  "apiGroup": "route.openshift.io",
+                  "resource": "routes"
+                }
+              },
+              "verbs": [
+                "get"
+              ]
+            }
+          ]
+        },
+        "version": "v1alpha1"
+      }
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "NetEdge Diagnostics"
+    },
+    "description": "Executes specialized diagnostic queries for specific NetEdge components (ingress, dns).",
+    "inputSchema": {
+      "properties": {
+        "diagnostic_target": {
+          "description": "Run specialized diagnostics for a specific component.",
+          "enum": [
+            "ingress",
+            "dns",
+            "operators"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "diagnostic_target"
+      ],
+      "type": "object"
+    },
+    "name": "netedge_query_prometheus",
+    "title": "NetEdge Diagnostics"
+  },
+  {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "none": {},
+        "version": "v1alpha1"
+      }
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "Probe DNS (Local)"
+    },
+    "description": "Run a DNS query using local libraries on the MCP server host to verify connectivity and resolution.",
+    "inputSchema": {
+      "properties": {
+        "name": {
+          "description": "FQDN to query",
+          "type": "string"
+        },
+        "server": {
+          "description": "DNS server IP (e.g. 8.8.8.8, 10.0.0.10)",
+          "type": "string"
+        },
+        "type": {
+          "default": "A",
+          "description": "Record type (A, AAAA, CNAME, TXT, SRV, etc.). Defaults to A.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "server",
+        "name"
+      ],
+      "type": "object"
+    },
+    "name": "probe_dns_local",
+    "title": "Probe DNS (Local)"
+  },
+  {
+    "_meta": {
+      "io.kubernetes-mcp-server/rbac": {
+        "none": {},
+        "version": "v1alpha1"
+      }
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "Probe HTTP"
+    },
+    "description": "Send an HTTP(S) request from the MCP server host to verify reachability and inspect the response status code and headers.",
+    "inputSchema": {
+      "properties": {
+        "method": {
+          "default": "GET",
+          "description": "HTTP method to use. Defaults to GET.",
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "default": 5,
+          "description": "Request timeout in seconds. Defaults to 5.",
+          "type": "integer"
+        },
+        "url": {
+          "description": "The URL to probe (e.g. https://example.com/path).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "type": "object"
+    },
+    "name": "probe_http",
+    "title": "Probe HTTP"
+  }
+]
