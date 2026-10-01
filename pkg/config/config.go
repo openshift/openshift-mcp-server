@@ -183,6 +183,8 @@ type TokenExchangeConfig struct {
 	SubjectTokenType Option[string]
 	// RequestedTokenType is an RFC 8693 requested_token_type override.
 	RequestedTokenType Option[string]
+	// TokenURL is the explicit token-exchange endpoint. Falls back to OIDC discovery when empty.
+	TokenURL Option[string]
 	// ClientAuth is nested under [token_exchange.client_auth].
 	ClientAuth TokenExchangeClientAuth `toml:"client_auth"`
 	// present is true when a [token_exchange] table appeared in TOML,
@@ -198,6 +200,7 @@ func newTokenExchangeConfig() TokenExchangeConfig {
 		Scopes:             opt("scopes", []string(nil)).reload().desc("Scopes for token exchange"),
 		SubjectTokenType:   opt("subject_token_type", "").reload().desc("RFC 8693 subject_token_type override"),
 		RequestedTokenType: opt("requested_token_type", "").reload().desc("RFC 8693 requested_token_type override"),
+		TokenURL:           opt("token_url", "").reload().desc("Explicit RFC 8693 token-exchange endpoint"),
 		ClientAuth:         newTokenExchangeClientAuth(),
 	}
 }
@@ -225,6 +228,9 @@ type Config struct {
 	MetricsPort Option[string]
 	// ListOutput is the output format for resource list operations (yaml or table).
 	ListOutput Option[string]
+	// AppsEnabled enables MCP Apps UI resources for tools that declare an app.
+	// Defaults to false so existing MCP clients retain their current behavior.
+	AppsEnabled Option[bool]
 	// Stateless configures the MCP server to operate in stateless mode.
 	// When true, the server will not send notifications to clients (e.g., tools/list_changed, prompts/list_changed).
 	// This is useful for container deployments, load balancing, and serverless environments where
@@ -232,6 +238,13 @@ type Config struct {
 	// and prompt updates, requiring clients to manually refresh their tool/prompt lists.
 	// Defaults to false (stateful mode with notifications enabled).
 	Stateless Option[bool]
+	// DisableLocalhostProtection disables the MCP Go SDK DNS-rebinding guard on
+	// Streamable HTTP. When false (default), requests accepted on a loopback
+	// address with a non-localhost Host header are rejected with 403.
+	// Set true only behind a trusted reverse proxy that forwards to 127.0.0.1
+	// while preserving the public or Service Host (for example kube-rbac-proxy).
+	// Requires a process restart (the Streamable HTTP handler is built once).
+	DisableLocalhostProtection Option[bool]
 	// ServerInstructions are provided by the MCP server to the MCP client.
 	// This can be used to provide specific instructions on how the client should use the server.
 	ServerInstructions Option[string]
@@ -379,13 +392,16 @@ func New() *Config {
 // (New / BaseDefault) after optional defaultOverrides.
 func newConfig() *Config {
 	return &Config{
-		LogLevel:                opt("log_level", 0).reload().desc("Log verbosity (0-9)"),
-		LogFile:                 opt("log_file", "").reload().desc("Server log file path"),
-		Port:                    opt("port", "").desc("HTTP listen port (empty is stdio)"),
-		BindAddress:             opt("bind_address", "0.0.0.0").desc("Address to bind the HTTP server"),
-		MetricsPort:             opt("metrics_port", "").validate(validateMetricsPortNumber).desc("Separate metrics server port"),
-		ListOutput:              opt("list_output", "table").reload().validate(validateListOutput).desc("Output format for resource list operations"),
-		Stateless:               opt("stateless", false).desc("Run without tool/prompt change notifications"),
+		LogLevel:    opt("log_level", 0).reload().desc("Log verbosity (0-9)"),
+		LogFile:     opt("log_file", "").reload().desc("Server log file path"),
+		Port:        opt("port", "").desc("HTTP listen port (empty is stdio)"),
+		BindAddress: opt("bind_address", "0.0.0.0").desc("Address to bind the HTTP server"),
+		MetricsPort: opt("metrics_port", "").validate(validateMetricsPortNumber).desc("Separate metrics server port"),
+		ListOutput:  opt("list_output", "table").reload().validate(validateListOutput).desc("Output format for resource list operations"),
+		AppsEnabled: opt("apps_enabled", false).desc("Enable MCP Apps UI resources (requires restart)"),
+		Stateless:   opt("stateless", false).desc("Run without tool/prompt change notifications"),
+		DisableLocalhostProtection: opt("disable_localhost_protection", false).
+			desc("Disable Streamable HTTP DNS-rebinding Host check (loopback + non-localhost Host)"),
 		ServerInstructions:      opt("server_instructions", "").desc("Instructions provided by the MCP server to clients"),
 		KubeConfig:              opt("kubeconfig", "").desc("Path to the kubeconfig file"),
 		ClusterProviderStrategy: opt("cluster_provider_strategy", "").desc("How the server finds clusters"),
