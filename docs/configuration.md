@@ -166,7 +166,7 @@ If the new files fail to parse (including unknown keys), a non-reloadable option
 A SIGHUP that would change a non-reloadable option is rejected and the process exits. Restart to apply those values. That includes:
 
 - Listen/TLS: `port`, `bind_address`, `metrics_port`, `tls_cert`, `tls_key`, `require_tls`, `tls_min_version`, `tls_cipher_suites`, `http.read_header_timeout`
-- Process shape: `stateless`, `server_instructions`
+- Process shape: `stateless`, `disable_localhost_protection`, `server_instructions`, `apps_enabled`
 - Cluster connection: `kubeconfig`, `cluster_provider_strategy`, `cluster_provider_configs`
 - Kubernetes client: `kube_client_qps`, `kube_client_burst`, watcher/poll timings
 - Telemetry: the `[telemetry]` table
@@ -185,12 +185,27 @@ SIGHUP is not available on Windows; restart the process.
 | `bind_address` | string | `"0.0.0.0"` | Address to bind the HTTP server to. Set to `127.0.0.1` to restrict to localhost. A warning is logged when listening on all interfaces (`0.0.0.0` or `::`) without TLS or OAuth, and when a separate metrics port is bound to all interfaces (the metrics server never uses TLS or OAuth). |
 | `metrics_port` | string | `""` | When set (in HTTP mode), starts a separate HTTP server on this port serving only `/metrics`, `/stats`, and `/healthz` endpoints. Useful for Kubernetes deployments with network policies to separate metrics scraping from MCP protocol access. The metrics server uses the same `bind_address` but does not use TLS or OAuth. A warning is logged if `bind_address` is all interfaces (`0.0.0.0` or `::`). |
 | `list_output` | string | `"table"` | Output format for resource list operations. Valid values: `yaml`, `table`. |
+| `apps_enabled` | boolean | `false` | Enables MCP Apps resources and interactive views for tools that support them. Requires server restart. |
 | `stateless` | boolean | `false` | When `true`, disables tool and prompt change notifications. Useful for container deployments, load balancing, and serverless environments. |
+| `disable_localhost_protection` | boolean | `false` | When `true`, disables the MCP Go SDK DNS-rebinding check on Streamable HTTP. Leave `false` for local HTTP. Set `true` only behind a trusted reverse proxy that forwards to loopback while preserving the public or Service `Host`. For that sidecar pattern, also set `bind_address = "127.0.0.1"` (see below). |
 | `tls_cert` | string | `""` | Path to TLS certificate file for HTTPS. When set along with `tls_key`, the server serves HTTPS instead of HTTP. |
 | `tls_key` | string | `""` | Path to TLS private key file for HTTPS. Must be set together with `tls_cert`. |
 | `require_tls` | boolean | `false` | When `true`, enforces TLS for all connections. Server refuses to start without TLS certificates, and outbound connections to non-HTTPS endpoints (e.g., Kiali) are rejected. |
 | `tls_min_version` | string | `""` | Minimum TLS version (e.g., `"1.2"`, `"1.3"`; `"1.0"` and `"1.1"` are accepted for operator parity but not recommended). Defaults to TLS 1.2 if not set. Overridden by `TLS_MIN_VERSION` when that env var is non-empty. Applies to inbound HTTPS and outbound clients (Kiali, NetObserv, OAuth, token exchange, well-known metadata). |
 | `tls_cipher_suites` | array | `[]` | TLS 1.2 cipher suites (TLS 1.3 cipher suites are not configurable). If empty, Go's defaults are used. Overridden by `TLS_CIPHER_SUITES` (comma-separated) when that env var is non-empty. Applies to inbound HTTPS and outbound clients. |
+
+The Streamable HTTP handler (go-sdk) rejects requests accepted on a loopback address (`127.0.0.1`, `::1`) when `Host` is not localhost. That blocks browser DNS rebinding against a local MCP server. It also 403s the usual in-pod sidecar pattern: kube-rbac-proxy `--upstream=http://127.0.0.1:8080/` keeps `Host: <service>:<port>`. Set `disable_localhost_protection = true` in that case.
+
+For that sidecar deploy, also set `bind_address = "127.0.0.1"` so only the proxy can reach the MCP port. The flag is not what enforces that: default `bind_address` is `0.0.0.0`, and traffic to `podIP:<port>` never hits the Host check (the accept address is not loopback), so other pods can skip kube-rbac-proxy. `metrics_port` uses the same `bind_address`; cluster Prometheus scrapes will fail unless metrics are scraped from a sidecar or you keep a non-loopback bind.
+
+Do not enable `disable_localhost_protection` for a laptop process listening on all interfaces without a trusted proxy. `trust_proxy_headers` does not rewrite `Host` and does not disable this check. Changing the value requires a restart.
+
+**Sidecar (kube-rbac-proxy):**
+```toml
+port = "8080"
+bind_address = "127.0.0.1"
+disable_localhost_protection = true
+```
 
 **Example:**
 ```toml
@@ -495,6 +510,8 @@ Fine-grained control over individual tools within enabled toolsets.
 | `enabled_tools` | string[] | `[]` | Allowlist of specific tools to enable. When set, only these tools are available. |
 | `disabled_tools` | string[] | `[]` | Denylist of specific tools to disable. Applied after `enabled_tools`. |
 
+The `configuration_view` tool is disabled by default in HTTP mode because it exposes kubeconfig contents. To expose it in HTTP mode, include `configuration_view` explicitly in `enabled_tools` along with every other tool the server should provide.
+
 **Example:**
 ```toml
 # Only enable specific tools
@@ -645,11 +662,12 @@ Configure OAuth/OIDC authentication for HTTP mode deployments.
 | `skip_jwt_verification` | boolean | `false` | When true and authorization_url is unset, the server forwards the bearer token without any local validation (no parse, no claims check, no audience check). Required to enable pure passthrough with non-JWT tokens (e.g., OpenShift OAuth sha256~…). When true and authorization_url is set, this flag has no effect — the configured OIDC provider validates tokens normally. Only use the no-authorization_url form when a downstream component (cluster, reverse proxy) is the authority. |
 | `disable_dynamic_client_registration` | boolean | `false` | When `true`, disables dynamic client registration in `.well-known` endpoints. |
 | `oauth_scopes` | string[] | `[]` | Supported client scopes for the OAuth flow. |
-| `token_exchange.strategy` | string | `""` | Required when `[token_exchange]` is used. Valid values are `rfc8693`, `keycloak-v1`, or `entra-obo`. The block enables global exchange and requires `require_oauth = true` and `authorization_url`. |
+| `token_exchange.strategy` | string | required | Registered token exchange strategy: `rfc8693`, `keycloak-v1`, or `entra-obo`. The block enables global exchange and requires `require_oauth = true`, plus either `token_exchange.token_url` or `authorization_url` to reach a token endpoint. |
 | `token_exchange.audience` | string | `""` | Audience for the exchanged token. |
 | `token_exchange.scopes` | string[] | `[]` | Scopes for the exchanged token. |
 | `token_exchange.subject_token_type` | string | `"urn:ietf:params:oauth:token-type:access_token"` | RFC 8693 `subject_token_type`. |
 | `token_exchange.requested_token_type` | string | `"urn:ietf:params:oauth:token-type:access_token"` | RFC 8693 `requested_token_type`. |
+| `token_exchange.token_url` | string | *(falls back to OIDC discovery)* | Explicit token-exchange endpoint. Falls back to the endpoint discovered from `authorization_url` **only when unset** — a set-but-invalid value is rejected at startup, never silently ignored. Use this to point token exchange at a separate STS gateway (cross-realm deployments), or to enable token exchange when no `authorization_url` is configured (e.g., with `skip_jwt_verification=true`). |
 | `token_exchange.client_auth.method` | string | none | Required when client credentials are configured: `client_secret_basic`, `client_secret_post`, `private_key_jwt`, or `jwt_file`. May be omitted when only `client_id` is set for a public client. |
 | `token_exchange.client_auth.client_id` | string | `""` | OAuth client ID. May be configured without a method or secret for a public client. |
 | `token_exchange.client_auth.client_secret` | string | `""` | Required by the client-secret methods. |
@@ -695,6 +713,27 @@ method = "private_key_jwt"
 client_id = "<CLIENT_ID>"
 certificate_file = "/path/to/client.crt"
 private_key_file = "/path/to/client.key"
+```
+
+**Example (separate STS gateway from user-token issuer):**
+
+`authorization_url` validates the user's bearer token; `token_exchange.token_url` is the
+distinct gateway that mints the delegated cluster token. The two URLs may point at
+different hosts/realms.
+```toml
+require_oauth     = true
+authorization_url = "https://idp.example.com/realms/users"
+oauth_audience    = "kubernetes-mcp-server"
+
+[token_exchange]
+strategy  = "rfc8693"
+audience  = "kubernetes-api"
+token_url = "https://sts-gateway.internal/oauth/token"
+
+[token_exchange.client_auth]
+method        = "client_secret_post"
+client_id     = "mcp-backend"
+client_secret = "your-client-secret"
 ```
 
 **Pure token passthrough (delegate validation to the cluster):**
@@ -937,6 +976,7 @@ port = "8080"
 bind_address = "0.0.0.0"
 list_output = "table"
 stateless = false
+disable_localhost_protection = false
 
 # HTTP server security
 [http]
