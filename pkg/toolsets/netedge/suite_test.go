@@ -39,7 +39,7 @@ func (s *NetEdgeTestSuite) SetupTest() {
 	}
 	s.params = api.ToolHandlerParams{
 		Context:          context.Background(),
-		ToolCallRequest:  s.mockReq,
+		Request:          s.mockReq,
 		KubernetesClient: s.mockClient,
 	}
 }
