@@ -4,7 +4,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
 
 	"github.com/rhobs/obs-mcp/pkg/logs"
-	metrics "github.com/rhobs/obs-mcp/pkg/metrics/toolset"
+	"github.com/rhobs/obs-mcp/pkg/metrics"
 	"github.com/rhobs/obs-mcp/pkg/otelcol"
 	"github.com/rhobs/obs-mcp/pkg/traces"
 )

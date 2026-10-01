@@ -151,7 +151,7 @@ If neither is provided, the tool returns an error. There is no environment-varia
 
 ## Instance discovery
 
-When `loki_url` is not set, the server lists **`LokiStack`** objects cluster-wide and derives gateway base URLs from each resource. With **`use_route = true`**, each instance's URL is resolved via an OpenShift `Route`; if Route resolution fails for any instance, discovery returns an error (there is no fallback to service URLs). Chosen instances are **validated** against this discovery list before any request is sent, so callers cannot point tools at arbitrary URLs.
+When `loki_url` is not set, the server lists **`LokiStack`** objects cluster-wide and derives gateway base URLs from each resource. With **`use_route = true`**, each instance's URL is resolved via an OpenShift `Route` when one exists; if no Route is found, discovery falls back to in-cluster service DNS for that instance. Unexpected Route API errors still fail discovery. Chosen instances are **validated** against this discovery list before any request is sent, so callers cannot point tools at arbitrary URLs.
 
 When `loki_url` is set, that URL is used directly and LokiStack discovery is skipped (`lokiNamespace` / `lokiName` are optional in that case).
 

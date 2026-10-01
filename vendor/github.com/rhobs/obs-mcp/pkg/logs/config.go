@@ -10,6 +10,8 @@ import (
 
 	"github.com/rhobs/obs-mcp/pkg/auth"
 	"github.com/rhobs/obs-mcp/pkg/instrumentation"
+	"github.com/rhobs/obs-mcp/pkg/logs/discovery"
+	"github.com/rhobs/obs-mcp/pkg/openshift"
 )
 
 func init() {
@@ -28,7 +30,17 @@ type Config struct {
 	Insecure bool `toml:"insecure,omitempty"`
 
 	// UseRoute controls whether to use OpenShift Routes for discovering LokiStack endpoints.
+	//
+	// When true and Resolver is nil, an OpenShift LogsGatewayResolver is installed
+	// automatically during TOML parse and Validate (before handlers run). Prefer
+	// setting Resolver directly for custom discovery; UseRoute remains for
+	// backward-compatible TOML/flag parsing.
 	UseRoute bool `toml:"use_route,omitempty"`
+
+	// Resolver performs cluster-based endpoint discovery (e.g., OpenShift Routes).
+	// When nil, plain HTTP service DNS is used. Not exposed in TOML; set programmatically
+	// or via UseRoute.
+	Resolver discovery.GatewayResolver `toml:"-"`
 
 	// ClientMetrics holds HTTP client metrics for instrumenting outbound requests.
 	ClientMetrics *instrumentation.ClientMetrics `toml:"-"`
@@ -42,6 +54,9 @@ func (c *Config) Validate() error {
 	if c.AuthMode != "" && c.AuthMode != auth.AuthModeHeader && c.AuthMode != auth.AuthModeKubeConfig {
 		return fmt.Errorf("invalid auth_mode: %q (valid options: %q, %q)", c.AuthMode, auth.AuthModeHeader, auth.AuthModeKubeConfig)
 	}
+	// Install resolver at validation time so programmatic Config{UseRoute: true}
+	// is ready before concurrent handlers run (no lazy init in GetConfig).
+	c.applyUseRouteResolver()
 	return nil
 }
 
@@ -52,11 +67,22 @@ func (c *Config) GetAuthMode() auth.AuthMode {
 	return c.AuthMode
 }
 
+// applyUseRouteResolver installs the OpenShift gateway resolver when UseRoute is
+// set and no Resolver has been provided yet. Call only during config setup
+// (parser/Validate), not from concurrent request handlers.
+func (c *Config) applyUseRouteResolver() {
+	if c == nil || !c.UseRoute || c.Resolver != nil {
+		return
+	}
+	c.Resolver = &openshift.LogsGatewayResolver{}
+}
+
 func logsToolsetParser(_ context.Context, primitive toml.Primitive, md toml.MetaData) (api.ExtendedConfig, error) {
 	var cfg Config
 	if err := md.PrimitiveDecode(primitive, &cfg); err != nil {
 		return nil, err
 	}
+	cfg.applyUseRouteResolver()
 	return &cfg, nil
 }
 
