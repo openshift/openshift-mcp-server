@@ -151,7 +151,7 @@ Bearer token behavior matches the [metrics toolset](./metrics.md) (**Authenticat
 
 ## Instance discovery
 
-When `tempo_url` is not set, the server lists **`TempoStack`** and **`TempoMonolithic`** objects cluster-wide and derives query-frontend or gateway base URLs from each resource. With **`use_route = true`**, each instance's URL is resolved via an OpenShift `Route`; instances whose Route cannot be resolved are silently skipped (there is no fallback to service URLs). Chosen instances are **validated** against this discovery list before any request is sent, so callers cannot point tools at arbitrary URLs.
+When `tempo_url` is not set, the server lists **`TempoStack`** and **`TempoMonolithic`** objects cluster-wide and derives query-frontend or gateway base URLs from each resource. With **`use_route = true`**, each instance's URL is resolved via an OpenShift `Route` when one exists; if Route resolution fails, discovery falls back to in-cluster service DNS for that instance. Chosen instances are **validated** against this discovery list before any request is sent, so callers cannot point tools at arbitrary URLs.
 
 When `tempo_url` is set, that URL is used directly and Kubernetes discovery is skipped. Tool calls still require `tempoNamespace` and `tempoName` in the input schema (they are unused for URL resolution in that case).
 
