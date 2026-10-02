@@ -194,11 +194,18 @@ Diagnostic metrics (via `netedge_query_prometheus`) interact with the in-cluster
 
 ## Offline Analysis (Must-Gather)
 
-The NetEdge toolset is designed to support both live-cluster and offline analysis modes. Currently, tools like `get_router_config`, `get_router_info`, and `exec_dns_in_pod` require a live cluster connection because they rely on `exec` commands or dynamic resource creation.
+`inspect_route`, `get_coredns_config`, and `get_service_endpoints` can read a selected local must-gather archive. Configure archive directories for the `openshift/mustgather` toolset and enable both toolsets:
 
-However, an upcoming integration will enable "Virtual Cluster" environments. By pointing the MCP server to a local `must-gather` archive or a remote Prow CI job URL, the agent will be able to debug past failures without live access.
+```toml
+toolsets = ["netedge", "openshift/mustgather"]
 
-*Note: The exact configuration mechanism for offline mode (e.g., `cluster="file:///path/to/must-gather"`) is under active development and will integrate with the `omc` (OpenShift Must-Gather Client).*
+[toolset_configs."openshift/mustgather"]
+mustgather_dirs = ["/path/to/must-gathers"]
+```
+
+Call `mustgather_list` to discover an archive's `archive_id`, then pass that ID to one of the three NetEdge tools. Omit `archive_id` to query the live cluster. An invalid or unknown ID returns an error and does not query the live cluster. Each call selects its own archive, so concurrent users can inspect different archives without changing a shared active archive.
+
+The other NetEdge tools still require a live cluster or a live network endpoint. This integration reads local archive directories; it does not download a remote Prow archive or run `omc`.
 
 ---
 

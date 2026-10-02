@@ -17,7 +17,7 @@ func initRoutes() []api.ServerTool {
 		{
 			Tool: api.Tool{
 				Name:        "inspect_route",
-				Description: "Inspect an OpenShift Route to view its full configuration and status.",
+				Description: "Inspect an OpenShift Route in the live cluster or a selected must-gather archive. Set archive_id for offline analysis.",
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
@@ -29,6 +29,7 @@ func initRoutes() []api.ServerTool {
 							Type:        "string",
 							Description: "Route name",
 						},
+						"archive_id": {Type: "string", Description: "Must-gather archive ID from mustgather_list. Omit for the live cluster."},
 					},
 					Required: []string{"namespace", "route"},
 				},
@@ -69,9 +70,21 @@ func inspectRoute(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		Resource: "routes",
 	}
 
-	route, err := params.DynamicClient().Resource(gvr).Namespace(namespace).Get(params.Context, routeName, metav1.GetOptions{})
+	var route *unstructured.Unstructured
+	p, err := selectedArchive(params)
 	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to get route %s/%s: %w", namespace, routeName, err)), nil
+		return api.NewToolCallResult("", err), nil
+	}
+	if p != nil {
+		route = p.GetResource(schema.GroupVersionKind{Group: "route.openshift.io", Version: "v1", Kind: "Route"}, routeName, namespace)
+		if route == nil {
+			return api.NewToolCallResult("", fmt.Errorf("route %s/%s not found in selected must-gather archive", namespace, routeName)), nil
+		}
+	} else {
+		route, err = params.DynamicClient().Resource(gvr).Namespace(namespace).Get(params.Context, routeName, metav1.GetOptions{})
+		if err != nil {
+			return api.NewToolCallResult("", fmt.Errorf("failed to get route %s/%s: %w", namespace, routeName, err)), nil
+		}
 	}
 
 	// Deep-copy the route so we can redact sensitive TLS fields without
