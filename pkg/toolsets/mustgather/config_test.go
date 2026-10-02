@@ -1,6 +1,7 @@
 package mustgather
 
 import (
+	"context"
 	"testing"
 
 	"github.com/containers/kubernetes-mcp-server/internal/test"
@@ -10,6 +11,14 @@ import (
 
 type ConfigSuite struct {
 	suite.Suite
+}
+
+func (s *ConfigSuite) SetupTest() {
+	current.Store(nil)
+}
+
+func (s *ConfigSuite) TearDownTest() {
+	current.Store(nil)
 }
 
 func (s *ConfigSuite) TestConfigParser_ParsesDirs() {
@@ -74,6 +83,42 @@ func (s *ConfigSuite) TestLimitDefaults() {
 		s.Equal(42, c.tailLimit())
 		s.Equal(4096, c.maxOutputSize())
 	})
+}
+
+// TestCommit_PublishesConfigForResourceHandlers verifies that commit publishes
+// the parsed toolset config to the package-global read by MCP resource handlers
+// (which receive only a context), and that the same *Config instance the tools
+// see is exposed — so resource handlers share the per-config archive registry.
+func (s *ConfigSuite) TestCommit_PublishesConfigForResourceHandlers() {
+	s.Nil(configFromContext(context.Background()), "no config should be published before commit")
+
+	cfg := test.Must(config.ReadToml([]byte(`
+		[toolset_configs."openshift/mustgather"]
+		mustgather_dirs = ["/var/data/must-gather"]
+	`)))
+	commit(cfg)
+
+	published := configFromContext(context.Background())
+	s.Require().NotNil(published, "commit should publish the parsed config for resource handlers")
+	s.Equal([]string{"/var/data/must-gather"}, published.MustGatherDirs)
+
+	toolCfg, _ := cfg.GetToolsetConfig("openshift/mustgather")
+	s.Same(toolCfg.(*Config), published, "resource handlers must observe the same *Config (and registry) as the tools")
+}
+
+// TestCommit_AbsentSectionClearsConfig verifies that a committed reload dropping
+// the mustgather section stops resource handlers from serving stale config.
+func (s *ConfigSuite) TestCommit_AbsentSectionClearsConfig() {
+	commit(test.Must(config.ReadToml([]byte(`
+		[toolset_configs."openshift/mustgather"]
+		mustgather_dirs = ["/var/data/must-gather"]
+	`))))
+	s.Require().NotNil(configFromContext(context.Background()))
+
+	commit(test.Must(config.ReadToml([]byte(`
+		[toolset_configs."core"]
+	`))))
+	s.Nil(configFromContext(context.Background()), "dropping the section must clear the published config")
 }
 
 func TestConfig(t *testing.T) {

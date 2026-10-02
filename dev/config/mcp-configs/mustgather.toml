@@ -1,0 +1,6 @@
+read_only = true
+disable_destructive = true
+stateless = true
+
+[toolset_configs."openshift/mustgather"]
+    mustgather_dirs = ["/var/lib/openshift/mustgather/archives-pvc-01", "/var/lib/openshift/mustgather/archives-pvc-02"]
