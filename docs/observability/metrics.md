@@ -169,7 +169,7 @@ prometheus_url = "https://thanos-querier.openshift-monitoring.svc.cluster.local:
 # URL of the Alertmanager endpoint.
 # Required for get_alerts and get_silences. No default — those tools fail without it.
 # Example for OpenShift in-cluster Alertmanager:
-alertmanager_url = "https://alertmanager-main.openshift-monitoring.svc.cluster.local:9095"
+alertmanager_url = "https://alertmanager-main.openshift-monitoring.svc.cluster.local:9094"
 # Example for an external route:
 # alertmanager_url = "https://alertmanager-main-openshift-monitoring.apps.example.com"
 
@@ -254,7 +254,7 @@ Typical values for OpenShift:
 | Endpoint | In-cluster service URL | External route URL (example) |
 |---|---|---|
 | Thanos Querier | `https://thanos-querier.openshift-monitoring.svc.cluster.local:9091` | `https://thanos-querier-openshift-monitoring.apps.<cluster>` |
-| Alertmanager | `https://alertmanager-main.openshift-monitoring.svc.cluster.local:9095` | `https://alertmanager-main-openshift-monitoring.apps.<cluster>` |
+| Alertmanager | `https://alertmanager-main.openshift-monitoring.svc.cluster.local:9094` | `https://alertmanager-main-openshift-monitoring.apps.<cluster>` |
 
 To look up the actual routes in an OpenShift cluster:
 
