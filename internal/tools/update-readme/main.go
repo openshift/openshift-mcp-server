@@ -17,6 +17,8 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type documentationInspector struct{}
@@ -26,7 +28,33 @@ func (i *documentationInspector) Discovery() api.AggregateDiscovery {
 }
 
 func (i *documentationInspector) Unstructured() api.AggregateUnstructured {
-	return nil
+	return i
+}
+
+func (i *documentationInspector) Resource(_ schema.GroupVersionResource) api.AggregateNamespaceableResourceInterface {
+	return i
+}
+
+func (i *documentationInspector) Namespace(_ string) api.AggregateResourceInterface {
+	return i
+}
+
+func (i *documentationInspector) Get(ctx context.Context, _ string, _ metav1.GetOptions, _ ...string) api.Results[*unstructured.Unstructured] {
+	return api.NewResults(ctx, i, func(context.Context, string) (*unstructured.Unstructured, error) {
+		return &unstructured.Unstructured{Object: map[string]any{
+			"spec": map[string]any{
+				"monitoring": map[string]any{
+					"clusterHealthAnalyzer": map[string]any{"enabled": true},
+				},
+			},
+		}}, nil
+	})
+}
+
+func (i *documentationInspector) List(ctx context.Context, _ metav1.ListOptions) api.Results[*unstructured.UnstructuredList] {
+	return api.NewResults(ctx, i, func(context.Context, string) (*unstructured.UnstructuredList, error) {
+		return &unstructured.UnstructuredList{}, nil
+	})
 }
 
 func (i *documentationInspector) ServerResourcesForGroupVersion(ctx context.Context, _ string) api.Results[*metav1.APIResourceList] {
@@ -50,6 +78,8 @@ func (i *documentationInspector) GetTargetParameterName() string { return "" }
 
 var _ api.ClusterInspector = (*documentationInspector)(nil)
 var _ api.AggregateDiscovery = (*documentationInspector)(nil)
+var _ api.AggregateUnstructured = (*documentationInspector)(nil)
+var _ api.AggregateNamespaceableResourceInterface = (*documentationInspector)(nil)
 var _ api.TargetProvider = (*documentationInspector)(nil)
 
 type evalTask struct {

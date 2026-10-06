@@ -14,6 +14,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/miekg/dns v1.1.73
 	github.com/modelcontextprotocol/go-sdk v1.8.0
+	github.com/openshift/cluster-health-analyzer v0.0.0-00010101000000-000000000000
 	github.com/ovn-kubernetes/ovn-kubernetes-mcp v0.1.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/rhobs/obs-mcp v0.8.1
@@ -206,3 +207,5 @@ require (
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.2 // indirect
 )
+
+replace github.com/openshift/cluster-health-analyzer => /home/tremes/GITHUB/cluster-health-analyzer
