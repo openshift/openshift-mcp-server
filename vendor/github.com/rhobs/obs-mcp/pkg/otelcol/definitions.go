@@ -34,15 +34,13 @@ var (
 	}
 )
 
-func hasOpenTelemetryCollectorCRD(p api.FilteringProvider) func() bool {
+func hasOpenTelemetryCollectorCRD(ctx context.Context, inspector api.ClusterInspector) func() bool {
 	return func() bool {
-		return p.AnyTargetHasGVKs(context.TODO(), []schema.GroupVersionKind{
-			openTelemetryCollectorGVK,
-		})
+		return api.AnyTargetHasGVK(ctx, inspector, openTelemetryCollectorGVK)
 	}
 }
 
-func initListComponents(p api.FilteringProvider) api.ServerTool {
+func initListComponents(ctx context.Context, inspector api.ClusterInspector) api.ServerTool {
 	return api.ServerTool{
 		Tool: api.Tool{
 			Name:        "otelcol_list_components",
@@ -68,12 +66,12 @@ func initListComponents(p api.FilteringProvider) api.ServerTool {
 		Handler: ListComponentsHandler,
 		RBAC:    rbacNoKubernetes(),
 		TargetCompatibilityFilters: []func() bool{
-			hasOpenTelemetryCollectorCRD(p),
+			hasOpenTelemetryCollectorCRD(ctx, inspector),
 		},
 	}
 }
 
-func initGetComponentSchema(p api.FilteringProvider) api.ServerTool {
+func initGetComponentSchema(ctx context.Context, inspector api.ClusterInspector) api.ServerTool {
 	return api.ServerTool{
 		Tool: api.Tool{
 			Name:        "otelcol_get_component_schema",
@@ -108,12 +106,12 @@ func initGetComponentSchema(p api.FilteringProvider) api.ServerTool {
 		Handler: GetComponentSchemaHandler,
 		RBAC:    rbacNoKubernetes(),
 		TargetCompatibilityFilters: []func() bool{
-			hasOpenTelemetryCollectorCRD(p),
+			hasOpenTelemetryCollectorCRD(ctx, inspector),
 		},
 	}
 }
 
-func initValidateConfig(p api.FilteringProvider) api.ServerTool {
+func initValidateConfig(ctx context.Context, inspector api.ClusterInspector) api.ServerTool {
 	return api.ServerTool{
 		Tool: api.Tool{
 			Name:        "otelcol_validate_config",
@@ -156,12 +154,12 @@ func initValidateConfig(p api.FilteringProvider) api.ServerTool {
 		Handler: ValidateConfigHandler,
 		RBAC:    rbacNoKubernetes(),
 		TargetCompatibilityFilters: []func() bool{
-			hasOpenTelemetryCollectorCRD(p),
+			hasOpenTelemetryCollectorCRD(ctx, inspector),
 		},
 	}
 }
 
-func initGetVersions(p api.FilteringProvider) api.ServerTool {
+func initGetVersions(ctx context.Context, inspector api.ClusterInspector) api.ServerTool {
 	return api.ServerTool{
 		Tool: api.Tool{
 			Name:        "otelcol_get_versions",
@@ -181,7 +179,7 @@ func initGetVersions(p api.FilteringProvider) api.ServerTool {
 		Handler: GetVersionsHandler,
 		RBAC:    rbacNoKubernetes(),
 		TargetCompatibilityFilters: []func() bool{
-			hasOpenTelemetryCollectorCRD(p),
+			hasOpenTelemetryCollectorCRD(ctx, inspector),
 		},
 	}
 }

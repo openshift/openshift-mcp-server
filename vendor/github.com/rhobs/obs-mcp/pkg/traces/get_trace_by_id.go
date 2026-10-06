@@ -1,6 +1,7 @@
 package traces
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -18,7 +19,7 @@ type getTraceByIDOutput struct {
 
 var getTraceByIDOutputSchema = tools.MustSchema[getTraceByIDOutput]()
 
-func initGetTraceByID(p api.FilteringProvider) api.ServerTool {
+func initGetTraceByID(ctx context.Context, inspector api.ClusterInspector) api.ServerTool {
 	return api.ServerTool{
 		Tool: api.Tool{
 			Name: "tempo_get_trace_by_id",
@@ -60,7 +61,7 @@ Narrows the time range to improve query performance.`,
 		Handler: getTraceByIDHandler,
 		RBAC:    rbacTempoDiscovery(),
 		TargetCompatibilityFilters: []func() bool{
-			hasTempoStackCRD(p),
+			hasTempoStackCRD(ctx, inspector),
 		},
 	}
 }

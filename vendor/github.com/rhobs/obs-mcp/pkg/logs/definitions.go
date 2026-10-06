@@ -29,15 +29,13 @@ var (
 	}
 )
 
-func hasLokiStackCRD(p api.FilteringProvider) func() bool {
+func hasLokiStackCRD(ctx context.Context, inspector api.ClusterInspector) func() bool {
 	return func() bool {
-		return p.AnyTargetHasGVKs(context.TODO(), []schema.GroupVersionKind{
-			lokiStackGVK,
-		})
+		return api.AnyTargetHasGVK(ctx, inspector, lokiStackGVK)
 	}
 }
 
-func initListInstances(p api.FilteringProvider) api.ServerTool {
+func initListInstances(ctx context.Context, inspector api.ClusterInspector) api.ServerTool {
 	return api.ServerTool{
 		Tool: api.Tool{
 			Name: "loki_list_instances",
@@ -58,12 +56,12 @@ Call this first when using Loki Operator managed stacks so you can pass lokiName
 		Handler: listInstancesHandler,
 		RBAC:    rbacLokiDiscovery(),
 		TargetCompatibilityFilters: []func() bool{
-			hasLokiStackCRD(p),
+			hasLokiStackCRD(ctx, inspector),
 		},
 	}
 }
 
-func initLabelNames(p api.FilteringProvider) api.ServerTool {
+func initLabelNames(ctx context.Context, inspector api.ClusterInspector) api.ServerTool {
 	return api.ServerTool{
 		Tool: api.Tool{
 			Name:        "loki_label_names",
@@ -96,12 +94,12 @@ func initLabelNames(p api.FilteringProvider) api.ServerTool {
 		Handler: labelNamesHandler,
 		RBAC:    rbacLokiDiscovery(),
 		TargetCompatibilityFilters: []func() bool{
-			hasLokiStackCRD(p),
+			hasLokiStackCRD(ctx, inspector),
 		},
 	}
 }
 
-func initLabelValues(p api.FilteringProvider) api.ServerTool {
+func initLabelValues(ctx context.Context, inspector api.ClusterInspector) api.ServerTool {
 	return api.ServerTool{
 		Tool: api.Tool{
 			Name:        "loki_label_values",
@@ -139,12 +137,12 @@ func initLabelValues(p api.FilteringProvider) api.ServerTool {
 		Handler: labelValuesHandler,
 		RBAC:    rbacLokiDiscovery(),
 		TargetCompatibilityFilters: []func() bool{
-			hasLokiStackCRD(p),
+			hasLokiStackCRD(ctx, inspector),
 		},
 	}
 }
 
-func initQueryRange(p api.FilteringProvider) api.ServerTool {
+func initQueryRange(ctx context.Context, inspector api.ClusterInspector) api.ServerTool {
 	return api.ServerTool{
 		Tool: api.Tool{
 			Name:        "loki_query_range",
@@ -195,7 +193,7 @@ func initQueryRange(p api.FilteringProvider) api.ServerTool {
 		Handler: queryRangeHandler,
 		RBAC:    rbacLokiDiscovery(),
 		TargetCompatibilityFilters: []func() bool{
-			hasLokiStackCRD(p),
+			hasLokiStackCRD(ctx, inspector),
 		},
 	}
 }

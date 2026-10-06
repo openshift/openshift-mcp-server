@@ -56,6 +56,29 @@ type KubernetesClient interface {
 	MetricsV1beta1Client() *metricsv1beta1.MetricsV1beta1Client
 }
 
+// IsNotFound reports Kubernetes API and cached discovery not-found errors.
+// For aggregated errors, every underlying error must be not-found.
+func IsNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		if len(joined.Unwrap()) == 0 {
+			return false
+		}
+		for _, cause := range joined.Unwrap() {
+			if !IsNotFound(cause) {
+				return false
+			}
+		}
+		return true
+	}
+	if wrapped := errors.Unwrap(err); wrapped != nil {
+		return IsNotFound(wrapped)
+	}
+	return apierrors.IsNotFound(err) || errors.Is(err, memory.ErrCacheNotFound)
+}
+
 // HasGVKs checks if all specified GVKs are available using the provided discovery interface.
 // Returns (true, nil) if all GVKs are found.
 // Returns (false, nil) if any GVK is missing (either the GroupVersion doesn't exist or the Kind is not found).

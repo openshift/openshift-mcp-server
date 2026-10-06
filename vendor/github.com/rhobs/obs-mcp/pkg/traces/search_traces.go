@@ -1,6 +1,7 @@
 package traces
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -19,7 +20,7 @@ type searchTracesOutput struct {
 
 var searchTracesOutputSchema = tools.MustSchema[searchTracesOutput]()
 
-func initSearchTraces(p api.FilteringProvider) api.ServerTool {
+func initSearchTraces(ctx context.Context, inspector api.ClusterInspector) api.ServerTool {
 	return api.ServerTool{
 		Tool: api.Tool{
 			Name: "tempo_search_traces",
@@ -124,7 +125,7 @@ Both start and end should be provided to search the full time range; if omitted,
 		Handler: searchTracesHandler,
 		RBAC:    rbacTempoDiscovery(),
 		TargetCompatibilityFilters: []func() bool{
-			hasTempoStackCRD(p),
+			hasTempoStackCRD(ctx, inspector),
 		},
 	}
 }

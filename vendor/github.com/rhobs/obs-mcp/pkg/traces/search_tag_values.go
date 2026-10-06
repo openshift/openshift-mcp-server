@@ -1,6 +1,7 @@
 package traces
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -18,7 +19,7 @@ type searchTagValuesOutput struct {
 
 var searchTagValuesOutputSchema = tools.MustSchema[searchTagValuesOutput]()
 
-func initSearchTagValues(p api.FilteringProvider) api.ServerTool {
+func initSearchTagValues(ctx context.Context, inspector api.ClusterInspector) api.ServerTool {
 	return api.ServerTool{
 		Tool: api.Tool{
 			Name: "tempo_search_tag_values",
@@ -72,7 +73,7 @@ e.g. '{ resource.service.name="payment-service" }' to only show tag values from 
 		Handler: searchTagValuesHandler,
 		RBAC:    rbacTempoDiscovery(),
 		TargetCompatibilityFilters: []func() bool{
-			hasTempoStackCRD(p),
+			hasTempoStackCRD(ctx, inspector),
 		},
 	}
 }
