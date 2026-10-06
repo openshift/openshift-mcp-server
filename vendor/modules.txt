@@ -521,7 +521,7 @@ github.com/prometheus/prometheus/util/annotations
 github.com/prometheus/prometheus/util/features
 github.com/prometheus/prometheus/util/kahansum
 github.com/prometheus/prometheus/util/strutil
-# github.com/rhobs/obs-mcp v0.8.1
+# github.com/rhobs/obs-mcp v0.8.2-0.20261001085735-b54e657caee6
 ## explicit; go 1.26.4
 github.com/rhobs/obs-mcp/pkg/auth
 github.com/rhobs/obs-mcp/pkg/instrumentation
@@ -533,6 +533,7 @@ github.com/rhobs/obs-mcp/pkg/metrics/alertmanager
 github.com/rhobs/obs-mcp/pkg/metrics/prometheus
 github.com/rhobs/obs-mcp/pkg/openshift
 github.com/rhobs/obs-mcp/pkg/otelcol
+github.com/rhobs/obs-mcp/pkg/toolcfg
 github.com/rhobs/obs-mcp/pkg/tools
 github.com/rhobs/obs-mcp/pkg/toolset
 github.com/rhobs/obs-mcp/pkg/traces

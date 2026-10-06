@@ -384,8 +384,8 @@ github.com/redis/go-redis/extra/redisotel/v9 v9.0.5 h1:EfpWLLCyXw8PSM2/XNJLjI3Pb
 github.com/redis/go-redis/extra/redisotel/v9 v9.0.5/go.mod h1:WZjPDy7VNzn77AAfnAfVjZNvfJTYfPetfZk5yoSTLaQ=
 github.com/redis/go-redis/v9 v9.7.3 h1:YpPyAayJV+XErNsatSElgRZZVCwXX9QzkKYNvO7x0wM=
 github.com/redis/go-redis/v9 v9.7.3/go.mod h1:bGUrSggJ9X9GUmZpZNEOQKaANxSGgOEBRltRTZHSvrA=
-github.com/rhobs/obs-mcp v0.8.1 h1:B6V8Dp1A2M1b0yO68fSmMnH1DCHDBPtuwHBKP8sfvhc=
-github.com/rhobs/obs-mcp v0.8.1/go.mod h1:qAP4f8F6lgCVum1X4dD7oOY5WVPWXb9dsI0erZ6nEfQ=
+github.com/rhobs/obs-mcp v0.8.2-0.20261001085735-b54e657caee6 h1:9j5vG0K+nMIfCneVsyDg7YsX3TFWKAkgAyFkJOn44NA=
+github.com/rhobs/obs-mcp v0.8.2-0.20261001085735-b54e657caee6/go.mod h1:JGbib2Hy1eV1hADIPSllwotzvQMhfW8q8/ApFxXt+Ug=
 github.com/rivo/uniseg v0.2.0 h1:S1pD9weZBuJdFmowNwbpi7BJ8TNftyUImj/0WQi72jY=
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
