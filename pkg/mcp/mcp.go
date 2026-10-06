@@ -112,6 +112,7 @@ type Server struct {
 	enabledResources         []string
 	enabledResourceTemplates []string
 	p                        internalk8s.Provider
+	httpTransport            bool
 	metrics                  *metrics.Metrics // Metrics collection system
 	rateLimitDone            chan struct{}    // Closed to stop the rate limiter reaper goroutine
 	closeOnce                sync.Once
@@ -122,6 +123,17 @@ func NewServer(ctx context.Context, configuration Configuration, targetProvider 
 	if sdkLogger == nil {
 		sdkLogger = slog.New(logr.ToSlogHandler(klogutil.FromContext(ctx)))
 	}
+	capabilities := &mcp.ServerCapabilities{
+		Resources: &mcp.ResourceCapabilities{ListChanged: !configuration.Stateless.Get()},
+		Prompts:   &mcp.PromptCapabilities{ListChanged: !configuration.Stateless.Get()},
+		Tools:     &mcp.ToolCapabilities{ListChanged: !configuration.Stateless.Get()},
+		Logging:   &mcp.LoggingCapabilities{}, //nolint:staticcheck // MCP logging deprecated (SEP-2577)
+	}
+	if configuration.AppsEnabled.Get() {
+		capabilities.AddExtension("io.modelcontextprotocol/ui", map[string]any{
+			"mimeTypes": []string{"text/html;profile=mcp-app"},
+		})
+	}
 	s := &Server{
 		server: mcp.NewServer(
 			&mcp.Implementation{
@@ -131,16 +143,12 @@ func NewServer(ctx context.Context, configuration Configuration, targetProvider 
 				WebsiteURL: version.WebsiteURL,
 			},
 			&mcp.ServerOptions{
-				Capabilities: &mcp.ServerCapabilities{
-					Resources: &mcp.ResourceCapabilities{ListChanged: !configuration.Stateless.Get()},
-					Prompts:   &mcp.PromptCapabilities{ListChanged: !configuration.Stateless.Get()},
-					Tools:     &mcp.ToolCapabilities{ListChanged: !configuration.Stateless.Get()},
-					Logging:   &mcp.LoggingCapabilities{}, //nolint:staticcheck // MCP logging deprecated (SEP-2577)
-				},
+				Capabilities: capabilities,
 				Instructions: configuration.ServerInstructions.Get(),
 				Logger:       sdkLogger,
 			}),
-		p: targetProvider,
+		p:             targetProvider,
+		httpTransport: configuration.Port.Get() != "",
 	}
 	s.configuration.Store(&configuration)
 
@@ -257,6 +265,13 @@ func (s *Server) applyToolsetsLocked(_ context.Context, cfg *Configuration) erro
 	applicableTools := s.collectApplicableTools(cfg)
 	applicablePrompts := s.collectApplicablePrompts(cfg)
 	applicableResources := s.collectApplicableResources(cfg)
+	if cfg.AppsEnabled.Get() {
+		generatedAppResources, err := appResources(applicableTools)
+		if err != nil {
+			return err
+		}
+		applicableResources = append(applicableResources, generatedAppResources...)
+	}
 	applicableResourceTemplates := s.collectApplicableResourceTemplates(cfg)
 
 	// Phase 1: convert all items to SDK types. This validates URIs, URITemplates,
@@ -312,10 +327,13 @@ func (s *Server) applyToolsetsLocked(_ context.Context, cfg *Configuration) erro
 
 	// Phase 2: commit. Pre-conversion has succeeded, so SDK mutations below
 	// don't error.
-	newTools := commitItems(previousTools, convertedTools, s.server.RemoveTools, s.server.AddTool)
-	newPrompts := commitItems(previousPrompts, convertedPrompts, s.server.RemovePrompts, s.server.AddPrompt)
 	newResources := commitItems(previousResources, convertedResources, s.server.RemoveResources, s.server.AddResource)
 	newResourceTemplates := commitItems(previousResourceTemplates, convertedResourceTemplates, s.server.RemoveResourceTemplates, s.server.AddResourceTemplate)
+	// Resources must be available before tools that reference them are
+	// announced. Clients such as VS Code can react to tools/list_changed
+	// immediately and fetch the associated ui:// resource.
+	newTools := commitItems(previousTools, convertedTools, s.server.RemoveTools, s.server.AddTool)
+	newPrompts := commitItems(previousPrompts, convertedPrompts, s.server.RemovePrompts, s.server.AddPrompt)
 
 	// Pre-warm cfg's lazy caches so concurrent first-readers (handlers
 	// reading cfg.ListOutput() etc.) don't race on the lazy initialization.
@@ -411,6 +429,7 @@ func (s *Server) collectApplicableTools(cfg *Configuration) []api.ServerTool {
 	filter := CompositeFilter(
 		cfg.isToolApplicable,
 		ShouldIncludeTargetListTool(s.p.GetTargetParameterName(), s.p.IsMultiTarget()),
+		ShouldIncludeConfigurationViewTool(s.httpTransport, cfg.EnabledTools.Get()),
 	)
 	mutator := ComposeMutators(
 		WithTargetParameter(s.p.GetDefaultTarget(), s.p.GetTargetParameterName(), s.p.IsMultiTarget()),
@@ -423,11 +442,68 @@ func (s *Server) collectApplicableTools(cfg *Configuration) []api.ServerTool {
 		for _, tool := range toolset.GetTools(s.p) {
 			tool = mutator(tool)
 			if filter(tool) {
+				if cfg.AppsEnabled.Get() && tool.App != nil {
+					tool.Tool.Meta = withAppResourceURI(tool.Tool.Meta, tool.App.URI)
+				}
 				tools = append(tools, tool)
 			}
 		}
 	}
 	return tools
+}
+
+func appResources(tools []api.ServerTool) ([]api.ServerResource, error) {
+	resources := make([]api.ServerResource, 0)
+	seen := make(map[string]*api.ToolApp)
+	for _, tool := range tools {
+		app := tool.App
+		if app == nil {
+			continue
+		}
+		if err := app.Validate(); err != nil {
+			return nil, fmt.Errorf("tool %q: invalid MCP App: %w", tool.Tool.Name, err)
+		}
+		if firstApp, ok := seen[app.URI]; ok {
+			if firstApp == app {
+				continue
+			}
+			return nil, fmt.Errorf("tool %q declares MCP App URI %q already declared by a different app", tool.Tool.Name, app.URI)
+		}
+		seen[app.URI] = app
+		resources = append(resources, api.ServerResource{
+			Resource: api.Resource{
+				URI:         app.URI,
+				Name:        app.Name,
+				Description: app.Description,
+				MIMEType:    "text/html;profile=mcp-app",
+				Meta:        app.Meta,
+			},
+			Handler: func(ctx context.Context) (*api.ResourceContent, error) {
+				html, err := app.Handler(ctx)
+				if err != nil {
+					return nil, err
+				}
+				return &api.ResourceContent{Text: html}, nil
+			},
+		})
+	}
+	return resources, nil
+}
+
+func withAppResourceURI(meta map[string]any, uri string) map[string]any {
+	result := make(map[string]any, len(meta)+1)
+	for key, value := range meta {
+		result[key] = value
+	}
+	ui := make(map[string]any)
+	if existing, ok := meta["ui"].(map[string]any); ok {
+		for key, value := range existing {
+			ui[key] = value
+		}
+	}
+	ui["resourceUri"] = uri
+	result["ui"] = ui
+	return result
 }
 
 // collectApplicablePrompts returns prompts after applying mutation and merging toolset and config prompts
@@ -524,6 +600,10 @@ func (s *Server) ServeHTTP() *mcp.StreamableHTTPHandler {
 		// is not desired or possible.
 		// https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#listening-for-messages-from-the-server
 		Stateless: s.configuration.Load().Stateless.Get(),
+		// When true, skip go-sdk DNS-rebinding protection (loopback accept +
+		// non-localhost Host → 403). Needed behind kube-rbac-proxy and similar
+		// sidecars that proxy to 127.0.0.1 while preserving the Service Host.
+		DisableLocalhostProtection: s.configuration.Load().DisableLocalhostProtection.Get(),
 	})
 }
 
