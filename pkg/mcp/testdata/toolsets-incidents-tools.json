@@ -1,0 +1,32 @@
+[
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": "Provides information about Incidents in the cluster"
+    },
+    "description": "List the current firing incidents in the cluster. \n\t\tOne incident is a group of related alerts that are likely triggered by the same root cause.\n\t\tUse this tool to analyze the cluster health status and determine why a component is failing or degraded.\n\t\t",
+    "inputSchema": {
+      "properties": {
+        "min_severity": {
+          "default": "warning",
+          "description": "Minimum severity level to be applied as filter for incidents. Allowed values, from lower severity to higher severity, can be: info, warning and critical. Default: warning.",
+          "pattern": "(?i)^(info|warning|critical)$",
+          "type": "string"
+        },
+        "time_range": {
+          "default": 360,
+          "description": "Maximum age of incidents to include in hours (max 360 for 15 days). Default: 360",
+          "maximum": 360,
+          "minimum": 1,
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "name": "get_incidents",
+    "title": "Provides information about Incidents in the cluster"
+  }
+]

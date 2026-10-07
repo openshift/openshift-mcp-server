@@ -69,6 +69,9 @@ func (s *ToolsetsSuite) TestIncidentToolsetVisibility() {
 				}
 			}
 			s.Equal(tt.want, found)
+			if tt.want {
+				s.assertJsonSnapshot("toolsets-incidents-tools.json", tools.Tools)
+			}
 		})
 	}
 }

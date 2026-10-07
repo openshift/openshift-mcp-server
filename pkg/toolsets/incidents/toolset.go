@@ -2,6 +2,7 @@ package incidents
 
 import (
 	"context"
+	"strings"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
@@ -26,7 +27,7 @@ func (t *Toolset) GetName() string {
 }
 
 func (t *Toolset) GetDescription() string {
-	return "Tools for investigating cluster health incidents"
+	return strings.Join(strings.Fields((&analyzerincidents.Toolset{}).GetDescription()), " ")
 }
 
 func (t *Toolset) GetTools(ctx context.Context, toolsetContext api.ToolsetContext) []api.ServerTool {
