@@ -1,6 +1,7 @@
 package kiali
 
 import (
+	"context"
 	"slices"
 
 	"k8s.io/utils/ptr"
@@ -46,7 +47,7 @@ func (t *Toolset) GetTools(p api.FilteringProvider) []api.ServerTool {
 	return tools
 }
 
-func (t *Toolset) GetPrompts() []api.ServerPrompt {
+func (t *Toolset) GetPrompts(_ context.Context, _ api.ToolsetContext) []api.ServerPrompt {
 	prompts := slices.Concat(
 		kialiPrompts.InitListApplications(),
 		kialiPrompts.InitListIstioConfig(),
@@ -67,11 +68,11 @@ func (t *Toolset) GetPrompts() []api.ServerPrompt {
 	return prompts
 }
 
-func (t *Toolset) GetResources() []api.ServerResource {
+func (t *Toolset) GetResources(_ context.Context, _ api.ToolsetContext) []api.ServerResource {
 	return nil
 }
 
-func (t *Toolset) GetResourceTemplates() []api.ServerResourceTemplate {
+func (t *Toolset) GetResourceTemplates(_ context.Context, _ api.ToolsetContext) []api.ServerResourceTemplate {
 	return nil
 }
 

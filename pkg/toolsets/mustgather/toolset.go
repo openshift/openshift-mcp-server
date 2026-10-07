@@ -1,6 +1,7 @@
 package mustgather
 
 import (
+	"context"
 	"slices"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
@@ -18,7 +19,7 @@ func (t *Toolset) GetDescription() string {
 	return "Analyze OpenShift must-gather archives offline without a live cluster connection. Call mustgather_list first to discover available archives and their archive_id, then pass that ID to the other mustgather_* tools."
 }
 
-func (t *Toolset) GetTools(_ api.FilteringProvider) []api.ServerTool {
+func (t *Toolset) GetTools(_ context.Context, _ api.ToolsetContext) []api.ServerTool {
 	return slices.Concat(
 		initList(),
 		initResources(),
@@ -30,7 +31,7 @@ func (t *Toolset) GetTools(_ api.FilteringProvider) []api.ServerTool {
 	)
 }
 
-func (t *Toolset) GetPrompts() []api.ServerPrompt {
+func (t *Toolset) GetPrompts(_ context.Context, _ api.ToolsetContext) []api.ServerPrompt {
 	return Prompts()
 }
 
@@ -39,11 +40,11 @@ func (t *Toolset) GetPrompts() []api.ServerPrompt {
 // they cannot resolve archives against the per-config registry. Must-gather data
 // is exposed through the mustgather_* tools instead; resources can be re-added
 // once resource handlers gain toolset-config access upstream.
-func (t *Toolset) GetResources() []api.ServerResource {
+func (t *Toolset) GetResources(_ context.Context, _ api.ToolsetContext) []api.ServerResource {
 	return nil
 }
 
-func (t *Toolset) GetResourceTemplates() []api.ServerResourceTemplate {
+func (t *Toolset) GetResourceTemplates(_ context.Context, _ api.ToolsetContext) []api.ServerResourceTemplate {
 	return nil
 }
 

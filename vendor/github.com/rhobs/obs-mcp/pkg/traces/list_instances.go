@@ -1,6 +1,8 @@
 package traces
 
 import (
+	"context"
+
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/google/jsonschema-go/jsonschema"
 
@@ -15,7 +17,7 @@ type listInstancesOutput struct {
 
 var listInstancesOutputSchema = tools.MustSchema[listInstancesOutput]()
 
-func initListInstances(p api.FilteringProvider) api.ServerTool {
+func initListInstances(ctx context.Context, inspector api.ClusterInspector) api.ServerTool {
 	return api.ServerTool{
 		Tool: api.Tool{
 			Name: "tempo_list_instances",
@@ -38,7 +40,7 @@ Always print the output of this tool in a table.`,
 		Handler: listInstancesHandler,
 		RBAC:    rbacTempoDiscovery(),
 		TargetCompatibilityFilters: []func() bool{
-			hasTempoStackCRD(p),
+			hasTempoStackCRD(ctx, inspector),
 		},
 	}
 }

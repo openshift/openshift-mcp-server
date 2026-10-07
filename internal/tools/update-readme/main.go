@@ -16,20 +16,71 @@ import (
 	_ "github.com/containers/kubernetes-mcp-server/pkg/mcp"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-type FilterProvider struct{}
+type documentationInspector struct{}
 
-func (p *FilterProvider) AnyTargetHasGVKs(_ context.Context, _ []schema.GroupVersionKind) bool {
-	return true
+func (i *documentationInspector) Discovery() api.AggregateDiscovery {
+	return i
 }
 
-func (p *FilterProvider) IsTargetCompatibilityToolFiltersEnabled() bool {
-	return false
+func (i *documentationInspector) Unstructured() api.AggregateUnstructured {
+	return i
 }
 
-var _ api.FilteringProvider = (*FilterProvider)(nil)
+func (i *documentationInspector) Resource(_ schema.GroupVersionResource) api.AggregateNamespaceableResourceInterface {
+	return i
+}
+
+func (i *documentationInspector) Namespace(_ string) api.AggregateResourceInterface {
+	return i
+}
+
+func (i *documentationInspector) Get(ctx context.Context, _ string, _ metav1.GetOptions, _ ...string) api.Results[*unstructured.Unstructured] {
+	return api.NewResults(ctx, i, func(context.Context, string) (*unstructured.Unstructured, error) {
+		return &unstructured.Unstructured{Object: map[string]any{
+			"spec": map[string]any{
+				"monitoring": map[string]any{
+					"clusterHealthAnalyzer": map[string]any{"enabled": true},
+				},
+			},
+		}}, nil
+	})
+}
+
+func (i *documentationInspector) List(ctx context.Context, _ metav1.ListOptions) api.Results[*unstructured.UnstructuredList] {
+	return api.NewResults(ctx, i, func(context.Context, string) (*unstructured.UnstructuredList, error) {
+		return &unstructured.UnstructuredList{}, nil
+	})
+}
+
+func (i *documentationInspector) ServerResourcesForGroupVersion(ctx context.Context, _ string) api.Results[*metav1.APIResourceList] {
+	return api.NewResults(ctx, i, func(context.Context, string) (*metav1.APIResourceList, error) {
+		return &metav1.APIResourceList{APIResources: []metav1.APIResource{
+			{Kind: "Project"}, {Kind: "Route"}, {Kind: "NodeMetrics"}, {Kind: "PodMetrics"},
+			{Kind: "VirtualMachine"}, {Kind: "VirtualMachineTemplate"},
+		}}, nil
+	})
+}
+
+func (i *documentationInspector) IsMultiTarget() bool { return false }
+
+func (i *documentationInspector) GetTargets(context.Context) ([]string, error) {
+	return []string{""}, nil
+}
+
+func (i *documentationInspector) GetDefaultTarget() string { return "" }
+
+func (i *documentationInspector) GetTargetParameterName() string { return "" }
+
+var _ api.ClusterInspector = (*documentationInspector)(nil)
+var _ api.AggregateDiscovery = (*documentationInspector)(nil)
+var _ api.AggregateUnstructured = (*documentationInspector)(nil)
+var _ api.AggregateNamespaceableResourceInterface = (*documentationInspector)(nil)
+var _ api.TargetProvider = (*documentationInspector)(nil)
 
 type evalTask struct {
 	Kind     string `json:"kind"`
@@ -105,7 +156,9 @@ func main() {
 	toolsetTools := strings.Builder{}
 	for _, toolset := range toolsetsList {
 		toolsetTools.WriteString("<details>\n\n<summary>" + toolset.GetName() + "</summary>\n\n")
-		tools := toolset.GetTools(&FilterProvider{})
+		tools := toolset.GetTools(context.Background(), api.ToolsetContext{
+			Inspector: &documentationInspector{},
+		})
 		for _, tool := range tools {
 			fmt.Fprintf(&toolsetTools, "- **%s** - %s\n", tool.Tool.Name, tool.Tool.Description)
 			for _, propName := range slices.Sorted(maps.Keys(tool.Tool.InputSchema.Properties)) {
@@ -130,7 +183,7 @@ func main() {
 	// Available Toolset Prompts
 	toolsetPrompts := strings.Builder{}
 	for _, toolset := range toolsetsList {
-		prompts := toolset.GetPrompts()
+		prompts := toolset.GetPrompts(context.Background(), api.ToolsetContext{Inspector: &documentationInspector{}})
 		if len(prompts) == 0 {
 			continue
 		}
@@ -158,7 +211,7 @@ func main() {
 	// Available Toolset Resources
 	toolsetResources := strings.Builder{}
 	for _, toolset := range toolsetsList {
-		resources := toolset.GetResources()
+		resources := toolset.GetResources(context.Background(), api.ToolsetContext{Inspector: &documentationInspector{}})
 		if len(resources) == 0 {
 			continue
 		}
@@ -180,7 +233,7 @@ func main() {
 	// Available Toolset Resource Templates
 	toolsetResourceTemplates := strings.Builder{}
 	for _, toolset := range toolsetsList {
-		templates := toolset.GetResourceTemplates()
+		templates := toolset.GetResourceTemplates(context.Background(), api.ToolsetContext{Inspector: &documentationInspector{}})
 		if len(templates) == 0 {
 			continue
 		}

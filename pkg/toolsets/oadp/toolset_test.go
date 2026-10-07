@@ -3,6 +3,7 @@ package oadp
 import (
 	"testing"
 
+	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -27,34 +28,34 @@ func (s *ToolsetSuite) TestGetDescription() {
 func (s *ToolsetSuite) TestGetTools() {
 	s.Run("returns nil", func() {
 		t := &Toolset{}
-		s.Nil(t.GetTools(nil))
+		s.Nil(t.GetTools(s.T().Context(), api.ToolsetContext{}))
 	})
 }
 
 func (s *ToolsetSuite) TestGetPrompts() {
 	s.Run("returns one prompt", func() {
 		t := &Toolset{}
-		prompts := t.GetPrompts()
+		prompts := t.GetPrompts(s.T().Context(), api.ToolsetContext{})
 		s.Len(prompts, 1)
 	})
 
 	s.Run("prompt is named oadp-troubleshoot", func() {
 		t := &Toolset{}
-		prompts := t.GetPrompts()
+		prompts := t.GetPrompts(s.T().Context(), api.ToolsetContext{})
 		s.Require().Len(prompts, 1)
 		s.Equal("oadp-troubleshoot", prompts[0].Prompt.Name)
 	})
 
 	s.Run("prompt has three arguments", func() {
 		t := &Toolset{}
-		prompts := t.GetPrompts()
+		prompts := t.GetPrompts(s.T().Context(), api.ToolsetContext{})
 		s.Require().Len(prompts, 1)
 		s.Len(prompts[0].Prompt.Arguments, 3)
 	})
 
 	s.Run("prompt has a handler", func() {
 		t := &Toolset{}
-		prompts := t.GetPrompts()
+		prompts := t.GetPrompts(s.T().Context(), api.ToolsetContext{})
 		s.Require().Len(prompts, 1)
 		s.NotNil(prompts[0].Handler)
 	})
@@ -63,14 +64,14 @@ func (s *ToolsetSuite) TestGetPrompts() {
 func (s *ToolsetSuite) TestGetResources() {
 	s.Run("returns nil", func() {
 		t := &Toolset{}
-		s.Nil(t.GetResources())
+		s.Nil(t.GetResources(s.T().Context(), api.ToolsetContext{}))
 	})
 }
 
 func (s *ToolsetSuite) TestGetResourceTemplates() {
 	s.Run("returns nil", func() {
 		t := &Toolset{}
-		s.Nil(t.GetResourceTemplates())
+		s.Nil(t.GetResourceTemplates(s.T().Context(), api.ToolsetContext{}))
 	})
 }
 

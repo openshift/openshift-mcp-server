@@ -276,26 +276,27 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 
 <!-- AVAILABLE-TOOLSETS-START -->
 
-| Toolset               | Description                                                                                                                                                                                                                             | Default |
-|-----------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| cluster-diagnostics   | Tools for cluster diagnostics and troubleshooting                                                                                                                                                                                       |         |
-| cni-diagnostics       | Tools for Container Network Interface (CNI) diagnostics and troubleshooting                                                                                                                                                             |         |
-| config                | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                                                                                 | ✓       |
-| core                  | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                                                                                     | ✓       |
-| helm                  | Tools for managing Helm charts and releases                                                                                                                                                                                             |         |
-| kcp                   | Manage kcp workspaces and multi-tenancy features                                                                                                                                                                                        |         |
-| kubevirt              | OpenShift Virtualization tools for managing virtual machines, check the [OpenShift Virtualization documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/kubevirt.md) for more details.                        |         |
-| netedge               | NetEdge troubleshooting tools for OpenShift                                                                                                                                                                                             |         |
-| netobserv             | Network observability tools backed by the NetObserv console plugin API (flows, metrics, export). Check the [NetObserv documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/NETOBSERV.md) for more details. |         |
-| oadp                  | OADP (OpenShift API for Data Protection) tools for managing Velero backups, restores, and schedules                                                                                                                                     |         |
-| observability/logs    | Toolset for querying Loki logs                                                                                                                                                                                                          |         |
-| observability/metrics | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                                                                           |         |
-| observability/otelcol | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                                                                              |         |
-| observability/traces  | Distributed tracing tools for discovering Tempo instances, searching and retrieving traces, and exploring trace attributes.                                                                                                             |         |
-| openshift/mustgather  | Analyze OpenShift must-gather archives offline without a live cluster connection. Call mustgather_list first to discover available archives and their archive_id, then pass that ID to the other mustgather_* tools.                    |         |
-| ossm                  | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                                                                         |         |
-| ovn-kubernetes        | OVN-Kubernetes CNI network troubleshooting tools                                                                                                                                                                                        |         |
-| tekton                | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, TaskRuns, and troubleshooting.                                                                                                                                     |         |
+| Toolset                 | Description                                                                                                                                                                                                                                            | Default |
+|-------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| cluster-diagnostics     | Tools for cluster diagnostics and troubleshooting                                                                                                                                                                                                      |         |
+| cni-diagnostics         | Tools for Container Network Interface (CNI) diagnostics and troubleshooting                                                                                                                                                                            |         |
+| config                  | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                                                                                                | ✓       |
+| core                    | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                                                                                                    | ✓       |
+| helm                    | Tools for managing Helm charts and releases                                                                                                                                                                                                            |         |
+| kcp                     | Manage kcp workspaces and multi-tenancy features                                                                                                                                                                                                       |         |
+| kubevirt                | OpenShift Virtualization tools for managing virtual machines, check the [OpenShift Virtualization documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/kubevirt.md) for more details.                                       |         |
+| netedge                 | NetEdge troubleshooting tools for OpenShift                                                                                                                                                                                                            |         |
+| netobserv               | Network observability tools backed by the NetObserv console plugin API (flows, metrics, export). Check the [NetObserv documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/NETOBSERV.md) for more details.                |         |
+| oadp                    | OADP (OpenShift API for Data Protection) tools for managing Velero backups, restores, and schedules                                                                                                                                                    |         |
+| observability/incidents | List the current firing incidents in the cluster. One incident is a group of related alerts that are likely triggered by the same root cause. Use this tool to analyze the cluster health status and determine why a component is failing or degraded. |         |
+| observability/logs      | Toolset for querying Loki logs                                                                                                                                                                                                                         |         |
+| observability/metrics   | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                                                                                          |         |
+| observability/otelcol   | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                                                                                             |         |
+| observability/traces    | Distributed tracing tools for discovering Tempo instances, searching and retrieving traces, and exploring trace attributes.                                                                                                                            |         |
+| openshift/mustgather    | Analyze OpenShift must-gather archives offline without a live cluster connection. Call mustgather_list first to discover available archives and their archive_id, then pass that ID to the other mustgather_* tools.                                   |         |
+| ossm                    | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                                                                                        |         |
+| ovn-kubernetes          | OVN-Kubernetes CNI network troubleshooting tools                                                                                                                                                                                                       |         |
+| tekton                  | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, TaskRuns, and troubleshooting.                                                                                                                                                    |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -878,6 +879,19 @@ Examples:
 <details>
 
 <summary>oadp</summary>
+
+</details>
+
+<details>
+
+<summary>observability/incidents</summary>
+
+- **get_incidents** - List the current firing incidents in the cluster. 
+		One incident is a group of related alerts that are likely triggered by the same root cause.
+		Use this tool to analyze the cluster health status and determine why a component is failing or degraded.
+		
+  - `min_severity` (`string`) - Minimum severity level to be applied as filter for incidents. Allowed values, from lower severity to higher severity, can be: info, warning and critical. Default: warning.
+  - `time_range` (`number`) - Maximum age of incidents to include in hours (max 360 for 15 days). Default: 360
 
 </details>
 

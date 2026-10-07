@@ -723,11 +723,17 @@ func (m *mockResourceToolset) GetName() string {
 	}
 	return "resource-test"
 }
-func (m *mockResourceToolset) GetDescription() string                            { return "Test toolset for resources" }
-func (m *mockResourceToolset) GetTools(_ api.FilteringProvider) []api.ServerTool { return nil }
-func (m *mockResourceToolset) GetPrompts() []api.ServerPrompt                    { return nil }
-func (m *mockResourceToolset) GetResources() []api.ServerResource                { return m.resources }
-func (m *mockResourceToolset) GetResourceTemplates() []api.ServerResourceTemplate {
+func (m *mockResourceToolset) GetDescription() string { return "Test toolset for resources" }
+func (m *mockResourceToolset) GetTools(_ context.Context, _ api.ToolsetContext) []api.ServerTool {
+	return nil
+}
+func (m *mockResourceToolset) GetPrompts(_ context.Context, _ api.ToolsetContext) []api.ServerPrompt {
+	return nil
+}
+func (m *mockResourceToolset) GetResources(_ context.Context, _ api.ToolsetContext) []api.ServerResource {
+	return m.resources
+}
+func (m *mockResourceToolset) GetResourceTemplates(_ context.Context, _ api.ToolsetContext) []api.ServerResourceTemplate {
 	return m.resourceTemplates
 }
 

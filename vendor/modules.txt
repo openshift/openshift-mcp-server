@@ -431,6 +431,15 @@ github.com/opencontainers/go-digest
 ## explicit; go 1.18
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
+# github.com/openshift/cluster-health-analyzer v0.0.0-00010101000000-000000000000 => /home/tremes/GITHUB/cluster-health-analyzer
+## explicit; go 1.26.4
+github.com/openshift/cluster-health-analyzer/pkg/alertmanager
+github.com/openshift/cluster-health-analyzer/pkg/common
+github.com/openshift/cluster-health-analyzer/pkg/mcp
+github.com/openshift/cluster-health-analyzer/pkg/processor
+github.com/openshift/cluster-health-analyzer/pkg/prom
+github.com/openshift/cluster-health-analyzer/pkg/toolset/incidents
+github.com/openshift/cluster-health-analyzer/pkg/utils
 # github.com/os-observability/redhat-opentelemetry-collector/configschemas v0.0.0-20260712195227-4e7d75e0d2ec
 ## explicit; go 1.26.0
 github.com/os-observability/redhat-opentelemetry-collector/configschemas
@@ -1772,3 +1781,4 @@ sigs.k8s.io/structured-merge-diff/v6/value
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v3
 sigs.k8s.io/yaml/kyaml
+# github.com/openshift/cluster-health-analyzer => /home/tremes/GITHUB/cluster-health-analyzer
