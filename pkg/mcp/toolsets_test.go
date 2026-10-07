@@ -22,6 +22,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kiali"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt"
 	mgToolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/mustgather"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/netedge"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/ovnkubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/tekton"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -262,6 +263,7 @@ func (s *ToolsetsSuite) TestGranularToolsetsTools() {
 		&tekton.Toolset{},
 		&clusterDiagnosticsToolset.Toolset{},
 		&cniDiagnosticsToolset.Toolset{},
+		&netedge.Toolset{},
 	}
 	for _, testCase := range testCases {
 		s.Run("Toolset "+testCase.GetName(), func() {

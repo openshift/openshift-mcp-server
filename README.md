@@ -631,9 +631,11 @@ In case multi-cluster support is enabled (default) and you have access to multip
 - **netedge_query_prometheus** - Executes specialized diagnostic queries for specific NetEdge components (ingress, dns).
   - `diagnostic_target` (`string`) **(required)** - Run specialized diagnostics for a specific component.
 
-- **get_coredns_config** - Retrieve the current CoreDNS configuration (Corefile) from the cluster.
+- **get_coredns_config** - Retrieve the CoreDNS Corefile from the live cluster or a selected must-gather archive. Set archive_id for offline analysis.
+  - `archive_id` (`string`) - Must-gather archive ID from mustgather_list. Omit for the live cluster.
 
-- **get_service_endpoints** - Return EndpointSlice objects for a Service to verify backend pod availability.
+- **get_service_endpoints** - Return EndpointSlices for a Service from the live cluster or a selected must-gather archive. Set archive_id for offline analysis.
+  - `archive_id` (`string`) - Must-gather archive ID from mustgather_list. Omit for the live cluster.
   - `namespace` (`string`) **(required)** - Service namespace
   - `service` (`string`) **(required)** - Service name
 
@@ -647,7 +649,8 @@ In case multi-cluster support is enabled (default) and you have access to multip
   - `timeout_seconds` (`integer`) - Request timeout in seconds. Defaults to 5.
   - `url` (`string`) **(required)** - The URL to probe (e.g. https://example.com/path).
 
-- **inspect_route** - Inspect an OpenShift Route to view its full configuration and status.
+- **inspect_route** - Inspect an OpenShift Route in the live cluster or a selected must-gather archive. Set archive_id for offline analysis.
+  - `archive_id` (`string`) - Must-gather archive ID from mustgather_list. Omit for the live cluster.
   - `namespace` (`string`) **(required)** - Route namespace
   - `route` (`string`) **(required)** - Route name
 
