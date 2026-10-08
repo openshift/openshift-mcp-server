@@ -77,13 +77,17 @@ func (c *Config) maxOutputSize() int {
 
 // configFromParams returns the openshift/mustgather toolset configuration for
 // the current request, or nil if the toolset is not configured.
-func configFromParams(params api.ToolHandlerParams) *Config {
-	if c, ok := params.GetToolsetConfig("openshift/mustgather"); ok {
+func configFromConfig(cfg *config.Config) *Config {
+	if c, ok := cfg.GetToolsetConfig("openshift/mustgather"); ok {
 		if mc, ok := c.(*Config); ok {
 			return mc
 		}
 	}
 	return nil
+}
+
+func configFromParams(params api.ToolHandlerParams) *Config {
+	return configFromConfig(params.Config)
 }
 
 // mustgatherToolsetParser parses the openshift/mustgather toolset

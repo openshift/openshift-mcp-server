@@ -22,7 +22,7 @@ func (s staticRequest) GetArguments() map[string]any {
 func (s *NodesHandlerSuite) TestValidatesInput() {
 	s.Run("missing node", func() {
 		params := api.ToolHandlerParams{
-			ToolCallRequest: staticRequest{args: map[string]any{}},
+			Request: staticRequest{args: map[string]any{}},
 		}
 		result, err := nodesDebugExec(params)
 		s.Require().NoError(err)
@@ -32,7 +32,7 @@ func (s *NodesHandlerSuite) TestValidatesInput() {
 
 	s.Run("invalid command type", func() {
 		params := api.ToolHandlerParams{
-			ToolCallRequest: staticRequest{args: map[string]any{
+			Request: staticRequest{args: map[string]any{
 				"node":    "worker-0",
 				"command": "ls -la",
 			}},
@@ -45,7 +45,7 @@ func (s *NodesHandlerSuite) TestValidatesInput() {
 
 	s.Run("missing command", func() {
 		params := api.ToolHandlerParams{
-			ToolCallRequest: staticRequest{args: map[string]any{
+			Request: staticRequest{args: map[string]any{
 				"node": "worker-0",
 			}},
 		}
@@ -57,7 +57,7 @@ func (s *NodesHandlerSuite) TestValidatesInput() {
 
 	s.Run("empty command array", func() {
 		params := api.ToolHandlerParams{
-			ToolCallRequest: staticRequest{args: map[string]any{
+			Request: staticRequest{args: map[string]any{
 				"node":    "worker-0",
 				"command": []interface{}{},
 			}},
@@ -70,7 +70,7 @@ func (s *NodesHandlerSuite) TestValidatesInput() {
 
 	s.Run("fractional timeout rejected", func() {
 		params := api.ToolHandlerParams{
-			ToolCallRequest: staticRequest{args: map[string]any{
+			Request: staticRequest{args: map[string]any{
 				"node":            "worker-0",
 				"command":         []interface{}{"uname"},
 				"timeout_seconds": 1.5,
@@ -84,7 +84,7 @@ func (s *NodesHandlerSuite) TestValidatesInput() {
 
 	s.Run("zero timeout rejected", func() {
 		params := api.ToolHandlerParams{
-			ToolCallRequest: staticRequest{args: map[string]any{
+			Request: staticRequest{args: map[string]any{
 				"node":            "worker-0",
 				"command":         []interface{}{"uname"},
 				"timeout_seconds": float64(0),
@@ -98,7 +98,7 @@ func (s *NodesHandlerSuite) TestValidatesInput() {
 
 	s.Run("non-numeric timeout rejected", func() {
 		params := api.ToolHandlerParams{
-			ToolCallRequest: staticRequest{args: map[string]any{
+			Request: staticRequest{args: map[string]any{
 				"node":            "worker-0",
 				"command":         []interface{}{"uname"},
 				"timeout_seconds": "sixty",
