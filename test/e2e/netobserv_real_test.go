@@ -18,6 +18,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/internal/test"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
@@ -151,8 +152,9 @@ func deployNetObservOperator(ctx context.Context, t *testing.T, kubeconfig strin
 		waitForLokiReady(ctx, t, kubeconfig, clientset, config, pluginNamespace)
 		return pluginNamespace
 	}
+	createdNamespaces := netObservNamespacesCreatedByTest(ctx, t, clientset, operatorNamespace, pluginNamespace)
 	t.Cleanup(func() {
-		cleanupNetObservOperator(t, kubeconfig)
+		cleanupNetObservOperator(t, kubeconfig, createdNamespaces)
 	})
 
 	// Create CatalogSource (y-stream Konflux catalog)
@@ -164,7 +166,9 @@ func deployNetObservOperator(ctx context.Context, t *testing.T, kubeconfig strin
 	// Wait for CatalogSource pod to be ready
 	t.Logf("Waiting for CatalogSource pod to be ready...")
 	deadline := time.Now().Add(3 * time.Minute)
+	catalogReady := false
 	for time.Now().Before(deadline) {
+		require.NoError(t, ctx.Err(), "context canceled while waiting for CatalogSource pod")
 		pods, err := clientset.CoreV1().Pods("openshift-marketplace").List(ctx, metav1.ListOptions{
 			LabelSelector: "olm.catalogSource=netobserv-konflux-fbc",
 		})
@@ -178,11 +182,13 @@ func deployNetObservOperator(ctx context.Context, t *testing.T, kubeconfig strin
 			}
 			if allReady {
 				t.Logf("CatalogSource pod is ready")
+				catalogReady = true
 				break
 			}
 		}
-		time.Sleep(5 * time.Second)
+		waitForNetObservRetry(ctx, t, 5*time.Second, "CatalogSource pod")
 	}
+	require.True(t, catalogReady, "CatalogSource pod did not become Running within 3 minutes")
 
 	// Konflux bundle images are mirrored from registry.redhat.io to quay.io.
 	// Match the operator backend tests by installing the cluster-wide IDMS before
@@ -213,7 +219,9 @@ func deployNetObservOperator(ctx context.Context, t *testing.T, kubeconfig strin
 	// Wait for operator pod to be ready
 	t.Logf("Waiting for operator pod to be ready...")
 	deadline = time.Now().Add(5 * time.Minute)
+	operatorReady := false
 	for time.Now().Before(deadline) {
+		require.NoError(t, ctx.Err(), "context canceled while waiting for NetObserv operator pod")
 		pods, err := clientset.CoreV1().Pods(operatorNamespace).List(ctx, metav1.ListOptions{
 			LabelSelector: "app=netobserv-operator",
 		})
@@ -234,23 +242,32 @@ func deployNetObservOperator(ctx context.Context, t *testing.T, kubeconfig strin
 			}
 			if allReady {
 				t.Logf("Operator pod is ready")
+				operatorReady = true
 				break
 			}
 		}
-		time.Sleep(10 * time.Second)
+		waitForNetObservRetry(ctx, t, 10*time.Second, "NetObserv operator pod")
 	}
+	require.True(t, operatorReady, "NetObserv operator pod did not become Ready within 5 minutes")
 
 	// Wait for FlowCollector CRD to be available
 	t.Logf("Waiting for FlowCollector CRD...")
 	deadline = time.Now().Add(3 * time.Minute)
+	crdReady := false
+	var crdErr error
+	var crdOutput []byte
 	for time.Now().Before(deadline) {
+		require.NoError(t, ctx.Err(), "context canceled while waiting for FlowCollector CRD")
 		cmd = exec.CommandContext(ctx, "kubectl", "get", "crd", "flowcollectors.flows.netobserv.io", "--kubeconfig", kubeconfig)
-		if cmd.Run() == nil {
+		crdOutput, crdErr = cmd.CombinedOutput()
+		if crdErr == nil {
 			t.Logf("FlowCollector CRD is available")
+			crdReady = true
 			break
 		}
-		time.Sleep(5 * time.Second)
+		waitForNetObservRetry(ctx, t, 5*time.Second, "FlowCollector CRD")
 	}
+	require.True(t, crdReady, "FlowCollector CRD did not become available within 3 minutes; last kubectl error: %v: %s", crdErr, strings.TrimSpace(string(crdOutput)))
 
 	// Deploy FlowCollector
 	t.Logf("Creating FlowCollector")
@@ -267,6 +284,33 @@ func deployNetObservOperator(ctx context.Context, t *testing.T, kubeconfig strin
 	pluginNamespace = netObservPluginNamespace(ctx, t, clientset, config)
 	waitForLokiReady(ctx, t, kubeconfig, clientset, config, pluginNamespace)
 	return pluginNamespace
+}
+
+func netObservNamespacesCreatedByTest(ctx context.Context, t *testing.T, clientset kubernetes.Interface, namespaces ...string) map[string]bool {
+	t.Helper()
+
+	created := make(map[string]bool, len(namespaces))
+	for _, namespace := range namespaces {
+		_, err := clientset.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			created[namespace] = true
+			continue
+		}
+		require.NoError(t, err, "check whether namespace %q exists", namespace)
+	}
+	return created
+}
+
+func waitForNetObservRetry(ctx context.Context, t *testing.T, interval time.Duration, resource string) {
+	t.Helper()
+
+	timer := time.NewTimer(interval)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		require.NoError(t, ctx.Err(), "context canceled while waiting for %s", resource)
+	case <-timer.C:
+	}
 }
 
 // isFlowCollectorMissingError reports whether the cluster FlowCollector or its API type is missing.
@@ -415,7 +459,7 @@ func waitForLokiReady(ctx context.Context, t *testing.T, kubeconfig string, clie
 }
 
 // cleanupNetObservOperator removes the NetObserv operator, FlowCollector, and IDMS.
-func cleanupNetObservOperator(t *testing.T, kubeconfig string) {
+func cleanupNetObservOperator(t *testing.T, kubeconfig string, createdNamespaces map[string]bool) {
 	t.Helper()
 
 	// Best effort cleanup - delete in reverse order
@@ -433,9 +477,14 @@ func cleanupNetObservOperator(t *testing.T, kubeconfig string) {
 	cmd = exec.Command("kubectl", "delete", "-f", filepath.Join(netobservRealManifestDir, "operator-group.yaml"), "--kubeconfig", kubeconfig, "--ignore-not-found")
 	_ = cmd.Run()
 
-	// Delete namespaces
-	cmd = exec.Command("kubectl", "delete", "-f", filepath.Join(netobservRealManifestDir, "operator-namespace.yaml"), "--kubeconfig", kubeconfig, "--ignore-not-found")
-	_ = cmd.Run()
+	// Delete only namespaces created by this test.
+	for _, namespace := range []string{"openshift-netobserv-operator", "netobserv"} {
+		if !createdNamespaces[namespace] {
+			continue
+		}
+		cmd = exec.Command("kubectl", "delete", "namespace", namespace, "--kubeconfig", kubeconfig, "--ignore-not-found")
+		_ = cmd.Run()
+	}
 
 	// Delete CatalogSource
 	cmd = exec.Command("kubectl", "delete", "-f", filepath.Join(netobservRealManifestDir, "operator-catalogsource.yaml"), "--kubeconfig", kubeconfig, "--ignore-not-found")
