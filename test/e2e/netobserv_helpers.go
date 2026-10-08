@@ -18,13 +18,7 @@ func assertNetobservListFlows(t *testing.T, mcpClient *test.McpClient, args map[
 
 	result, err := mcpClient.CallTool("netobserv_list_flows", args)
 	require.NoError(t, err, "list_flows should succeed")
-	var response any = result.Content
-	if len(result.Content) > 0 {
-		if text, ok := result.Content[0].(*mcp.TextContent); ok {
-			response = text.Text
-		}
-	}
-	require.False(t, result.IsError, "list_flows should not return error; response: %v", response)
+	require.False(t, result.IsError, "list_flows should not return error; response: %v", result.Content)
 	require.NotEmpty(t, result.Content, "should return content")
 
 	// Parse JSON response
@@ -41,13 +35,7 @@ func assertNetobservGetMetrics(t *testing.T, mcpClient *test.McpClient, args map
 
 	result, err := mcpClient.CallTool("netobserv_get_flow_metrics", args)
 	require.NoError(t, err, "get_flow_metrics should succeed")
-	var response any = result.Content
-	if len(result.Content) > 0 {
-		if text, ok := result.Content[0].(*mcp.TextContent); ok {
-			response = text.Text
-		}
-	}
-	require.False(t, result.IsError, "get_flow_metrics should not return error; response: %v", response)
+	require.False(t, result.IsError, "get_flow_metrics should not return error; response: %v", result.Content)
 	require.NotEmpty(t, result.Content, "should return content")
 
 	// Parse JSON response
