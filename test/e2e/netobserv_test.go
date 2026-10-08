@@ -305,15 +305,15 @@ func deployNetObservOperator(ctx context.Context, t *testing.T, kubeconfig strin
 	return pluginNamespace
 }
 
+// isFlowCollectorMissingError reports whether the cluster FlowCollector or its API type is missing.
 func isFlowCollectorMissingError(err error) bool {
 	if err == nil {
 		return false
 	}
 	message := strings.ToLower(err.Error())
-	return strings.Contains(message, "notfound") ||
-		strings.Contains(message, "not found") ||
-		strings.Contains(message, "no matches for kind") ||
-		strings.Contains(message, "doesn't have a resource type")
+	return strings.Contains(message, `flowcollectors.flows.netobserv.io "cluster" not found`) ||
+		strings.Contains(message, `no matches for kind "flowcollector" in version "flows.netobserv.io`) ||
+		strings.Contains(message, `the server doesn't have a resource type "flowcollector"`)
 }
 
 // checkNetObservOperatorStatus checks if NetObserv operator is already deployed and ready
