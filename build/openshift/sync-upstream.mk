@@ -1,9 +1,6 @@
 ##@ Upstream Sync
-# Limitation: -X theirs silently resolves textual conflicts in favor of upstream.
-# Downstream-specific patches to shared code (same lines as upstream) will be
-# dropped without warning. Only structural conflicts (delete/modify, rename)
-# trigger a hard failure. If downstream carries patches to files upstream also
-# edits, verify the merge result before approving the sync PR.
+# Sync policy: fail closed on committed merge conflicts and report changed-path
+# overlaps for review. Open downstream PRs are rebased after sync lands.
 
 UPSTREAM_REPO ?= containers/kubernetes-mcp-server
 UPSTREAM_REMOTE ?= upstream
@@ -30,45 +27,83 @@ sync-upstream-check: ## Check if fork is behind upstream (dry-run)
 		echo "Run 'make sync-upstream-pr' to create a PR"; \
 	fi
 
-.PHONY: sync-upstream-pr
+.PHONY: sync-upstream-pr sync-upstream-pr-run
 sync-upstream-pr: ## Create/update PR to sync with upstream (requires gh CLI)
-	@echo "🔍 Checking sync status with upstream..."
-	@command -v gh >/dev/null 2>&1 || { echo "❌ Error: gh CLI is required. Install from https://cli.github.com/"; exit 1; }
-	@git remote add $(UPSTREAM_REMOTE) "https://github.com/$(UPSTREAM_REPO).git" 2>/dev/null || true
-	@git fetch $(UPSTREAM_REMOTE)
-	@git fetch $(ORIGIN_REMOTE)
-	@BEHIND_COUNT=$$(git rev-list --count $(ORIGIN_REMOTE)/main..$(UPSTREAM_REMOTE)/main); \
-	if [ "$$BEHIND_COUNT" -eq "0" ]; then \
+	@set -eu; \
+	if [ -n "$$(git status --porcelain)" ]; then \
+		echo "❌ Refusing to sync from a dirty worktree."; \
+		git status --short; \
+		exit 1; \
+	fi; \
+	if ! git remote get-url "$(UPSTREAM_REMOTE)" >/dev/null 2>&1; then \
+		git remote add "$(UPSTREAM_REMOTE)" "https://github.com/$(UPSTREAM_REPO).git"; \
+	fi; \
+	UPSTREAM_URL=$$(git remote get-url "$(UPSTREAM_REMOTE)"); \
+	case "$$UPSTREAM_URL" in \
+		*github.com[:/]$(UPSTREAM_REPO)|*github.com[:/]$(UPSTREAM_REPO).git) ;; \
+		*) echo "❌ Remote $(UPSTREAM_REMOTE) does not point to the configured upstream repository."; exit 1 ;; \
+	esac; \
+	git fetch $(UPSTREAM_REMOTE) || { echo "❌ Failed to fetch $(UPSTREAM_REMOTE)."; exit 1; }; \
+	git fetch $(ORIGIN_REMOTE) || { echo "❌ Failed to fetch $(ORIGIN_REMOTE)."; exit 1; }; \
+	UPSTREAM_SHA=$$(git rev-parse "$(UPSTREAM_REMOTE)/main"); \
+	DOWNSTREAM_SHA=$$(git rev-parse "$(ORIGIN_REMOTE)/main"); \
+	BEHIND_COUNT=$$(git rev-list --count "$$DOWNSTREAM_SHA..$$UPSTREAM_SHA"); \
+	if [ "$$BEHIND_COUNT" -eq 0 ]; then \
 		echo "✅ $(ORIGIN_REMOTE)/main is up to date. No PR needed."; \
 		exit 0; \
-	fi
-	@echo "📝 Creating sync branch..."
-	@BEHIND_COUNT=$$(git rev-list --count $(ORIGIN_REMOTE)/main..$(UPSTREAM_REMOTE)/main); \
-	echo "  Behind by $$BEHIND_COUNT commits"; \
-	git checkout -B $(SYNC_BRANCH_NAME) $(ORIGIN_REMOTE)/main
-	@echo "🔀 Merging upstream changes..."
-	@if ! git merge --no-ff -X theirs $(UPSTREAM_REMOTE)/main -m "chore: merge upstream changes"; then \
-		echo "⚠️  Merge conflicts remain after -X theirs. Attempting to resolve generated files..."; \
-		CONFLICTED=$$(git diff --name-only --diff-filter=U); \
-		UNRESOLVABLE=""; \
-		for f in $$CONFLICTED; do \
-			case "$$f" in \
-				go.sum|go.mod|vendor/*) \
-					echo "  Accepting upstream for generated file: $$f"; \
-					git checkout --theirs "$$f"; \
-					git add "$$f"; \
-					;; \
-				*) \
-					UNRESOLVABLE="$$UNRESOLVABLE $$f"; \
-					;; \
-			esac; \
-		done; \
-		if [ -n "$$UNRESOLVABLE" ]; then \
-			echo "❌ Unresolvable conflicts in:$$UNRESOLVABLE"; \
-			git merge --abort; \
+	fi; \
+	command -v gh >/dev/null 2>&1 || { echo "❌ Error: gh CLI is required. Install from https://cli.github.com/"; exit 1; }; \
+	BASE_SHA=$$(git merge-base "$$DOWNSTREAM_SHA" "$$UPSTREAM_SHA") || { echo "❌ Upstream and downstream histories have no merge base."; exit 1; }; \
+	TMP_DIR=$$(mktemp -d); \
+	trap 'rm -rf "$$TMP_DIR"' EXIT; \
+	trap 'exit 1' HUP INT TERM; \
+	git diff --name-only "$$BASE_SHA" "$$UPSTREAM_SHA" > "$$TMP_DIR/upstream.paths.unsorted"; \
+	git diff --name-only "$$BASE_SHA" "$$DOWNSTREAM_SHA" > "$$TMP_DIR/downstream.paths.unsorted"; \
+	LC_ALL=C sort -u "$$TMP_DIR/upstream.paths.unsorted" > "$$TMP_DIR/upstream.paths"; \
+	LC_ALL=C sort -u "$$TMP_DIR/downstream.paths.unsorted" > "$$TMP_DIR/downstream.paths"; \
+	comm -12 "$$TMP_DIR/upstream.paths" "$$TMP_DIR/downstream.paths" > "$$TMP_DIR/committed-overlaps"; \
+	if [ -s "$$TMP_DIR/committed-overlaps" ]; then \
+		echo "⚠️  Paths changed on both sides since merge-base; review the sync PR carefully:"; \
+		while IFS= read -r path; do printf '  %s\n' "$$path"; done < "$$TMP_DIR/committed-overlaps"; \
+	fi; \
+	if ! git merge-tree --write-tree "$$DOWNSTREAM_SHA" "$$UPSTREAM_SHA" > "$$TMP_DIR/merge-tree.out" 2>&1; then \
+		echo "❌ Upstream/downstream merge preflight found conflicts; no sync branch was created:"; \
+		while IFS= read -r line; do printf '  %s\n' "$$line"; done < "$$TMP_DIR/merge-tree.out"; \
+		exit 1; \
+	fi; \
+	SYNC_REMOTE_REFS=$$(git ls-remote --refs "$(ORIGIN_REMOTE)" "refs/heads/$(SYNC_BRANCH_NAME)") || { echo "❌ Could not inspect the remote sync branch."; exit 1; }; \
+	SYNC_REMOTE_SHA=$$(printf '%s\n' "$$SYNC_REMOTE_REFS" | cut -f1); \
+	ORIGINAL_BRANCH=$$(git symbolic-ref --short HEAD 2>/dev/null || true); \
+	ORIGINAL_SHA=$$(git rev-parse HEAD); \
+	if [ "$$ORIGINAL_BRANCH" = "$(SYNC_BRANCH_NAME)" ]; then echo "❌ Run sync from a branch other than $(SYNC_BRANCH_NAME)."; exit 1; fi; \
+	if $(MAKE) sync-upstream-pr-run UPSTREAM_SHA="$$UPSTREAM_SHA" DOWNSTREAM_SHA="$$DOWNSTREAM_SHA" SYNC_REMOTE_SHA="$$SYNC_REMOTE_SHA"; then \
+		SYNC_STATUS=0; \
+	else \
+		SYNC_STATUS=$$?; \
+	fi; \
+	CURRENT_BRANCH=$$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true); \
+	if [ "$$CURRENT_BRANCH" = "$(SYNC_BRANCH_NAME)" ]; then \
+		if [ -n "$$ORIGINAL_BRANCH" ]; then git checkout "$$ORIGINAL_BRANCH"; else git checkout --detach "$$ORIGINAL_SHA"; fi; \
+	fi; \
+	exit "$$SYNC_STATUS"
+
+sync-upstream-pr-run: ## Internal: execute a preflighted sync using pinned commit SHAs
+	@test -z "$$(git status --porcelain)" || { echo "❌ Refusing to reset a sync branch from a dirty worktree."; exit 1; }
+	@test -n "$(UPSTREAM_SHA)" -a -n "$(DOWNSTREAM_SHA)" || { echo "❌ Sync SHAs must be provided by sync-upstream-pr."; exit 1; }
+	@if git show-ref --verify --quiet "refs/heads/$(SYNC_BRANCH_NAME)"; then \
+		LOCAL_SYNC_SHA=$$(git rev-parse "refs/heads/$(SYNC_BRANCH_NAME)"); \
+		if [ "$$LOCAL_SYNC_SHA" != "$(SYNC_REMOTE_SHA)" ]; then \
+			echo "❌ Local $(SYNC_BRANCH_NAME) differs from its inspected remote tip; refusing to reset it."; \
 			exit 1; \
 		fi; \
-		git commit --no-edit; \
+	fi
+	@echo "📝 Creating sync branch from pinned downstream SHA..."
+	@git checkout -B $(SYNC_BRANCH_NAME) "$(DOWNSTREAM_SHA)"
+	@echo "🔀 Merging pinned upstream SHA..."
+	@if ! git merge --no-ff "$(UPSTREAM_SHA)" -m "chore: merge upstream changes"; then \
+		echo "❌ Merge failed after preflight; aborting without resolving conflicts automatically."; \
+		git merge --abort; \
+		exit 1; \
 	fi
 	@echo "🔧 Updating dependencies..."
 	@go mod tidy && go mod vendor
@@ -91,9 +126,12 @@ sync-upstream-pr: ## Create/update PR to sync with upstream (requires gh CLI)
 		git add pkg/mcp/testdata; \
 		git commit -m "chore: update test snapshots"; \
 	fi
-	@echo "📤 Pushing sync branch..."
-	@PUSHED_SHA=$$(git rev-parse $(SYNC_BRANCH_NAME)); \
-	git push -f $(ORIGIN_REMOTE) $(SYNC_BRANCH_NAME); \
+	@echo "📤 Pushing sync branch with lease protection..."
+	@set -eu; \
+	PUSHED_SHA=$$(git rev-parse HEAD); \
+	git merge-base --is-ancestor "$(UPSTREAM_SHA)" "$$PUSHED_SHA"; \
+	git merge-base --is-ancestor "$(DOWNSTREAM_SHA)" "$$PUSHED_SHA"; \
+	git push --force-with-lease="refs/heads/$(SYNC_BRANCH_NAME):$(SYNC_REMOTE_SHA)" $(ORIGIN_REMOTE) "HEAD:refs/heads/$(SYNC_BRANCH_NAME)"; \
 	echo "⏳ Waiting for GitHub to index pushed branch at $$PUSHED_SHA..."; \
 	INDEXED=""; \
 	for i in $$(seq 1 30); do \
@@ -111,8 +149,8 @@ sync-upstream-pr: ## Create/update PR to sync with upstream (requires gh CLI)
 	fi
 	@echo "🚀 Creating or updating PR..."
 	@echo "  OWNER_REPO='$(OWNER_REPO)'"; \
-	CHANGELOG=$$(git log --pretty=format:"- %h %s (%an)" $(ORIGIN_REMOTE)/main..$(UPSTREAM_REMOTE)/main); \
-	BEHIND_COUNT=$$(git rev-list --count $(ORIGIN_REMOTE)/main..$(UPSTREAM_REMOTE)/main); \
+	CHANGELOG=$$(git log --pretty=format:"- %h %s (%an)" "$(DOWNSTREAM_SHA)..$(UPSTREAM_SHA)"); \
+	BEHIND_COUNT=$$(git rev-list --count "$(DOWNSTREAM_SHA)..$(UPSTREAM_SHA)"); \
 	if ! PR_NUMBER=$$(gh pr list --repo "$(OWNER_REPO)" --head $(SYNC_BRANCH_NAME) --state open --json number --jq '.[0].number'); then \
 		echo "❌ Failed to list PRs (possible rate-limit or auth error). Aborting to prevent duplicate PR creation."; \
 		exit 1; \
