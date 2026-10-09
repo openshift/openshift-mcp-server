@@ -15,6 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
@@ -106,14 +107,20 @@ type ExecDNSResult struct {
 	Phase   string `json:"phase"`
 }
 
-func initExecDNSInPod() []api.ServerTool {
-	return initExecDNSInPodWith(nil)
+var execDNSPodGVK = schema.GroupVersionKind{
+	Group:   "",
+	Version: "v1",
+	Kind:    "Pod",
+}
+
+func initExecDNSInPod(p api.FilteringProvider) []api.ServerTool {
+	return initExecDNSInPodWith(p, nil)
 }
 
 // initExecDNSInPodWith creates exec_dns_in_pod tools using the provided podExecutor.
 // If executor is nil, a defaultPodExecutor is created at handler call-time from the KubernetesClient.
 // Pass a mock executor in tests.
-func initExecDNSInPodWith(executor podExecutor) []api.ServerTool {
+func initExecDNSInPodWith(p api.FilteringProvider, executor podExecutor) []api.ServerTool {
 	return []api.ServerTool{
 		{
 			Tool: api.Tool{
@@ -165,7 +172,8 @@ func initExecDNSInPodWith(executor podExecutor) []api.ServerTool {
 					Namespace: &api.RBACNamespace{Argument: "namespace"},
 				},
 			),
-			Handler: makeExecDNSInPodHandler(executor),
+			Handler:                    makeExecDNSInPodHandler(executor),
+			TargetCompatibilityFilters: []func() bool{targetHasGVK(p, execDNSPodGVK)},
 		},
 	}
 }

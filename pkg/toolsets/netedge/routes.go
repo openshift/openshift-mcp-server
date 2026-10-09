@@ -12,7 +12,13 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func initRoutes() []api.ServerTool {
+var inspectRouteGVK = schema.GroupVersionKind{
+	Group:   "route.openshift.io",
+	Version: "v1",
+	Kind:    "Route",
+}
+
+func initRoutes(p api.FilteringProvider) []api.ServerTool {
 	return []api.ServerTool{
 		{
 			Tool: api.Tool{
@@ -48,7 +54,8 @@ func initRoutes() []api.ServerTool {
 				Namespace:    &api.RBACNamespace{Argument: "namespace"},
 				ResourceName: &api.RBACResourceName{Argument: "route"},
 			}),
-			Handler: inspectRoute,
+			Handler:                    inspectRoute,
+			TargetCompatibilityFilters: []func() bool{targetHasGVK(p, inspectRouteGVK)},
 		},
 	}
 }
