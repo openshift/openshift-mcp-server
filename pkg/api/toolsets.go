@@ -12,6 +12,14 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 )
 
+// ConfiguredToolset optionally lets a toolset build tools using the configuration
+// being applied. The MCP server uses this instead of GetTools when implemented,
+// including during configuration reloads.
+type ConfiguredToolset interface {
+	Toolset
+	GetToolsWithConfig(FilteringProvider, *config.Config) []ServerTool
+}
+
 type ServerTool struct {
 	Tool    Tool
 	RBAC    *RBACMetadata

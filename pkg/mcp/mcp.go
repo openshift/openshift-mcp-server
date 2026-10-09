@@ -439,7 +439,13 @@ func (s *Server) collectApplicableTools(cfg *Configuration) []api.ServerTool {
 
 	tools := make([]api.ServerTool, 0)
 	for _, toolset := range cfg.Toolsets() {
-		for _, tool := range toolset.GetTools(s.p) {
+		var toolsetTools []api.ServerTool
+		if configured, ok := toolset.(api.ConfiguredToolset); ok {
+			toolsetTools = configured.GetToolsWithConfig(s.p, cfg.Config)
+		} else {
+			toolsetTools = toolset.GetTools(s.p)
+		}
+		for _, tool := range toolsetTools {
 			tool = mutator(tool)
 			if filter(tool) {
 				if cfg.AppsEnabled.Get() && tool.App != nil {

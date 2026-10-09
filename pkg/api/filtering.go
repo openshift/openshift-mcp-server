@@ -12,7 +12,8 @@ import (
 type FilteringProvider interface {
 	IsTargetCompatibilityToolFiltersEnabled() bool
 	// AnyTargetHasGVKs reports whether every GVK in gvks is available on at least one target
-	// exposed by this provider. Providers that have not opted in to GVK discovery
+	// exposed by this provider. An empty Version matches any served version of
+	// the specified group and kind. Providers that have not opted in to GVK discovery
 	// should return true so existing tools remain visible.
 	AnyTargetHasGVKs(context.Context, []schema.GroupVersionKind) bool
 }

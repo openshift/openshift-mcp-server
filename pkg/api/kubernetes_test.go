@@ -1,10 +1,14 @@
 package api
 
 import (
+	"encoding/json"
+	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/containers/kubernetes-mcp-server/internal/test"
 	"github.com/stretchr/testify/suite"
+	apidiscovery "k8s.io/api/apidiscovery/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
@@ -32,6 +36,150 @@ func (s *HasGVKsTestSuite) TearDownTest() {
 
 func (s *HasGVKsTestSuite) discoveryClient() discovery.DiscoveryInterface {
 	return discovery.NewDiscoveryClientForConfigOrDie(s.mockServer.Config())
+}
+
+func (s *HasGVKsTestSuite) TestAnyServedVersion() {
+	for _, tc := range []struct {
+		name      string
+		resources []metav1.APIResourceList
+		expected  bool
+	}{
+		{name: "absent group"},
+		{name: "absent kind", resources: []metav1.APIResourceList{{
+			GroupVersion: "flows.netobserv.io/v1beta2",
+			APIResources: []metav1.APIResource{{Name: "other", Kind: "OtherKind"}},
+		}}},
+		{name: "arbitrary served version", expected: true, resources: []metav1.APIResourceList{{
+			GroupVersion: "flows.netobserv.io/v99",
+			APIResources: []metav1.APIResource{{Name: "flowcollectors", Kind: "FlowCollector"}},
+		}}},
+		{name: "kind present only in later version", expected: true, resources: []metav1.APIResourceList{
+			{GroupVersion: "flows.netobserv.io/v1beta1", APIResources: []metav1.APIResource{{Name: "other", Kind: "OtherKind"}}},
+			{GroupVersion: "flows.netobserv.io/v1beta2", APIResources: []metav1.APIResource{{Name: "flowcollectors", Kind: "FlowCollector"}}},
+		}},
+	} {
+		s.Run(tc.name, func() {
+			s.mockServer.ResetHandlers()
+			s.mockServer.Handle(test.NewDiscoveryClientHandler(tc.resources...))
+			for _, cached := range []bool{false, true} {
+				s.Run(fmt.Sprintf("cached=%t", cached), func() {
+					dc := s.discoveryClient()
+					if cached {
+						dc = memory.NewMemCacheClient(dc)
+					}
+					has, err := HasGVKs(dc, []schema.GroupVersionKind{{Group: "flows.netobserv.io", Kind: "FlowCollector"}})
+					s.Require().NoError(err)
+					s.Equal(tc.expected, has)
+				})
+			}
+		})
+	}
+}
+
+func (s *HasGVKsTestSuite) TestAnyServedVersionAggregatedDiscovery() {
+	for _, tc := range []struct {
+		name       string
+		staleGroup string
+		freshKind  string
+		want       bool
+		wantError  bool
+	}{
+		{name: "all relevant versions stale", staleGroup: "flows.netobserv.io", wantError: true},
+		{name: "stale version and healthy version without kind", staleGroup: "flows.netobserv.io", freshKind: "OtherKind", wantError: true},
+		{name: "healthy version confirms kind despite stale version", staleGroup: "flows.netobserv.io", freshKind: "FlowCollector", want: true},
+		{name: "unrelated stale group is not uncertainty", staleGroup: "unrelated.example"},
+	} {
+		for _, cached := range []bool{false, true} {
+			s.Run(fmt.Sprintf("%s/cached=%t", tc.name, cached), func() {
+				s.mockServer.ResetHandlers()
+				groups := []apidiscovery.APIGroupDiscovery{{
+					ObjectMeta: metav1.ObjectMeta{Name: tc.staleGroup},
+					Versions:   []apidiscovery.APIVersionDiscovery{{Version: "v1beta1", Freshness: apidiscovery.DiscoveryFreshnessStale}},
+				}}
+				if tc.freshKind != "" {
+					groups[0].Versions = append(groups[0].Versions, apidiscovery.APIVersionDiscovery{
+						Version: "v1beta2", Freshness: apidiscovery.DiscoveryFreshnessCurrent,
+						Resources: []apidiscovery.APIResourceDiscovery{{
+							Resource: "flowcollectors", Scope: apidiscovery.ScopeCluster,
+							ResponseKind: &metav1.GroupVersionKind{Group: "flows.netobserv.io", Version: "v1beta2", Kind: tc.freshKind},
+						}},
+					})
+				}
+				s.mockServer.Handle(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					list := apidiscovery.APIGroupDiscoveryList{
+						TypeMeta: metav1.TypeMeta{APIVersion: "apidiscovery.k8s.io/v2", Kind: "APIGroupDiscoveryList"},
+					}
+					if r.URL.Path == "/apis" {
+						list.Items = groups
+					} else if r.URL.Path != "/api" {
+						http.NotFound(w, r)
+						return
+					}
+					w.Header().Set("Content-Type", "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList")
+					if err := json.NewEncoder(w).Encode(list); err != nil {
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+					}
+				}))
+				dc := s.discoveryClient()
+				if cached {
+					dc = memory.NewMemCacheClient(dc)
+				}
+				has, err := HasGVKs(dc, []schema.GroupVersionKind{{Group: "flows.netobserv.io", Kind: "FlowCollector"}})
+				if tc.wantError {
+					s.Error(err)
+				} else {
+					s.NoError(err)
+				}
+				s.Equal(tc.want, has)
+			})
+		}
+	}
+}
+
+func (s *HasGVKsTestSuite) TestAnyServedVersionResourceDiscoveryError() {
+	for _, available := range []bool{false, true} {
+		s.Run(fmt.Sprintf("another version available=%t", available), func() {
+			s.mockServer.ResetHandlers()
+			resources := []metav1.APIResourceList{{GroupVersion: "flows.netobserv.io/v1beta1"}}
+			if available {
+				resources = append(resources, metav1.APIResourceList{
+					GroupVersion: "flows.netobserv.io/v1beta2",
+					APIResources: []metav1.APIResource{{Name: "flowcollectors", Kind: "FlowCollector"}},
+				})
+			}
+			handler := test.NewDiscoveryClientHandler(resources...)
+			s.mockServer.Handle(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/apis/flows.netobserv.io/v1beta1" {
+					http.Error(w, "discovery unavailable", http.StatusServiceUnavailable)
+					return
+				}
+				handler.ServeHTTP(w, r)
+			}))
+			has, err := HasGVKs(s.discoveryClient(), []schema.GroupVersionKind{{Group: "flows.netobserv.io", Kind: "FlowCollector"}})
+			if available {
+				s.Require().NoError(err)
+			} else {
+				s.Error(err)
+			}
+			s.Equal(available, has)
+		})
+	}
+}
+
+func (s *HasGVKsTestSuite) TestAnyServedVersionCoreGroup() {
+	s.mockServer.Handle(test.NewDiscoveryClientHandler())
+	has, err := HasGVKs(s.discoveryClient(), []schema.GroupVersionKind{{Kind: "Pod"}, {Group: "apps", Version: "v1", Kind: "Deployment"}})
+	s.Require().NoError(err)
+	s.True(has)
+}
+
+func (s *HasGVKsTestSuite) TestAnyServedVersionDiscoveryError() {
+	s.mockServer.Handle(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "discovery unavailable", http.StatusServiceUnavailable)
+	}))
+	has, err := HasGVKs(s.discoveryClient(), []schema.GroupVersionKind{{Group: "flows.netobserv.io", Kind: "FlowCollector"}})
+	s.Error(err)
+	s.False(has)
 }
 
 func (s *HasGVKsTestSuite) TestAllGVKsExist() {
