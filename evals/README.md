@@ -38,6 +38,11 @@ below.
 - `mcpchecker`: `make mcpchecker` installs it under `_output/tools/bin/`. The
   `make run-evals` target calls that path directly; to run the bare `mcpchecker …`
   commands shown below by hand, add `_output/tools/bin` to your `PATH`.
+  Installation requires Bash, `curl`, `unzip`, `mktemp`, `mkdir`, `sleep`, and
+  either `sha256sum` or `shasum`. Its destination filesystem must support atomic
+  directory creation for the per-destination installer lock. The current Prow
+  `rhel-9-golang-1.26-openshift-5.0` build root provides these prerequisites;
+  revalidate them when the CI build root changes.
 - For the **`acp-anthropic`** agent only:
   - The `claude` CLI (Claude Code) installed, on your `PATH`, and **signed in**.
     The agent runs through your existing Claude Code session, so your Claude
@@ -233,10 +238,27 @@ make run-evals SUITE=core-readonly
 
 ## Versions
 
-`make mcpchecker` installs `mcpchecker@latest`. CI runs the same binary version:
-`.github/workflows/mcpchecker.yaml` calls `mcpchecker-action` (currently pinned at
-`v0.0.18`) with `mcpchecker-version: latest`. If you need to reproduce CI exactly,
-pin the binary with `make mcpchecker MCPCHECKER_VERSION=<version>`.
+`make mcpchecker` installs the official `mcpchecker` v0.0.21 release binary after
+verifying its archive against the committed checksums in
+`build/mcpchecker-v0.0.21.sha256`. Prow and local runs therefore use the same
+binary without requiring the repository's Go toolchain to build mcpchecker.
+The installer serializes concurrent updates to one destination and reuses the
+cache only when its metadata names the requested version, platform, and committed
+archive checksum and the binary still matches the digest stored in that metadata.
+This detects stale metadata and binary-only modification; because the metadata is
+stored beside the binary and is writable by the same user, it does not protect
+against hostile modification of both files. The lock is bounded to avoid an
+indefinite wait and is removed on normal exits. An uncatchable termination can
+leave a lock directory behind; a later installer fails explicitly after its
+timeout so the caller can check for active installers before removing the lock.
+An explicit
+`MCPCHECKER_VERSION=<version>` override is accepted only when the matching
+`build/mcpchecker-<version>.sha256` manifest has been committed and reviewed.
+
+`.github/workflows/mcpchecker.yaml` also explicitly requests v0.0.21 and pins the
+outer evaluation actions to the v0.0.21 commit. Those upstream actions internally
+delegate setup to `setup-mcpchecker@main`, so the binary version is explicit but
+the complete upstream action chain is not immutable.
 
 `make claude-agent-acp` likewise installs `@agentclientprotocol/claude-agent-acp@latest`;
 pin it with `make claude-agent-acp CLAUDE_AGENT_ACP_VERSION=<version>` for local

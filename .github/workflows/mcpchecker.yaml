@@ -336,10 +336,11 @@ jobs:
 
       - name: Run mcpchecker evaluation
         id: mcpchecker
-        uses: mcpchecker/mcpchecker/.github/actions/mcpchecker-action@v0.0.19
+        # v0.0.21 commit; the action still delegates setup to upstream's mutable main ref.
+        uses: mcpchecker/mcpchecker/.github/actions/mcpchecker-action@92e4e860817f00e1d48640b756762ccf3ad39532
         with:
           eval-config: ${{ matrix.eval-config }}
-          mcpchecker-version: 'latest'
+          mcpchecker-version: 'v0.0.21'
           task-filter: ${{ github.event.inputs.task-filter || '' }}
           output-format: 'json'
           verbose: ${{ github.event.inputs.verbose || 'false' }}
@@ -399,11 +400,12 @@ jobs:
       - name: Run mcpchecker diff
         id: mcpchecker-diff
         if: needs.check-trigger.outputs.is-pr == 'true' && steps.diff-check.outputs.has-diff == 'true'
-        uses: mcpchecker/mcpchecker/.github/actions/mcpchecker-diff-action@v0.0.19
+        # v0.0.21 commit; the action still delegates setup to upstream's mutable main ref.
+        uses: mcpchecker/mcpchecker/.github/actions/mcpchecker-diff-action@92e4e860817f00e1d48640b756762ccf3ad39532
         with:
           base-results: /tmp/baseline-results.json
           current-results: ${{ steps.diff-check.outputs.results-file }}
-          mcpchecker-version: 'latest'
+          mcpchecker-version: 'v0.0.21'
 
       # Save context and results for the reporting workflow
       - name: Save evaluation context
