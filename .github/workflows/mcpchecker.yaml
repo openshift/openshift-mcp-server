@@ -336,8 +336,8 @@ jobs:
 
       - name: Run mcpchecker evaluation
         id: mcpchecker
-        # v0.0.21 commit; the action still delegates setup to upstream's mutable main ref.
-        uses: mcpchecker/mcpchecker/.github/actions/mcpchecker-action@92e4e860817f00e1d48640b756762ccf3ad39532
+        # Vendored from mcpchecker v0.0.21 with every nested action pinned.
+        uses: ./.github/actions/mcpchecker-action
         with:
           eval-config: ${{ matrix.eval-config }}
           mcpchecker-version: 'v0.0.21'
@@ -400,8 +400,8 @@ jobs:
       - name: Run mcpchecker diff
         id: mcpchecker-diff
         if: needs.check-trigger.outputs.is-pr == 'true' && steps.diff-check.outputs.has-diff == 'true'
-        # v0.0.21 commit; the action still delegates setup to upstream's mutable main ref.
-        uses: mcpchecker/mcpchecker/.github/actions/mcpchecker-diff-action@92e4e860817f00e1d48640b756762ccf3ad39532
+        # Vendored from mcpchecker v0.0.21 with every nested action pinned.
+        uses: ./.github/actions/mcpchecker-diff-action
         with:
           base-results: /tmp/baseline-results.json
           current-results: ${{ steps.diff-check.outputs.results-file }}

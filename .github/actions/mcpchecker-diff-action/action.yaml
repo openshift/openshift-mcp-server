@@ -1,0 +1,85 @@
+# Vendored from mcpchecker/mcpchecker v0.0.21 (commit 92e4e860817f00e1d48640b756762ccf3ad39532).
+# Local changes pin nested action dependencies and omit unused branding metadata.
+name: 'Run mcpchecker Diff'
+description: 'Compare MCP evaluation results to detect regressions and improvements'
+author: 'mcpchecker'
+
+inputs:
+  base-results:
+    description: 'Path to baseline results file'
+    required: true
+
+  current-results:
+    description: 'Path to current results file'
+    required: true
+
+  mcpchecker-version:
+    description: 'Version of mcpchecker to use (latest, main, or vX.Y.Z)'
+    required: false
+    default: 'latest'
+
+  working-directory:
+    description: 'Working directory for running diff'
+    required: false
+    default: '.'
+
+outputs:
+  diff-output:
+    description: 'The diff output in markdown format (for use in PR comments)'
+    value: ${{ steps.run-diff.outputs.diff-output }}
+
+  exit-code:
+    description: 'Exit code from the diff command'
+    value: ${{ steps.run-diff.outputs.exit-code }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup mcpchecker
+      id: setup
+      uses: mcpchecker/mcpchecker/.github/actions/setup-mcpchecker@92e4e860817f00e1d48640b756762ccf3ad39532
+      with:
+        version: ${{ inputs.mcpchecker-version }}
+        action-ref: ${{ github.action_ref }}
+
+    - name: Run diff
+      id: run-diff
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        MCPCHECKER: ${{ steps.setup.outputs.mcpchecker-path }}
+        BASE: ${{ inputs.base-results }}
+        CURRENT: ${{ inputs.current-results }}
+      run: |
+        # Validate input files exist
+        if [ ! -f "$BASE" ]; then
+          echo "Error: Base results file not found: $BASE"
+          exit 1
+        fi
+        if [ ! -f "$CURRENT" ]; then
+          echo "Error: Current results file not found: $CURRENT"
+          exit 1
+        fi
+
+        echo "=== Comparing Results ==="
+        echo "Base: $BASE"
+        echo "Current: $CURRENT"
+        echo ""
+
+        # Capture diff output
+        set +e
+        DIFF_OUTPUT=$("$MCPCHECKER" result diff --base "$BASE" --current "$CURRENT" --output markdown)
+        DIFF_EXIT=$?
+        set -e
+
+        # Display and write to step summary
+        echo "$DIFF_OUTPUT"
+        echo "$DIFF_OUTPUT" >> $GITHUB_STEP_SUMMARY
+
+        # Set outputs for PR comments
+        echo "exit-code=$DIFF_EXIT" >> $GITHUB_OUTPUT
+        {
+          echo "diff-output<<MCPCHECKER_DIFF_EOF"
+          echo "$DIFF_OUTPUT"
+          echo "MCPCHECKER_DIFF_EOF"
+        } >> $GITHUB_OUTPUT

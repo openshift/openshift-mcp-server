@@ -151,7 +151,9 @@ temp_dir=$(mktemp -d "${destination_dir}/.mcpchecker-install.XXXXXX")
 archive="${temp_dir}/${asset}"
 release_url="https://github.com/mcpchecker/mcpchecker/releases/download/${version}/${asset}"
 echo "Downloading mcpchecker ${version} (${goos}/${goarch}) from the official GitHub release"
-curl --proto '=https' --tlsv1.2 -fsSL "${release_url}" -o "${archive}"
+# Bound both connection establishment and the complete transfer while the
+# per-destination installation lock is held.
+curl --proto '=https' --tlsv1.2 --connect-timeout 10 --max-time 300 -fsSL "${release_url}" -o "${archive}"
 
 actual_archive_sha=$(sha256_file "${archive}")
 actual_archive_sha=$(printf '%s' "${actual_archive_sha}" | tr '[:upper:]' '[:lower:]')
@@ -179,6 +181,7 @@ temporary_metadata=$(mktemp "${metadata_file}.tmp.XXXXXX")
 cp "${extracted_binary}" "${temporary_binary}"
 chmod 0755 "${temporary_binary}"
 printf 'cache_key=%s\nbinary_sha256=%s\n' "${cache_key}" "${binary_sha}" > "${temporary_metadata}"
+chmod 0644 "${temporary_metadata}"
 
 # The per-destination lock serializes cache checks and both atomic renames.
 reject_directory_final_paths

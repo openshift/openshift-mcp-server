@@ -247,18 +247,21 @@ cache only when its metadata names the requested version, platform, and committe
 archive checksum and the binary still matches the digest stored in that metadata.
 This detects stale metadata and binary-only modification; because the metadata is
 stored beside the binary and is writable by the same user, it does not protect
-against hostile modification of both files. The lock is bounded to avoid an
-indefinite wait and is removed on normal exits. An uncatchable termination can
+against hostile modification of both files. Published metadata is explicitly
+mode `0644` rather than inheriting a restrictive umask; the binary remains mode
+`0755`. The release download uses a 10-second connection timeout and a
+300-second total timeout so the installer cannot hold the lock indefinitely.
+Lock acquisition is separately bounded and the lock is removed on normal exits.
+An uncatchable termination can
 leave a lock directory behind; a later installer fails explicitly after its
 timeout so the caller can check for active installers before removing the lock.
 An explicit
 `MCPCHECKER_VERSION=<version>` override is accepted only when the matching
 `build/mcpchecker-<version>.sha256` manifest has been committed and reviewed.
 
-`.github/workflows/mcpchecker.yaml` also explicitly requests v0.0.21 and pins the
-outer evaluation actions to the v0.0.21 commit. Those upstream actions internally
-delegate setup to `setup-mcpchecker@main`, so the binary version is explicit but
-the complete upstream action chain is not immutable.
+`.github/workflows/mcpchecker.yaml` also explicitly requests v0.0.21. The two
+evaluation composites are vendored from that release commit, with their nested
+setup and artifact-upload action dependencies pinned to immutable commits.
 
 `make claude-agent-acp` likewise installs `@agentclientprotocol/claude-agent-acp@latest`;
 pin it with `make claude-agent-acp CLAUDE_AGENT_ACP_VERSION=<version>` for local

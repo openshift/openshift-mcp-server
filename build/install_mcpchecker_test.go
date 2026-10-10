@@ -88,6 +88,8 @@ output=
 url=
 proto=
 tlsv12=false
+connect_timeout=
+max_time=
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --proto)
@@ -97,6 +99,14 @@ while [ "$#" -gt 0 ]; do
         --tlsv1.2)
             tlsv12=true
             shift
+            ;;
+        --connect-timeout)
+            connect_timeout=$2
+            shift 2
+            ;;
+        --max-time)
+            max_time=$2
+            shift 2
             ;;
         -fsSL)
             shift
@@ -117,8 +127,13 @@ while [ "$#" -gt 0 ]; do
 done
 [ "$proto" = "=https" ] || { echo "missing curl --proto '=https'" >&2; exit 95; }
 [ "$tlsv12" = "true" ] || { echo "missing curl --tlsv1.2" >&2; exit 94; }
+[ "$connect_timeout" = "10" ] || { echo "missing curl --connect-timeout 10" >&2; exit 92; }
+[ "$max_time" = "300" ] || { echo "missing curl --max-time 300" >&2; exit 91; }
 [ -n "$url" ] && [ -n "$output" ] || { echo "missing curl URL or output" >&2; exit 93; }
-printf 'proto=%s tlsv1.2=%s url=%s\n' "$proto" "$tlsv12" "$url" >> "$FAKE_CURL_LOG"
+printf 'proto=%s tlsv1.2=%s connect-timeout=%s max-time=%s url=%s\n' "$proto" "$tlsv12" "$connect_timeout" "$max_time" "$url" >> "$FAKE_CURL_LOG"
+if [ "${FAKE_CURL_TIMEOUT:-}" = "1" ]; then
+    exit 28
+fi
 if [ -n "${FAKE_CURL_READY:-}" ]; then
     active_file=
     if [ -n "${FAKE_FIXTURE_ACTIVE_DIR:-}" ]; then
@@ -312,6 +327,17 @@ func runInstaller(t *testing.T, environment []string, args ...string) (string, e
 	return string(returnOutput), err
 }
 
+func runInstallerWithUmask(t *testing.T, environment []string, umask string, args ...string) (string, error) {
+	t.Helper()
+	installer := installerCommand(t, environment, args...)
+	commandArgs := []string{"-c", `umask "$1"; shift; exec "$@"`, "installer-umask", umask, installer.Path}
+	commandArgs = append(commandArgs, installer.Args[1:]...)
+	command := exec.Command("bash", commandArgs...)
+	command.Env = installer.Env
+	returnOutput, err := command.CombinedOutput()
+	return string(returnOutput), err
+}
+
 type runningInstaller struct {
 	command          *exec.Cmd
 	output           bytes.Buffer
@@ -488,7 +514,7 @@ func signalFile(t *testing.T, path string) {
 
 func expectedCurlLog(version, asset string) string {
 	return fmt.Sprintf(
-		"proto==https tlsv1.2=true url=https://github.com/mcpchecker/mcpchecker/releases/download/%s/%s\n",
+		"proto==https tlsv1.2=true connect-timeout=10 max-time=300 url=https://github.com/mcpchecker/mcpchecker/releases/download/%s/%s\n",
 		version,
 		asset,
 	)
@@ -634,6 +660,59 @@ func (s *InstallMCPCheckerSuite) TestInstaller() {
 			t.Fatalf("binary-only cache modification was not repaired: %v\n%s", err, output)
 		}
 		assertInstalledPair(t, destination, fakeLinuxBinary, "v0.0.21", "linux/amd64", digest)
+		assertNoInstallerArtifacts(t, destination)
+	})
+
+	s.Run("publishes readable metadata under a restrictive umask and preserves modes on cache reuse", func() {
+		t := s.T()
+		tempDir := t.TempDir()
+		asset := "mcpchecker-linux-amd64.zip"
+		archive, digest := createArchive(t, tempDir, asset, "mcpchecker", fakeLinuxBinary)
+		manifest := filepath.Join(tempDir, "mcpchecker-v0.0.21.sha256")
+		writeManifest(t, manifest, digest+"  "+asset)
+		fakeBin := createFakeCurl(t, tempDir)
+		destination := filepath.Join(tempDir, "tools", "mcpchecker")
+		curlLog := filepath.Join(tempDir, "curl.log")
+
+		output, err := runInstallerWithUmask(t,
+			fakeCurlEnvironment(fakeBin, archive, curlLog, "", "", ""),
+			"0077", "v0.0.21", "linux", "amd64", destination, manifest,
+		)
+		if err != nil {
+			t.Fatalf("restrictive-umask install failed: %v\n%s", err, output)
+		}
+		for path, expected := range map[string]os.FileMode{
+			destination:               0o755,
+			destination + ".metadata": 0o644,
+		} {
+			info, statErr := os.Stat(path)
+			if statErr != nil {
+				t.Fatalf("stat installed file %s: %v", path, statErr)
+			}
+			if actual := info.Mode().Perm(); actual != expected {
+				t.Fatalf("installed file %s mode = %04o, want %04o", path, actual, expected)
+			}
+		}
+
+		output, err = runInstallerWithUmask(t,
+			fakeCurlEnvironment(fakeBin, archive, curlLog, "1", "", ""),
+			"0077", "v0.0.21", "linux", "amd64", destination, manifest,
+		)
+		if err != nil {
+			t.Fatalf("restrictive-umask cache reuse failed: %v\n%s", err, output)
+		}
+		for path, expected := range map[string]os.FileMode{
+			destination:               0o755,
+			destination + ".metadata": 0o644,
+		} {
+			info, statErr := os.Stat(path)
+			if statErr != nil {
+				t.Fatalf("stat cached file %s: %v", path, statErr)
+			}
+			if actual := info.Mode().Perm(); actual != expected {
+				t.Fatalf("cached file %s mode = %04o, want %04o", path, actual, expected)
+			}
+		}
 		assertNoInstallerArtifacts(t, destination)
 	})
 
@@ -1025,6 +1104,45 @@ func (s *InstallMCPCheckerSuite) TestInstaller() {
 		}
 		if len(active) != 0 {
 			t.Fatalf("timeout cleanup left fixture commands active: %v", active)
+		}
+		assertNoInstallerArtifacts(t, destination)
+	})
+
+	s.Run("releases the lock after a bounded download timeout and permits retry", func() {
+		t := s.T()
+		tempDir := t.TempDir()
+		asset := "mcpchecker-linux-amd64.zip"
+		archive, digest := createArchive(t, tempDir, asset, "mcpchecker", fakeLinuxBinary)
+		manifest := filepath.Join(tempDir, "mcpchecker-v0.0.21.sha256")
+		writeManifest(t, manifest, digest+"  "+asset)
+		fakeBin := createFakeCurl(t, tempDir)
+		destination := filepath.Join(tempDir, "tools", "mcpchecker")
+		curlLog := filepath.Join(tempDir, "curl.log")
+		timeoutEnvironment := append(
+			fakeCurlEnvironment(fakeBin, archive, curlLog, "", "", ""),
+			"FAKE_CURL_TIMEOUT=1",
+		)
+
+		if output, err := runInstaller(t, timeoutEnvironment, "v0.0.21", "linux", "amd64", destination, manifest); err == nil {
+			t.Fatalf("simulated curl timeout unexpectedly succeeded: %s", output)
+		}
+		assertNoInstallerArtifacts(t, destination)
+
+		output, err := runInstaller(t,
+			fakeCurlEnvironment(fakeBin, archive, curlLog, "", "", ""),
+			"v0.0.21", "linux", "amd64", destination, manifest,
+		)
+		if err != nil {
+			t.Fatalf("retry after curl timeout failed: %v\n%s", err, output)
+		}
+		assertInstalledPair(t, destination, fakeLinuxBinary, "v0.0.21", "linux/amd64", digest)
+		curlCalls, readErr := os.ReadFile(curlLog)
+		if readErr != nil {
+			t.Fatalf("read curl timeout and retry log: %v", readErr)
+		}
+		expectedCalls := expectedCurlLog("v0.0.21", asset) + expectedCurlLog("v0.0.21", asset)
+		if string(curlCalls) != expectedCalls {
+			t.Fatalf("timeout and retry did not use the required bounded curl request: %q", curlCalls)
 		}
 		assertNoInstallerArtifacts(t, destination)
 	})
