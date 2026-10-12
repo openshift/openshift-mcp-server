@@ -107,7 +107,7 @@ func (s *McpConfigProviderSuite) TestToolHandlerReceivesReloadedConfig() {
 	s.Require().Len(result.Content, 1)
 	s.Equal("yaml", result.Content[0].(*mcp.TextContent).Text)
 
-	newConfig := config.New()
+	newConfig := config.BaseDefault()
 	newConfig.KubeConfig.SetForTest(s.Cfg.KubeConfig.Get())
 	newConfig.ListOutput.SetForTest("table")
 	newConfig.Toolsets.SetForTest([]string{testToolset.name})
