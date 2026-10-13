@@ -3,7 +3,6 @@
 package observability
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -14,28 +13,19 @@ import (
 	internalk8s "github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	mcpserver "github.com/containers/kubernetes-mcp-server/pkg/mcp"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/rhobs/obs-mcp/pkg/openshift"
 	"github.com/stretchr/testify/suite"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/tools/clientcmd"
 
 	_ "github.com/rhobs/obs-mcp/pkg/toolset"
 )
 
-const (
-	openshiftMonitoringNS = "openshift-monitoring"
-	thanosQuerierRoute    = "thanos-querier"
-	alertmanagerRoute     = "alertmanager-main"
-)
-
-// MetricsE2ESuite tests the obs-mcp (metrics) toolset against a real
+// MetricsE2ESuite tests the observability/metrics toolset against a real
 // OpenShift cluster where Prometheus and Alertmanager are available
 // in the openshift-monitoring namespace.
 //
 // URLs are auto-discovered from OpenShift routes in the openshift-monitoring
 // namespace. Override with PROMETHEUS_URL / ALERTMANAGER_URL env vars if needed.
+// See README.md in this package for the full OpenShift e2e migration checklist.
 //
 // Run with:
 //
@@ -50,6 +40,7 @@ const (
 //	PROMETHEUS_URL   - Override auto-discovered Prometheus/Thanos Querier URL
 //	ALERTMANAGER_URL - Override auto-discovered Alertmanager URL
 //	KUBECONFIG       - Path to kubeconfig file (defaults to ~/.kube/config)
+//	PROMETHEUS_K8S_TOKEN - Bearer for monitoring Route HTTP checks (CI)
 type MetricsE2ESuite struct {
 	suite.Suite
 	*test.McpClient
@@ -60,16 +51,17 @@ type MetricsE2ESuite struct {
 }
 
 func (s *MetricsE2ESuite) SetupSuite() {
+	ensurePrometheusK8sToken(s.T())
 	s.prometheusURL = os.Getenv("PROMETHEUS_URL")
 	s.alertmanagerURL = os.Getenv("ALERTMANAGER_URL")
 
 	if s.prometheusURL == "" || s.alertmanagerURL == "" {
-		discovered := s.discoverRoutes()
+		discovered := s.discoverRoutesViaResolver()
 		if s.prometheusURL == "" {
-			s.prometheusURL = discovered[thanosQuerierRoute]
+			s.prometheusURL = discovered["thanos"]
 		}
 		if s.alertmanagerURL == "" {
-			s.alertmanagerURL = discovered[alertmanagerRoute]
+			s.alertmanagerURL = discovered["alertmanager"]
 		}
 	}
 
@@ -107,7 +99,7 @@ func (s *MetricsE2ESuite) discoverTestMetric() string {
 	}
 	defer server.Close()
 
-	client := test.NewMcpClient(s.T(), server.ServeHTTP())
+	client := test.NewMcpClient(s.T(), server.ServeHTTP(), mcpAuthOptions()...)
 	defer client.Close()
 
 	result, err := client.CallTool("list_metrics", map[string]any{"name_regex": ".*cpu.*"})
@@ -123,54 +115,24 @@ func (s *MetricsE2ESuite) discoverTestMetric() string {
 	return output.Metrics[0]
 }
 
-// discoverRoutes reads OpenShift Route objects from the openshift-monitoring
-// namespace and returns a map of route-name -> URL.
-func (s *MetricsE2ESuite) discoverRoutes() map[string]string {
+// discoverRoutesViaResolver uses the production MetricsRouteResolver so suite
+// setup and TestRouteDiscovery_* exercise the same code path (no duplicate
+// hand-rolled Route parsing).
+func (s *MetricsE2ESuite) discoverRoutesViaResolver() map[string]string {
 	result := make(map[string]string)
+	resolver := &openshift.MetricsRouteResolver{}
+	dyn := dynamicClient(s.T())
 
-	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, nil)
-	restConfig, err := kubeConfig.ClientConfig()
-	if err != nil {
-		s.T().Logf("Could not load kubeconfig for route discovery: %v", err)
-		return result
+	if url, err := resolver.ResolveMetricsBackend(s.T().Context(), dyn, "thanos"); err != nil {
+		s.T().Logf("Could not resolve thanos/prometheus route: %v", err)
+	} else {
+		result["thanos"] = url
 	}
-
-	dynClient, err := dynamic.NewForConfig(restConfig)
-	if err != nil {
-		s.T().Logf("Could not create dynamic client for route discovery: %v", err)
-		return result
+	if url, err := resolver.ResolveAlertmanager(s.T().Context(), dyn); err != nil {
+		s.T().Logf("Could not resolve alertmanager route: %v", err)
+	} else {
+		result["alertmanager"] = url
 	}
-
-	routeGVR := schema.GroupVersionResource{
-		Group:    "route.openshift.io",
-		Version:  "v1",
-		Resource: "routes",
-	}
-
-	for _, routeName := range []string{thanosQuerierRoute, alertmanagerRoute} {
-		route, err := dynClient.Resource(routeGVR).Namespace(openshiftMonitoringNS).
-			Get(context.Background(), routeName, metav1.GetOptions{})
-		if err != nil {
-			s.T().Logf("Could not get route %s/%s: %v", openshiftMonitoringNS, routeName, err)
-			continue
-		}
-
-		host, found, _ := unstructured.NestedString(route.Object, "spec", "host")
-		if !found || host == "" {
-			s.T().Logf("Route %s has no spec.host", routeName)
-			continue
-		}
-
-		tls, _, _ := unstructured.NestedString(route.Object, "spec", "tls", "termination")
-		scheme := "http"
-		if tls != "" {
-			scheme = "https"
-		}
-
-		result[routeName] = fmt.Sprintf("%s://%s", scheme, host)
-	}
-
 	return result
 }
 
@@ -178,18 +140,16 @@ func (s *MetricsE2ESuite) buildConfig() *config.Config {
 	tomlCfg := fmt.Sprintf(`
 		toolsets = ["observability/metrics"]
 		[toolset_configs."observability/metrics"]
+		auth_mode = "%s"
 		prometheus_url = "%s"
 		alertmanager_url = "%s"
 		insecure = true
 		guardrails = "none"
-	`, s.prometheusURL, s.alertmanagerURL)
+	`, metricsAuthMode(), s.prometheusURL, s.alertmanagerURL)
 
 	cfg, err := config.ReadToml(s.T().Context(), []byte(tomlCfg))
 	s.Require().NoError(err, "Failed to parse test config")
-
-	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
-		cfg.KubeConfig.SetForTest(kubeconfig)
-	}
+	applyE2EDefaults(cfg)
 	return cfg
 }
 
@@ -202,7 +162,7 @@ func (s *MetricsE2ESuite) SetupTest() {
 	s.server, err = mcpserver.NewServer(s.T().Context(), mcpserver.Configuration{Config: cfg}, provider)
 	s.Require().NoError(err, "Failed to create MCP server")
 
-	s.McpClient = test.NewMcpClient(s.T(), s.server.ServeHTTP())
+	s.McpClient = test.NewMcpClient(s.T(), s.server.ServeHTTP(), mcpAuthOptions()...)
 }
 
 func (s *MetricsE2ESuite) TearDownTest() {
@@ -212,20 +172,6 @@ func (s *MetricsE2ESuite) TearDownTest() {
 	if s.server != nil {
 		s.server.Close()
 	}
-}
-
-func (s *MetricsE2ESuite) TestListMetrics() {
-	s.Run("lists metrics matching a regex pattern", func() {
-		toolResult, err := s.CallTool("list_metrics", map[string]any{
-			"name_regex": ".*cpu.*",
-		})
-		s.Require().NoError(err)
-		s.Require().False(toolResult.IsError, "tool returned error: %s", textContent(toolResult))
-
-		var output listMetricsOutput
-		s.Require().NoError(json.Unmarshal([]byte(textContent(toolResult)), &output))
-		s.NotEmpty(output.Metrics, "expected at least one CPU metric")
-	})
 }
 
 func (s *MetricsE2ESuite) TestExecuteInstantQuery() {
