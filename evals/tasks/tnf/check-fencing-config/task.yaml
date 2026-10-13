@@ -1,0 +1,15 @@
+kind: Task
+metadata:
+  labels:
+    suite: tnf
+  name: check-fencing-config
+  difficulty: easy
+steps:
+  prompt:
+    inline: Check the fencing configuration for this Two-Node Fencing cluster. Verify that BareMetalHost resources exist, BMC credentials are valid, and the cluster topology matches a TNF profile.
+  verify:
+    contains: "BMC"
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "tnf_check_fencing_config"
