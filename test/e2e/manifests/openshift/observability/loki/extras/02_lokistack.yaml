@@ -1,0 +1,19 @@
+apiVersion: loki.grafana.com/v1
+kind: LokiStack
+metadata:
+  name: observability-loki
+  namespace: observability-loki
+spec:
+  managementState: Managed
+  size: 1x.demo
+  # storageClassName patched at apply time by hack/e2e/observability/setup-openshift.sh
+  # (LOKI_STORAGE_CLASS or cluster default StorageClass).
+  storage:
+    schemas:
+      - effectiveDate: "2020-10-11"
+        version: v13
+    secret:
+      name: loki-storage
+      type: s3
+  tenants:
+    mode: openshift-network

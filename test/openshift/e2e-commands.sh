@@ -19,3 +19,14 @@ export MCP_SERVER_IMAGE="${IMAGE_OPENSHIFT_MCP_SERVER}"
 
 make e2e-ci-setup
 make e2e-ci-test
+
+# Observability e2e: install Tempo/Loki (+ platform monitoring already present),
+# run the full suite, always tear stacks down (ephemeral CI cluster).
+cleanup_observability_e2e() {
+    echo "==> Cleaning up observability e2e stacks"
+    make clean-observability-e2e || true
+}
+trap cleanup_observability_e2e EXIT
+
+make setup-observability-e2e
+make test-observability-e2e

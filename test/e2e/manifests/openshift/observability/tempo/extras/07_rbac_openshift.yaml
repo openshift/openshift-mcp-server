@@ -1,0 +1,47 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: traces-reader-project1
+rules:
+- apiGroups: [tempo.grafana.com]
+  resources: [project1]
+  resourceNames: [traces]
+  verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: traces-writer-project1
+rules:
+- apiGroups: [tempo.grafana.com]
+  resources: [project1]
+  resourceNames: [traces]
+  verbs: [create]
+---
+# allow any authenticated user to read traces from the 'project1' tenant in Tempo
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: traces-reader-project1
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: traces-reader-project1
+subjects:
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: system:authenticated
+---
+# allow otel-collector to write traces to the 'project1' tenant in Tempo
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tracing-otel-collector-traces-writer-project1
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: traces-writer-project1
+subjects:
+- kind: ServiceAccount
+  name: otel-collector
+  namespace: tracing
