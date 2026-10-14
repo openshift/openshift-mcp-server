@@ -19,3 +19,7 @@ export MCP_SERVER_IMAGE="${IMAGE_OPENSHIFT_MCP_SERVER}"
 
 make e2e-ci-setup
 make e2e-ci-test
+
+# Platform monitoring only (Thanos/Alertmanager routes + metrics toolset).
+# No Tempo/Loki stack install — runs on every OpenShift CI job.
+make test-observability-e2e-metrics
