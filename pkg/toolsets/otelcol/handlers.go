@@ -38,12 +38,21 @@ type schemaManagerWrapper struct {
 	manager *schemagen.SchemaManager
 }
 
+// slashFS converts OS-native paths from schemagen to fs.FS paths.
+type slashFS struct {
+	fs.FS
+}
+
+func (f slashFS) Open(name string) (fs.File, error) {
+	return f.FS.Open(strings.ReplaceAll(name, `\`, "/"))
+}
+
 // NewSchemaLoaderFromFS creates a new SchemaLoader using schemas from the provided filesystem.
 // This allows using an embed.FS or any other fs.FS implementation.
 // The basePath should be the path within the filesystem where version subdirectories are located.
 func NewSchemaLoaderFromFS(filesystem fs.FS, basePath string) SchemaLoader {
 	return &schemaManagerWrapper{
-		manager: schemagen.NewSchemaManagerFromFS(filesystem, basePath),
+		manager: schemagen.NewSchemaManagerFromFS(slashFS{FS: filesystem}, strings.ReplaceAll(basePath, `\`, "/")),
 	}
 }
 

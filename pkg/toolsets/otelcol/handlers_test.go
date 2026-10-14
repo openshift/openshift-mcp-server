@@ -1,8 +1,10 @@
 package otelcol
 
 import (
+	"io/fs"
 	"slices"
 	"testing"
+	"testing/fstest"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/os-observability/redhat-opentelemetry-collector/configschemas"
@@ -23,6 +25,26 @@ func handlerParams(t *testing.T, args map[string]any) api.ToolHandlerParams {
 	return api.ToolHandlerParams{
 		Context: toolcfg.With(t.Context(), ToolsetName, &Config{SchemaFS: configschemas.Schemas}),
 		Request: &mockToolCallRequest{arguments: args},
+	}
+}
+
+func TestSchemaLoaderWindowsPaths(t *testing.T) {
+	filesystem := fstest.MapFS{"root/schemas/0.144.0/schema.json": {Data: []byte("schema")}}
+	data, err := fs.ReadFile(slashFS{FS: filesystem}, `root\schemas\0.144.0\schema.json`)
+	if err != nil {
+		t.Fatalf("open schema with Windows separators: %v", err)
+	}
+	if string(data) != "schema" {
+		t.Fatalf("schema content = %q, want %q", data, "schema")
+	}
+
+	loader := NewSchemaLoaderFromFS(filesystem, `root\schemas`)
+	versions, err := loader.GetAllVersions()
+	if err != nil {
+		t.Fatalf("list versions with Windows base path: %v", err)
+	}
+	if !slices.Contains(versions, "0.144.0") {
+		t.Fatalf("expected 0.144.0 in versions: %v", versions)
 	}
 }
 
