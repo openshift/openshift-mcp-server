@@ -6,11 +6,41 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
-	"github.com/containers/kubernetes-mcp-server/pkg/output"
 	"github.com/google/jsonschema-go/jsonschema"
 )
+
+// ToolContent represents a single content block in a multi-content tool result.
+// Used by tools that return both text and images (e.g., vm_console_screenshot).
+type ToolContent struct {
+	Data     []byte
+	MIMEType string
+}
+
+func (c *ToolContent) IsText() bool {
+	return c != nil && (c.MIMEType == "" || strings.HasPrefix(c.MIMEType, "text/"))
+}
+
+func (c *ToolContent) Text() string {
+	if c == nil {
+		return ""
+	}
+	return string(c.Data)
+}
+
+// NewTextToolContent creates a text content block.
+func NewTextToolContent(text string) *ToolContent {
+	return &ToolContent{Data: []byte(text)}
+}
+
+// NewImageToolContent creates an image content block, copying the byte slice for safety.
+func NewImageToolContent(data []byte, mimeType string) *ToolContent {
+	dataCopy := make([]byte, len(data))
+	copy(dataCopy, data)
+	return &ToolContent{Data: dataCopy, MIMEType: mimeType}
+}
 
 type ServerTool struct {
 	Tool    Tool
@@ -28,13 +58,12 @@ type ServerTool struct {
 }
 
 // ToolApp describes the UI resource rendered for a tool result.
-// Handler returns a complete, self-contained HTML document.
 type ToolApp struct {
 	URI         string
 	Name        string
 	Description string
 	Meta        map[string]any
-	Handler     func(context.Context) (string, error)
+	Handler     ResourceHandler
 }
 
 // Validate verifies that an app can be safely registered as an MCP resource.
@@ -77,6 +106,12 @@ func (s *ServerTool) IsTargetListProvider() bool {
 	return false
 }
 
+type ToolsetContext struct {
+	Inspector                         ClusterInspector
+	Config                            *config.Config
+	TargetCompatibilityFiltersEnabled bool
+}
+
 type Toolset interface {
 	// GetName returns the name of the toolset.
 	// Used to identify the toolset in configuration, logs, and command-line arguments.
@@ -85,16 +120,16 @@ type Toolset interface {
 	// GetDescription returns a human-readable description of the toolset.
 	// Will be used to generate documentation and help text.
 	GetDescription() string
-	GetTools(p FilteringProvider) []ServerTool
+	GetTools(ctx context.Context, toolsetContext ToolsetContext) []ServerTool
 	// GetPrompts returns the prompts provided by this toolset.
 	// Returns nil if the toolset doesn't provide any prompts.
-	GetPrompts() []ServerPrompt
+	GetPrompts(ctx context.Context, toolsetContext ToolsetContext) []ServerPrompt
 	// GetResources returns the resources provided by this toolset.
 	// Returns nil if the toolset doesn't provide any resources.
-	GetResources() []ServerResource
+	GetResources(ctx context.Context, toolsetContext ToolsetContext) []ServerResource
 	// GetResourceTemplates returns the resource templates provided by this toolset.
 	// Returns nil if the toolset doesn't provide any resource templates.
-	GetResourceTemplates() []ServerResourceTemplate
+	GetResourceTemplates(ctx context.Context, toolsetContext ToolsetContext) []ServerResourceTemplate
 }
 
 type ToolCallRequest interface {
@@ -102,12 +137,17 @@ type ToolCallRequest interface {
 }
 
 type ToolCallResult struct {
-	// Raw content returned by the tool.
+	// Raw content returned by the tool. Ignored whenever ContentBlocks is
+	// non-empty (see ContentBlocks) - not required to be left empty in that case,
+	// simply unused.
 	Content string
 	// StructuredContent is an optional JSON-serializable value for MCP Apps UI rendering.
 	// When set, it is passed as structuredContent in the MCP CallToolResult alongside Content.
 	// Must be completely omitted (nil) when not used.
 	StructuredContent any
+	// ContentBlocks are SDK-neutral content blocks (text and/or images) for multi-content
+	// tools. When non-empty, these take precedence over the legacy Content field above.
+	ContentBlocks []*ToolContent
 	// Error (non-protocol) to send back to the LLM.
 	Error error
 }
@@ -116,6 +156,17 @@ type ToolCallResult struct {
 // Use this for tools that return human-readable text output.
 func NewToolCallResult(content string, err error) *ToolCallResult {
 	return NewToolCallResultFull(content, nil, err)
+}
+
+// NewToolCallResultContentBlocks creates a ToolCallResult from content blocks (text and/or
+// images). Use this for multi-content tools like vm_console_screenshot.
+//
+// It takes no structured/error parameters, unlike its siblings below: set
+// ToolCallResult.StructuredContent or .Error directly on the result if a caller needs them
+// (the growing NewToolCallResult...() family would benefit from an options pattern instead of
+// each new combination growing its own constructor, but that's a larger change than this one).
+func NewToolCallResultContentBlocks(blocks ...*ToolContent) *ToolCallResult {
+	return &ToolCallResult{ContentBlocks: blocks}
 }
 
 // NewToolCallResultFull creates a ToolCallResult with both human-readable text
@@ -171,10 +222,17 @@ type ResourceContent struct {
 	Blob []byte
 }
 
+// ResourceCallRequest provides the URI requested by an MCP resource read.
+type ResourceCallRequest interface {
+	GetURI() string
+}
+
+// ResourceHandlerParams contains the parameters passed to resource handlers.
+type ResourceHandlerParams HandlerParams[ResourceCallRequest]
+
 // ResourceHandler is called when a client reads a resource.
-// Session state (auth, request context) is available on ctx via sessionInjectionMiddleware.
 // Handlers should return a ResourceContent with exactly one of Text or Blob set.
-type ResourceHandler func(ctx context.Context) (*ResourceContent, error)
+type ResourceHandler func(params ResourceHandlerParams) (*ResourceContent, error)
 
 // ServerResource represents a resource that can be registered with the MCP server.
 type ServerResource struct {
@@ -192,10 +250,9 @@ type ResourceTemplate struct {
 }
 
 // ResourceTemplateHandler is called when a client reads a resource matching a template.
-// Session state (auth, request context) is available on ctx via sessionInjectionMiddleware.
-// The uri parameter is the actual resource URI that matches the template.
+// The request URI is available from params.Request.GetURI().
 // Handlers should return a ResourceContent with exactly one of Text or Blob set.
-type ResourceTemplateHandler func(ctx context.Context, uri string) (*ResourceContent, error)
+type ResourceTemplateHandler func(params ResourceHandlerParams) (*ResourceContent, error)
 
 // ServerResourceTemplate represents a resource template that can be registered with the MCP server.
 type ServerResourceTemplate struct {
@@ -204,15 +261,12 @@ type ServerResourceTemplate struct {
 	Handler          ResourceTemplateHandler
 }
 
-type ToolHandlerParams struct {
-	context.Context
-	Config                  *config.Config
-	ClusterProviderStrategy string
-	KubernetesClient
-	FilteringProvider FilteringProvider
-	ToolCallRequest
-	ListOutput output.Output
-	Elicitor
+// ToolHandlerParams contains the shared handler environment and tool request.
+type ToolHandlerParams HandlerParams[ToolCallRequest]
+
+// GetArguments returns the arguments supplied with the tool call.
+func (p ToolHandlerParams) GetArguments() map[string]any {
+	return p.Request.GetArguments()
 }
 
 // ExtendedConfig is configuration owned by a provider or toolset.

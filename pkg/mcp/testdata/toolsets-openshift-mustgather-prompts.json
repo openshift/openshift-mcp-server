@@ -99,6 +99,7 @@
       }
     ],
     "description": "Plan for collecting a must-gather archive from an OpenShift cluster. Must-gather is a tool for collecting cluster data related to debugging and troubleshooting like logs, kubernetes resources, etc.",
-    "name": "plan_mustgather"
+    "name": "plan_mustgather",
+    "title": "Plan a must-gather collection"
   }
 ]

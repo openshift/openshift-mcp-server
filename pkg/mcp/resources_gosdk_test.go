@@ -44,7 +44,7 @@ func (s *ResourceSuite) TestResources() {
 					Description: "First",
 					MIMEType:    "text/plain",
 				},
-				Handler: func(_ context.Context) (*api.ResourceContent, error) {
+				Handler: func(_ api.ResourceHandlerParams) (*api.ResourceContent, error) {
 					return &api.ResourceContent{Text: txt1}, nil
 				},
 			},
@@ -55,7 +55,7 @@ func (s *ResourceSuite) TestResources() {
 					Description: "Second",
 					MIMEType:    "application/json",
 				},
-				Handler: func(_ context.Context) (*api.ResourceContent, error) {
+				Handler: func(_ api.ResourceHandlerParams) (*api.ResourceContent, error) {
 					return &api.ResourceContent{Text: json2}, nil
 				},
 			},
@@ -118,8 +118,8 @@ func (s *ResourceSuite) TestResourceTemplates() {
 					Description: txtFoo,
 					MIMEType:    "text/plain",
 				},
-				Handler: func(_ context.Context, uri string) (*api.ResourceContent, error) {
-					return &api.ResourceContent{Text: "content for: " + uri}, nil
+				Handler: func(params api.ResourceHandlerParams) (*api.ResourceContent, error) {
+					return &api.ResourceContent{Text: "content for: " + params.Request.GetURI()}, nil
 				},
 			},
 		},
@@ -206,7 +206,7 @@ func (s *ResourceSuite) TestHandlerErrors() {
 					Name:     "Error Resource",
 					MIMEType: "text/plain",
 				},
-				Handler: func(_ context.Context) (*api.ResourceContent, error) {
+				Handler: func(_ api.ResourceHandlerParams) (*api.ResourceContent, error) {
 					return nil, errors.New("permission denied")
 				},
 			},
@@ -218,7 +218,7 @@ func (s *ResourceSuite) TestHandlerErrors() {
 					Name:        "Template with Error",
 					MIMEType:    "text/plain",
 				},
-				Handler: func(_ context.Context, uri string) (*api.ResourceContent, error) {
+				Handler: func(_ api.ResourceHandlerParams) (*api.ResourceContent, error) {
 					return nil, errors.New("permission denied")
 				},
 			},
@@ -252,7 +252,7 @@ func (s *ResourceSuite) TestNilContentReturnsError() {
 					Name:     "Nil Content Resource",
 					MIMEType: "text/plain",
 				},
-				Handler: func(_ context.Context) (*api.ResourceContent, error) {
+				Handler: func(_ api.ResourceHandlerParams) (*api.ResourceContent, error) {
 					return nil, nil
 				},
 			},
@@ -264,7 +264,7 @@ func (s *ResourceSuite) TestNilContentReturnsError() {
 					Name:        "Nil Content Template",
 					MIMEType:    "text/plain",
 				},
-				Handler: func(_ context.Context, _ string) (*api.ResourceContent, error) {
+				Handler: func(_ api.ResourceHandlerParams) (*api.ResourceContent, error) {
 					return nil, nil
 				},
 			},
@@ -298,7 +298,7 @@ func (s *ResourceSuite) TestReloadRemovesResources() {
 					Name:     "Removable",
 					MIMEType: "text/plain",
 				},
-				Handler: func(_ context.Context) (*api.ResourceContent, error) {
+				Handler: func(_ api.ResourceHandlerParams) (*api.ResourceContent, error) {
 					return &api.ResourceContent{Text: "will be removed"}, nil
 				},
 			},
@@ -310,8 +310,8 @@ func (s *ResourceSuite) TestReloadRemovesResources() {
 					Name:        "Removable Template",
 					MIMEType:    "text/plain",
 				},
-				Handler: func(_ context.Context, uri string) (*api.ResourceContent, error) {
-					return &api.ResourceContent{Text: "template: " + uri}, nil
+				Handler: func(params api.ResourceHandlerParams) (*api.ResourceContent, error) {
+					return &api.ResourceContent{Text: "template: " + params.Request.GetURI()}, nil
 				},
 			},
 		},
@@ -363,7 +363,7 @@ func (s *ResourceSuite) TestReloadNotifiesResourceListChanged() {
 					Name:     "Notify Resource",
 					MIMEType: "text/plain",
 				},
-				Handler: func(_ context.Context) (*api.ResourceContent, error) {
+				Handler: func(_ api.ResourceHandlerParams) (*api.ResourceContent, error) {
 					return &api.ResourceContent{Text: "notify"}, nil
 				},
 			},
@@ -402,7 +402,7 @@ func (s *ResourceSuite) TestBlobResource() {
 					Name:     "Image Resource",
 					MIMEType: "image/png",
 				},
-				Handler: func(_ context.Context) (*api.ResourceContent, error) {
+				Handler: func(_ api.ResourceHandlerParams) (*api.ResourceContent, error) {
 					return &api.ResourceContent{Blob: blobData}, nil
 				},
 			},
@@ -433,7 +433,7 @@ func (s *ResourceSuite) TestMIMETypeOverride() {
 					Name:     "Override Resource",
 					MIMEType: "text/plain",
 				},
-				Handler: func(_ context.Context) (*api.ResourceContent, error) {
+				Handler: func(_ api.ResourceHandlerParams) (*api.ResourceContent, error) {
 					return &api.ResourceContent{
 						Text:     `{"overridden": true}`,
 						MIMEType: "application/json",
@@ -448,9 +448,9 @@ func (s *ResourceSuite) TestMIMETypeOverride() {
 					Name:        "Override Template",
 					MIMEType:    "text/plain",
 				},
-				Handler: func(_ context.Context, uri string) (*api.ResourceContent, error) {
+				Handler: func(params api.ResourceHandlerParams) (*api.ResourceContent, error) {
 					return &api.ResourceContent{
-						Text:     `{"uri": "` + uri + `"}`,
+						Text:     `{"uri": "` + params.Request.GetURI() + `"}`,
 						MIMEType: "application/json",
 					}, nil
 				},
@@ -489,7 +489,7 @@ func (s *ResourceSuite) TestInvalidURITemplateReturnsError() {
 					Name:     "Good Resource",
 					MIMEType: "text/plain",
 				},
-				Handler: func(_ context.Context) (*api.ResourceContent, error) {
+				Handler: func(_ api.ResourceHandlerParams) (*api.ResourceContent, error) {
 					return &api.ResourceContent{Text: "still up"}, nil
 				},
 			},
@@ -505,7 +505,7 @@ func (s *ResourceSuite) TestInvalidURITemplateReturnsError() {
 					Name:        "Bad Template",
 					MIMEType:    "text/plain",
 				},
-				Handler: func(_ context.Context, _ string) (*api.ResourceContent, error) {
+				Handler: func(_ api.ResourceHandlerParams) (*api.ResourceContent, error) {
 					return &api.ResourceContent{Text: "unreachable"}, nil
 				},
 			},
@@ -571,7 +571,7 @@ func (s *ResourceSuite) TestInvalidResourceURIReturnsError() {
 					Name:     "Good Resource",
 					MIMEType: "text/plain",
 				},
-				Handler: func(_ context.Context) (*api.ResourceContent, error) {
+				Handler: func(_ api.ResourceHandlerParams) (*api.ResourceContent, error) {
 					return &api.ResourceContent{Text: "still up"}, nil
 				},
 			},
@@ -588,7 +588,7 @@ func (s *ResourceSuite) TestInvalidResourceURIReturnsError() {
 					Name:     "Bad URI Resource",
 					MIMEType: "text/plain",
 				},
-				Handler: func(_ context.Context) (*api.ResourceContent, error) {
+				Handler: func(_ api.ResourceHandlerParams) (*api.ResourceContent, error) {
 					return &api.ResourceContent{Text: "unreachable"}, nil
 				},
 			},
@@ -633,7 +633,7 @@ func (s *ResourceSuite) TestResourceContentInvariant() {
 					Name:     "Both Empty",
 					MIMEType: "text/plain",
 				},
-				Handler: func(_ context.Context) (*api.ResourceContent, error) {
+				Handler: func(_ api.ResourceHandlerParams) (*api.ResourceContent, error) {
 					return &api.ResourceContent{}, nil
 				},
 			},
@@ -645,7 +645,7 @@ func (s *ResourceSuite) TestResourceContentInvariant() {
 					Name:        "Tmpl Both Empty",
 					MIMEType:    "text/plain",
 				},
-				Handler: func(_ context.Context, _ string) (*api.ResourceContent, error) {
+				Handler: func(_ api.ResourceHandlerParams) (*api.ResourceContent, error) {
 					return &api.ResourceContent{}, nil
 				},
 			},
@@ -661,7 +661,7 @@ func (s *ResourceSuite) TestResourceContentInvariant() {
 					Name:     "Both Set",
 					MIMEType: "text/plain",
 				},
-				Handler: func(_ context.Context) (*api.ResourceContent, error) {
+				Handler: func(_ api.ResourceHandlerParams) (*api.ResourceContent, error) {
 					return &api.ResourceContent{Text: "x", Blob: []byte{0x01}}, nil
 				},
 			},
@@ -673,7 +673,7 @@ func (s *ResourceSuite) TestResourceContentInvariant() {
 					Name:        "Tmpl Both Set",
 					MIMEType:    "text/plain",
 				},
-				Handler: func(_ context.Context, _ string) (*api.ResourceContent, error) {
+				Handler: func(_ api.ResourceHandlerParams) (*api.ResourceContent, error) {
 					return &api.ResourceContent{Text: "x", Blob: []byte{0x01}}, nil
 				},
 			},
@@ -723,11 +723,17 @@ func (m *mockResourceToolset) GetName() string {
 	}
 	return "resource-test"
 }
-func (m *mockResourceToolset) GetDescription() string                            { return "Test toolset for resources" }
-func (m *mockResourceToolset) GetTools(_ api.FilteringProvider) []api.ServerTool { return nil }
-func (m *mockResourceToolset) GetPrompts() []api.ServerPrompt                    { return nil }
-func (m *mockResourceToolset) GetResources() []api.ServerResource                { return m.resources }
-func (m *mockResourceToolset) GetResourceTemplates() []api.ServerResourceTemplate {
+func (m *mockResourceToolset) GetDescription() string { return "Test toolset for resources" }
+func (m *mockResourceToolset) GetTools(context.Context, api.ToolsetContext) []api.ServerTool {
+	return nil
+}
+func (m *mockResourceToolset) GetPrompts(context.Context, api.ToolsetContext) []api.ServerPrompt {
+	return nil
+}
+func (m *mockResourceToolset) GetResources(context.Context, api.ToolsetContext) []api.ServerResource {
+	return m.resources
+}
+func (m *mockResourceToolset) GetResourceTemplates(context.Context, api.ToolsetContext) []api.ServerResourceTemplate {
 	return m.resourceTemplates
 }
 
