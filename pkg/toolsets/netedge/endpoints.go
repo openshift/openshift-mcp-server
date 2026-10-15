@@ -12,7 +12,13 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func initEndpoints() []api.ServerTool {
+var serviceEndpointSliceGVK = schema.GroupVersionKind{
+	Group:   "discovery.k8s.io",
+	Version: "v1",
+	Kind:    "EndpointSlice",
+}
+
+func initEndpoints(p api.FilteringProvider) []api.ServerTool {
 	return []api.ServerTool{
 		{
 			Tool: api.Tool{
@@ -47,7 +53,8 @@ func initEndpoints() []api.ServerTool {
 				}},
 				Namespace: &api.RBACNamespace{Argument: "namespace"},
 			}),
-			Handler: getServiceEndpoints,
+			Handler:                    getServiceEndpoints,
+			TargetCompatibilityFilters: []func() bool{targetHasGVK(p, serviceEndpointSliceGVK)},
 		},
 	}
 }

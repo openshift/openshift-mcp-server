@@ -11,7 +11,13 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func initCoreDNS() []api.ServerTool {
+var coreDNSConfigMapGVK = schema.GroupVersionKind{
+	Group:   "",
+	Version: "v1",
+	Kind:    "ConfigMap",
+}
+
+func initCoreDNS(p api.FilteringProvider) []api.ServerTool {
 	return []api.ServerTool{
 		{
 			Tool: api.Tool{
@@ -35,7 +41,8 @@ func initCoreDNS() []api.ServerTool {
 				Namespace:    &api.RBACNamespace{Name: "openshift-dns"},
 				ResourceName: &api.RBACResourceName{Name: "dns-default"},
 			}),
-			Handler: getCoreDNSConfig,
+			Handler:                    getCoreDNSConfig,
+			TargetCompatibilityFilters: []func() bool{targetHasGVK(p, coreDNSConfigMapGVK)},
 		},
 	}
 }

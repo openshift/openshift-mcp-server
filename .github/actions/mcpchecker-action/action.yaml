@@ -1,0 +1,235 @@
+# Vendored from mcpchecker/mcpchecker v0.0.21 (commit 92e4e860817f00e1d48640b756762ccf3ad39532).
+# Local changes pin nested action dependencies to immutable commits.
+name: 'Run mcpchecker MCP Evaluation'
+description: 'Evaluate MCP servers using the mcpchecker framework'
+author: 'mcpchecker'
+
+inputs:
+  eval-config:
+    description: 'Path to eval.yaml configuration file'
+    required: true
+
+  mcpchecker-version:
+    description: 'Version of mcpchecker to use (latest, main, or vX.Y.Z)'
+    required: false
+    default: 'latest'
+
+  task-filter:
+    description: 'Regular expression to filter tasks (passed to -run flag)'
+    required: false
+    default: ''
+
+  label-selector:
+    description: 'Label selector to filter tasks (e.g., "env=prod,tier=backend")'
+    required: false
+    default: ''
+
+  output-format:
+    description: 'Output format: text or json'
+    required: false
+    default: 'json'
+
+  verbose:
+    description: 'Enable verbose output'
+    required: false
+    default: 'false'
+
+  upload-artifacts:
+    description: 'Upload results as GitHub artifacts'
+    required: false
+    default: 'true'
+
+  artifact-name:
+    description: 'Name for uploaded artifacts'
+    required: false
+    default: 'mcpchecker-results'
+
+  fail-on-error:
+    description: 'Fail the workflow if evaluation fails'
+    required: false
+    default: 'true'
+
+  task-pass-threshold:
+    description: 'Minimum fraction of tasks that must pass verification (0.0 to 1.0). Default 1.0 means all tasks must pass.'
+    required: false
+    default: '1.0'
+
+  assertion-pass-threshold:
+    description: 'Minimum fraction of tasks that must pass assertions (0.0 to 1.0). Default 1.0 means all tasks must pass assertions.'
+    required: false
+    default: '1.0'
+
+  working-directory:
+    description: 'Working directory for running evaluations'
+    required: false
+    default: '.'
+
+  parallel:
+    description: 'Number of parallel workers for tasks marked as parallel (1 = sequential)'
+    required: false
+    default: '1'
+
+outputs:
+  results-file:
+    description: 'Path to the JSON results file'
+    value: ${{ steps.run-eval.outputs.results-file }}
+
+  passed:
+    description: 'Whether evaluations met the thresholds (true/false)'
+    value: ${{ steps.run-eval.outputs.passed }}
+
+  task-pass-rate:
+    description: 'Fraction of tasks that passed verification (0.0 to 1.0)'
+    value: ${{ steps.run-eval.outputs.task-pass-rate }}
+
+  assertion-pass-rate:
+    description: 'Fraction of tasks that passed assertions (0.0 to 1.0)'
+    value: ${{ steps.run-eval.outputs.assertion-pass-rate }}
+
+  tasks-passed:
+    description: 'Number of tasks that passed verification'
+    value: ${{ steps.run-eval.outputs.tasks-passed }}
+
+  tasks-total:
+    description: 'Total number of tasks run'
+    value: ${{ steps.run-eval.outputs.tasks-total }}
+
+  assertions-passed:
+    description: 'Number of tasks that passed assertions'
+    value: ${{ steps.run-eval.outputs.assertions-passed }}
+
+  assertions-total:
+    description: 'Total number of tasks with assertions evaluated'
+    value: ${{ steps.run-eval.outputs.assertions-total }}
+
+  mcpchecker-path:
+    description: 'Path to the installed mcpchecker binary'
+    value: ${{ steps.setup.outputs.mcpchecker-path }}
+
+  agent-path:
+    description: 'Path to the installed agent binary'
+    value: ${{ steps.setup.outputs.agent-path }}
+
+  mcpchecker-version:
+    description: 'The version of mcpchecker that was installed'
+    value: ${{ steps.setup.outputs.version }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup mcpchecker
+      id: setup
+      uses: mcpchecker/mcpchecker/.github/actions/setup-mcpchecker@92e4e860817f00e1d48640b756762ccf3ad39532
+      with:
+        version: ${{ inputs.mcpchecker-version }}
+        action-ref: ${{ github.action_ref }}
+
+    - name: Run evaluation
+      id: run-eval
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        MCPCHECKER="${{ steps.setup.outputs.mcpchecker-path }}"
+
+        # Build command as array (safe from shell injection)
+        CMD=("$MCPCHECKER" "check" "${{ inputs.eval-config }}")
+
+        if [ -n "${{ inputs.output-format }}" ]; then
+          CMD+=("--output" "${{ inputs.output-format }}")
+        fi
+        if [ -n "${{ inputs.task-filter }}" ]; then
+          CMD+=("--run" "${{ inputs.task-filter }}")
+        fi
+        if [ -n "${{ inputs.label-selector }}" ]; then
+          CMD+=("--label-selector" "${{ inputs.label-selector }}")
+        fi
+        if [ "${{ inputs.verbose }}" = "true" ]; then
+          CMD+=("--verbose")
+        fi
+        if [ "${{ inputs.parallel }}" != "1" ] && [ -n "${{ inputs.parallel }}" ]; then
+          CMD+=("--parallel" "${{ inputs.parallel }}")
+        fi
+
+        echo "Running: ${CMD[@]}"
+        echo ""
+
+        # Run evaluation
+        set +e
+        "${CMD[@]}"
+        EVAL_EXIT_CODE=$?
+        set -e
+
+        echo ""
+        echo "=== Evaluation Results ==="
+
+        # Find results file (deterministic: pick most recently modified)
+        # ls -t sorts by modification time (newest first), ensuring deterministic selection
+        RESULTS_FILE=$(ls -t mcpchecker-*-out.json 2>/dev/null | head -1 || echo "")
+
+        if [ -z "$RESULTS_FILE" ]; then
+          echo "⚠ No results file found"
+          echo "results-file=" >> $GITHUB_OUTPUT
+          echo "passed=false" >> $GITHUB_OUTPUT
+          if [ "${{ inputs.fail-on-error }}" = "true" ]; then
+            exit 1
+          fi
+          exit 0
+        fi
+
+        echo "Results file: $RESULTS_FILE"
+        echo "results-file=$RESULTS_FILE" >> $GITHUB_OUTPUT
+
+        # Output metrics in GitHub Actions format
+        "$MCPCHECKER" result summary "$RESULTS_FILE" --github-output >> $GITHUB_OUTPUT
+
+        # Display human-readable summary
+        "$MCPCHECKER" result summary "$RESULTS_FILE"
+
+        # Verify thresholds
+        TASK_THRESHOLD="${{ inputs.task-pass-threshold }}"
+        ASSERTION_THRESHOLD="${{ inputs.assertion-pass-threshold }}"
+
+        set +e
+        "$MCPCHECKER" result verify "$RESULTS_FILE" --task "$TASK_THRESHOLD" --assertion "$ASSERTION_THRESHOLD"
+        VERIFY_EXIT_CODE=$?
+        set -e
+
+        if [ $VERIFY_EXIT_CODE -eq 0 ]; then
+          echo "passed=true" >> $GITHUB_OUTPUT
+          echo ""
+          echo "✓ Evaluation completed successfully"
+        else
+          echo "passed=false" >> $GITHUB_OUTPUT
+          echo ""
+          echo "❌ Evaluation thresholds not met"
+        fi
+
+        # Determine final exit code
+        if [ $EVAL_EXIT_CODE -ne 0 ]; then
+          echo "❌ Evaluation exited with code $EVAL_EXIT_CODE"
+          FINAL_EXIT_CODE=$EVAL_EXIT_CODE
+        elif [ $VERIFY_EXIT_CODE -ne 0 ]; then
+          FINAL_EXIT_CODE=$VERIFY_EXIT_CODE
+        else
+          FINAL_EXIT_CODE=0
+        fi
+
+        if [ $FINAL_EXIT_CODE -ne 0 ] && [ "${{ inputs.fail-on-error }}" = "true" ]; then
+          exit $FINAL_EXIT_CODE
+        fi
+
+        exit 0
+
+    - name: Upload results
+      if: always() && inputs.upload-artifacts == 'true'
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: |
+          ${{ inputs.working-directory }}/mcpchecker-*-out.json
+          ${{ inputs.working-directory }}/*-error.txt
+        if-no-files-found: warn
+
+branding:
+  icon: 'check-circle'
+  color: 'green'

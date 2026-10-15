@@ -29,9 +29,15 @@ var podGVR = schema.GroupVersionResource{
 	Resource: "pods",
 }
 
+var routerPodGVK = schema.GroupVersionKind{
+	Group:   "",
+	Version: "v1",
+	Kind:    "Pod",
+}
+
 var haproxySectionKeywords = []string{"global", "defaults", "frontend", "backend", "listen"}
 
-func initRouter() []api.ServerTool {
+func initRouter(p api.FilteringProvider) []api.ServerTool {
 	return []api.ServerTool{
 		{
 			Tool: api.Tool{
@@ -83,7 +89,8 @@ func initRouter() []api.ServerTool {
 					Namespace: &api.RBACNamespace{Name: ingressNamespace},
 				},
 			),
-			Handler: getRouterConfig,
+			Handler:                    getRouterConfig,
+			TargetCompatibilityFilters: []func() bool{targetHasGVK(p, routerPodGVK)},
 		},
 		{
 			Tool: api.Tool{
@@ -120,7 +127,8 @@ func initRouter() []api.ServerTool {
 					Namespace: &api.RBACNamespace{Name: ingressNamespace},
 				},
 			),
-			Handler: getRouterInfo,
+			Handler:                    getRouterInfo,
+			TargetCompatibilityFilters: []func() bool{targetHasGVK(p, routerPodGVK)},
 		},
 		{
 			Tool: api.Tool{
@@ -167,7 +175,8 @@ func initRouter() []api.ServerTool {
 					Namespace: &api.RBACNamespace{Name: ingressNamespace},
 				},
 			),
-			Handler: getRouterSessions,
+			Handler:                    getRouterSessions,
+			TargetCompatibilityFilters: []func() bool{targetHasGVK(p, routerPodGVK)},
 		},
 	}
 }
