@@ -1,18 +1,25 @@
 package mcp
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/containers/kubernetes-mcp-server/internal/test"
 	configuration "github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	netedgeToolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/netedge"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached/memory"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
@@ -253,6 +260,16 @@ func (s *ToolsetsSuite) TestNetEdgeConfirmedAbsenceHidesOnlyDependentTools() {
 			},
 			absent: groups.endpointSlice,
 		},
+		{
+			name: "Route Kind in wrong API group is insufficient", coreKinds: []string{"Pod", "ConfigMap"},
+			groupVersions: map[string][]string{"other.example.io/v1": {"Route"}, "discovery.k8s.io/v1": {"EndpointSlice"}},
+			absent:        groups.route,
+		},
+		{
+			name: "EndpointSlice Kind in wrong API group is insufficient", coreKinds: []string{"Pod", "ConfigMap"},
+			groupVersions: map[string][]string{"route.openshift.io/v1": {"Route"}, "other.example.io/v1": {"EndpointSlice"}},
+			absent:        groups.endpointSlice,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -399,4 +416,139 @@ func (s *ToolsetsSuite) TestNetEdgeFilteringDisabledPreservesFullCatalog() {
 		s.useNetEdgeFixture(handler, false)
 		s.requireNetEdgeCatalog(nil)
 	})
+}
+
+type netEdgeCatalogProvider struct {
+	kubernetes.Provider
+	targets        []string
+	enumerationErr error
+	deriveErr      error
+	derivations    atomic.Int64
+}
+
+func (provider *netEdgeCatalogProvider) GetTargets(context.Context) ([]string, error) {
+	return provider.targets, provider.enumerationErr
+}
+
+func (provider *netEdgeCatalogProvider) GetDerivedKubernetes(ctx context.Context, target string) (*kubernetes.Kubernetes, error) {
+	provider.derivations.Add(1)
+	if provider.deriveErr != nil {
+		return nil, provider.deriveErr
+	}
+	return provider.Provider.GetDerivedKubernetes(ctx, target)
+}
+
+func (s *ToolsetsSuite) TestNetEdgeTargetEnumerationAndDerivationBoundaries() {
+	groups := netEdgeTools((&netedgeToolset.Toolset{}).GetName())
+	cases := []struct {
+		name           string
+		empty          bool
+		enumerationErr error
+		deriveErr      error
+		filtering      bool
+		absent         []string
+	}{
+		{name: "empty managed target set hides cluster tools", empty: true, filtering: true, absent: slices.Concat(groups.route, groups.configMap, groups.endpointSlice, groups.pod)},
+		{name: "target enumeration failure fails open", enumerationErr: errors.New("target enumeration unavailable"), filtering: true},
+		{name: "derived client failure fails open", deriveErr: errors.New("derived client unavailable"), filtering: true},
+		{name: "derived client NotFound confirms absence", deriveErr: apierrors.NewNotFound(schema.GroupResource{Resource: "targets"}, "missing"), filtering: true, absent: slices.Concat(groups.route, groups.configMap, groups.endpointSlice, groups.pod)},
+		{name: "cache NotFound confirms absence", deriveErr: memory.ErrCacheNotFound, filtering: true, absent: slices.Concat(groups.route, groups.configMap, groups.endpointSlice, groups.pod)},
+		{name: "disabled filters never derive compatibility clients", deriveErr: errors.New("must not be called"), filtering: false},
+	}
+	for _, testCase := range cases {
+		s.Run(testCase.name, func() {
+			s.ResetHandlers()
+			s.Handle(allNetEdgeDiscovery())
+			s.configureNetEdgeCatalog(s.KubeconfigFile(s.T()), testCase.filtering)
+			base, err := kubernetes.NewProvider(s.T().Context(), s.Cfg)
+			s.Require().NoError(err)
+			targets, err := base.GetTargets(s.T().Context())
+			s.Require().NoError(err)
+			if testCase.empty {
+				targets = nil
+			}
+			provider := &netEdgeCatalogProvider{Provider: base, targets: targets, enumerationErr: testCase.enumerationErr, deriveErr: testCase.deriveErr}
+			s.mcpServer, err = NewServer(s.T().Context(), Configuration{Config: s.Cfg}, provider)
+			s.Require().NoError(err)
+			s.McpClient = test.NewMcpClient(s.T(), s.mcpServer.ServeHTTP())
+			s.requireNetEdgeCatalog(testCase.absent)
+			if !testCase.filtering {
+				s.Zero(provider.derivations.Load(), "disabled filtering must not inspect any target")
+			}
+		})
+	}
+}
+
+func (s *ToolsetsSuite) TestNetEdgeMixedAbsenceAndDiscoveryErrors() {
+	for _, path := range []string{"/apis/route.openshift.io/v1", "/apis/discovery.k8s.io/v1", "/api/v1"} {
+		for _, statusCode := range []int{http.StatusForbidden, http.StatusInternalServerError} {
+			s.Run(fmt.Sprintf("%s/%d", path, statusCode), func() {
+				missing := test.NewMockServer()
+				s.T().Cleanup(missing.Close)
+				missing.Handle(newNetEdgeDiscoveryFixture(nil, nil))
+				unknown := test.NewMockServer()
+				s.T().Cleanup(unknown.Close)
+				reason := metav1.StatusReasonInternalError
+				if statusCode == http.StatusForbidden {
+					reason = metav1.StatusReasonForbidden
+				}
+				unknown.Handle(discoveryStatusWrapper(allNetEdgeDiscovery(), path, metav1.Status{
+					TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: metav1.StatusFailure,
+					Code: int32(statusCode), Reason: reason, Message: "discovery unavailable",
+				}))
+				s.configureNetEdgeCatalog(kubeconfigForNetEdgeMockServers(s.T(), "missing", map[string]*test.MockServer{"missing": missing, "unknown": unknown}), true)
+				s.InitMcpClient()
+				s.requireNetEdgeCatalog(nil)
+			})
+		}
+	}
+}
+
+func (s *ToolsetsSuite) TestNetEdgePositiveTargetWinsOverDiscoveryErrors() {
+	s.Run("nondefault support wins over unknown default target", func() {
+		unknown := test.NewMockServer()
+		s.T().Cleanup(unknown.Close)
+		unknown.Handle(discoveryStatusWrapper(allNetEdgeDiscovery(), "/apis/route.openshift.io/v1", metav1.Status{
+			TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: metav1.StatusFailure,
+			Code: http.StatusForbidden, Reason: metav1.StatusReasonForbidden, Message: "discovery forbidden",
+		}))
+		present := test.NewMockServer()
+		s.T().Cleanup(present.Close)
+		present.Handle(allNetEdgeDiscovery())
+		s.configureNetEdgeCatalog(kubeconfigForNetEdgeMockServers(s.T(), "unknown", map[string]*test.MockServer{"unknown": unknown, "present": present}), true)
+		s.InitMcpClient()
+		s.requireNetEdgeCatalog(nil)
+	})
+}
+
+func (s *ToolsetsSuite) TestNetEdgeCoreRequirementsHaveExactGroupAndVersion() {
+	groups := netEdgeTools((&netedgeToolset.Toolset{}).GetName())
+	for _, groupVersion := range []string{"v2", "other.example.io/v1"} {
+		s.Run(groupVersion, func() {
+			handler := newNetEdgeDiscoveryFixture([]string{"Node"}, map[string][]string{
+				"route.openshift.io/v1": {"Route"}, "discovery.k8s.io/v1": {"EndpointSlice"},
+				groupVersion: {"Pod", "ConfigMap"},
+			})
+			var discoveryHandler http.Handler = handler
+			if groupVersion == "v2" {
+				handler.APIResourceLists = slices.DeleteFunc(handler.APIResourceLists, func(list metav1.APIResourceList) bool { return list.GroupVersion == "v2" })
+				legacy := http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+					switch request.URL.Path {
+					case "/api":
+						test.WriteObject(writer, &metav1.APIVersions{Versions: []string{"v2"}})
+					case "/api/v2":
+						test.WriteObject(writer, &metav1.APIResourceList{GroupVersion: "v2", APIResources: apiResources([]string{"Pod", "ConfigMap"})})
+					default:
+						handler.ServeHTTP(writer, request)
+					}
+				})
+				discoveryHandler = discoveryStatusWrapper(legacy, "/api/v1", metav1.Status{
+					TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: metav1.StatusFailure,
+					Code: http.StatusNotFound, Reason: metav1.StatusReasonNotFound, Message: "core v1 not served",
+				})
+			}
+			s.useNetEdgeFixture(discoveryHandler, true)
+			s.requireNetEdgeCatalog(slices.Concat(groups.configMap, groups.pod))
+		})
+	}
 }

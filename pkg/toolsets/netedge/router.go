@@ -1,6 +1,7 @@
 package netedge
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -37,7 +38,7 @@ var routerPodGVK = schema.GroupVersionKind{
 
 var haproxySectionKeywords = []string{"global", "defaults", "frontend", "backend", "listen"}
 
-func initRouter(p api.FilteringProvider) []api.ServerTool {
+func initRouter(ctx context.Context, inspector api.ClusterInspector) []api.ServerTool {
 	return []api.ServerTool{
 		{
 			Tool: api.Tool{
@@ -90,7 +91,7 @@ func initRouter(p api.FilteringProvider) []api.ServerTool {
 				},
 			),
 			Handler:                    getRouterConfig,
-			TargetCompatibilityFilters: []func() bool{targetHasGVK(p, routerPodGVK)},
+			TargetCompatibilityFilters: []func() bool{targetHasGVK(ctx, inspector, routerPodGVK)},
 		},
 		{
 			Tool: api.Tool{
@@ -128,7 +129,7 @@ func initRouter(p api.FilteringProvider) []api.ServerTool {
 				},
 			),
 			Handler:                    getRouterInfo,
-			TargetCompatibilityFilters: []func() bool{targetHasGVK(p, routerPodGVK)},
+			TargetCompatibilityFilters: []func() bool{targetHasGVK(ctx, inspector, routerPodGVK)},
 		},
 		{
 			Tool: api.Tool{
@@ -176,7 +177,7 @@ func initRouter(p api.FilteringProvider) []api.ServerTool {
 				},
 			),
 			Handler:                    getRouterSessions,
-			TargetCompatibilityFilters: []func() bool{targetHasGVK(p, routerPodGVK)},
+			TargetCompatibilityFilters: []func() bool{targetHasGVK(ctx, inspector, routerPodGVK)},
 		},
 	}
 }

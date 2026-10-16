@@ -40,7 +40,7 @@ var queryPrometheusRouteGVK = schema.GroupVersionKind{
 	Kind:    "Route",
 }
 
-func InitQueryPrometheus(p api.FilteringProvider) []api.ServerTool {
+func InitQueryPrometheus(ctx context.Context, inspector api.ClusterInspector) []api.ServerTool {
 	return []api.ServerTool{
 		{
 			Tool: api.Tool{
@@ -75,7 +75,7 @@ func InitQueryPrometheus(p api.FilteringProvider) []api.ServerTool {
 				ResourceName: &api.RBACResourceName{Name: thanosQuerierRoute},
 			}),
 			Handler:                    queryPrometheusHandler,
-			TargetCompatibilityFilters: []func() bool{targetHasGVK(p, queryPrometheusRouteGVK)},
+			TargetCompatibilityFilters: []func() bool{targetHasGVK(ctx, inspector, queryPrometheusRouteGVK)},
 		},
 	}
 }

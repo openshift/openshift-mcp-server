@@ -14,15 +14,21 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/containers/kubernetes-mcp-server/internal/test"
+	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 )
 
-type staticManagerProvider struct {
-	managers []*Manager
+type deadlineInspectorProvider struct {
+	Provider
+	manager *Manager
 }
 
-func (p staticManagerProvider) GetTargetManagers(context.Context) ([]*Manager, error) {
-	return p.managers, nil
+func (provider deadlineInspectorProvider) GetTargets(context.Context) ([]string, error) {
+	return []string{"test"}, nil
+}
+
+func (provider deadlineInspectorProvider) GetDerivedKubernetes(ctx context.Context, _ string) (*Kubernetes, error) {
+	return provider.manager.Derived(ctx)
 }
 
 type ProviderGVKFilterTestSuite struct {
@@ -64,13 +70,13 @@ func (s *ProviderGVKFilterTestSuite) TestClientDeadlineIsBoundedAndFailsOpen() {
 	s.Require().NoError(err)
 	s.T().Cleanup(manager.Close)
 
-	filter := NewProviderGVKFilter(staticManagerProvider{managers: []*Manager{manager}})
+	inspector := NewClusterInspector(deadlineInspectorProvider{manager: manager})
 	start := time.Now()
-	hasGVK := filter.AnyTargetHasGVKs(s.T().Context(), []schema.GroupVersionKind{{
+	hasGVK := api.AnyTargetHasGVK(s.T().Context(), inspector, schema.GroupVersionKind{
 		Group:   "route.openshift.io",
 		Version: "v1",
 		Kind:    "Route",
-	}})
+	})
 	elapsed := time.Since(start)
 
 	s.True(hasGVK, "client deadline errors must fail open")

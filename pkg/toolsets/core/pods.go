@@ -2,19 +2,22 @@ package core
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 
 	"github.com/google/jsonschema-go/jsonschema"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubectl/pkg/metricsutil"
 	"k8s.io/utils/ptr"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
+	"github.com/containers/kubernetes-mcp-server/pkg/mcpapps"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
 )
 
-func initPods(p api.FilteringProvider) []api.ServerTool {
+func initPods(ctx context.Context, inspector api.ClusterInspector) []api.ServerTool {
 	return []api.ServerTool{
 		{Tool: api.Tool{
 			Name:        "pods_list",
@@ -44,7 +47,8 @@ func initPods(p api.FilteringProvider) []api.ServerTool {
 			Verbs:     []string{"list"},
 			Target:    api.RBACTarget{Resource: &api.RBACResourceTarget{Resource: "pods"}},
 			Namespace: &api.RBACNamespace{AllNamespaces: true},
-		}), Handler: podsListInAllNamespaces},
+		}), Handler: podsListInAllNamespaces,
+			App: mcpapps.Table("ui://kubernetes-mcp-server/pods-list", "Pods list", mcpapps.WithDescription("Interactive table of Kubernetes pods"))},
 		{Tool: api.Tool{
 			Name:        "pods_list_in_namespace",
 			Description: "List all the Kubernetes pods in the specified namespace in the current cluster",
@@ -78,7 +82,8 @@ func initPods(p api.FilteringProvider) []api.ServerTool {
 			Verbs:     []string{"list"},
 			Target:    api.RBACTarget{Resource: &api.RBACResourceTarget{Resource: "pods"}},
 			Namespace: &api.RBACNamespace{Argument: "namespace"},
-		}), Handler: podsListInNamespace},
+		}), Handler: podsListInNamespace,
+			App: mcpapps.Table("ui://kubernetes-mcp-server/pods-list-in-namespace", "Pods list in namespace", mcpapps.WithDescription("Interactive table of Kubernetes pods"))},
 		{Tool: api.Tool{
 			Name:        "pods_get",
 			Description: "Get a Kubernetes Pod in the current or provided namespace with the provided name",
@@ -107,7 +112,8 @@ func initPods(p api.FilteringProvider) []api.ServerTool {
 			Target:       api.RBACTarget{Resource: &api.RBACResourceTarget{Resource: "pods"}},
 			Namespace:    &api.RBACNamespace{Argument: "namespace"},
 			ResourceName: &api.RBACResourceName{Argument: "name"},
-		}), Handler: podsGet},
+		}), Handler: podsGet,
+			App: mcpapps.Resource("ui://kubernetes-mcp-server/pods-get", "Pod details", mcpapps.WithDescription("Interactive Kubernetes Pod details"))},
 		{Tool: api.Tool{
 			Name:        "pods_delete",
 			Description: "Delete a Kubernetes Pod in the current or provided namespace with the provided name",
@@ -195,8 +201,9 @@ func initPods(p api.FilteringProvider) []api.ServerTool {
 			// narrow this based on namespace and all_namespaces arguments.
 			Namespace: &api.RBACNamespace{AllNamespaces: true},
 		}), Handler: podsTop,
+			App: mcpapps.Metrics("ui://kubernetes-mcp-server/pods-top", "Pod metrics", mcpapps.WithDescription("Interactive CPU and memory metrics for Kubernetes pods")),
 			TargetCompatibilityFilters: []func() bool{
-				kubernetes.HasPodMetrics(p),
+				kubernetes.HasPodMetrics(ctx, inspector),
 			},
 		},
 		{Tool: api.Tool{
@@ -370,7 +377,11 @@ func podsListInAllNamespaces(params api.ToolHandlerParams) (*api.ToolCallResult,
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to list pods in all namespaces: %w", err)), nil
 	}
-	return api.NewToolCallResult(params.ListOutput.PrintObj(ret)), nil
+	printed, err := params.ListOutput.PrintObjStructured(ret)
+	if err != nil {
+		return api.NewToolCallResult("", fmt.Errorf("failed to render pods: %w", err)), nil
+	}
+	return api.NewToolCallResultFull(printed.Text, tableAppStructured(ret, printed.Structured), nil), nil
 }
 
 func podsListInNamespace(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -388,7 +399,11 @@ func podsListInNamespace(params api.ToolHandlerParams) (*api.ToolCallResult, err
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to list pods in namespace %s: %w", ns, err)), nil
 	}
-	return api.NewToolCallResult(params.ListOutput.PrintObj(ret)), nil
+	printed, err := params.ListOutput.PrintObjStructured(ret)
+	if err != nil {
+		return api.NewToolCallResult("", fmt.Errorf("failed to render pods: %w", err)), nil
+	}
+	return api.NewToolCallResultFull(printed.Text, tableAppStructured(ret, printed.Structured), nil), nil
 }
 
 func podsGet(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -402,7 +417,11 @@ func podsGet(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get pod %s in namespace %s: %w", name, ns, err)), nil
 	}
-	return api.NewToolCallResult(output.MarshalYaml(ret)), nil
+	printed, err := output.Yaml.PrintObjStructured(ret)
+	if err != nil {
+		return api.NewToolCallResult("", fmt.Errorf("failed to render pod: %w", err)), nil
+	}
+	return api.NewToolCallResultFull(printed.Text, printed.Structured, nil), nil
 }
 
 func podsDelete(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -440,7 +459,22 @@ func podsTop(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get pods top: %w", err)), nil
 	}
-	return api.NewToolCallResult(buf.String(), nil), nil
+	items := make([]map[string]any, 0, len(ret.Items))
+	for _, pod := range ret.Items {
+		cpu := resource.NewQuantity(0, resource.DecimalSI)
+		memory := resource.NewQuantity(0, resource.BinarySI)
+		for _, container := range pod.Containers {
+			cpu.Add(*container.Usage.Cpu())
+			memory.Add(*container.Usage.Memory())
+		}
+		items = append(items, map[string]any{
+			"Namespace": pod.Namespace,
+			"Name":      pod.Name,
+			"CPU":       cpu.String(),
+			"Memory":    memory.String(),
+		})
+	}
+	return api.NewToolCallResultFull(buf.String(), map[string]any{"columns": []string{"Namespace", "Name", "CPU", "Memory"}, "items": items}, nil), nil
 }
 
 func podsExec(params api.ToolHandlerParams) (*api.ToolCallResult, error) {

@@ -1,6 +1,7 @@
 package netedge
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
@@ -17,7 +18,7 @@ var coreDNSConfigMapGVK = schema.GroupVersionKind{
 	Kind:    "ConfigMap",
 }
 
-func initCoreDNS(p api.FilteringProvider) []api.ServerTool {
+func initCoreDNS(ctx context.Context, inspector api.ClusterInspector) []api.ServerTool {
 	return []api.ServerTool{
 		{
 			Tool: api.Tool{
@@ -42,7 +43,7 @@ func initCoreDNS(p api.FilteringProvider) []api.ServerTool {
 				ResourceName: &api.RBACResourceName{Name: "dns-default"},
 			}),
 			Handler:                    getCoreDNSConfig,
-			TargetCompatibilityFilters: []func() bool{targetHasGVK(p, coreDNSConfigMapGVK)},
+			TargetCompatibilityFilters: []func() bool{targetHasGVK(ctx, inspector, coreDNSConfigMapGVK)},
 		},
 	}
 }

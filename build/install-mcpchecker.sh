@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-if [[ $# -ne 5 ]]; then
-    echo "Usage: $0 VERSION GOOS GOARCH DESTINATION CHECKSUM_MANIFEST" >&2
+if [[ $# -ne 5 && $# -ne 6 ]]; then
+    echo "Usage: $0 VERSION GOOS GOARCH DESTINATION CHECKSUM_MANIFEST [mcpchecker|agent]" >&2
     exit 2
 fi
 
@@ -12,6 +12,15 @@ goos=$2
 goarch=$3
 destination=$4
 checksum_manifest=$5
+component=${6:-mcpchecker}
+
+case "${version}/${component}" in
+    v0.0.21/mcpchecker|v0.0.22/mcpchecker|v0.0.22/agent) ;;
+    *)
+        echo "ERROR: unsupported version/component ${version}/${component}; no committed checksum manifest is approved for this combination" >&2
+        exit 1
+        ;;
+esac
 
 case "${goos}/${goarch}" in
     linux/amd64|linux/arm64|darwin/amd64|darwin/arm64|windows/amd64|windows/arm64)
@@ -23,11 +32,11 @@ case "${goos}/${goarch}" in
         ;;
 esac
 
-binary_name=mcpchecker
+binary_name=${component}
 if [[ ${goos} == windows ]]; then
-    binary_name=mcpchecker.exe
+    binary_name="${component}.exe"
 fi
-asset="mcpchecker-${goos}-${goarch}.zip"
+asset="${component}-${goos}-${goarch}.zip"
 
 if [[ ! -f ${checksum_manifest} ]]; then
     echo "ERROR: no committed checksum manifest for mcpchecker ${version}: ${checksum_manifest}" >&2
@@ -40,6 +49,10 @@ if [[ ${matching_checksum_count} -ne 1 ]]; then
     echo "ERROR: expected exactly one committed checksum for ${asset} in ${checksum_manifest}" >&2
     exit 1
 fi
+if ! awk -v asset="${asset}" '$2 == asset && NF != 2 { exit 1 }' "${checksum_manifest}"; then
+    echo "ERROR: invalid checksum manifest entry for ${asset}" >&2
+    exit 1
+fi
 expected_archive_sha=$(awk -v asset="${asset}" '$2 == asset { print $1 }' "${checksum_manifest}")
 if [[ ! ${expected_archive_sha} =~ ^[[:xdigit:]]{64}$ ]]; then
     echo "ERROR: invalid SHA-256 for ${asset} in ${checksum_manifest}" >&2
@@ -49,9 +62,9 @@ expected_archive_sha=$(printf '%s' "${expected_archive_sha}" | tr '[:upper:]' '[
 
 sha256_file() {
     if command -v sha256sum >/dev/null 2>&1; then
-        sha256sum "$1" | awk '{ print $1 }'
+        sha256sum < "$1" | awk '{ print $1 }'
     elif command -v shasum >/dev/null 2>&1; then
-        shasum -a 256 "$1" | awk '{ print $1 }'
+        shasum -a 256 < "$1" | awk '{ print $1 }'
     else
         echo "ERROR: sha256sum or shasum is required to verify mcpchecker" >&2
         return 1
@@ -167,9 +180,14 @@ echo "Verified ${asset} SHA-256: ${expected_archive_sha}"
 
 extract_dir="${temp_dir}/extract"
 mkdir -p "${extract_dir}"
-unzip -q "${archive}" -d "${extract_dir}"
+member_count=$(unzip -Z1 "${archive}" | awk -v member="${binary_name}" '$0 == member { count++ } END { print count + 0 }')
+if [[ ${member_count} -ne 1 ]]; then
+    echo "ERROR: verified archive ${asset} does not contain ${binary_name} exactly once" >&2
+    exit 1
+fi
+unzip -q "${archive}" "${binary_name}" -d "${extract_dir}"
 extracted_binary="${extract_dir}/${binary_name}"
-if [[ ! -f ${extracted_binary} ]]; then
+if [[ ! -f ${extracted_binary} || -L ${extracted_binary} ]]; then
     echo "ERROR: verified archive ${asset} does not contain ${binary_name}" >&2
     exit 1
 fi
@@ -190,4 +208,4 @@ temporary_binary=
 mv -f "${temporary_metadata}" "${metadata_file}"
 temporary_metadata=
 
-echo "Installed checksum-verified mcpchecker ${version} to ${destination}"
+echo "Installed checksum-verified ${component} ${version} to ${destination}"

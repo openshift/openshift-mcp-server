@@ -1,6 +1,7 @@
 package netedge
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
@@ -18,7 +19,7 @@ var inspectRouteGVK = schema.GroupVersionKind{
 	Kind:    "Route",
 }
 
-func initRoutes(p api.FilteringProvider) []api.ServerTool {
+func initRoutes(ctx context.Context, inspector api.ClusterInspector) []api.ServerTool {
 	return []api.ServerTool{
 		{
 			Tool: api.Tool{
@@ -55,7 +56,7 @@ func initRoutes(p api.FilteringProvider) []api.ServerTool {
 				ResourceName: &api.RBACResourceName{Argument: "route"},
 			}),
 			Handler:                    inspectRoute,
-			TargetCompatibilityFilters: []func() bool{targetHasGVK(p, inspectRouteGVK)},
+			TargetCompatibilityFilters: []func() bool{targetHasGVK(ctx, inspector, inspectRouteGVK)},
 		},
 	}
 }

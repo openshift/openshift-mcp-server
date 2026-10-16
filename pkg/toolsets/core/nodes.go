@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 
@@ -14,9 +15,10 @@ import (
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
+	"github.com/containers/kubernetes-mcp-server/pkg/mcpapps"
 )
 
-func initNodes(p api.FilteringProvider) []api.ServerTool {
+func initNodes(ctx context.Context, inspector api.ClusterInspector) []api.ServerTool {
 	return []api.ServerTool{
 		{Tool: api.Tool{
 			Name:        "nodes_log",
@@ -133,8 +135,9 @@ func initNodes(p api.FilteringProvider) []api.ServerTool {
 				Target: api.RBACTarget{Resource: &api.RBACResourceTarget{Resource: "nodes"}},
 			},
 		), Handler: nodesTop,
+			App: mcpapps.Metrics("ui://kubernetes-mcp-server/nodes-top", "Node metrics", mcpapps.WithDescription("Interactive CPU and memory metrics for Kubernetes nodes")),
 			TargetCompatibilityFilters: []func() bool{
-				kubernetes.HasNodeMetrics(p),
+				kubernetes.HasNodeMetrics(ctx, inspector),
 			},
 		},
 	}
@@ -221,5 +224,13 @@ func nodesTop(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		return api.NewToolCallResult("", fmt.Errorf("failed to print node metrics: %w", err)), nil
 	}
 
-	return api.NewToolCallResult(buf.String(), nil), nil
+	items := make([]map[string]any, 0, len(nodeMetrics.Items))
+	for _, node := range nodeMetrics.Items {
+		items = append(items, map[string]any{
+			"Name":   node.Name,
+			"CPU":    node.Usage.Cpu().String(),
+			"Memory": node.Usage.Memory().String(),
+		})
+	}
+	return api.NewToolCallResultFull(buf.String(), map[string]any{"columns": []string{"Name", "CPU", "Memory"}, "items": items}, nil), nil
 }

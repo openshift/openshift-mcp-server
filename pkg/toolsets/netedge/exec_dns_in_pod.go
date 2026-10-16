@@ -113,14 +113,14 @@ var execDNSPodGVK = schema.GroupVersionKind{
 	Kind:    "Pod",
 }
 
-func initExecDNSInPod(p api.FilteringProvider) []api.ServerTool {
-	return initExecDNSInPodWith(p, nil)
+func initExecDNSInPod(ctx context.Context, inspector api.ClusterInspector) []api.ServerTool {
+	return initExecDNSInPodWith(ctx, inspector, nil)
 }
 
 // initExecDNSInPodWith creates exec_dns_in_pod tools using the provided podExecutor.
 // If executor is nil, a defaultPodExecutor is created at handler call-time from the KubernetesClient.
 // Pass a mock executor in tests.
-func initExecDNSInPodWith(p api.FilteringProvider, executor podExecutor) []api.ServerTool {
+func initExecDNSInPodWith(ctx context.Context, inspector api.ClusterInspector, executor podExecutor) []api.ServerTool {
 	return []api.ServerTool{
 		{
 			Tool: api.Tool{
@@ -173,7 +173,7 @@ func initExecDNSInPodWith(p api.FilteringProvider, executor podExecutor) []api.S
 				},
 			),
 			Handler:                    makeExecDNSInPodHandler(executor),
-			TargetCompatibilityFilters: []func() bool{targetHasGVK(p, execDNSPodGVK)},
+			TargetCompatibilityFilters: []func() bool{targetHasGVK(ctx, inspector, execDNSPodGVK)},
 		},
 	}
 }

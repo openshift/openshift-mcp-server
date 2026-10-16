@@ -10,8 +10,8 @@ import (
 
 // When a handler's Kubernetes API dependency changes, review its colocated GVK,
 // registration contract tests, and catalog negative tests together.
-func targetHasGVK(p api.FilteringProvider, gvk schema.GroupVersionKind) func() bool {
+func targetHasGVK(ctx context.Context, inspector api.ClusterInspector, gvk schema.GroupVersionKind) func() bool {
 	return func() bool {
-		return p.AnyTargetHasGVKs(context.TODO(), []schema.GroupVersionKind{gvk})
+		return api.AnyTargetHasGVK(ctx, inspector, gvk)
 	}
 }

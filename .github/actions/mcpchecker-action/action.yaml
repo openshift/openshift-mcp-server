@@ -1,5 +1,5 @@
 # Vendored from mcpchecker/mcpchecker v0.0.21 (commit 92e4e860817f00e1d48640b756762ccf3ad39532).
-# Local changes pin nested action dependencies to immutable commits.
+# Local helpers use verified v0.0.22 binaries from the trusted action source.
 name: 'Run mcpchecker MCP Evaluation'
 description: 'Evaluate MCP servers using the mcpchecker framework'
 author: 'mcpchecker'
@@ -10,9 +10,9 @@ inputs:
     required: true
 
   mcpchecker-version:
-    description: 'Version of mcpchecker to use (latest, main, or vX.Y.Z)'
+    description: 'Verified version (v0.0.22 only)'
     required: false
-    default: 'latest'
+    default: 'v0.0.22'
 
   task-filter:
     description: 'Regular expression to filter tasks (passed to -run flag)'
@@ -69,6 +69,11 @@ inputs:
     required: false
     default: '1'
 
+  expected-results-file:
+    description: 'Optional exact safe results basename'
+    required: false
+    default: ''
+
 outputs:
   results-file:
     description: 'Path to the JSON results file'
@@ -114,121 +119,76 @@ outputs:
     description: 'The version of mcpchecker that was installed'
     value: ${{ steps.setup.outputs.version }}
 
-runs:
-  using: 'composite'
-  steps:
-    - name: Setup mcpchecker
-      id: setup
-      uses: mcpchecker/mcpchecker/.github/actions/setup-mcpchecker@92e4e860817f00e1d48640b756762ccf3ad39532
-      with:
-        version: ${{ inputs.mcpchecker-version }}
-        action-ref: ${{ github.action_ref }}
+  version:
+    description: 'Verified checker and agent version'
+    value: ${{ steps.setup.outputs.version }}
+  check-exit:
+    description: 'Explicit runner status'
+    value: ${{ steps.run-eval.outputs.check-exit }}
+  summary-exit:
+    description: 'Explicit runner status'
+    value: ${{ steps.run-eval.outputs.summary-exit }}
+  verify-exit:
+    description: 'Explicit runner status'
+    value: ${{ steps.run-eval.outputs.verify-exit }}
 
-    - name: Run evaluation
+runs:
+  using: composite
+  steps:
+    - name: Setup verified mcpchecker and agent
+      id: setup
+      shell: bash
+      env:
+        MCPCHECKER_VERSION: ${{ inputs.mcpchecker-version }}
+        MODEL_BASE_URL: ''
+        MODEL_KEY: ''
+        JUDGE_BASE_URL: ''
+        JUDGE_API_KEY: ''
+        JUDGE_MODEL_NAME: ''
+        OPENAI_API_KEY: ''
+        ANTHROPIC_API_KEY: ''
+        GOOGLE_API_KEY: ''
+        GEMINI_API_KEY: ''
+        AZURE_OPENAI_API_KEY: ''
+      run: bash "$GITHUB_ACTION_PATH/../../../build/setup-mcpchecker-action.sh"
+    - name: Run trusted helper
       id: run-eval
       shell: bash
-      working-directory: ${{ inputs.working-directory }}
-      run: |
-        MCPCHECKER="${{ steps.setup.outputs.mcpchecker-path }}"
-
-        # Build command as array (safe from shell injection)
-        CMD=("$MCPCHECKER" "check" "${{ inputs.eval-config }}")
-
-        if [ -n "${{ inputs.output-format }}" ]; then
-          CMD+=("--output" "${{ inputs.output-format }}")
-        fi
-        if [ -n "${{ inputs.task-filter }}" ]; then
-          CMD+=("--run" "${{ inputs.task-filter }}")
-        fi
-        if [ -n "${{ inputs.label-selector }}" ]; then
-          CMD+=("--label-selector" "${{ inputs.label-selector }}")
-        fi
-        if [ "${{ inputs.verbose }}" = "true" ]; then
-          CMD+=("--verbose")
-        fi
-        if [ "${{ inputs.parallel }}" != "1" ] && [ -n "${{ inputs.parallel }}" ]; then
-          CMD+=("--parallel" "${{ inputs.parallel }}")
-        fi
-
-        echo "Running: ${CMD[@]}"
-        echo ""
-
-        # Run evaluation
-        set +e
-        "${CMD[@]}"
-        EVAL_EXIT_CODE=$?
-        set -e
-
-        echo ""
-        echo "=== Evaluation Results ==="
-
-        # Find results file (deterministic: pick most recently modified)
-        # ls -t sorts by modification time (newest first), ensuring deterministic selection
-        RESULTS_FILE=$(ls -t mcpchecker-*-out.json 2>/dev/null | head -1 || echo "")
-
-        if [ -z "$RESULTS_FILE" ]; then
-          echo "⚠ No results file found"
-          echo "results-file=" >> $GITHUB_OUTPUT
-          echo "passed=false" >> $GITHUB_OUTPUT
-          if [ "${{ inputs.fail-on-error }}" = "true" ]; then
-            exit 1
-          fi
-          exit 0
-        fi
-
-        echo "Results file: $RESULTS_FILE"
-        echo "results-file=$RESULTS_FILE" >> $GITHUB_OUTPUT
-
-        # Output metrics in GitHub Actions format
-        "$MCPCHECKER" result summary "$RESULTS_FILE" --github-output >> $GITHUB_OUTPUT
-
-        # Display human-readable summary
-        "$MCPCHECKER" result summary "$RESULTS_FILE"
-
-        # Verify thresholds
-        TASK_THRESHOLD="${{ inputs.task-pass-threshold }}"
-        ASSERTION_THRESHOLD="${{ inputs.assertion-pass-threshold }}"
-
-        set +e
-        "$MCPCHECKER" result verify "$RESULTS_FILE" --task "$TASK_THRESHOLD" --assertion "$ASSERTION_THRESHOLD"
-        VERIFY_EXIT_CODE=$?
-        set -e
-
-        if [ $VERIFY_EXIT_CODE -eq 0 ]; then
-          echo "passed=true" >> $GITHUB_OUTPUT
-          echo ""
-          echo "✓ Evaluation completed successfully"
-        else
-          echo "passed=false" >> $GITHUB_OUTPUT
-          echo ""
-          echo "❌ Evaluation thresholds not met"
-        fi
-
-        # Determine final exit code
-        if [ $EVAL_EXIT_CODE -ne 0 ]; then
-          echo "❌ Evaluation exited with code $EVAL_EXIT_CODE"
-          FINAL_EXIT_CODE=$EVAL_EXIT_CODE
-        elif [ $VERIFY_EXIT_CODE -ne 0 ]; then
-          FINAL_EXIT_CODE=$VERIFY_EXIT_CODE
-        else
-          FINAL_EXIT_CODE=0
-        fi
-
-        if [ $FINAL_EXIT_CODE -ne 0 ] && [ "${{ inputs.fail-on-error }}" = "true" ]; then
-          exit $FINAL_EXIT_CODE
-        fi
-
-        exit 0
-
-    - name: Upload results
-      if: always() && inputs.upload-artifacts == 'true'
+      env:
+        MCPCHECKER: ${{ steps.setup.outputs.mcpchecker-path }}
+        AGENT: ${{ steps.setup.outputs.agent-path }}
+        MCPCHECKER_VERSION: ${{ steps.setup.outputs.version }}
+        WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        EVAL_CONFIG: ${{ inputs.eval-config }}
+        TASK_FILTER: ${{ inputs.task-filter }}
+        LABEL_SELECTOR: ${{ inputs.label-selector }}
+        OUTPUT_FORMAT: ${{ inputs.output-format }}
+        VERBOSE: ${{ inputs.verbose }}
+        UPLOAD_ARTIFACTS: ${{ inputs.upload-artifacts }}
+        FAIL_ON_ERROR: ${{ inputs.fail-on-error }}
+        TASK_THRESHOLD: ${{ inputs.task-pass-threshold }}
+        ASSERTION_THRESHOLD: ${{ inputs.assertion-pass-threshold }}
+        PARALLEL: ${{ inputs.parallel }}
+        EXPECTED_RESULTS_FILE: ${{ inputs.expected-results-file }}
+      run: bash "$GITHUB_ACTION_PATH/../../../build/run-mcpchecker-action.sh"
+    - name: Upload sanitized fresh artifacts
+      if: always() && inputs.upload-artifacts == 'true' && steps.run-eval.outputs.artifact-paths != ''
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      env:
+        MODEL_BASE_URL: ''
+        MODEL_KEY: ''
+        JUDGE_BASE_URL: ''
+        JUDGE_API_KEY: ''
+        JUDGE_MODEL_NAME: ''
+        OPENAI_API_KEY: ''
+        ANTHROPIC_API_KEY: ''
+        GOOGLE_API_KEY: ''
+        GEMINI_API_KEY: ''
+        AZURE_OPENAI_API_KEY: ''
       with:
         name: ${{ inputs.artifact-name }}
-        path: |
-          ${{ inputs.working-directory }}/mcpchecker-*-out.json
-          ${{ inputs.working-directory }}/*-error.txt
-        if-no-files-found: warn
+        path: ${{ steps.run-eval.outputs.artifact-paths }}
+        if-no-files-found: error
 
 branding:
   icon: 'check-circle'

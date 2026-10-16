@@ -1,6 +1,7 @@
 package netedge
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
@@ -18,7 +19,7 @@ var serviceEndpointSliceGVK = schema.GroupVersionKind{
 	Kind:    "EndpointSlice",
 }
 
-func initEndpoints(p api.FilteringProvider) []api.ServerTool {
+func initEndpoints(ctx context.Context, inspector api.ClusterInspector) []api.ServerTool {
 	return []api.ServerTool{
 		{
 			Tool: api.Tool{
@@ -54,7 +55,7 @@ func initEndpoints(p api.FilteringProvider) []api.ServerTool {
 				Namespace: &api.RBACNamespace{Argument: "namespace"},
 			}),
 			Handler:                    getServiceEndpoints,
-			TargetCompatibilityFilters: []func() bool{targetHasGVK(p, serviceEndpointSliceGVK)},
+			TargetCompatibilityFilters: []func() bool{targetHasGVK(ctx, inspector, serviceEndpointSliceGVK)},
 		},
 	}
 }

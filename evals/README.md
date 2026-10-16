@@ -35,7 +35,8 @@ below.
 
 - A Kubernetes cluster (kind, minikube, or any cluster) and `kubectl` configured for it
 - The Kubernetes MCP server running at `http://localhost:8080/mcp` (see `make run-server`)
-- `mcpchecker`: `make mcpchecker` installs it under `_output/tools/bin/`. The
+- `mcpchecker` and the standalone `agent`: `make mcpchecker` installs both under
+  `_output/tools/bin/`. The
   `make run-evals` target calls that path directly; to run the bare `mcpchecker …`
   commands shown below by hand, add `_output/tools/bin` to your `PATH`.
   Installation requires Bash, `curl`, `unzip`, `mktemp`, `mkdir`, `sleep`, and
@@ -238,10 +239,17 @@ make run-evals SUITE=core-readonly
 
 ## Versions
 
-`make mcpchecker` installs the official `mcpchecker` v0.0.21 release binary after
-verifying its archive against the committed checksums in
-`build/mcpchecker-v0.0.21.sha256`. Prow and local runs therefore use the same
-binary without requiring the repository's Go toolchain to build mcpchecker.
+`make mcpchecker` installs the official **v0.0.22 checker and standalone agent**
+release binaries, verifying each archive against the twelve committed hashes in
+`build/mcpchecker-v0.0.22.sha256` before extracting only its expected member.
+Both components support Linux, macOS and Windows on amd64/arm64; other
+architectures fail explicitly rather than building from source or skipping.
+Prow and local Make consumers use this installer without compiling the dependency
+with the server's Go toolchain. The current `builtin-*` configurations instantiate
+their LLM agent **in-process**; installing the standalone `agent` does not mean
+those configurations launch it. Its absolute `agent-path` output and tools/bin
+PATH entry remain available for external ACP consumers. Existing agent/model and
+judge options are unchanged.
 The installer serializes concurrent updates to one destination and reuses the
 cache only when its metadata names the requested version, platform, and committed
 archive checksum and the binary still matches the digest stored in that metadata.
@@ -255,18 +263,154 @@ Lock acquisition is separately bounded and the lock is removed on normal exits.
 An uncatchable termination can
 leave a lock directory behind; a later installer fails explicitly after its
 timeout so the caller can check for active installers before removing the lock.
-An explicit
-`MCPCHECKER_VERSION=<version>` override is accepted only when the matching
-`build/mcpchecker-<version>.sha256` manifest has been committed and reviewed.
+Only v0.0.22 is supported by the evaluation composites and both-component Make
+target. The original six-row `build/mcpchecker-v0.0.21.sha256` manifest and
+five-argument installer API remain for explicit **checker-only** compatibility:
 
-`.github/workflows/mcpchecker.yaml` also explicitly requests v0.0.21. The two
-evaluation composites are vendored from that release commit, with their nested
-setup and artifact-upload action dependencies pinned to immutable commits.
+```bash
+bash build/install-mcpchecker.sh v0.0.21 linux amd64 \
+  "$PWD/_output/tools/bin/mcpchecker" "$PWD/build/mcpchecker-v0.0.21.sha256"
+```
+
+The optional sixth argument selects `mcpchecker` (default) or `agent`; v0.0.21
+has no approved agent row and cannot silently fetch one. Unknown versions or
+version/component combinations fail closed. A writable cache plus its colocated
+metadata is not an adversarial trust boundary. The committed manifest in reviewed
+source, not a freshly downloaded checksum, is the runtime archive trust anchor.
+The hashes are publisher-channel integrity checks, not a signature or attestation.
+
+The two evaluation composites use fixed source-root helpers and pinned third-party
+actions, not a mutable nested setup action. Setup installs both components into a
+fresh owned action-instance directory without executing either downloaded binary.
 
 `make claude-agent-acp` likewise installs `@agentclientprotocol/claude-agent-acp@latest`;
 pin it with `make claude-agent-acp CLAUDE_AGENT_ACP_VERSION=<version>` for local
 reproducibility. CI never installs the adapter (it runs `builtin-openai`), so this
 knob is purely local.
+
+## Compatibility filtering maintenance
+
+Existing netedge tools use lazy exact-GVK compatibility requirements supplied by
+the current `api.ClusterInspector` API. Keep each requirement beside its handler;
+when a handler's API dependency changes, update that literal, the independent
+constructor/registration contracts and the full catalog negative tests together.
+
+| Tools | Exact group/version/kind |
+|---|---|
+| `query_prometheus` (toolset-name prefix), `inspect_route` | `route.openshift.io/v1`, `Route` |
+| `get_coredns_config` | core group `""`, `v1`, `ConfigMap` |
+| `get_service_endpoints` | `discovery.k8s.io/v1`, `EndpointSlice` |
+| `exec_dns_in_pod`, `get_router_config`, `get_router_info`, `get_router_sessions` | core group `""`, `v1`, `Pod` |
+| `probe_dns_local`, `probe_http` | None; both local probes remain ungated |
+
+These are eight requirements and two ungated tools, not object, namespace, verb,
+RBAC, connectivity or operator-configuration checks. Any enumerated target with
+the exact GVK is enough. Confirmed absence hides only dependent tools; unknown
+discovery/403/transport errors fail open. Disabled filtering performs no such
+queries. Current ACM inspection enumerates managed targets; an empty target set
+hides gated tools, and error aggregation can continue through later targets.
+The discovery REST client has a bounded per-client timeout, but this is **not a
+global deadline guarantee** for aggregate inspection. No provider/watcher policy
+or ordinary non-discovery HTTP behavior changes here.
+
+## Workflow trust and deployment status
+
+The workflow separates a secret-free, read-only candidate build from protected
+evaluation. **C** is the whole candidate commit. **H** is a separately reviewed,
+immutable harness commit checked out from the fixed public repository
+`redhat-chai-bot/openshift_openshift-mcp-server`. Only the compiled candidate
+server crosses into the harness; candidate Makefiles, scripts, configs, tasks,
+actions and caches do not. Trusted `make -C trusted -o build run-server` uses H's
+configuration without rebuilding the server. Read-only API identity/review/SHA
+checks establish eligibility and reject drift; they do **not** make code safe or
+constitute credential-release approval. Before deployment and each approval, an
+independent maintainer must audit that administrative bypass of the protected
+environment is disabled. The REST environment response does not expose that
+setting: automated eligibility checks do not verify it. This external audited
+deployment prerequisite is mandatory, alongside protected approval of exact C/H.
+
+The `mcpchecker-reviewed` protected environment requires independent human
+approval of **exact C and H, including the whole candidate as privileged code
+execution**. Candidate and evaluator share an OS account: this is **not a
+sandbox**, and removing model variables from the server's environment cannot
+prove it cannot inspect sibling files/processes. Do not approve or run if that
+risk is unacceptable; there is no automatic safe-fork fallback. Model/judge
+credentials are confined to the trusted evaluation step, not build, setup,
+server, diff, reporter or scheduled writer.
+
+**This wiring is deliberately not ready for credentialed execution.** H does not
+yet exist: the tracked workflow's empty H pin is rejected, and the external
+future-C template is invalid until replaced with an actual reviewed H SHA. After
+all implementation, independent author review and mandatory repository gates,
+freeze validated H as a local commit. Then finalize C with literal H and perform
+C's own review/gates before its local commit; H's checks do not cover C. No
+current feature SHA, branch, artifact or label substitutes for reviewed H.
+
+A maintainer must separately deploy the reviewed workflow/report code to the
+trusted default branch, configure the protected environment and scoped secrets,
+and approve exact C/H before any credentialed run. A feature-branch change alone
+does not deploy `workflow_run` code. The existing downstream repository guard
+remains unchanged and dormant. Publication, guard activation, secret/environment
+configuration and live workflow/model/cluster runs are **not authorized by local
+implementation or offline tests**; none is claimed to have happened.
+
+The evaluation runner requires Linux child-subreaper support, Node.js and Python 3
+(standard library only) on PATH. The protected workflow uses GitHub-hosted Ubuntu;
+generic macOS/Windows callers are rejected, not claimed supported. A capture owner
+supervises the checker, diagnostic drainer and inherited-pipe descendants through
+completion. Its fixed 1800-second deadline includes EOF collection even after the
+checker parent exits. Expiry always fails capture, sends TERM to the owned checker
+group, then escalates after 30 seconds and allows five seconds for EOF draining
+before killing a stuck drainer. It reaps owned children, with an explicit failure
+if another five seconds of post-KILL reaping cannot complete.
+Actual checker/drainer statuses remain separate from capture expiry. Unsupported
+subreaper setup and incomplete cleanup fail explicitly; this is not a sandbox or
+a guarantee against processes escaping their owned group or kernel-stuck tasks.
+Diagnostics are drained to EOF and bounded to 1 MiB after redaction, with an
+explicit truncation marker. Complete summary JSON has a separate 64 MiB bound;
+it is parsed before publishing a bounded excerpt. Result acceptance stays 64 MiB.
+These are offline-checked wrapper contracts, not native multi-OS or model-runtime
+attestations.
+
+The evaluation collects diagnostics with `fail-on-error=false`, but its final
+gate requires successful check, fresh valid nonempty results, successful summary
+and verification, and successful applicable diff. A missing baseline is an
+explicit optional absence; a corrupt present baseline fails. Task/assertion
+thresholds remain **0.8**, not 100% task success; task assertions, maxToolCalls,
+security defaults and CI Go versions are unchanged. Generic composite thresholds
+still default to 1.0. Reporter artifacts are bounded typed DATA, isolated per
+suite and API-bound to source run/attempt/current reviewed PR head; raw task/diff
+text is not rendered into comments. Trusted run-name metadata records the source
+trigger run, with no artifact-selected PR fallback. Scheduled baseline updates
+remain schedule-only and may retain valid partial failed-suite results, never
+manufacture a pass or consume a PR candidate's results.
+
+The three RBAC task contracts/production policy and cross-repository Prow
+extension kubeconfig staging remain deferred. Main's tools/bin PATH and
+`MCP_EVAL_KUBECONFIG`/`KUBECONFIG` precedence are retained, not a claim that all
+Prow or Google-agent failures are fixed. Offline fixtures do not validate live
+GitHub approvals, model behavior or cluster semantics.
+
+## Istio/Kiali bootstrap
+
+The trusted Kiali bootstrap retains Istio **1.31.0**, Kiali **v2.33**, the demo
+profile, tracing transform, sample addons and readiness waits. It downloads a
+fixed official Istio archive over HTTPS with 10-second connection/300-second
+total timeouts, checks `build/istio-1.31.0.sha256` before listing/extracting, and
+publishes only regular `bin/istioctl` and the three required addon YAML files.
+It does not execute a downloaded installer script or reuse an unchecked binary.
+Linux amd64/arm64/armv7 and macOS amd64/arm64 map to five approved archives;
+unsupported platforms fail closed. Local bootstrap prerequisites include Bash,
+curl, tar/gzip, sed, grep, mktemp, core file utilities and sha256sum or shasum.
+
+Both Bookinfo inputs use `openshift-service-mesh/istio` commit
+`b6fb5348dd66280245e3d98d8d93f416ece453c3`; the Sail ingress sample uses
+`istio-ecosystem/sail-operator` commit
+`0c7171a9fdc4762366a78e9a0e3f226ff6e6bbd3`. There is no main/master fallback
+if a pinned path disappears. Fixed source pointers and archive hashes do not
+attest every runtime image or eliminate inherited publisher/runner trust; this
+is not a hermetic or sandboxed supply chain. Public archive bytes and pinned
+YAML can be inspected as data without running istioctl or contacting a cluster.
 
 ## Expected results
 

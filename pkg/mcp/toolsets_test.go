@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/containers/kubernetes-mcp-server/internal/test"
@@ -21,9 +22,13 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kcp"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kiali"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/logs"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/metrics"
 	mgToolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/mustgather"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/otelcol"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/ovnkubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/tekton"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/traces"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/suite"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -262,6 +267,11 @@ func (s *ToolsetsSuite) TestGranularToolsetsTools() {
 		&tekton.Toolset{},
 		&clusterDiagnosticsToolset.Toolset{},
 		&cniDiagnosticsToolset.Toolset{},
+		&logs.Toolset{},
+		&metrics.Toolset{},
+		&otelcol.Toolset{},
+		&tekton.Toolset{},
+		&traces.Toolset{},
 	}
 	for _, testCase := range testCases {
 		s.Run("Toolset "+testCase.GetName(), func() {
@@ -275,7 +285,7 @@ func (s *ToolsetsSuite) TestGranularToolsetsTools() {
 				s.NoError(err, "Expected no error from ListTools")
 			})
 			s.Run("ListTools returns correct Tool metadata", func() {
-				s.assertJsonSnapshot("toolsets-"+testCase.GetName()+"-tools.json", tools.Tools)
+				s.assertJsonSnapshot("toolsets-"+strings.ReplaceAll(testCase.GetName(), "/", "-")+"-tools.json", tools.Tools)
 			})
 		})
 	}

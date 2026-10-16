@@ -1,6 +1,8 @@
 package oadp
 
 import (
+	"context"
+
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
 )
@@ -24,22 +26,22 @@ func (t *Toolset) GetDescription() string {
 }
 
 // GetTools returns nil — OADP resources are managed via the core toolset's generic resource tools.
-func (t *Toolset) GetTools(_ api.FilteringProvider) []api.ServerTool {
+func (t *Toolset) GetTools(_ context.Context, _ api.ToolsetContext) []api.ServerTool {
 	return nil
 }
 
 // GetPrompts returns the prompts provided by this toolset.
-func (t *Toolset) GetPrompts() []api.ServerPrompt {
+func (t *Toolset) GetPrompts(_ context.Context, _ api.ToolsetContext) []api.ServerPrompt {
 	return initOADPTroubleshoot()
 }
 
 // GetResources returns the resources provided by this toolset.
-func (t *Toolset) GetResources() []api.ServerResource {
+func (t *Toolset) GetResources(_ context.Context, _ api.ToolsetContext) []api.ServerResource {
 	return nil
 }
 
 // GetResourceTemplates returns the resource templates provided by this toolset.
-func (t *Toolset) GetResourceTemplates() []api.ServerResourceTemplate {
+func (t *Toolset) GetResourceTemplates(_ context.Context, _ api.ToolsetContext) []api.ServerResourceTemplate {
 	return nil
 }
 
