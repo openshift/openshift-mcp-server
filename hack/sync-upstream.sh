@@ -5,7 +5,7 @@ set -Eeuo pipefail
 UPSTREAM_SYNC_ROOT=${BASH_SOURCE[0]%/*}
 [[ "$UPSTREAM_SYNC_ROOT" != "${BASH_SOURCE[0]}" ]] || UPSTREAM_SYNC_ROOT=.
 UPSTREAM_SYNC_ROOT=$(cd -- "$UPSTREAM_SYNC_ROOT" && pwd)
-ALLOWLIST_FILE=${UPSTREAM_SYNC_ALLOWLIST:-"$UPSTREAM_SYNC_ROOT/upstream-sync-generated.allowlist"}
+ALLOWLIST_FILE=${UPSTREAM_SYNC_ALLOWLIST:-"$UPSTREAM_SYNC_ROOT/upstream-sync.allowlist"}
 
 # Shared validation, configuration, and process lifecycle helpers.
 fail() {
@@ -68,7 +68,7 @@ initialize_config() {
 	SYNC_BRANCH_NAME=${SYNC_BRANCH_NAME:-upstream-sync}
 	SYNC_BASE_BRANCH=${SYNC_BASE_BRANCH:-main}
 	OWNER_REPO=${OWNER_REPO:-}
-	ALLOWLIST_FILE=${UPSTREAM_SYNC_ALLOWLIST:-${ALLOWLIST_FILE:-$UPSTREAM_SYNC_ROOT/upstream-sync-generated.allowlist}}
+	ALLOWLIST_FILE=${UPSTREAM_SYNC_ALLOWLIST:-${ALLOWLIST_FILE:-$UPSTREAM_SYNC_ROOT/upstream-sync.allowlist}}
 	valid_remote_name "$UPSTREAM_REMOTE" || fail "invalid upstream remote name: $UPSTREAM_REMOTE"
 	valid_remote_name "$ORIGIN_REMOTE" || fail "invalid downstream remote name: $ORIGIN_REMOTE"
 	if [[ -z "$OWNER_REPO" ]]; then
@@ -423,13 +423,7 @@ remove_worktree() {
 }
 
 run_generators() {
-	(
-		cd "$WORKTREE"
-		go mod tidy
-		go mod vendor
-		make update-readme-tools
-		make test-update-snapshots
-	)
+	make -C "$WORKTREE" downstream-autogenerate-content
 }
 
 commit_generated() {
@@ -492,7 +486,7 @@ Usage: hack/sync-upstream.sh [plan|publish]
   plan     Fetch and describe the pinned sync plan without publishing (default).
   publish  Integrate, regenerate, push with a lease, and upsert the sync PR.
 
-The sibling upstream-sync-generated.allowlist is parsed as data; it is never sourced.
+The sibling upstream-sync.allowlist is parsed as data; it is never sourced.
 USAGE
 }
 

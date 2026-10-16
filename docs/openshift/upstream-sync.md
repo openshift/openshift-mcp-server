@@ -72,7 +72,9 @@ make sync-upstream-pr
 
 Publishing integrates the pinned upstream commit in a temporary Git worktree, runs the repository's generators, and verifies that the candidate includes the pinned upstream SHA and merges cleanly with the pinned downstream SHA. Immediately before pushing, it checks that both remote base refs still match the pinned SHAs. The sync branch is pushed with an explicit `--force-with-lease` expectation so concurrent changes are not silently overwritten. The script then sets the `upstream-sync/mergeable` commit status and creates or updates the pull request.
 
-When a conflict exists, every conflicted path must match a rule in `hack/upstream-sync-generated.allowlist`. Rules use `GENERATED|<glob>`; a single `*` matches within one path segment, while `**` may span directories. The current rules cover vendor files, test snapshots, and the generated sections in README/configuration docs.
+The regeneration sequence is centralized in `make downstream-autogenerate-content` in `build/openshift/sync-upstream.mk`. It runs module tidy/vendor, README/configuration generation, and test snapshot generation; it does not stage or commit files. The sync script invokes this target from its temporary worktree, so new regeneration steps can be added there without expanding the script's command list.
+
+When a conflict exists, every conflicted path must match a rule in `hack/upstream-sync.allowlist`. Rules use `GENERATED|<glob>`; a single `*` matches within one path segment, while `**` may span directories. The current rules cover vendor files, test snapshots, and the generated sections in README/configuration docs.
 
 The allowlist is parsed as data; it is never sourced or evaluated. The script runs the existing generators in a temporary worktree before staging any conflicted file. This lets the documentation generator replace its marker-bounded sections directly, while the vendor and snapshot generators rewrite their outputs. It then checks that conflict markers are gone and the Git index has no unmerged paths.
 
