@@ -1,0 +1,6 @@
+# Parsed as inert text by sync-upstream.sh; never sourced or evaluated.
+# GENERATED|glob identifies paths refreshed by the sync generators.
+GENERATED|vendor/**
+GENERATED|pkg/mcp/testdata/*.json
+GENERATED|README.md
+GENERATED|docs/configuration.md
