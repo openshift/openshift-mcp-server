@@ -1,103 +1,78 @@
 # Upstream synchronization
 
-The downstream repository can periodically integrate `containers/kubernetes-mcp-server`'s `main` branch through a dedicated `upstream-sync` branch and pull request. The workflow is implemented by `hack/sync-upstream.sh`; Make targets in `build/openshift/sync-upstream.mk` provide its entrypoints.
+`hack/sync-upstream.sh` merges upstream `main` into downstream `main` through an `upstream-sync` branch and PR. The Make targets are defined in `build/openshift/sync-upstream.mk`.
 
-## Prerequisites
+## Setup
 
-- Configure an `upstream` Git remote pointing to `containers/kubernetes-mcp-server`.
-- Configure an `origin` remote pointing to the downstream fork.
-- Install Git and Bash. Publishing also requires the GitHub CLI (`gh`) authenticated for the downstream repository.
-- Start publishing from a clean working tree. `sync-upstream-pr` refuses a dirty tree.
+- Configure `origin` to point to the downstream repository. The script adds `upstream` if missing and checks existing remote URLs against the configured repository names.
+- Install Bash 4.4 or newer, Git with `merge-tree --write-tree` support, and Make. The script rejects older Bash versions before doing any work. Publishing also requires Go and an authenticated GitHub CLI (`gh`) with permission to push and manage PRs in the downstream repository.
+- Publish from a clean working tree.
 
-The script preflights mode-specific commands before inspecting remotes. Publish mode also requires Go, Make, `seq`, and `sleep` for generators and branch-index polling.
+On macOS, put a newer Bash on `PATH`; the system `/bin/bash` is too old. The Make targets invoke `bash` from `PATH`.
 
-Defaults are `upstream/main`, `origin/main`, and the `upstream-sync` branch. Synchronization is intentionally limited to the `main` base branch. Make variables can override `UPSTREAM_REPO`, `UPSTREAM_REMOTE`, `ORIGIN_REMOTE`, `SYNC_BRANCH_NAME`, and `OWNER_REPO`.
+The defaults are `upstream/main`, `origin/main`, and the `upstream-sync` branch. Only the `main` base branch is supported. Override `UPSTREAM_REPO`, `UPSTREAM_REMOTE`, `ORIGIN_REMOTE`, `SYNC_BRANCH_NAME`, or `OWNER_REPO` through Make variables. `OWNER_REPO` defaults to the repository identified by `ORIGIN_REMOTE`.
 
-In a developer clone where `origin` is a personal fork and `downstream` points to the downstream repository, select the downstream remote explicitly:
+If `origin` is your personal fork and `downstream` is the OpenShift repository, specify the destination:
 
 ```sh
 make sync-upstream-check ORIGIN_REMOTE=downstream
 make sync-upstream-pr ORIGIN_REMOTE=downstream
 ```
 
-## Workflow at a glance
-
-```text
-make sync-upstream-check ──> plan mode ──> fetch/pin refs ──> report plan ──> stop
-
-make sync-upstream-pr ─────> publish mode ──> plan ──> temporary worktree merge
-                                                            │
-                                              ┌─────────────┴─────────────┐
-                                              │                           │
-                                         no conflict                  conflict
-                                              │                           │
-                                              │                 all paths allowlisted?
-                                              │                    │ yes       │ no
-                                              │                    │           └──> stop
-                                              └──────────┬─────────┘               no push/PR
-                                                         ▼
-                                             run generators and verify
-                                                         │
-                                                candidate clean?
-                                                  │ yes       │ no
-                                                  ▼           └──> stop; no PR
-                                          lease-push branch
-                                                  │
-                                                  ▼
-                                        verify refs and mergeability
-                                                  │
-                                     ┌────────────┴─────────────┐
-                                     │                          │
-                                   pass                       fail
-                                     │                          │
-                                     ▼                          ▼
-                          success status, PR upsert      failure status; no PR
-```
-
-## Inspect the plan
+## Preview
 
 ```sh
 make sync-upstream-check
 ```
 
-This fetches the configured base refs, pins their commit SHAs, reports upstream commits and overlapping paths, and previews merge conflicts. It does not push a branch or create/update a pull request. As with any Git fetch, it updates local fetch metadata.
+Fetch the base branches, record their commit SHAs, and report how many upstream commits downstream lacks. If there are incoming commits, show overlapping paths and merge-conflict previews. This does not run generators, push branches, or create/update PRs. It updates local fetch metadata and adds the upstream remote if missing.
 
-Planning considers only the two repositories' merged `main` refs. It does not inspect open downstream pull requests. After a sync PR lands, maintainers of affected downstream PRs should rebase or update those branches against downstream `main` and resolve any resulting conflicts.
-
-## Publish or update the sync pull request
+## Publish
 
 ```sh
 make sync-upstream-pr
 ```
 
-Publishing integrates the pinned upstream commit in a temporary Git worktree, runs the repository's generators, and verifies that the candidate includes the pinned upstream SHA and merges cleanly with the pinned downstream SHA. Immediately before pushing, it checks that both remote base refs still match the pinned SHAs. The sync branch is pushed with an explicit `--force-with-lease` expectation so concurrent changes are not silently overwritten. The script then sets the `upstream-sync/mergeable` commit status and creates or updates the pull request.
-
-The regeneration sequence is centralized in `make downstream-autogenerate-content` in `build/openshift/sync-upstream.mk`. It runs module tidy/vendor, README/configuration generation, and test snapshot generation; it does not stage or commit files. The sync script invokes this target from its temporary worktree, so new regeneration steps can be added there without expanding the script's command list.
-
-When a conflict exists, every conflicted path must match a rule in `hack/upstream-sync.allowlist`. Rules use `GENERATED|<glob>`; a single `*` matches within one path segment, while `**` may span directories. The current rules cover vendor files, test snapshots, and the generated sections in README/configuration docs.
-
-The allowlist is parsed as data; it is never sourced or evaluated. The script runs the existing generators in a temporary worktree before staging any conflicted file. This lets the documentation generator replace its marker-bounded sections directly, while the vendor and snapshot generators rewrite their outputs. It then checks that conflict markers are gone and the Git index has no unmerged paths.
+Each attempt builds from the recorded downstream `main` commit in a temporary worktree. It merges upstream, runs generators, and verifies that the result contains the upstream commit and merges cleanly with downstream. The caller's checkout and index are left unchanged.
 
 ```text
-unmerged paths ──> every path matches GENERATED allowlist?
-                            │
-                 ┌──────────┴──────────┐
-                 │                     │
-                no                    yes
-                 │                     │
-       discard worktree          run generators
-       stop; no push/PR                │
-                                      ▼
-                            conflict markers remain?
-                              │                 │
-                             yes                no
-                              │                 │
-                     discard; no PR       stage generated outputs
-                                                │
-                                                ▼
-                                     verify no unmerged paths
+Fetch and record base SHAs
+          │
+          ├── No incoming commits ──> stop
+          ▼
+Merge upstream into temporary downstream worktree
+          │
+          ├── Unlisted conflict ────> stop; no push or PR update
+          ▼
+Regenerate outputs and verify candidate
+          │
+          ├── Failure ─────────────> stop; no push or PR update
+          ▼
+Recheck base refs; push with lease
+          ▼
+Wait for remote branch; recheck refs and mergeability
+          │
+          ├── Failure ─────────────> stop; no PR update
+          ▼
+Create or update sync PR
 ```
 
-If integration cannot produce a clean candidate, publishing stops without pushing a branch or creating/updating a PR. If a post-push pinned-ref or mergeability check fails, the script publishes a failing status and does not create/update a PR. The mergeability status and PR are updated only after the candidate passes the pinned checks; conflict-only draft PRs are not created.
+The push uses `--force-with-lease` against the inspected sync-branch SHA to reject concurrent branch changes. It replaces the previous integration; changes made only on the old sync branch are not retained.
 
-For CI, protect the downstream base branch with the `upstream-sync/mergeable` status check. A failed status blocks the sync PR until a maintainer resolves the conflict or generation problem and reruns the workflow. Keep the repository's normal CI tests required as well: this status verifies upstream coverage and mergeability, not semantic correctness.
+If checks fail after the push, the branch may already be updated, but the script does not create or update the PR body. An existing PR on that branch will still reflect the pushed commits.
+
+PR lookup is limited to the downstream repository's own sync branch targeting `main`; same-named branches in personal forks are excluded.
+
+## Generated conflicts
+
+Every conflicted path must match `hack/upstream-sync.allowlist`. Entries use `GENERATED|<regex>`, with Bash extended regular expressions anchored by `^` and `$`. Rules match the complete repository-relative path; absolute paths and parent traversal are rejected. The file is parsed once as data, never executed. Invalid or unanchored rules stop the sync.
+
+For example, `GENERATED|^vendor/.*$` includes nested vendor files, while `GENERATED|^pkg/mcp/testdata/[^/]*\.json$` matches JSON files directly in that directory. Escape literal dots with `\.`.
+
+The current rules cover `go.sum`, vendor files, snapshot JSON files, `README.md`, and `docs/configuration.md`. Conflicts in `go.mod` or other unlisted paths stop the sync.
+
+`make downstream-autogenerate-content` runs module tidy/vendor, documentation generation, and snapshot generation. Add regeneration steps to that target. It does not stage or commit files; the sync script does that in the temporary worktree.
+
+For allowlisted conflicts, generators run before the files are staged. The script rejects remaining conflict markers or unmerged index entries. README and configuration generators replace only their marked sections, so handwritten conflicts outside those sections remain unresolved. An allowlist match permits regeneration; it does not guarantee resolution.
+
+Keep normal required CI checks on sync PRs. A clean merge does not establish that the changes work correctly. The planner does not inspect other open downstream PRs; their authors may need to update their branches after a sync lands.
