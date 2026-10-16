@@ -11,10 +11,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	"github.com/containers/kubernetes-mcp-server/pkg/tlsutil"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 )
 
@@ -31,7 +31,7 @@ type NetObserv struct {
 }
 
 // NewNetObserv creates a client using toolset config, cluster detection, and the Kubernetes REST config.
-func NewNetObserv(ctx context.Context, cfg *config.Config, restConfig *rest.Config, provider api.FilteringProvider) (*NetObserv, error) {
+func NewNetObserv(ctx context.Context, cfg *config.Config, restConfig *rest.Config, discoveryClient discovery.DiscoveryInterface, detected ...EffectiveConfig) (*NetObserv, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("config is required")
 	}
@@ -46,7 +46,7 @@ func NewNetObserv(ctx context.Context, cfg *config.Config, restConfig *rest.Conf
 		bearerTokenFile: strings.TrimSpace(restConfig.BearerTokenFile),
 	}
 	var shared *Config
-	if tc, ok := cfg.GetToolsetConfig("netobserv"); ok {
+	if tc, ok := cfg.GetToolsetConfig(ToolsetConfigKey); ok {
 		if parsed, ok := tc.(*Config); ok && parsed != nil {
 			shared = parsed
 		}
@@ -55,7 +55,10 @@ func NewNetObserv(ctx context.Context, cfg *config.Config, restConfig *rest.Conf
 	if shared != nil {
 		resolved = *shared
 	}
-	isOpenShift := isOpenShiftFromProvider(ctx, provider)
+	if len(detected) > 0 && detected[0].Found {
+		resolved.ApplyDetectedEndpoint(detected[0])
+	}
+	isOpenShift := clusterIsOpenShiftFromDiscovery(discoveryClient)
 	resolved.applyDefaults(ctx, isOpenShift)
 	client.pluginURL = resolved.ResolvedURL(isOpenShift)
 	client.insecure = resolved.Insecure

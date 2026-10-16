@@ -1,5 +1,5 @@
-//go:build purego || !(amd64 || arm64)
-// +build purego !amd64,!arm64
+//go:build purego || !amd64
+// +build purego !amd64
 
 package base64
 
