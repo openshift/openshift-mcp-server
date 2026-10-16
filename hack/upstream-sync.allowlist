@@ -1,6 +1,8 @@
 # Parsed as inert text by sync-upstream.sh; never sourced or evaluated.
-# GENERATED|glob identifies paths refreshed by the sync generators.
-GENERATED|vendor/**
-GENERATED|pkg/mcp/testdata/*.json
-GENERATED|README.md
-GENERATED|docs/configuration.md
+# GENERATED|regex matches a complete repository-relative path using Bash EREs.
+# Rules must start with ^ and end with $. Escape literal dots with \.
+GENERATED|^go\.sum$
+GENERATED|^vendor/.*$
+GENERATED|^pkg/mcp/testdata/[^/]*\.json$
+GENERATED|^README\.md$
+GENERATED|^docs/configuration\.md$

@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+# Bash 4.4 fixed empty-array expansion under nounset.
+if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
+	printf '%s: Bash 4.4 or newer is required (found %s)\n' "${0##*/}" "$BASH_VERSION" >&2
+	exit 1
+fi
+
 set -Eeuo pipefail
 
 UPSTREAM_SYNC_ROOT=${BASH_SOURCE[0]%/*}
@@ -9,7 +15,7 @@ ALLOWLIST_FILE=${UPSTREAM_SYNC_ALLOWLIST:-"$UPSTREAM_SYNC_ROOT/upstream-sync.all
 
 # Shared validation, configuration, and process lifecycle helpers.
 fail() {
-	printf 'upstream-sync: %s\n' "$*" >&2
+	printf '%s: %s\n' "${0##*/}" "$*" >&2
 	exit 1
 }
 
@@ -84,7 +90,11 @@ initialize_config() {
 
 validate_remote() {
 	local remote=$1 expected=$2 url actual
-	url=$(git -C "$REPO_DIR" remote get-url "$remote") || fail "unknown remote: $remote"
+	if ! url=$(git -C "$REPO_DIR" remote get-url "$remote" 2>/dev/null); then
+		[[ "$remote" == "$UPSTREAM_REMOTE" && -n "$expected" ]] || fail "unknown remote: $remote"
+		git -C "$REPO_DIR" remote add "$remote" "https://github.com/$expected.git" || fail "could not add remote: $remote"
+		url=$(git -C "$REPO_DIR" remote get-url "$remote") || fail "could not read remote: $remote"
+	fi
 	if [[ -n "$expected" ]]; then
 		actual=$(github_repo_from_url "$url") || fail "remote $remote does not point to expected GitHub repository $expected"
 		[[ "$actual" == "$expected" ]] || fail "remote $remote does not point to expected GitHub repository $expected"
@@ -108,61 +118,44 @@ cleanup() {
 }
 
 # Plaintext allowlist parsing and generated-conflict resolution.
-validate_allowlist() {
+load_allowlist() {
 	local file=${1:-$ALLOWLIST_FILE}
-	local line kind path start end extra line_number=0
+	local line kind pattern regex line_number=0
+	GENERATED_PATTERNS=()
 	[[ -r "$file" ]] || fail "generated-content allowlist is missing: $file"
 	while IFS= read -r line || [[ -n "$line" ]]; do
 		line_number=$((line_number + 1))
 		line=${line%$'\r'}
 		[[ -z "$line" || "$line" == \#* ]] && continue
-		kind="" path="" start="" end="" extra=""
-		IFS='|' read -r kind path start end extra <<< "$line"
+		[[ "$line" == *'|'* ]] || fail "missing rule separator on allowlist line $line_number"
+		kind=${line%%|*}
+		pattern=${line#*|}
 		case "$kind" in
 			GENERATED)
-				[[ -z "$start$end$extra" ]] || fail "allowlist line $line_number has unexpected fields"
-				[[ -n "$path" && "$path" != /* && "$path" =~ ^[A-Za-z0-9_./*-]+$ ]] || fail "invalid generated path pattern on allowlist line $line_number"
-				case "/$path/" in *"/../"*) fail "parent traversal in allowlist line $line_number" ;; esac
+				[[ "$pattern" == ^* && "$pattern" == *'$' ]] || fail "regex must start with ^ and end with \$ on allowlist line $line_number"
+				# Group the rule so alternatives cannot bypass whole-path matching.
+				regex="^($pattern)$"
+				if [[ "" =~ $regex ]]; then
+					:
+				elif [[ $? -eq 2 ]]; then
+					fail "invalid regex on allowlist line $line_number"
+				fi
+				GENERATED_PATTERNS+=("$regex")
 				;;
 			*) fail "unknown allowlist rule '$kind' on line $line_number" ;;
 		esac
 	done < "$file"
 }
 
-file_rule_matches() {
-	local path=$1 pattern=$2 regex='^' index=0 char next
-	while (( index < ${#pattern} )); do
-		char=${pattern:index:1}
-		if [[ "$char" == '*' ]]; then
-			next=${pattern:index+1:1}
-			if [[ "$next" == '*' ]]; then
-				regex+='.*'
-				index=$((index + 2))
-			else
-				regex+='[^/]*'
-				index=$((index + 1))
-			fi
-		else
-			[[ "$char" == '.' ]] && regex+='\.' || regex+="$char"
-			index=$((index + 1))
-		fi
-	done
-	regex+='$'
-	[[ "$path" =~ $regex ]]
-}
-
 allowlisted_conflict() {
-	local path=$1 line kind pattern start end extra
+	local path=$1 pattern
 	valid_relative_path "$path" || return 1
-	while IFS= read -r line || [[ -n "$line" ]]; do
-		line=${line%$'\r'}
-		[[ -z "$line" || "$line" == \#* ]] && continue
-		kind="" pattern="" start="" end="" extra=""
-		IFS='|' read -r kind pattern start end extra <<< "$line"
-		if [[ "$kind" == GENERATED ]] && file_rule_matches "$path" "$pattern"; then
+	[[ ${#GENERATED_PATTERNS[@]} -gt 0 ]] || return 1
+	for pattern in "${GENERATED_PATTERNS[@]}"; do
+		if [[ "$path" =~ $pattern ]]; then
 			return 0
 		fi
-	done < "$ALLOWLIST_FILE"
+	done
 	return 1
 }
 
@@ -194,7 +187,9 @@ conflict_markers_remain() {
 		[[ -r "$file" ]] || return 0
 		while IFS= read -r line || [[ -n "$line" ]]; do
 			case "$line" in
-				'<<<<<<<'*|'======='*|'>>>>>>>'*) return 0 ;;
+				# A separator alone can be a Markdown heading underline.
+				# Reject opening/closing markers even if the block is incomplete.
+				'<<<<<<<'*|'>>>>>>>'*) return 0 ;;
 			esac
 		done < "$file"
 	done
@@ -437,27 +432,16 @@ commit_generated() {
 	[[ -z "$status" ]]
 }
 
-# GitHub commit-status and pull-request publishing operations.
-set_merge_status() {
-	local head=$1 state_code=$2 description=$3 state
-	state=failure
-	[[ "$state_code" == 0 ]] && state=success
-	gh api --method POST "repos/$OWNER_REPO/statuses/$head" \
-		--field "state=$state" \
-		--field "context=upstream-sync/mergeable" \
-		--field "description=$description" >/dev/null || fail "could not publish mergeability status"
-}
-
+# GitHub pull-request publishing operations.
 upsert_pr() {
-	local head=$1 body=$2 number is_draft
-	number=$(gh pr list --repo "$OWNER_REPO" --head "$SYNC_BRANCH_NAME" --base "$SYNC_BASE_BRANCH" --state open --json number --jq '.[0].number') || fail "could not inspect existing sync PR"
-	if [[ -n "$number" && "$number" != null ]]; then
-		is_draft=$(gh pr view "$number" --repo "$OWNER_REPO" --json isDraft --jq '.isDraft') || fail "could not inspect sync PR draft state"
-		[[ "$is_draft" == true || "$is_draft" == false ]] || fail "unexpected sync PR draft state: $is_draft"
+	local body=$1 number
+	number=$(gh api --method GET "repos/$OWNER_REPO/pulls" --paginate \
+		--raw-field state=open --raw-field "base=$SYNC_BASE_BRANCH" \
+		--raw-field "head=${OWNER_REPO%%/*}:$SYNC_BRANCH_NAME" --field per_page=100 \
+		--jq ".[] | select(.head.repo.full_name == \"$OWNER_REPO\") | .number") || fail "could not inspect existing sync PR"
+	if [[ -n "$number" ]]; then
+		[[ "$number" =~ ^[0-9]+$ ]] || fail "multiple matching sync PRs; refusing to select one"
 		gh api --method PATCH "repos/$OWNER_REPO/pulls/$number" --raw-field "body=$body" >/dev/null || fail "could not update sync PR body"
-		if [[ "$is_draft" == true ]]; then
-			gh pr ready "$number" --repo "$OWNER_REPO" || fail "could not mark sync PR ready"
-		fi
 		return 0
 	fi
 	gh api --method POST "repos/$OWNER_REPO/pulls" \
@@ -471,7 +455,7 @@ clean_pr_body() {
 	local head=$1
 	{
 		printf '### 🔄 Upstream Sync\n\nThis PR syncs the downstream fork with upstream.\n\n'
-		printf -- '- Upstream SHA: `%s`\n- Downstream SHA: `%s`\n- Published head: `%s`\n- Mergeable: `true`\n\n' "$UPSTREAM_SHA" "$DOWNSTREAM_SHA" "$head"
+		printf -- '- Upstream SHA: `%s`\n- Downstream SHA: `%s`\n- Published head: `%s`\n\n' "$UPSTREAM_SHA" "$DOWNSTREAM_SHA" "$head"
 		printf '**Changes:**\n'
 		git -C "$REPO_DIR" log --pretty=format:'- %h %s (%an)' "$DOWNSTREAM_SHA..$UPSTREAM_SHA"
 		printf '\n'
@@ -491,7 +475,7 @@ USAGE
 }
 
 build_sync_plan() {
-	validate_allowlist
+	load_allowlist
 	if [[ "$MODE" == publish ]]; then validate_publish_preconditions; fi
 	validate_remote "$UPSTREAM_REMOTE" "$UPSTREAM_REPO"
 	validate_remote "$ORIGIN_REMOTE" "$OWNER_REPO"
@@ -527,7 +511,7 @@ main() {
 
 publish_sync() {
 	local base_sha="$DOWNSTREAM_SHA" head_sha body
-	if [[ -n "$SYNC_REMOTE_SHA" ]]; then base_sha="$SYNC_REMOTE_SHA"; fi
+	# Rebuild from current downstream main; the old sync tip only guards the push lease.
 	INTEGRATION_NOTE=""
 	if ! merge_in_worktree "$base_sha"; then
 		fail "could not produce a conflict-free candidate; no branch or PR was published: ${INTEGRATION_NOTE:-see command error output}"
@@ -537,16 +521,13 @@ publish_sync() {
 	push_branch "$head_sha" "$SYNC_REMOTE_SHA"
 	wait_for_branch "$head_sha"
 	if ! pinned_refs_match; then
-		set_merge_status "$head_sha" 1 "source refs moved after planning; rerun sync before creating a PR"
 		fail "source refs moved after pushing the clean candidate; no PR was created"
 	fi
 	if ! mergeable_head "$head_sha"; then
-		set_merge_status "$head_sha" 1 "candidate is not mergeable with the pinned downstream ref"
 		fail "published candidate failed mergeability verification; no PR was created"
 	fi
 	body=$(clean_pr_body "$head_sha")
-	set_merge_status "$head_sha" 0 "candidate contains pinned upstream and merges cleanly with downstream"
-	upsert_pr "$head_sha" "$body"
+	upsert_pr "$body"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then main "$@"; fi
