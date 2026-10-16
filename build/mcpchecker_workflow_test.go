@@ -368,6 +368,31 @@ func (suiteState *MCPCheckerWorkflowSuite) TestFinalGateAndTypedContext() {
 	}
 }
 
+func workflowServerRootReady(serverRootPath, trusted string) bool {
+	serverRoot, err := os.ReadFile(serverRootPath)
+	return err == nil && string(serverRoot) == trusted+"\n"
+}
+
+func (suiteState *MCPCheckerWorkflowSuite) TestServerRootReadiness() {
+	root := suiteState.T().TempDir()
+	serverRootPath, trusted := filepath.Join(root, "server-root"), filepath.Join(root, "trusted")
+	suiteState.False(workflowServerRootReady(serverRootPath, trusted))
+	for _, fixture := range []struct {
+		name, content string
+		ready         bool
+	}{
+		{name: "empty"},
+		{name: "partial", content: trusted[:len(trusted)-1]},
+		{name: "missing-newline", content: trusted},
+		{name: "complete", content: trusted + "\n", ready: true},
+	} {
+		suiteState.Run(fixture.name, func() {
+			suiteState.Require().NoError(os.WriteFile(serverRootPath, []byte(fixture.content), 0o600))
+			suiteState.Equal(fixture.ready, workflowServerRootReady(serverRootPath, trusted))
+		})
+	}
+}
+
 func (suiteState *MCPCheckerWorkflowSuite) TestActualTrustedMakeServerConsumer() {
 	if runtime.GOOS != "linux" {
 		suiteState.T().Skip("fixture ownership requires the workflow's Linux child-subreaper support")
@@ -478,7 +503,7 @@ while :; do sleep 0.1; done
 			_, statErr := os.Stat(filepath.Join("/proc", strconv.Itoa(pid)))
 			suiteState.Require().NoError(statErr)
 			suiteState.T().Logf("owned before cleanup scenario=%s server=%d present=true", scenario, pid)
-			suiteState.Eventually(func() bool { _, statErr := os.Stat(filepath.Join(root, "server-root")); return statErr == nil }, 2*time.Second, 10*time.Millisecond)
+			suiteState.Eventually(func() bool { return workflowServerRootReady(filepath.Join(root, "server-root"), trusted) }, 2*time.Second, 10*time.Millisecond)
 			serverRoot, err := os.ReadFile(filepath.Join(root, "server-root"))
 			suiteState.Require().NoError(err)
 			suiteState.Equal(trusted+"\n", string(serverRoot))
@@ -489,7 +514,7 @@ while :; do sleep 0.1; done
 	}
 }
 
-func (suiteState *MCPCheckerWorkflowSuite) TestWorkflowTrustStructureAndUnresolvedHarness() {
+func (suiteState *MCPCheckerWorkflowSuite) TestWorkflowTrustStructureAndLiteralHarness() {
 	data, err := os.ReadFile(workflowBuildPath(suiteState.T(), "../.github/workflows/mcpchecker.yaml"))
 	suiteState.Require().NoError(err)
 	var workflow struct {
@@ -508,13 +533,14 @@ func (suiteState *MCPCheckerWorkflowSuite) TestWorkflowTrustStructureAndUnresolv
 		}
 	}
 	suiteState.Require().NoError(yaml.Unmarshal(data, &workflow))
-	suiteState.Equal("", workflow.Env["HARNESS_SHA"])
+	const reviewedHarness = "efd3cf05f607ab7804c4a16b543d916ebfc51a74"
+	suiteState.Equal(reviewedHarness, workflow.Env["HARNESS_SHA"])
 	gate := workflow.Jobs["check-trigger"].Steps[0].Run
-	for _, pin := range []string{"", "__REVIEWED_H_SHA__", strings.Repeat("a", 40)} {
+	for _, pin := range []string{"", "__REVIEWED_H_SHA__", "main", strings.Repeat("a", 39), strings.Repeat("g", 40), workflow.Env["HARNESS_SHA"]} {
 		command := exec.Command("bash", "-c", gate)
 		command.Env = append(os.Environ(), "HARNESS_SHA="+pin)
 		output, err := command.CombinedOutput()
-		if len(pin) == 40 {
+		if pin == reviewedHarness {
 			suiteState.NoError(err, string(output))
 		} else {
 			suiteState.Error(err, string(output))
@@ -561,7 +587,7 @@ func (suiteState *MCPCheckerWorkflowSuite) TestWorkflowTrustStructureAndUnresolv
 			if jobName == "run-evaluation" && strings.HasPrefix(step.Uses, "actions/checkout@") {
 				suiteState.Equal("redhat-chai-bot/openshift_openshift-mcp-server", step.With["repository"])
 				suiteState.Equal("trusted", step.With["path"])
-				suiteState.Equal("", step.With["ref"])
+				suiteState.Equal(reviewedHarness, step.With["ref"])
 			}
 			if step.ID == "mcpchecker" {
 				suiteState.Equal("0.8", step.With["task-pass-threshold"])
@@ -575,13 +601,37 @@ func (suiteState *MCPCheckerWorkflowSuite) TestWorkflowTrustStructureAndUnresolv
 		}
 	}
 	suiteState.NotContains(string(data), "pull_request_target")
-	rendered := strings.ReplaceAll(strings.Replace(string(data), "HARNESS_SHA: ''", "HARNESS_SHA: '"+strings.Repeat("a", 40)+"'", 1), "          ref: ''", "          ref: '"+strings.Repeat("a", 40)+"'")
-	suiteState.Require().NoError(yaml.Unmarshal([]byte(rendered), &workflow))
+	suiteState.NotContains(string(data), "__REVIEWED_H_SHA__")
+	checkoutPaths := map[string]string{"check-trigger": "control-trusted", "candidate-build": "trusted-build", "run-evaluation": "trusted"}
 	for _, jobName := range []string{"check-trigger", "candidate-build", "run-evaluation"} {
+		trustedCheckouts := 0
 		for _, step := range workflow.Jobs[jobName].Steps {
-			if step.With["repository"] == "redhat-chai-bot/openshift_openshift-mcp-server" {
-				suiteState.Equal(strings.Repeat("a", 40), step.With["ref"])
+			if step.With["path"] == checkoutPaths[jobName] {
+				trustedCheckouts++
+				suiteState.Equal("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", step.Uses)
+				suiteState.Equal("redhat-chai-bot/openshift_openshift-mcp-server", step.With["repository"])
+				suiteState.Equal(reviewedHarness, step.With["ref"])
+				suiteState.Equal(false, step.With["persist-credentials"])
 			}
+			if step.With["path"] == "candidate" {
+				suiteState.Equal("candidate-build", jobName)
+				suiteState.Equal("${{ needs.check-trigger.outputs.source-repository }}", step.With["repository"])
+				suiteState.Equal("${{ needs.check-trigger.outputs.pr-sha }}", step.With["ref"])
+			}
+		}
+		suiteState.Equal(1, trustedCheckouts, jobName)
+	}
+	for _, mode := range []string{"control", "revalidate", "artifact", "baseline"} {
+		decoded, output, runErr := suiteState.runControl(mode, "valid", "HARNESS_SHA="+workflow.Env["HARNESS_SHA"], "CONTROL_JSON="+strings.ReplaceAll(workflowControlJSON(), strings.Repeat("a", 40), reviewedHarness))
+		suiteState.Require().NoError(runErr, mode+": "+output)
+		if mode == "control" {
+			var outputs map[string]any
+			suiteState.Require().NoError(json.Unmarshal(decoded["outputs"], &outputs))
+			var metadata map[string]any
+			suiteState.Require().NoError(json.Unmarshal([]byte(outputs["control-json"].(string)), &metadata))
+			suiteState.Equal(reviewedHarness, metadata["harness"])
+			suiteState.Equal(strings.Repeat("c", 40), metadata["candidate"])
+			suiteState.NotEqual(metadata["harness"], metadata["candidate"])
 		}
 	}
 	module, err := os.ReadFile(workflowBuildPath(suiteState.T(), "../go.mod"))
