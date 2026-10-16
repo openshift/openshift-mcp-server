@@ -9,6 +9,13 @@ OWNER_REPO ?=
 
 export UPSTREAM_REPO UPSTREAM_REMOTE ORIGIN_REMOTE SYNC_BRANCH_NAME SYNC_BASE_BRANCH OWNER_REPO
 
+.PHONY: downstream-autogenerate-content
+downstream-autogenerate-content: ## Regenerate generated content for downstream syncs
+	$(MAKE) tidy
+	go mod vendor
+	$(MAKE) update-readme-tools
+	$(MAKE) test-update-snapshots
+
 .PHONY: sync-upstream-check
 sync-upstream-check: ## Inspect upstream sync plan without publishing
 	@bash hack/sync-upstream.sh plan
