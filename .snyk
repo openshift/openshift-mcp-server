@@ -7,3 +7,5 @@ exclude:
     - vendor/**
     - "**/*_test.go"
     - python/**
+    # Uses parent-window validation, following the MCP Apps SDK transport.
+    - pkg/mcpapps/standard.js
