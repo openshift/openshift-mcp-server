@@ -12,14 +12,14 @@ type AdapterSuite struct {
 
 func (s *AdapterSuite) TestNewRunDebugNodeCommand() {
 	s.Run("returns function with correct signature", func() {
-		fn := NewRunDebugNodeCommand(nil)
+		fn := NewRunDebugNodeCommand(nil, nil)
 		s.NotNil(fn, "adapter should return a non-nil function")
 	})
 }
 
 func (s *AdapterSuite) TestNewRunPodExecCommand() {
 	s.Run("returns function with correct signature", func() {
-		fn := NewRunPodExecCommand(nil)
+		fn := NewRunPodExecCommand(nil, nil)
 		s.NotNil(fn, "adapter should return a non-nil function")
 	})
 }

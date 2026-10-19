@@ -99,7 +99,7 @@ func nodesDebugExec(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		}
 	}
 
-	client := nodesdebug.NewNodeDebug(params.KubernetesClient)
+	client := nodesdebug.NewNodeDebug(params.KubernetesClient, params.Config)
 	stdout, stderr, execErr := client.NodesDebugExec(params.Context, namespace, nodeName, image, command, "", "", timeout)
 	if stdout == "" && stderr == "" && execErr == nil {
 		stdout = fmt.Sprintf("Command executed successfully on node %s but produced no output.", nodeName)

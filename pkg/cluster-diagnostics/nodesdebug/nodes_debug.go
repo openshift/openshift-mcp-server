@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/version"
 
@@ -93,18 +94,19 @@ func NodeDebugRBAC(nodeArgument, namespaceArgument string) *api.RBACMetadata {
 }
 
 // NewNodeDebug creates a new NodeDebug client from an api.KubernetesClient.
-func NewNodeDebug(k api.KubernetesClient) *NodeDebug {
-	return &NodeDebug{NodeDebugClient: NewNodeDebugClient(k)}
+func NewNodeDebug(k api.KubernetesClient, cfg *config.Config) *NodeDebug {
+	return &NodeDebug{NodeDebugClient: NewNodeDebugClient(k, cfg)}
 }
 
 // nodeDebugAdapter adapts api.KubernetesClient to implement NodeDebugClient.
 type nodeDebugAdapter struct {
-	k api.KubernetesClient
+	k   api.KubernetesClient
+	cfg *config.Config
 }
 
 // NewNodeDebugClient creates a NodeDebugClient from an api.KubernetesClient.
-func NewNodeDebugClient(k api.KubernetesClient) NodeDebugClient {
-	return &nodeDebugAdapter{k: k}
+func NewNodeDebugClient(k api.KubernetesClient, cfg *config.Config) NodeDebugClient {
+	return &nodeDebugAdapter{k: k, cfg: cfg}
 }
 
 func (a *nodeDebugAdapter) NamespaceOrDefault(namespace string) string {
@@ -120,7 +122,7 @@ func (a *nodeDebugAdapter) PodsLog(ctx context.Context, namespace, name, contain
 }
 
 func (a *nodeDebugAdapter) PodsExec(ctx context.Context, namespace, name, container string, command []string) (string, string, error) {
-	return kubernetes.NewCore(a.k).PodsExec(ctx, namespace, name, container, command)
+	return kubernetes.NewCore(a.k).PodsExec(ctx, a.cfg, namespace, name, container, command)
 }
 
 func (a *nodeDebugAdapter) DoesNodeExist(ctx context.Context, name string) (bool, error) {
