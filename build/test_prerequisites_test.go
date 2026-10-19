@@ -19,6 +19,6 @@ func (suiteState *TestPrerequisitesSuite) TestOfflineBootstrapAndMakeConsumer() 
 	command.Env = append(os.Environ(), "KUBECONFIG=/dev/null", "PYTHONDONTWRITEBYTECODE=1")
 	output, err := command.CombinedOutput()
 	suiteState.NoError(err, string(output))
-	suiteState.Contains(string(output), "Ran 10 tests")
+	suiteState.Contains(string(output), "Ran 29 tests")
 	suiteState.Contains(string(output), "OK")
 }

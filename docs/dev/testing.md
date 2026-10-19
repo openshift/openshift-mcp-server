@@ -2,6 +2,44 @@
 
 This project follows specific testing patterns to ensure consistency, maintainability, and quality. When writing tests, adhere to the following guidelines.
 
+## Test Prerequisites and Cache
+
+`make test` prepares missing Node, jq, and ShellCheck before running the unchanged
+`go test -race -count=1 -v ./...` command. Python 3.9 or newer, Bash, Make, tar,
+sha256sum, and unzip are baseline prerequisites. Missing tools can be bootstrapped
+on Linux x86_64 using the versions and checksums in `build/test-prerequisites.json`.
+Already compatible tools on the caller's `PATH` are retained without cache or
+download work. The caller's executable search path, loader options, proxy/TLS
+configuration, and command environment are trusted inputs, not a sandbox boundary.
+The bootstrap also accepts other explicit command argument lists used by local
+validation; it does not interpret those lists as shell strings.
+
+When tools are missing, an explicitly set `XDG_CACHE_HOME` must be nonempty,
+absolute, physical (no symlink or `..` components), owned, and writable. Invalid
+explicit settings fail rather than silently switching caches. Without that
+setting, an unavailable or unsafe home cache (including `HOME=/`) uses a unique
+owned 0700 temporary directory instead. A set `TMPDIR` must name a safe physical
+writable directory; invalid settings fail. Otherwise `/tmp` is used. Root-owned
+sticky temporary directories are allowed only with a unique private child, not
+a shared predictable cache. Temporary caches survive until the command finishes
+and are cleaned on normal success or failure; persistent tool-cache corruption
+fails closed and does not trigger fallback or an automatic redownload.
+
+Cache path components must be owned by the caller or the system administrator
+and not writable by other accounts, except for root-owned sticky temporary
+ancestors. Private cache directories remain caller-owned 0700. This prevents
+foreign accounts replacing cache ancestors, but does not isolate a malicious
+process running as the caller or the system administrator. Downloads and cached
+executables are checksum verified; this is not a universal atomic-execution or
+hard wall-clock guarantee.
+
+The offline Python regressions run through the ordinary Go build-helper suite.
+They include the actual Make recipe with deliberately missing tools and an
+unwritable home, isolated release-byte fixtures, cache safety and cleanup, and
+unchanged Go argument/environment/exit behavior. Version-parser unit cases mock
+both executable lookup and execution; real missing-tool coverage stays separate
+so it does not depend on the host already having jq or ShellCheck installed.
+
 ## Test Framework
 
 - **Use `testify/suite`** for organizing tests into suites

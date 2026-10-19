@@ -1,4 +1,5 @@
 import hashlib
+from contextlib import contextmanager
 import io
 import json
 import os
@@ -31,14 +32,16 @@ def open_release(url, timeout):
 
 
 def usable(name, search_path):
-    executable = shutil.which(name, path=search_path)
-    if not executable:
-        return False
     probes = {
         "node": ["-e", "if(+process.versions.node.split('.')[0]<18||!Object.hasOwn({ok:1},'ok'))process.exit(1)"],
         "jq": ["--version"],
         "shellcheck": ["--version"],
     }
+    if name not in probes:
+        raise ValueError("unsupported test executable: " + name)
+    executable = shutil.which(name, path=search_path)
+    if not executable:
+        return False
     try:
         result = subprocess.run([executable, *probes[name]], capture_output=True, timeout=10)
         if result.returncode:
@@ -56,17 +59,98 @@ def usable(name, search_path):
         return False
 
 
-def private_directory(directory):
+@contextmanager
+def checked_directory(directory, create=False, private=False):
     directory = Path(directory)
+    if not directory.is_absolute() or ".." in directory.parts:
+        raise RuntimeError("test-tool directory must be an absolute physical path")
+    descriptor = os.open(directory.anchor, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     try:
-        directory.mkdir(mode=0o700, parents=True)
-    except FileExistsError:
+        for component in (*directory.parts[1:], None):
+            info = os.fstat(descriptor)
+            shared_temporary = info.st_uid == 0 and bool(info.st_mode & stat.S_ISVTX)
+            if info.st_uid not in (0, os.getuid()) or (info.st_mode & 0o022 and not shared_temporary):
+                raise RuntimeError("test-tool directory has untrusted ownership or writable ancestors")
+            if component is None:
+                break
+            created = False
+            try:
+                child = os.open(component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=descriptor)
+            except FileNotFoundError:
+                if not create:
+                    raise
+                if info.st_uid != os.getuid() or info.st_mode & 0o022:
+                    raise RuntimeError("test-tool directories require an owned non-shared parent")
+                try:
+                    os.mkdir(component, mode=0o700, dir_fd=descriptor)
+                    created = True
+                except FileExistsError:
+                    pass
+                child = os.open(component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = child
+            if created:
+                if os.fstat(descriptor).st_uid != os.getuid():
+                    raise RuntimeError("new test-tool directory is not owned")
+                os.fchmod(descriptor, 0o700)
+        if private and (info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700):
+            raise RuntimeError("test-tool cache must be an owned physical 0700 directory")
+        yield descriptor
+    finally:
+        os.close(descriptor)
+
+
+def private_directory(directory):
+    with checked_directory(directory, create=True, private=True):
         pass
-    else:
-        os.chmod(directory, 0o700)
-    info = directory.lstat()
-    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700 or directory.resolve() != directory:
-        raise RuntimeError("test-tool cache must be an owned physical 0700 directory")
+
+
+def writable_cache_base(base):
+    with checked_directory(base, create=True) as descriptor:
+        if os.fstat(descriptor).st_uid != os.getuid() or not os.access(base, os.W_OK | os.X_OK):
+            raise RuntimeError("test-tool cache base must be owned and writable")
+
+
+@contextmanager
+def cache_directory():
+    if "XDG_CACHE_HOME" in os.environ:
+        explicit = os.environ["XDG_CACHE_HOME"]
+        if not explicit:
+            raise RuntimeError("XDG_CACHE_HOME must be a nonempty absolute physical writable directory")
+        base = Path(explicit)
+        try:
+            writable_cache_base(base)
+        except (OSError, RuntimeError) as error:
+            raise RuntimeError("invalid XDG_CACHE_HOME: " + str(error)) from error
+        yield base / "openshift-mcp-test-tools"
+        return
+    try:
+        home = Path.home()
+        if home == Path(home.anchor):
+            raise RuntimeError("root is not a private cache home")
+        base = home / ".cache"
+        writable_cache_base(base)
+    except (KeyError, OSError, RuntimeError):
+        base = None
+    if base is not None:
+        yield base / "openshift-mcp-test-tools"
+        return
+    temporary_base = os.environ.get("TMPDIR", "/tmp")
+    if not temporary_base:
+        raise RuntimeError("TMPDIR must be a nonempty absolute physical writable directory")
+    with checked_directory(temporary_base) as descriptor:
+        info = os.fstat(descriptor)
+        if not os.access(temporary_base, os.W_OK | os.X_OK) or not (info.st_uid == os.getuid() or info.st_uid == 0 and info.st_mode & stat.S_ISVTX):
+            raise RuntimeError("unsafe or unwritable test-tool temporary directory")
+        with tempfile.TemporaryDirectory(prefix="openshift-mcp-test-", dir=temporary_base) as temporary:
+            with checked_directory(temporary) as child:
+                info = os.fstat(child)
+                current = os.stat(temporary, follow_symlinks=False)
+                if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) not in (0o700, 0o2700) or (info.st_dev, info.st_ino) != (current.st_dev, current.st_ino):
+                    raise RuntimeError("new test-tool temporary directory is not private and owned")
+                os.fchmod(child, 0o700)
+            private_directory(temporary)
+            yield Path(temporary) / "openshift-mcp-test-tools"
 
 
 def verified_file(filename, digest):
@@ -120,7 +204,7 @@ def prepare(manifest, cache, search_path, system=None):
     import fcntl
     cache = Path(cache)
     private_directory(cache)
-    lock = os.open(cache / "lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    lock = os.open(cache / "lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
     paths = []
     with os.fdopen(lock, "w") as lockfile:
         info = os.fstat(lockfile.fileno())
@@ -150,11 +234,14 @@ def prepare(manifest, cache, search_path, system=None):
                         output.write(payload)
                         os.fchmod(output.fileno(), 0o700)
                     verified_file(temporary, entry["binary_sha256"])
+                    private_directory(directory)
                     os.replace(temporary, target)
                 finally:
+                    private_directory(directory)
                     if os.path.lexists(temporary):
                         os.unlink(temporary)
             verified_file(target, entry["binary_sha256"])
+            private_directory(directory)
             if not usable(name, str(directory)):
                 raise RuntimeError("verified test tool is incompatible with this runtime: " + name)
             paths.append(str(directory))
@@ -173,10 +260,12 @@ def main():
         raise RuntimeError("usage: test-prerequisites.py -- command [args...]")
     with Path(__file__).with_suffix(".json").open() as source:
         manifest = json.load(source)
-    base = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))).resolve()
     environment = os.environ.copy()
-    environment["PATH"] = prepare(manifest, base / "openshift-mcp-test-tools", search_path)
-    return subprocess.call(sys.argv[2:], env=environment)
+    if all(usable(name, search_path) for name in ("node", "jq", "shellcheck")):
+        return subprocess.call(sys.argv[2:], env=environment)
+    with cache_directory() as cache:
+        environment["PATH"] = prepare(manifest, cache, search_path)
+        return subprocess.call(sys.argv[2:], env=environment)
 
 
 if __name__ == "__main__":
