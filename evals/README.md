@@ -338,15 +338,15 @@ risk is unacceptable; there is no automatic safe-fork fallback. Model/judge
 credentials are confined to the trusted evaluation step, not build, setup,
 server, diff, reporter or scheduled writer.
 
-**A harness pin is not approval for credentialed execution.** The published
-workflow pins H `efd3cf05f607ab7804c4a16b543d916ebfc51a74`, which completed local
-review and repository gates before publication. Those historical local checks
-do not establish external CI success, deployment, or maintainer risk approval.
-Corrections to harness helpers require a separately reviewed and validated new
-immutable H2 commit; only then may C2 wire its actual literal SHA and complete
-its own review and gates. Until then the existing pin still executes the old H,
-not corrected working-tree sources. H2 checks do not cover C2. No branch,
-artifact or label substitutes for the reviewed immutable harness.
+**A harness pin is not approval for credentialed execution.** The older published
+workflow pins H `efd3cf05f607ab7804c4a16b543d916ebfc51a74`. The current source
+instead pins immutable H2 `62b465f982d92ca72128eb52a819925ac9ef26cd`, whose
+corrected helpers completed independent review and local repository gates.
+Those historical local checks do not establish external CI success, deployment,
+or maintainer risk approval. In the older published workflow, the existing pin
+still executes the old H until C2 is published. This C2 workflow wiring requires
+its own independent review and gates before publication; H2 checks do not cover
+C2. No branch, artifact or label substitutes for the reviewed immutable harness.
 
 A maintainer must separately deploy the reviewed workflow/report code to the
 trusted default branch, configure the protected environment and scoped secrets,

@@ -582,7 +582,7 @@ func (suiteState *MCPCheckerWorkflowSuite) TestWorkflowTrustStructureAndLiteralH
 		}
 	}
 	suiteState.Require().NoError(yaml.Unmarshal(data, &workflow))
-	const reviewedHarness = "efd3cf05f607ab7804c4a16b543d916ebfc51a74"
+	const reviewedHarness = "62b465f982d92ca72128eb52a819925ac9ef26cd"
 	suiteState.Equal(reviewedHarness, workflow.Env["HARNESS_SHA"])
 	gate := workflow.Jobs["check-trigger"].Steps[0].Run
 	for _, pin := range []string{"", "__REVIEWED_H_SHA__", "main", strings.Repeat("a", 39), strings.Repeat("g", 40), workflow.Env["HARNESS_SHA"]} {
