@@ -34,13 +34,13 @@ func workflowControlJSON() string {
 
 const controlHarness = `
 const helper = require(process.argv[1]);
-const mode = process.argv[2], scenario = process.argv[3];
+const mode = process.argv[2], scenario = process.argv[3].replace(/:empty$/, '');
 const C = 'c'.repeat(40), B = 'b'.repeat(40);
 const outputs = {}, calls = [];
 const repository = 'containers/kubernetes-mcp-server';
-const pr = {number:518,state:'open',base:{ref:'main',repo:{full_name:repository}},head:{sha:C,ref:'feature',repo:{full_name:'fork/server'}}};
+const pr = {number:518,state:'open',merge_commit_sha:'e'.repeat(40),base:{ref:'main',repo:{full_name:repository}},head:{sha:C,ref:'feature',repo:{id:71,full_name:'fork/server'}}};
 let reviews = [{id:44,state:'COMMENTED',body:'/run-mcpchecker core',commit_id:C,user:{login:'maintainer'}}];
-const trigger = {id:99,workflow_id:8,repository:{full_name:repository},event:'pull_request_review',status:'completed',conclusion:'success',head_branch:'feature',pull_requests:[{number:518}]};
+const trigger = {id:99,workflow_id:8,repository:{full_name:repository},event:'pull_request_review',status:'completed',conclusion:'success',head_branch:'feature',head_sha:C,head_repository:{full_name:'fork/server'},pull_requests:[{number:518,head:JSON.parse(JSON.stringify(pr.head))}]};
 const artifact = {id:123,name:'mcpchecker-candidate-server',expired:false,size_in_bytes:2048,workflow_run:{id:22}};
 const environment = {protection_rules:[{type:'required_reviewers',prevent_self_review:true,reviewers:[{type:'Team',reviewer:{id:4}}]}],deployment_branch_policy:{custom_branch_policies:true,protected_branches:false}};
 const policies = {total_count:1,branch_policies:[{name:'main',type:'branch'}]};
@@ -48,7 +48,18 @@ const job = {name:'Build Candidate',run_attempt:2,conclusion:'success',steps:[{n
 let permission = 'write', pulls = [pr], baseline = '[{"taskPassed":true}]';
 if(scenario.startsWith('baseline-large'))baseline=require('node:fs').readFileSync(require('node:path').join(require('node:path').dirname(process.argv[1]),'../evals/results/builtin-openai-core-latest.json'),'utf8')+(scenario==='baseline-large-newline'?'\n':'');
 switch(scenario) {
-case 'ambiguous': pulls = [pr,{number:519,head:{ref:'feature',repo:{full_name:'other/fork'}}}]; break;
+case 'two-forks': pulls = [pr,{...pr,number:519,head:{ref:'feature',repo:{full_name:'other/fork'}}}]; break;
+case 'other-base': pulls = [pr,{...pr,number:519,base:{...pr.base,ref:'release-1'}}]; break;
+case 'ambiguous': pulls = [pr,{...pr,number:519}]; break;
+case 'empty-trigger': trigger.pull_requests=[]; break;
+case 'current-head-moved': trigger.pull_requests=[]; pulls=JSON.parse(JSON.stringify(pulls)); pr.head.sha='d'.repeat(40); reviews[0].commit_id=pr.head.sha; break;
+case 'missing-head-repo': delete trigger.head_repository; break;
+case 'wrong-head-repo': trigger.head_repository.full_name='other/fork'; break;
+case 'wrong-trigger-sha': trigger.head_sha='f'.repeat(40); break;
+case 'merge-as-trigger-sha': trigger.head_sha=pr.merge_commit_sha; break;
+case 'unready-merge': pr.merge_commit_sha=null; break;
+case 'closed-pr': pr.state='closed'; break;
+case 'wrong-branch': trigger.head_branch='other'; break;
 case 'no-pr': pulls = []; break;
 case 'missing-review': reviews = []; break;
 case 'dismissed': reviews[0].state='DISMISSED'; break;
@@ -81,6 +92,7 @@ case 'self-approval': environment.protection_rules[0].prevent_self_review=false;
 case 'no-reviewers': environment.protection_rules[0].reviewers=[]; break;
 case 'branch-policy': policies.branch_policies[0].name='*'; break;
 }
+if(process.argv[3].endsWith(':empty'))trigger.pull_requests=[];
 if(scenario==='baseline-network')baseline='network';
 const list = function list(){}, listReviews=function listReviews(){}, listJobs=function listJobs(){};
 const github = {rest:{pulls:{list,listReviews,get:async()=>({data:pr})},repos:{
@@ -89,7 +101,7 @@ const github = {rest:{pulls:{list,listReviews,get:async()=>({data:pr})},repos:{
  getEnvironment:async()=>({data:environment}),listDeploymentBranchPolicies:async()=>({data:policies}),
  getContent:async args=>{calls.push(['baseline',args.ref,args.path]);if(scenario==='baseline-absent')throw {status:404};if(scenario==='baseline-denied')throw {status:403};if(scenario==='baseline-network')throw Error('network unavailable');if(scenario==='baseline-media')return {data:'unexpected raw representation'}; if(args.mediaType.format!=='object'||args.ref!==B||args.path!=='evals/results/builtin-openai-core-latest.json')throw Error('identity');const bytes=Buffer.from(baseline);return {data:{type:scenario==='baseline-symlink'?'symlink':'file',path:scenario==='baseline-path'?'wrong/path':args.path,sha:scenario==='baseline-sha'?'invalid':'e'.repeat(40),encoding:bytes.length>1048576?'none':'base64',size:scenario==='baseline-size'?67108865:bytes.length,content:bytes.length>1048576?'':bytes.toString('base64')}}}
  },git:{getBlob:async args=>{if(args.file_sha!=='e'.repeat(40)||args.owner!=='containers'||args.repo!=='kubernetes-mcp-server')throw Error('blob identity');if(scenario==='blob-404')throw {status:404};if(scenario==='blob-network')throw Error('network unavailable');const bytes=scenario==='blob-oversize'?Buffer.alloc(67108865,120):Buffer.from(baseline);return {data:{sha:scenario==='blob-sha'?'f'.repeat(40):args.file_sha,size:scenario==='blob-size'?bytes.length+1:scenario==='blob-oversize'?Buffer.byteLength(baseline):bytes.length,encoding:scenario==='blob-encoding'?'none':'base64',content:scenario==='blob-base64'?'Zh==':scenario==='blob-media'?{}:bytes.toString('base64')}}}},actions:{getWorkflowRun:async()=>({data:trigger}),getWorkflow:async()=>({data:{id:8}}),getArtifact:async()=>({data:artifact}),listJobsForWorkflowRun:listJobs}},
- paginate:async target=>target===list?pulls:target===listReviews?reviews:[job]};
+ paginate:async (target,args)=>target===list?pulls.filter(pr=>(!args.base||pr.base?.ref===args.base)&&(!args.state||pr.state===args.state)):target===listReviews?reviews:[job]};
 const context={repo:{owner:'containers',repo:'kubernetes-mcp-server'},runId:22,eventName:'workflow_run',ref:'refs/heads/main',payload:{workflow_run:{id:99}}};
 if(scenario==='schedule')context.eventName='schedule';
 if(scenario==='dispatch')context.eventName='workflow_dispatch';
@@ -131,11 +143,17 @@ func (suiteState *MCPCheckerWorkflowSuite) TestControlCurrentAPIEligibilityAndRe
 			suiteState.Contains(outputs["matrix"], "mcpchecker-core-e2e-out.json")
 		})
 	}
-	for _, scenario := range []string{"ambiguous", "no-pr", "missing-review", "dismissed", "pending", "stale", "denied", "command-injection", "command-prefix", "command-duplicate", "latest-invalid", "wrong-trigger", "wrong-event", "wrong-trigger-repo", "wrong-pr", "untrusted-dispatch", "unprotected", "self-approval", "no-reviewers", "branch-policy"} {
+	for _, scenario := range []string{"ambiguous", "no-pr", "missing-head-repo", "wrong-head-repo", "wrong-trigger-sha", "merge-as-trigger-sha", "closed-pr", "wrong-branch", "head-drift", "current-head-moved", "missing-review", "dismissed", "pending", "stale", "denied", "command-injection", "command-prefix", "command-duplicate", "latest-invalid", "wrong-trigger", "wrong-event", "wrong-trigger-repo", "wrong-pr", "untrusted-dispatch", "unprotected", "self-approval", "no-reviewers", "branch-policy"} {
 		suiteState.Run(scenario, func() {
 			_, output, err := suiteState.runControl("control", scenario)
 			suiteState.Error(err, output)
 			suiteState.Contains(output, `"should-run":"false"`)
+		})
+	}
+	for _, scenario := range []string{"empty-trigger", "two-forks"} {
+		suiteState.Run(scenario, func() {
+			_, output, err := suiteState.runControl("control", scenario)
+			suiteState.NoError(err, output)
 		})
 	}
 	_, output, err := suiteState.runControl("revalidate", "valid")
@@ -151,6 +169,35 @@ func (suiteState *MCPCheckerWorkflowSuite) TestControlCurrentAPIEligibilityAndRe
 			_, output, err := suiteState.runControl("revalidate", "valid", invalid)
 			suiteState.Error(err, output)
 		})
+	}
+}
+
+func (suiteState *MCPCheckerWorkflowSuite) TestRESTCandidateIdentity() {
+	for _, suffix := range []string{"", ":empty"} {
+		for _, mode := range []string{"control", "revalidate"} {
+			for _, scenario := range []string{"valid", "other-base", "unready-merge", "wrong-trigger-sha", "merge-as-trigger-sha", "ambiguous", "no-pr", "current-head-moved", "head-drift", "stale", "review-drift", "reviewer-drift", "suite-drift"} {
+				if mode == "revalidate" && (scenario == "wrong-trigger-sha" || scenario == "merge-as-trigger-sha" || scenario == "ambiguous" || scenario == "no-pr") {
+					continue
+				}
+				if mode == "control" && (scenario == "review-drift" || scenario == "reviewer-drift" || scenario == "suite-drift") {
+					continue
+				}
+				suiteState.Run(mode+"/"+scenario+suffix, func() {
+					_, output, err := suiteState.runControl(mode, scenario+suffix)
+					if scenario == "valid" || scenario == "other-base" || scenario == "unready-merge" {
+						suiteState.NoError(err, output)
+						if mode == "control" {
+							suiteState.Contains(output, `"should-run":"true"`)
+						}
+					} else {
+						suiteState.Error(err, output)
+						if mode == "control" {
+							suiteState.Contains(output, `"should-run":"false"`)
+						}
+					}
+				})
+			}
+		}
 	}
 }
 
@@ -403,6 +450,8 @@ func (suiteState *MCPCheckerWorkflowSuite) TestActualTrustedMakeServerConsumer()
 			cleanupAssertions := assert.New(testingT)
 			root := suiteState.T().TempDir()
 			trusted, candidate := filepath.Join(root, "trusted"), filepath.Join(root, "candidate")
+			diagnostics := filepath.Join(root, "diagnostics")
+			suiteState.Require().NoError(os.Mkdir(diagnostics, 0o700))
 			makefile, err := os.ReadFile(workflowBuildPath(suiteState.T(), "../Makefile"))
 			suiteState.Require().NoError(err)
 			writeActionFixture(suiteState.T(), filepath.Join(trusted, "Makefile"), string(makefile), 0o600)
@@ -442,7 +491,7 @@ while :; do sleep 0.1; done
 			if scenario == "early-failure" {
 				arguments = append([]string{"bash", "-c", `"$@"; result=$?; [[ $result != 0 ]] || result=47; exit "$result"`, "fixture"}, arguments...)
 			}
-			arguments = append([]string{filepath.Join(root, "mcpchecker-capture.py"), filepath.Join(root, "make.log"), ""}, arguments...)
+			arguments = append([]string{filepath.Join(root, "mcpchecker-capture.py"), diagnostics, "check.txt", ""}, arguments...)
 			command := exec.Command("python3", arguments...)
 			command.Dir, command.Env = candidate, environment
 			mockProbe := exec.Command("bash", "-c", `[[ $(command -v kubectl) == "$FIXTURE_ROOT/bin/kubectl" && $KUBECONFIG == /dev/null ]]`)
@@ -483,7 +532,7 @@ while :; do sleep 0.1; done
 				cleanupAssertions.NoError(statusErr)
 				expected := map[string]string{"normal": "0 0 0\n", "early-failure": "47 0 0\n", "timeout": "0 0 1\n"}
 				cleanupAssertions.Equal(expected[scenario], string(status))
-				data, readErr := os.ReadFile(filepath.Join(root, "make.log"))
+				data, readErr := os.ReadFile(filepath.Join(diagnostics, "check.txt"))
 				cleanupAssertions.NoError(readErr)
 				cleanupAssertions.NotContains(string(data), "BUILD_MUST_NOT_RUN")
 				cleanupAssertions.FileExists(filepath.Join(root, "server-stopped"))

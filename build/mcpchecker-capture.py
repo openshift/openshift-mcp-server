@@ -9,7 +9,9 @@ import time
 def capture():
     if sys.platform != "linux" or ctypes.CDLL(None, use_errno=True).prctl(36, 1, 0, 0, 0) != 0:
         raise RuntimeError("capture requires Linux child-subreaper support")
-    destination, summary, *command = sys.argv[1:]
+    root, leaf, summary, *command = sys.argv[1:]
+    if summary not in ("", "summary") or not command:
+        raise RuntimeError("invalid capture arguments")
     deadline = time.monotonic() + 1800
     grace = 30
     interrupted = False
@@ -38,7 +40,7 @@ def capture():
         checker = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)
         processes.append(checker)
         try:
-            drainer = subprocess.Popen(["node", os.path.join(os.path.dirname(__file__), "mcpchecker-diagnostics.cjs"), destination, *([summary] if summary else [])], stdin=checker.stdout, stdout=subprocess.DEVNULL, start_new_session=True)
+            drainer = subprocess.Popen(["node", os.path.join(os.path.dirname(__file__), "mcpchecker-diagnostics.cjs"), root, leaf, *(["summary"] if summary == "summary" else [])], stdin=checker.stdout, stdout=subprocess.DEVNULL, start_new_session=True)
             processes.append(drainer)
         finally:
             checker.stdout.close()

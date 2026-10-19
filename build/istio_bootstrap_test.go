@@ -238,6 +238,31 @@ func (suiteState *IstioBootstrapSuite) TestRejectedInputsNeverPublishOrExecute()
 	}
 }
 
+func (suiteState *IstioBootstrapSuite) TestExistingSymlinkAncestor() {
+	fixture := newIstioFixture(suiteState.T(), "valid", false)
+	alias := filepath.Join(fixture.root, "existing-alias")
+	suiteState.Require().NoError(os.Symlink(fixture.checkout, alias))
+	fixture.checkout = alias
+	output, err := fixture.run("istioctl", "PWD="+alias)
+	suiteState.Require().NoError(err, output)
+	suiteState.FileExists(fixture.destination)
+	suiteState.assertClean(fixture)
+}
+
+func (suiteState *IstioBootstrapSuite) TestInternalInstallerRejectsEscapes() {
+	for _, destination := range []string{"outside", "_output/../escaped", "_output/tools/bin/../istioctl"} {
+		suiteState.Run(destination, func() {
+			fixture := newIstioFixture(suiteState.T(), "valid", false)
+			command := exec.Command("bash", filepath.Join(fixture.checkout, "build/install-istio.sh"), "1.31.0", fixture.checkout+"/"+destination, fixture.addons, filepath.Join(fixture.checkout, "build/istio-1.31.0.sha256"))
+			command.Env = fixture.environment
+			output, err := command.CombinedOutput()
+			suiteState.Error(err, string(output))
+			suiteState.NoFileExists(fixture.destination)
+			suiteState.NoFileExists(fixture.log)
+		})
+	}
+}
+
 func (suiteState *IstioBootstrapSuite) TestActualMakeProfileWaitsAndPinnedBookinfo() {
 	fixture := newIstioFixture(suiteState.T(), "valid", false)
 	output, err := fixture.run("install-istio")
@@ -282,7 +307,7 @@ func (suiteState *IstioBootstrapSuite) TestCommittedManifestAndDocumentation() {
 	suiteState.Equal("79fda9a16d0e718677cd8a1c01eb859dc90e18adf7fcd2a7c18cfb8819ab4903  istio-1.31.0-linux-amd64.tar.gz\n1ebedd17ae4d49c56887d0d7c264486d6cf2d0e43d5fefcad78afdf922fee112  istio-1.31.0-linux-arm64.tar.gz\nb5f07c7ea1a3a9b805ff8690c3a591621feef8b714d346a2e240c898cd2a84b0  istio-1.31.0-linux-armv7.tar.gz\nafff9ca5a07c7ea3aad81276ee5eb47b5f87bc386f5dae6eb54c57e50629ab33  istio-1.31.0-osx-amd64.tar.gz\n263844544567c2137576a24c19c087a48f3b9b8188d76176efdd5eacc23f553c  istio-1.31.0-osx-arm64.tar.gz\n", string(data))
 	data, err = os.ReadFile(workflowBuildPath(suiteState.T(), "../evals/README.md"))
 	suiteState.Require().NoError(err)
-	for _, expected := range []string{"v0.0.22 checker and standalone agent", "in-process", "checker-only", "not a signature or attestation", "not a sandbox", "H does not", "0.8", "mcpchecker-reviewed", "b6fb5348dd66280245e3d98d8d93f416ece453c3", "0c7171a9fdc4762366a78e9a0e3f226ff6e6bbd3"} {
+	for _, expected := range []string{"v0.0.22 checker and standalone agent", "in-process", "checker-only", "not a signature or attestation", "not a sandbox", "efd3cf05f607ab7804c4a16b543d916ebfc51a74", "existing pin still executes the old H", "historical local checks", "0.8", "mcpchecker-reviewed", "b6fb5348dd66280245e3d98d8d93f416ece453c3", "0c7171a9fdc4762366a78e9a0e3f226ff6e6bbd3"} {
 		suiteState.Contains(strings.Join(strings.Fields(strings.ReplaceAll(string(data), "**", "")), " "), expected)
 	}
 }

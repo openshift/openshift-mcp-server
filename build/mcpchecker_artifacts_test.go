@@ -18,7 +18,7 @@ func TestMCPCheckerArtifacts(testingT *testing.T) { suite.Run(testingT, new(MCPC
 
 const artifactHarness = `
 const helper=require(process.argv[1]), fs=require('node:fs'), path=require('node:path');
-const scenario=process.argv[2], scheduled=process.argv[3]==='schedule', selected=process.argv[4], root=process.argv[5];
+const scenario=process.argv[2].replace(/:empty$/, ''), scheduled=process.argv[3]==='schedule', selected=process.argv[4], root=process.argv[5];
 const C='c'.repeat(40), H='a'.repeat(40), B='b'.repeat(40), repository='containers/kubernetes-mcp-server';
 const outputs={}, comments=[], copies={}, originals={}, api=[];
 const destination=path.join(root,'baselines');fs.mkdirSync(destination);process.env.RESULTS_DIRECTORY=destination;
@@ -34,9 +34,10 @@ function snapshot(target){
 snapshot(originals);
 const selectedSuites=scheduled?['core','helm','kubevirt','kiali','tekton','netobserv','argocd']:[selected];
 const source={id:22,run_attempt:2,workflow_id:8,repository:{full_name:repository},head_sha:B,head_branch:'main',head_repository:{full_name:repository},path:'.github/workflows/mcpchecker.yaml',event:scheduled?'schedule':'workflow_run',status:'completed',conclusion:scenario==='failed-workflow'?'failure':'success',pull_requests:[{number:518,head:{sha:C,ref:'feature',repo:{id:71}}}]};
-const pr={number:518,state:'open',base:{repo:{full_name:repository},ref:'main'},head:{ref:'feature',sha:C,repo:{id:71,full_name:'fork/server'}}};
+const pr={number:518,state:'open',merge_commit_sha:'e'.repeat(40),base:{repo:{full_name:repository},ref:'main'},head:{ref:'feature',sha:C,repo:{id:71,full_name:'fork/server'}}};
 source.display_title='mcpchecker source=99';
-const trigger={id:99,workflow_id:9,repository:{full_name:repository},event:'pull_request_review',status:'completed',conclusion:'success',pull_requests:source.pull_requests};
+const trigger={id:99,workflow_id:9,repository:{full_name:repository},event:'pull_request_review',status:'completed',conclusion:'success',head_branch:'feature',head_sha:C,head_repository:{full_name:'fork/server'},pull_requests:source.pull_requests};
+let pulls=[pr];
 source.pull_requests=[];
 const reviews=[{id:44,state:'COMMENTED',commit_id:C,body:'/run-mcpchecker '+selected,user:{login:'maintainer'}}];
 const listPulls=()=>{}, listReviews=()=>{}, listJobs=()=>{}, listArtifacts=()=>{};
@@ -61,6 +62,18 @@ if(scenario==='source-attempt')source.run_attempt=3;
 if(scenario==='source-event')source.event='pull_request';
 if(scenario==='ambiguous-fork')pr.head.repo.id=72;
 if(scenario==='missing-api-pr')trigger.pull_requests=[];
+if(scenario==='current-head-moved'){trigger.pull_requests=[];pulls=JSON.parse(JSON.stringify(pulls));pr.head.sha=B;reviews[0].commit_id=B;}
+if(scenario==='two-forks')pulls.push({...pr,number:519,head:{ref:'feature',repo:{full_name:'other/fork'}}});
+if(scenario==='other-base')pulls.push({...pr,number:519,base:{...pr.base,ref:'release-1'}});
+if(scenario==='no-pr')pulls=[];
+if(scenario==='ambiguous-pr')pulls.push({...pr,number:519});
+if(scenario==='missing-head-repo')delete trigger.head_repository;
+if(scenario==='wrong-head-repo')trigger.head_repository.full_name='other/fork';
+if(scenario==='wrong-branch')trigger.head_branch='other';
+if(scenario==='wrong-trigger-sha')trigger.head_sha='f'.repeat(40);
+if(scenario==='merge-as-trigger-sha')trigger.head_sha=pr.merge_commit_sha;
+if(scenario==='unready-merge')pr.merge_commit_sha=null;
+if(scenario==='closed-pr')pr.state='closed';
 if(scenario==='ambiguous-api-pr')trigger.pull_requests.push(trigger.pull_requests[0]);
 if(scenario==='untrusted-source-ref')source.head_branch='feature';
 if(scenario==='trigger-title')source.display_title='mcpchecker source=99\n::warning::';
@@ -70,8 +83,9 @@ if(scenario==='trigger-repo')trigger.repository.full_name='other/repo';
 if(scenario==='review-missing')reviews.length=0;
 if(scenario==='review-stale')reviews[0].commit_id=B;
 if(scenario==='head-drift')pr.head.sha=B;
+if(process.argv[2].endsWith(':empty'))trigger.pull_requests=[];
 const code="env:\n  HARNESS_SHA: '"+H+"'\n";
-const github={rest:{actions:{getWorkflowRun:async request=>({data:request.run_id===99?trigger:source}),getWorkflow:async request=>({data:{id:request.workflow_id==='mcpchecker.yaml'?8:9}}),listJobsForWorkflowRun:listJobs,listWorkflowRunArtifacts:listArtifacts},pulls:{list:listPulls,get:async()=>({data:pr}),listReviews},repos:{getContent:async()=>({data:{type:'file',encoding:'base64',size:Buffer.byteLength(code),content:Buffer.from(code).toString('base64')}}),getCollaboratorPermissionLevel:async()=>({data:{permission:scenario==='review-denied'?'read':'write'}})},issues:{createComment:async value=>{comments.push(value)}}},paginate:async target=>{api.push('read');return target===listPulls?[pr]:target===listReviews?reviews:target===listJobs?jobs:artifacts}};
+const github={rest:{actions:{getWorkflowRun:async request=>({data:request.run_id===99?trigger:source}),getWorkflow:async request=>({data:{id:request.workflow_id==='mcpchecker.yaml'?8:9}}),listJobsForWorkflowRun:listJobs,listWorkflowRunArtifacts:listArtifacts},pulls:{list:listPulls,get:async()=>({data:pr}),listReviews},repos:{getContent:async()=>({data:{type:'file',encoding:'base64',size:Buffer.byteLength(code),content:Buffer.from(code).toString('base64')}}),getCollaboratorPermissionLevel:async()=>({data:{permission:scenario==='review-denied'?'read':'write'}})},issues:{createComment:async value=>{comments.push(value)}}},paginate:async (target,args)=>{api.push('read');return target===listPulls?pulls.filter(pr=>(!args.base||pr.base?.ref===args.base)&&(!args.state||pr.state===args.state)):target===listReviews?reviews:target===listJobs?jobs:artifacts}};
 const context={repo:{owner:'containers',repo:'kubernetes-mcp-server'},runId:scheduled?22:33,eventName:scheduled?'schedule':'workflow_run',payload:{workflow_run:{id:22,run_attempt:2}}};
 if(scenario==='not-schedule')context.eventName='workflow_dispatch';
 const control={version:1,repository,candidate:B,harness:H,baseline:B,source_repository:repository,source_ref:'main',pr_number:0,is_pr:false,review_id:0,reviewer:'',suite:selectedSuites,run_id:22,run_attempt:2,trigger_run_id:0};
@@ -122,8 +136,10 @@ async function exercise(){
   if(scenario.startsWith('diagnostic-')){
    const input=scenario==='diagnostic-expansion'?'s3'.repeat(550000):scenario==='diagnostic-split'?'x'.repeat(1048571)+'secret-model'+'x'.repeat(100):'x'.repeat(scenario==='diagnostic-below'?1048575:scenario==='diagnostic-at'?1048576:1048577);
    const output=path.join(results,'check.txt');
-   const run=require('node:child_process').spawnSync('node',[path.join(path.dirname(process.argv[1]),'mcpchecker-diagnostics.cjs'),output],{input,env:{...process.env,MODEL_KEY:scenario==='diagnostic-expansion'?'s3':'secret-model'}});
+   const diagnosticRoot=fs.mkdtempSync(path.join(root,'diagnostic-'));fs.chmodSync(diagnosticRoot,0o700);
+   const run=require('node:child_process').spawnSync('node',[path.join(path.dirname(process.argv[1]),'mcpchecker-diagnostics.cjs'),diagnosticRoot,'check.txt'],{input,env:{...process.env,MODEL_KEY:scenario==='diagnostic-expansion'?'s3':'secret-model'}});
    if(run.status!==0)throw Error('diagnostic producer failed');
+   fs.copyFileSync(path.join(diagnosticRoot,'check.txt'),output);
    const diagnostic=fs.readFileSync(output);
    if(diagnostic.length>1048576||diagnostic.includes('secret-model')||scenario==='diagnostic-expansion'&&diagnostic.includes('s3'))throw Error('diagnostic contract');
    if(['diagnostic-above','diagnostic-expansion','diagnostic-split'].includes(scenario)&&!diagnostic.includes('[diagnostic truncated]'))throw Error('missing truncation marker');
@@ -138,6 +154,8 @@ async function exercise(){
  }
  if(artifacts.length===1){const own=path.join(process.env.ARTIFACT_ROOT,artifacts[0].name);for(const name of fs.readdirSync(own))fs.renameSync(path.join(own,name),path.join(process.env.ARTIFACT_ROOT,name));fs.rmdirSync(own);}
  if(scenario==='head-after-download')pr.head.sha=B;
+ if(scenario==='review-after-download')reviews[0].commit_id=B;
+ if(scenario==='suite-after-download')reviews[0].body='/run-mcpchecker helm';
  if(scenario==='extra-root')fs.mkdirSync(path.join(process.env.ARTIFACT_ROOT,'eval-context-unknown'));
  if(scenario==='root-traversal')process.env.ARTIFACT_ROOT+='/../'+path.basename(process.env.ARTIFACT_ROOT);
  if(scenario==='tamper-plan')process.env.ARTIFACT_PLAN=process.env.ARTIFACT_PLAN.replace('"run_id":22','"run_id":99');
@@ -178,8 +196,41 @@ func (suiteState *MCPCheckerArtifactsSuite) TestAllSuiteReportConsumers() {
 	}
 }
 
+func (suiteState *MCPCheckerArtifactsSuite) TestEmptyTriggerAndTwoForkConsumers() {
+	for _, scenario := range []string{"missing-api-pr", "two-forks"} {
+		suiteState.Run(scenario, func() {
+			data, err := suiteState.execute(scenario, "report", "core")
+			suiteState.Require().NoError(err, data)
+			suiteState.Len(data["comments"], 1)
+		})
+	}
+}
+
+func (suiteState *MCPCheckerArtifactsSuite) TestMovedHeadWithEmptyTrigger() {
+	data, err := suiteState.execute("current-head-moved", "report", "core")
+	suiteState.Error(err)
+	suiteState.Empty(data["comments"])
+}
+
+func (suiteState *MCPCheckerArtifactsSuite) TestRESTCandidateIdentity() {
+	for _, suffix := range []string{"", ":empty"} {
+		for _, scenario := range []string{"valid", "other-base", "unready-merge", "wrong-trigger-sha", "merge-as-trigger-sha", "ambiguous-pr", "no-pr", "current-head-moved", "head-drift", "review-stale", "head-after-download", "review-after-download", "suite-after-download"} {
+			suiteState.Run(scenario+suffix, func() {
+				data, err := suiteState.execute(scenario+suffix, "report", "core")
+				if scenario == "valid" || scenario == "other-base" || scenario == "unready-merge" {
+					suiteState.NoError(err, data)
+					suiteState.Len(data["comments"], 1)
+				} else {
+					suiteState.Error(err, data)
+					suiteState.Empty(data["comments"])
+				}
+			})
+		}
+	}
+}
+
 func (suiteState *MCPCheckerArtifactsSuite) TestIdentityRejectionBeforeCommentOrCopy() {
-	for _, scenario := range []string{"duplicate", "artifact-traversal", "artifact-run", "artifact-head", "artifact-expired", "artifact-oversize", "artifact-attempt", "artifact-time", "workflow-mismatch", "source-repo", "source-attempt", "source-event", "ambiguous-fork", "missing-api-pr", "ambiguous-api-pr", "untrusted-source-ref", "trigger-title", "trigger-event", "trigger-workflow", "trigger-repo", "review-missing", "review-stale", "head-drift", "review-denied", "invalid-pr", "invalid-sha", "run-mismatch", "repo-mismatch", "attempt-mismatch", "suite-mismatch", "head-after-download", "extra-root", "root-traversal", "tamper-plan"} {
+	for _, scenario := range []string{"duplicate", "no-pr", "ambiguous-pr", "missing-head-repo", "wrong-head-repo", "wrong-branch", "wrong-trigger-sha", "merge-as-trigger-sha", "closed-pr", "artifact-traversal", "artifact-run", "artifact-head", "artifact-expired", "artifact-oversize", "artifact-attempt", "artifact-time", "workflow-mismatch", "source-repo", "source-attempt", "source-event", "ambiguous-fork", "ambiguous-api-pr", "untrusted-source-ref", "trigger-title", "trigger-event", "trigger-workflow", "trigger-repo", "review-missing", "review-stale", "head-drift", "review-denied", "invalid-pr", "invalid-sha", "run-mismatch", "repo-mismatch", "attempt-mismatch", "suite-mismatch", "head-after-download", "extra-root", "root-traversal", "tamper-plan"} {
 		suiteState.Run(scenario, func() {
 			data, err := suiteState.execute(scenario, "report", "core")
 			suiteState.Error(err)

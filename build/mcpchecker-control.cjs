@@ -57,6 +57,24 @@ async function currentReview(github, context, number) {
   requireValue(['write', 'admin'].includes(permission.permission));
   return {pr, review, suite: (match[1] || 'core').toLowerCase()};
 }
+async function triggerPullRequest(github, context, trigger) {
+  const {owner, repo} = context.repo;
+  requireValue(repository(trigger.head_repository?.full_name) && typeof trigger.head_branch === 'string' && trigger.head_branch.length > 0 && trigger.head_branch.length <= 255 && !/[\x00-\x20\x7f]/.test(trigger.head_branch) && sha(trigger.head_sha));
+  requireValue(Array.isArray(trigger.pull_requests) && trigger.pull_requests.length <= 1);
+  const pulls = await github.paginate(github.rest.pulls.list, {owner, repo, state: 'open', base: 'main', per_page: 100});
+  requireValue(Array.isArray(pulls) && pulls.length <= 5000);
+  const matches = pulls.filter(pr => pr.head?.ref === trigger.head_branch && pr.head.repo?.full_name === trigger.head_repository.full_name);
+  requireValue(matches.length === 1 && integer(matches[0].number) && sha(matches[0].head.sha));
+  const {data: pr} = await github.rest.pulls.get({owner, repo, pull_number: matches[0].number});
+  requireValue(pr.number === matches[0].number && pr.state === 'open' && pr.base?.repo?.full_name === `${owner}/${repo}` && pr.base.ref === 'main');
+  requireValue(pr.head?.repo?.full_name === trigger.head_repository.full_name && pr.head.ref === trigger.head_branch && pr.head.sha === matches[0].head.sha);
+  requireValue(pr.head.sha === trigger.head_sha);
+  if (trigger.pull_requests.length) {
+    const recorded = trigger.pull_requests[0];
+    requireValue(recorded.number === pr.number && recorded.head?.sha === pr.head.sha && recorded.head.ref === pr.head.ref && integer(pr.head.repo.id) && recorded.head.repo?.id === pr.head.repo.id);
+  }
+  return pr;
+}
 async function protectedEnvironment(github, context) {
   const {owner, repo} = context.repo;
   const environment_name = 'mcpchecker-reviewed';
@@ -82,13 +100,9 @@ async function run({github, context, core, mode = 'control'}) {
       const {data: trigger} = await github.rest.actions.getWorkflowRun({owner, repo, run_id: triggerID});
       const {data: workflow} = await github.rest.actions.getWorkflow({owner, repo, workflow_id: 'mcpchecker-trigger.yaml'});
       requireValue(trigger.id === triggerID && trigger.workflow_id === workflow.id && trigger.repository.full_name === `${owner}/${repo}` && trigger.event === 'pull_request_review' && trigger.status === 'completed' && trigger.conclusion === 'success');
-      const pulls = await github.paginate(github.rest.pulls.list, {owner, repo, state: 'open', per_page: 100});
-      requireValue(Array.isArray(pulls) && pulls.length <= 5000 && typeof trigger.head_branch === 'string');
-      const matches = pulls.filter(pr => pr.head.ref === trigger.head_branch);
-      requireValue(matches.length === 1);
-      const current = await currentReview(github, context, matches[0].number);
-      requireValue(current.pr.head.ref === trigger.head_branch);
-      if (trigger.pull_requests?.length) requireValue(trigger.pull_requests.length === 1 && trigger.pull_requests[0].number === current.pr.number);
+      const bound = await triggerPullRequest(github, context, trigger);
+      const current = await currentReview(github, context, bound.number);
+      requireValue(current.pr.head.sha === bound.head.sha && current.pr.head.ref === bound.head.ref && current.pr.head.repo.full_name === bound.head.repo.full_name && current.pr.head.sha === trigger.head_sha);
       identity = {candidate: current.pr.head.sha, source_repository: current.pr.head.repo.full_name, source_ref: current.pr.head.ref, pr_number: current.pr.number, is_pr: true, review_id: current.review.id, reviewer: current.review.user.login, trigger_run_id: triggerID};
       selected = [current.suite];
     } else {
@@ -155,4 +169,4 @@ async function run({github, context, core, mode = 'control'}) {
   throw new Error('Unknown evaluation control operation');
 }
 
-module.exports = {run, validate, suiteEntry};
+module.exports = {run, validate, suiteEntry, triggerPullRequest};

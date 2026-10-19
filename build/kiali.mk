@@ -1,11 +1,11 @@
 ##@ Istio/Kiali
 
-ISTIOCTL = $(shell pwd)/_output/tools/bin/istioctl
-ISTIO_ADDONS_DIR = $(shell pwd)/_output/istio-addons
+ISTIOCTL = $(shell pwd -P)/_output/tools/bin/istioctl
+ISTIO_ADDONS_DIR = $(shell pwd -P)/_output/istio-addons
 ISTIO_VERSION = 1.31.0
 KIALI_VERSION = v2.33
-ISTIO_INSTALLER := $(shell pwd)/build/install-istio.sh
-ISTIO_CHECKSUM_MANIFEST := $(shell pwd)/build/istio-1.31.0.sha256
+ISTIO_INSTALLER := $(shell pwd -P)/build/install-istio.sh
+ISTIO_CHECKSUM_MANIFEST := $(shell pwd -P)/build/istio-1.31.0.sha256
 export ISTIOCTL ISTIO_ADDONS_DIR ISTIO_VERSION ISTIO_INSTALLER ISTIO_CHECKSUM_MANIFEST
 # Release version without patch (e.g. 1.28.0 -> 1.28)
 

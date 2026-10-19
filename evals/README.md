@@ -338,13 +338,15 @@ risk is unacceptable; there is no automatic safe-fork fallback. Model/judge
 credentials are confined to the trusted evaluation step, not build, setup,
 server, diff, reporter or scheduled writer.
 
-**This wiring is deliberately not ready for credentialed execution.** H does not
-yet exist: the tracked workflow's empty H pin is rejected, and the external
-future-C template is invalid until replaced with an actual reviewed H SHA. After
-all implementation, independent author review and mandatory repository gates,
-freeze validated H as a local commit. Then finalize C with literal H and perform
-C's own review/gates before its local commit; H's checks do not cover C. No
-current feature SHA, branch, artifact or label substitutes for reviewed H.
+**A harness pin is not approval for credentialed execution.** The published
+workflow pins H `efd3cf05f607ab7804c4a16b543d916ebfc51a74`, which completed local
+review and repository gates before publication. Those historical local checks
+do not establish external CI success, deployment, or maintainer risk approval.
+Corrections to harness helpers require a separately reviewed and validated new
+immutable H2 commit; only then may C2 wire its actual literal SHA and complete
+its own review and gates. Until then the existing pin still executes the old H,
+not corrected working-tree sources. H2 checks do not cover C2. No branch,
+artifact or label substitutes for the reviewed immutable harness.
 
 A maintainer must separately deploy the reviewed workflow/report code to the
 trusted default branch, configure the protected environment and scoped secrets,

@@ -2,6 +2,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const {triggerPullRequest} = require('./mcpchecker-control.cjs');
 const suites = Object.freeze(['core', 'helm', 'kubevirt', 'kiali', 'tekton', 'netobserv', 'argocd', 'all']);
 const positive = value => Number.isSafeInteger(value) && value > 0;
 const count = value => Number.isSafeInteger(value) && value >= 0 && value <= 2147483647;
@@ -110,11 +111,7 @@ async function identity(github, context, scheduled) {
     const {data: trigger} = await github.rest.actions.getWorkflowRun({owner, repo, run_id: triggerRunID});
     const {data: triggerWorkflow} = await github.rest.actions.getWorkflow({owner, repo, workflow_id: 'mcpchecker-trigger.yaml'});
     requireData(trigger.id === triggerRunID && trigger.workflow_id === triggerWorkflow.id && trigger.repository?.full_name === repository && trigger.event === 'pull_request_review' && trigger.status === 'completed' && trigger.conclusion === 'success');
-    requireData(Array.isArray(trigger.pull_requests) && trigger.pull_requests.length === 1 && positive(trigger.pull_requests[0].number) && sha(trigger.pull_requests[0].head?.sha));
-    const recorded = trigger.pull_requests[0];
-    const {data: pr} = await github.rest.pulls.get({owner, repo, pull_number: recorded.number});
-    requireData(pr.state === 'open' && pr.number === recorded.number && pr.base?.repo?.full_name === repository && pr.base.ref === 'main' && typeof pr.head?.ref === 'string' && pr.head.ref.length > 0 && pr.head.ref.length <= 255 && /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/.test(pr.head?.repo?.full_name));
-    requireData(pr.head.sha === recorded.head.sha && pr.head.ref === recorded.head.ref && pr.head.repo.id === recorded.head.repo?.id && positive(pr.head.repo.id));
+    const pr = await triggerPullRequest(github, context, trigger);
     const reviews = await github.paginate(github.rest.pulls.listReviews, {owner, repo, pull_number: pr.number, per_page: 100});
     requireData(Array.isArray(reviews) && reviews.length <= 5000);
     const commands = reviews.filter(review => review.state !== 'DISMISSED' && typeof review.body === 'string' && review.body.includes('/run-mcpchecker')).sort((left, right) => right.id - left.id);

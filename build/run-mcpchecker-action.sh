@@ -51,16 +51,16 @@ shopt -s nullglob dotglob
 existing=(mcpchecker-*-out.json *-error.txt)
 (( ${#existing[@]} == 0 )) || fail
 diagnostics=$(mktemp -d "$runner_temp/mcpchecker-diagnostics.XXXXXXXX")
-chmod 0700 "$diagnostics"
+chmod 00700 "$diagnostics"
 trap 'rm -f -- "$diagnostics/raw-summary.json"' EXIT
 capture() {
     local destination=$1
     shift
     local statuses checker_exit helper_exit expired supervisor_exit
     local summary=()
-    [[ $destination != "$diagnostics/summary.txt" ]] || summary=("$diagnostics/raw-summary.json")
+    [[ $destination != "$diagnostics/summary.txt" ]] || summary=(summary)
     set +e
-    statuses=$(python3 "$script_root/build/mcpchecker-capture.py" "$destination" "${summary[0]:-}" "$@")
+    statuses=$(python3 "$script_root/build/mcpchecker-capture.py" "$diagnostics" "${destination##*/}" "${summary[0]:-}" "$@")
     supervisor_exit=$?
     set -e
     read -r checker_exit helper_exit expired <<< "$statuses"
@@ -97,7 +97,7 @@ fi
 for error_file in *-error.txt; do
     [[ -f $error_file && ! -L $error_file && -O $error_file ]] || { valid=false; continue; }
     owned_error=$(mktemp "$diagnostics/task-error.XXXXXXXX")
-    node "$script_root/build/mcpchecker-diagnostics.cjs" "$owned_error" < "$error_file" || { rm -f -- "$owned_error"; valid=false; }
+    node "$script_root/build/mcpchecker-diagnostics.cjs" "$diagnostics" "${owned_error##*/}" < "$error_file" || { rm -f -- "$owned_error"; valid=false; }
 done
 if [[ $valid == true ]]; then
     capture "$diagnostics/summary.txt" "$MCPCHECKER" result summary "$working_dir/$result" --output=json
@@ -120,7 +120,7 @@ if [[ $valid == true ]]; then
     printf 'results-file=%s\n' "$working_dir/$result" >> "$GITHUB_OUTPUT"
 fi
 if [[ -f $diagnostics/raw-summary.json ]]; then
-    node "$script_root/build/mcpchecker-diagnostics.cjs" "$diagnostics/summary.txt" < "$diagnostics/raw-summary.json" || fail
+    node "$script_root/build/mcpchecker-diagnostics.cjs" "$diagnostics" summary.txt < "$diagnostics/raw-summary.json" || fail
 fi
 rm -f -- "$diagnostics/raw-summary.json"
 printf 'summary-exit=%s\nverify-exit=%s\n' "$summary_exit" "$verify_exit" >> "$GITHUB_OUTPUT"

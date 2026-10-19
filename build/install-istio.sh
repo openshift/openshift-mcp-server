@@ -8,6 +8,8 @@ version=$1
 destination=$2
 addons=$3
 manifest=$4
+source_root=$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
+[[ $destination == "$source_root/_output/tools/bin/istioctl" && $addons == "$source_root/_output/istio-addons" && $manifest == "$source_root/build/istio-1.31.0.sha256" ]] || fail
 [[ $version == 1.31.0 && -f $manifest && ! -L $manifest ]] || fail
 case "$(uname -s)/$(uname -m)" in
     Linux/x86_64) platform=linux-amd64 ;;
@@ -38,7 +40,8 @@ done < "$manifest"
 safe_path() {
     local current=$1
     [[ $current == /* && $current != *$'\n'* && $current != *$'\r'* && $current != */ && $current != *'//'* && $current != */./* && $current != */../* && $current != */. && $current != */.. ]] || fail
-    while [[ $current != / ]]; do
+    [[ $current == "$source_root/"* ]] || fail
+    while [[ $current != "$source_root" ]]; do
         [[ ! -L $current ]] || fail
         current=$(dirname -- "$current")
         [[ ! -e $current || -d $current ]] || fail
