@@ -6,6 +6,7 @@ import importlib.util
 import io
 import json
 import os
+import platform
 from pathlib import Path
 import shutil
 import stat
@@ -196,15 +197,19 @@ class TestPrerequisites(unittest.TestCase):
             (binary / name).symlink_to(executable)
         (binary / "python3").write_text(
             "#!" + sys.executable + "\n"
-            "import os,runpy,sys,urllib.request\nfrom unittest import mock\n"
+            "import json,os,platform,runpy,sys,urllib.request\nfrom contextlib import nullcontext\nfrom unittest import mock\n"
+            "sys.argv=sys.argv[1:]\n"
+            "if not sys.argv or os.path.realpath(sys.argv[0]) != os.path.realpath('build/test-prerequisites.py'):\n"
+            " os.execv(sys.executable,[sys.executable,*sys.argv])\n"
+            "selected=json.loads(os.environ['FIXTURE_PLATFORM']) if os.environ.get('FIXTURE_PLATFORM') else None\n"
+            "platform_context=mock.patch.multiple(platform,system=lambda:selected[0],machine=lambda:selected[1]) if selected else nullcontext()\n"
             "original=urllib.request.build_opener()\n"
             "class LocalRelease:\n"
             " def open(self,url,timeout):\n"
             "  if not url.startswith('https://official.invalid/'): raise RuntimeError('nonfixture network forbidden')\n"
             "  response=original.open('http://127.0.0.1:' + os.environ['FIXTURE_PORT'] + '/' + url.rsplit('/',1)[1],timeout=timeout)\n"
             "  response.geturl=lambda:url\n  return response\n"
-            "sys.argv=sys.argv[1:]\n"
-            "with mock.patch.object(urllib.request,'build_opener',return_value=LocalRelease()):\n"
+            "with platform_context,mock.patch.object(urllib.request,'build_opener',return_value=LocalRelease()):\n"
             " runpy.run_path(sys.argv[0],run_name='__main__')\n"
         )
         (binary / "python3").chmod(0o700)
@@ -224,14 +229,18 @@ class TestPrerequisites(unittest.TestCase):
         (binary / "go").chmod(0o700)
         temporary = self.root / "temporary"
         temporary.mkdir(mode=0o700)
+        data_directory = self.root / "owned-data"
+        data_directory.mkdir(mode=0o700)
         unwritable = self.root / "unwritable-home"
         unwritable.mkdir(mode=0o500)
         self.addCleanup(unwritable.chmod, 0o700)
         caches = []
         cases = [(mode, home, child_exit, False) for mode in (0o700, 0o2700) for home, child_exit in (("/", 17), (str(unwritable), 17), ("/", 0))]
         cases.extend((0o2700, "/", child_exit, True) for child_exit in (0, 17))
-        for mode, home, child_exit, direct in cases:
-            with self.subTest(mode=oct(mode), home=home, child_exit=child_exit, direct=direct):
+        native = (platform.system(), platform.machine())
+        profiles = [None, ("Linux", "x86_64")] if native == ("Linux", "x86_64") else [("Linux", "x86_64")]
+        for profile, (mode, home, child_exit, direct) in [(profile, case) for profile in profiles for case in cases]:
+            with self.subTest(profile=profile, mode=oct(mode), home=home, child_exit=child_exit, direct=direct):
                 temporary.chmod(mode)
                 base_info = temporary.stat()
                 self.assertEqual(os.getuid(), base_info.st_uid)
@@ -240,7 +249,7 @@ class TestPrerequisites(unittest.TestCase):
                     self.assertEqual(mode, stat.S_IMODE(Path(raw).stat().st_mode))
                 if marker.exists():
                     marker.unlink()
-                environment = dict(os.environ, PATH=str(binary), HOME=home, TMPDIR=str(temporary), GOFLAGS="-mod=readonly -p=1", XDG_DATA_HOME="/tmp/owned-data", OWNED_MARKER=str(marker), OWNED_SENTINEL="retained", FIXTURE_EXIT=str(child_exit), FIXTURE_PORT=str(self.server_port), KUBECONFIG="/dev/null", PYTHONDONTWRITEBYTECODE="1")
+                environment = dict(os.environ, PATH=str(binary), HOME=home, TMPDIR=str(temporary), GOFLAGS="-mod=readonly -p=1", XDG_DATA_HOME=str(data_directory), OWNED_MARKER=str(marker), OWNED_SENTINEL="retained", FIXTURE_EXIT=str(child_exit), FIXTURE_PORT=str(self.server_port), FIXTURE_PLATFORM=json.dumps(profile) if profile else "", KUBECONFIG="/dev/null", PYTHONDONTWRITEBYTECODE="1")
                 environment.pop("XDG_CACHE_HOME", None)
                 command = [str(binary / "python3"), "build/test-prerequisites.py", "--", "go", "test", "-race", "-count=1", "-v", "./..."] if direct else [str(binary / "make"), "test"]
                 result = subprocess.run(command, cwd=fixture, env=environment, capture_output=True, timeout=30)
@@ -248,7 +257,7 @@ class TestPrerequisites(unittest.TestCase):
                 record = json.loads(marker.read_text())
                 self.assertEqual(["test", "-race", "-count=1", "-v", "./..."], record["argv"])
                 self.assertEqual("-mod=readonly -p=1", record["flags"])
-                self.assertEqual("/tmp/owned-data", record["data"])
+                self.assertEqual(str(data_directory), record["data"])
                 self.assertEqual("retained", record["sentinel"])
                 self.assertTrue(record["private"])
                 self.assertEqual(0o700, record["private_mode"])
@@ -261,9 +270,43 @@ class TestPrerequisites(unittest.TestCase):
                 self.assertEqual([], list(temporary.iterdir()))
                 after = temporary.stat()
                 self.assertEqual((base_info.st_dev, base_info.st_ino, base_info.st_uid, mode), (after.st_dev, after.st_ino, after.st_uid, stat.S_IMODE(after.st_mode)))
-        self.assertEqual(len(cases), len(set(caches)))
+        self.assertEqual(len(cases) * len(profiles), len(set(caches)))
         self.assertFalse((unwritable / ".cache").exists())
-        self.assertEqual(["/node", "/jq", "/shellcheck"] * len(cases), self.requests)
+        self.assertEqual(["/node", "/jq", "/shellcheck"] * len(cases) * len(profiles), self.requests)
+        unsupported = [("Linux", "aarch64"), ("Darwin", "arm64")]
+        if native != ("Linux", "x86_64"):
+            unsupported.append(None)
+        requests = list(self.requests)
+        for profile in unsupported:
+            with self.subTest(unsupported=profile):
+                marker.unlink()
+                environment["FIXTURE_PLATFORM"] = json.dumps(profile) if profile else ""
+                result = subprocess.run([str(binary / "make"), "test"], cwd=fixture, env=environment, capture_output=True, timeout=30)
+                self.assertEqual(2, result.returncode, result.stderr)
+                self.assertIn(b"pinned bootstrap supports Linux x86_64 only", result.stderr)
+                self.assertFalse(marker.exists())
+                self.assertEqual([], list(temporary.iterdir()))
+                self.assertEqual(requests, self.requests)
+                marker.touch()
+        environment["FIXTURE_PLATFORM"] = json.dumps(("Linux", "x86_64"))
+        environment["FIXTURE_EXIT"] = "0"
+        literal_arguments = ["; touch " + str(self.root / "shell-marker"), "$(touch shell-marker)", "`touch shell-marker`", "two words", "--flag=value"]
+        for installed in (False, True):
+            with self.subTest(generic_command_installed=installed):
+                if installed:
+                    for name in ("node", "jq", "shellcheck"):
+                        (binary / name).write_bytes(self.payloads["/" + name])
+                        (binary / name).chmod(0o700)
+                result = subprocess.run([str(binary / "python3"), "build/test-prerequisites.py", "--", sys.executable, "-c", "import json,os,pathlib,sys; pathlib.Path(os.environ['OWNED_MARKER']).write_text(json.dumps(sys.argv[1:]))", *literal_arguments], cwd=fixture, env=environment, capture_output=True, timeout=30)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual(literal_arguments, json.loads(marker.read_text()))
+                self.assertFalse((self.root / "shell-marker").exists())
+                self.assertFalse((fixture / "shell-marker").exists())
+                self.assertEqual([], list(temporary.iterdir()))
+                self.assertEqual(requests + ["/node", "/jq", "/shellcheck"], self.requests)
+        result = subprocess.run([str(binary / "python3"), "-c", "import sys; print(sys.argv[1])", "unchanged argument"], cwd=fixture, env=environment, capture_output=True, timeout=30)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(b"unchanged argument\n", result.stdout)
 
     def test_real_missing_tools_and_fixed_dispatch(self):
         empty = self.root / "empty-path"
@@ -273,6 +316,19 @@ class TestPrerequisites(unittest.TestCase):
                 self.assertFalse(TOOLS.usable(name, str(empty)))
             with self.assertRaisesRegex(ValueError, "unsupported test executable"):
                 TOOLS.usable("unexpected", str(empty))
+        executable_directory = self.root / "trusted path ; touch not-a-command"
+        executable_directory.mkdir()
+        argument_record = self.root / "probe-arguments"
+        (executable_directory / "node").write_text("#!" + sys.executable + "\nimport json,pathlib,sys\npathlib.Path(" + repr(str(argument_record)) + ").write_text(json.dumps(sys.argv[1:]))\n")
+        (executable_directory / "node").chmod(0o700)
+        self.assertTrue(TOOLS.usable("node", str(executable_directory)))
+        self.assertEqual(["-e", "if(+process.versions.node.split('.')[0]<18||!Object.hasOwn({ok:1},'ok'))process.exit(1)"], json.loads(argument_record.read_text()))
+        argument_record.unlink()
+        (executable_directory / "jq").write_text("#!" + sys.executable + "\nimport json,pathlib,sys\nwith pathlib.Path(" + repr(str(argument_record)) + ").open('a') as record: record.write(json.dumps(sys.argv[1:])+'\\n')\nprint('jq-1.7.1')\n")
+        (executable_directory / "jq").chmod(0o700)
+        self.assertTrue(TOOLS.usable("jq", str(executable_directory)))
+        self.assertEqual([["--version"], ["-ne", '[1,2]|all(.[]; type=="number")']], [json.loads(line) for line in argument_record.read_text().splitlines()])
+        self.assertFalse((Path.cwd() / "not-a-command").exists())
 
     def test_explicit_cache_does_not_resolve_home(self):
         explicit = self.root / "explicit"
@@ -350,8 +406,22 @@ class TestPrerequisites(unittest.TestCase):
         environment.pop("XDG_CACHE_HOME", None)
         environment.pop("TMPDIR", None)
         with mock.patch.dict(os.environ, environment, clear=True):
+            with mock.patch.object(TOOLS, "checked_directory", wraps=TOOLS.checked_directory) as checked:
+                if Path("/tmp").is_symlink():
+                    with mock.patch.object(TOOLS.tempfile, "TemporaryDirectory", side_effect=AssertionError("symlink base must not create a child")) as temporary, self.assertRaises((OSError, RuntimeError)):
+                        with TOOLS.cache_directory():
+                            self.fail("symlink default accepted")
+                    temporary.assert_not_called()
+                else:
+                    with TOOLS.cache_directory() as cache:
+                        self.assertEqual(Path("/tmp"), cache.parent.parent)
+                        self.assertEqual(0o700, stat.S_IMODE(cache.parent.stat().st_mode))
+                        self.assertEqual(os.getuid(), cache.parent.stat().st_uid)
+                    self.assertFalse(cache.parent.exists())
+                self.assertTrue(any(Path(call.args[0]) == Path("/tmp") for call in checked.call_args_list))
+            os.environ["TMPDIR"] = str(self.root)
             with TOOLS.cache_directory() as cache:
-                self.assertEqual(Path("/tmp"), cache.parent.parent)
+                self.assertEqual(self.root, cache.parent.parent)
                 self.assertEqual(0o700, stat.S_IMODE(cache.parent.stat().st_mode))
                 self.assertEqual(os.getuid(), cache.parent.stat().st_uid)
             self.assertFalse(cache.parent.exists())

@@ -170,7 +170,7 @@ kinds:
 
 **Builtin agents** use mcpchecker's built-in LLM agent:
 
-- **`builtin-openai`** — `openai:gpt-5` (what CI runs)
+- **`builtin-openai`** — `openai:gpt-6-luna` (what CI runs)
 - **`builtin-anthropic`** — `anthropic:claude-sonnet-4-6`
 - **`builtin-google`** — `google:gemini-3.1-pro-preview`
 
@@ -339,16 +339,32 @@ credentials are confined to the trusted evaluation step, not build, setup,
 server, diff, reporter or scheduled writer.
 
 **A harness pin is not approval for credentialed execution.** The older published
-workflow pinned H `efd3cf05f607ab7804c4a16b543d916ebfc51a74`. At this local C3
-implementation checkpoint, the published branch still pins H2
-`62b465f982d92ca72128eb52a819925ac9ef26cd`. The current local source instead pins
-immutable H3 `4942815c1af74894f58640938c12c4f84623ec69`, whose cache/security
-corrections completed independent review and local repository gates.
-Those historical local checks do not establish external CI success, deployment,
-or maintainer risk approval. This C3 workflow wiring remains uncommitted and
-requires its own independent review and gates before publication; H3 checks do
-not cover C3. No branch, artifact or label substitutes for the reviewed immutable
-harness.
+workflow pinned H `efd3cf05f607ab7804c4a16b543d916ebfc51a74`, followed by H2
+`62b465f982d92ca72128eb52a819925ac9ef26cd`. The published C3 source
+`601554bed0375083b88d62d115d3ed0cde324fed` pins immutable H3
+`4942815c1af74894f58640938c12c4f84623ec69`. H3 and C3 completed independent
+review and local repository gates. Those historical local checks do not
+establish integrated-tree validation, deployment, or maintainer risk approval.
+This local main integration intentionally retains the H3 pins as interim wiring:
+H4 has not been committed or validated. After independent integration review and
+mandatory gates, a separate C4 change must pin the actual immutable H4 commit and
+complete its own review and gates. Until then the workflow does not consume the
+integrated harness changes. No branch, artifact or label substitutes for the
+reviewed immutable harness.
+
+### Operator-only Kiali multicluster
+
+The upstream Kiali multicluster local Make targets, configurations, task links,
+and operator instructions remain available for explicitly operator-run use; see
+[`core-eval-testing/README.md`](core-eval-testing/README.md) and `build/kiali.mk`.
+Automatic protected evaluation, reporter mapping, and scheduled baseline branches
+for Kiali multicluster are deferred. They are not part of the trusted supported
+suite allowlist. The local setup defaults to mutable Kiali `master`/`dev` inputs
+and transitive external scripts; pinning this repository alone does not make
+those inputs immutable. Any future automatic integration requires separately
+reviewed immutable dependencies and lifecycle/consumer checks. Keeping these
+operator paths does not authorize their execution, credentialed runs, or workflow
+activation.
 
 A maintainer must separately deploy the reviewed workflow/report code to the
 trusted default branch, configure the protected environment and scoped secrets,

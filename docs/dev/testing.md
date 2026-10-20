@@ -40,6 +40,19 @@ unchanged Go argument/environment/exit behavior. Version-parser unit cases mock
 both executable lookup and execution; real missing-tool coverage stays separate
 so it does not depend on the host already having jq or ShellCheck installed.
 
+The actual Make consumer fixtures use a test-only `runpy` platform driver and
+isolated release-byte fixtures to exercise all eight command/environment/exit
+and private-cache cases even on native hosts outside Linux x86_64. Native Linux
+x86_64 also runs those cases without a platform override. Unsupported-platform
+negative cases reject missing-tool bootstrap before downloads or child execution;
+on an unsupported native host that rejection is also exercised without an
+override. Temporary bases are physical paths rather than assuming `/tmp` is not
+a symlink. Fixed version probes and explicit generic command arguments retain
+literal argv semantics, including shell metacharacters. These offline fixtures
+do not replace official-asset CI coverage or establish macOS/ARM execution.
+The capture/process-reaping tests still require Linux child-subreaper support;
+portable bootstrap tests do not make the complete Go suite platform-independent.
+
 ## Test Framework
 
 - **Use `testify/suite`** for organizing tests into suites

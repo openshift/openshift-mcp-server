@@ -11,7 +11,12 @@ Capture/process-reaping coverage requires Linux child-subreaper support.
 The missing-tool bootstrap supports Linux x86_64. Other platforms without the
 required tools fail explicitly, not by skipping or tagging tests. No system
 packages, root access, Go version changes, or cross-repository edits are used.
-The cache is `${XDG_CACHE_HOME:-$HOME/.cache}/openshift-mcp-test-tools`; installed
+An explicit `XDG_CACHE_HOME` must be a safe physical owned writable path; invalid
+explicit settings fail closed. Without it, the bootstrap tries the home cache
+and falls back to a unique owned 0700 temporary child when home is unavailable
+or unsafe (including `HOME=/`). Temporary children survive the command and are
+cleaned afterward; they do not promise reuse across invocations. A symlink
+`/tmp` is rejected unless a safe physical `TMPDIR` is provided. Installed
 executables are rehashed before reuse, and corruption fails closed. It is not a
 sandbox against malicious processes running under the same user. Initial
 downloads need HTTPS network access. Requests have a 10-second socket timeout,
@@ -37,3 +42,13 @@ Checksum provenance:
 Archives are verified before parsing and only one exact regular-file member is
 read, without filesystem extraction. Files are installed atomically after both
 checksums match. Partial preparation never runs tests with missing tools.
+
+The caller's PATH, loader configuration, proxy/TLS settings and explicit command
+are trusted inputs. Fixed version probes and generic CLI commands use argv, not
+shell interpretation; this wrapper intentionally executes the caller's selected
+program and does not restrict it to Go. Offline regressions test the actual Make
+recipe using test-only platform overrides and fake release assets, with native
+Linux x86_64 positives and unsupported-platform negatives retained. They are not
+official-download evidence or proof of native macOS/ARM execution. Command-exec
+scanner warnings require security-owner disposition; no suppression or blanket
+false-positive/clearance claim follows from these boundary tests.

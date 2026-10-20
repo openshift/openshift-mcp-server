@@ -13,6 +13,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 )
 
@@ -378,7 +379,7 @@ func ovnShow(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		return api.NewToolCallResult("", fmt.Errorf("failed to run ovn show: %w", err)), nil
 	}
 
-	server, err := newOVNServer(kubernetes.NewCore(params), containerForDatabase(database))
+	server, err := newOVNServer(kubernetes.NewCore(params), params.Config, containerForDatabase(database))
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -409,7 +410,7 @@ func ovnGet(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		return api.NewToolCallResult("", fmt.Errorf("failed to run ovn get: %w", err)), nil
 	}
 
-	server, err := newOVNServer(kubernetes.NewCore(params), containerForDatabase(database))
+	server, err := newOVNServer(kubernetes.NewCore(params), params.Config, containerForDatabase(database))
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -441,7 +442,7 @@ func ovnLFlowList(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		return api.NewToolCallResult("", fmt.Errorf("failed to run ovn lflow-list: %w", err)), nil
 	}
 
-	server, err := newOVNServer(kubernetes.NewCore(params), "sbdb")
+	server, err := newOVNServer(kubernetes.NewCore(params), params.Config, "sbdb")
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -472,7 +473,7 @@ func ovnTrace(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		return api.NewToolCallResult("", fmt.Errorf("failed to run ovn trace: %w", err)), nil
 	}
 
-	server, err := newOVNServer(kubernetes.NewCore(params), "northd")
+	server, err := newOVNServer(kubernetes.NewCore(params), params.Config, "northd")
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
@@ -492,9 +493,9 @@ func ovnTrace(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 
 // newOVNServer creates an ovnmcp.MCPServer that executes OVN CLI commands
 // inside the given container of an OVN pod.
-func newOVNServer(core *kubernetes.Core, container string) (*ovnmcp.MCPServer, error) {
+func newOVNServer(core *kubernetes.Core, cfg *config.Config, container string) (*ovnmcp.MCPServer, error) {
 	return ovnmcp.NewMCPServer(func(ctx context.Context, namespace, name, _ string, command []string) (string, string, error) {
-		return core.PodsExec(ctx, namespace, name, container, command)
+		return core.PodsExec(ctx, cfg, namespace, name, container, command)
 	})
 }
 

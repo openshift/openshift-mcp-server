@@ -356,7 +356,7 @@ Example output:
 func newOVSServer(params api.ToolHandlerParams) (*ovsmcp.MCPServer, error) {
 	core := kubernetes.NewCore(params)
 	return ovsmcp.NewMCPServer(func(ctx context.Context, namespace, name, _ string, command []string) (string, string, error) {
-		return core.PodsExec(ctx, namespace, name, "ovn-controller", command)
+		return core.PodsExec(ctx, params.Config, namespace, name, "ovn-controller", command)
 	})
 }
 

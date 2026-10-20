@@ -50,6 +50,7 @@ for(const suite of selectedSuites){
 if(scenario==='duplicate')artifacts.push({...artifacts[0],id:99});
 if(scenario==='single-context')artifacts=artifacts.filter(artifact=>artifact.name==='eval-context-core');
 if(scenario==='artifact-traversal')artifacts[0].name='eval-context-../core';
+if(scenario==='multicluster-artifact')artifacts.push({...artifacts[0],id:99,name:'eval-context-kiali-multicluster'});
 if(scenario==='artifact-run')artifacts[0].workflow_run.id=99;
 if(scenario==='artifact-head')artifacts[0].workflow_run.head_sha=C;
 if(scenario==='artifact-expired')artifacts[0].expired=true;
@@ -193,6 +194,19 @@ func (suiteState *MCPCheckerArtifactsSuite) TestAllSuiteReportConsumers() {
 				suiteState.NotContains(body, unsafe)
 			}
 		})
+	}
+}
+
+func (suiteState *MCPCheckerArtifactsSuite) TestMulticlusterRejectedBeforePublication() {
+	data, err := suiteState.execute("valid", "report", "kiali-multicluster")
+	suiteState.Error(err, data)
+	suiteState.Empty(data["comments"])
+	suiteState.Empty(data["copies"])
+	for _, mode := range []string{"report", "schedule"} {
+		data, err = suiteState.execute("multicluster-artifact", mode, "core")
+		suiteState.Error(err, data)
+		suiteState.Empty(data["comments"])
+		suiteState.Equal(data["originals"], data["copies"])
 	}
 }
 

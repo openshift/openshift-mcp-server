@@ -106,7 +106,7 @@ func PwruImage(params api.ToolHandlerParams) string {
 // node debug execution.
 func NewKernelMCPServer(params api.ToolHandlerParams, image string) (*ovnkkernelmcp.MCPServer, error) {
 	return ovnkkernelmcp.NewMCPServer(
-		adapter.NewRunDebugNodeCommand(params.KubernetesClient),
+		adapter.NewRunDebugNodeCommand(params.KubernetesClient, params.Config),
 		ovnkkernelmcp.Config{Image: image},
 	)
 }
@@ -115,8 +115,8 @@ func NewKernelMCPServer(params api.ToolHandlerParams, image string) (*ovnkkernel
 // kubernetes-mcp-server node debug and pod exec execution.
 func NewNetworkToolsMCPServer(params api.ToolHandlerParams, cfg ovnknetmcp.Config) (*ovnknetmcp.MCPServer, error) {
 	return ovnknetmcp.NewMCPServer(
-		adapter.NewRunDebugNodeCommand(params.KubernetesClient),
-		adapter.NewRunPodExecCommand(params.KubernetesClient),
+		adapter.NewRunDebugNodeCommand(params.KubernetesClient, params.Config),
+		adapter.NewRunPodExecCommand(params.KubernetesClient, params.Config),
 		cfg,
 	)
 }

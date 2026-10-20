@@ -69,6 +69,7 @@ case 'denied': permission='read'; break;
 case 'command-injection': reviews[0].body='/run-mcpchecker core; touch SENTINEL'; break;
 case 'command-prefix': reviews[0].body='prose /run-mcpchecker core'; break;
 case 'command-duplicate': reviews[0].body='/run-mcpchecker core\n/run-mcpchecker helm'; break;
+case 'multicluster-review': reviews[0].body='/run-mcpchecker kiali-multicluster'; break;
 case 'latest-invalid': reviews.push({...reviews[0],id:45,body:'/run-mcpchecker bogus'}); break;
 case 'wrong-trigger': trigger.workflow_id=9; break;
 case 'wrong-event': trigger.event='push'; break;
@@ -271,6 +272,54 @@ func (suiteState *MCPCheckerWorkflowSuite) TestIndependentLiteralSuiteMap() {
 	}
 	_, text, err := suiteState.runControl("control", "dispatch", "INPUT_SUITE=core;touch SENTINEL")
 	suiteState.Error(err, text)
+}
+
+func (suiteState *MCPCheckerWorkflowSuite) TestMulticlusterRemainsOperatorOnly() {
+	_, output, err := suiteState.runControl("control", "multicluster-review")
+	suiteState.Error(err, output)
+	suiteState.Contains(output, `"should-run":"false"`)
+	_, output, err = suiteState.runControl("control", "dispatch", "INPUT_SUITE=kiali-multicluster")
+	suiteState.Error(err, output)
+	suiteState.Contains(output, `"should-run":"false"`)
+	metadata := strings.Replace(workflowControlJSON(), `"suite":["core"]`, `"suite":["kiali-multicluster"]`, 1)
+	for _, mode := range []string{"revalidate", "artifact", "baseline"} {
+		_, output, err = suiteState.runControl(mode, "valid", "CONTROL_JSON="+metadata, "SUITE=kiali-multicluster")
+		suiteState.Error(err, mode+": "+output)
+	}
+	decoded, output, err := suiteState.runControl("control", "schedule")
+	suiteState.Require().NoError(err, output)
+	var outputs map[string]json.RawMessage
+	suiteState.Require().NoError(json.Unmarshal(decoded["outputs"], &outputs))
+	var encodedMatrix string
+	suiteState.Require().NoError(json.Unmarshal(outputs["matrix"], &encodedMatrix))
+	var matrix struct {
+		Include []struct{ Suite string }
+	}
+	suiteState.Require().NoError(json.Unmarshal([]byte(encodedMatrix), &matrix))
+	actual := make([]string, 0, len(matrix.Include))
+	for _, entry := range matrix.Include {
+		actual = append(actual, entry.Suite)
+	}
+	suiteState.ElementsMatch([]string{"core", "helm", "kubevirt", "kiali", "tekton", "netobserv", "argocd"}, actual)
+	for _, name := range []string{"mcpchecker.yaml", "mcpchecker-report.yaml"} {
+		data, readErr := os.ReadFile(workflowBuildPath(suiteState.T(), "../.github/workflows/"+name))
+		suiteState.Require().NoError(readErr)
+		suiteState.NotContains(strings.ToLower(string(data)), "multicluster", name)
+	}
+	data, err := os.ReadFile(workflowBuildPath(suiteState.T(), "kiali.mk"))
+	suiteState.Require().NoError(err)
+	for _, target := range []string{"write-kiali-multicluster-mcp-config:", "setup-kiali-multicluster:", "redeploy-kiali-multicluster-dev:", "kind-delete-multicluster:", "run-evals-multicluster: mcpchecker"} {
+		suiteState.Contains(string(data), target)
+	}
+	for _, agent := range []string{"builtin-openai", "builtin-anthropic", "builtin-google", "acp-anthropic", "acp-google"} {
+		data, err = os.ReadFile(workflowBuildPath(suiteState.T(), "../evals/core-eval-testing/"+agent+"/eval-kiali-multicluster.yaml"))
+		suiteState.Require().NoError(err, agent)
+		suiteState.Contains(string(data), "multicluster", agent)
+	}
+	for _, task := range []string{"mesh-status-multicluster", "metrics-west-reviews", "resource-list-clusters", "resource-remote-workload", "topology-west-cluster-graph", "traces-west-reviews"} {
+		_, err = os.Stat(workflowBuildPath(suiteState.T(), "../evals/tasks/kiali/multicluster/"+task+"/"+task+".yaml"))
+		suiteState.NoError(err, task)
+	}
 }
 
 func fixtureELF() []byte { return append([]byte{0x7f, 'E', 'L', 'F'}, make([]byte, 60)...) }

@@ -21,4 +21,5 @@ func (suiteState *TestPrerequisitesSuite) TestOfflineBootstrapAndMakeConsumer() 
 	suiteState.NoError(err, string(output))
 	suiteState.Contains(string(output), "Ran 29 tests")
 	suiteState.Contains(string(output), "OK")
+	suiteState.NotContains(string(output), "skipped")
 }
