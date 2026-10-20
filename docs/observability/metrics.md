@@ -224,6 +224,27 @@ range_query_full_response = false
 | `max_label_cardinality` | uint64 | `500` | Max label values before blanket regex is rejected (0 = always reject) |
 | `range_query_full_response` | bool | `false` | Controls whether range queries return full data points |
 
+### Incidents configuration fallback
+
+The separate `observability/incidents` toolset uses the
+`observability/metrics` configuration when present. Only when that section is
+absent does it use its own configuration:
+
+```toml
+[toolset_configs."observability/incidents"]
+prometheus_url = "https://thanos-querier.openshift-monitoring.svc.cluster.local:9091"
+alertmanager_url = "https://alertmanager-main.openshift-monitoring.svc.cluster.local:9094"
+auth_mode = "kubeconfig"
+insecure = false
+```
+
+The selected configuration must provide both URLs, and both must use HTTPS.
+Fields are not merged between sections. An incomplete metrics configuration
+produces an error rather than falling back to incidents configuration.
+
+Incident retrieval uses the selected URLs, `auth_mode`, and `insecure` settings;
+metrics query guardrails and response-format settings are not applied.
+
 ---
 
 ## Authentication and TLS

@@ -7,6 +7,7 @@ import (
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/obs/auth"
+	"github.com/containers/kubernetes-mcp-server/pkg/obs/toolcfg"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/metrics"
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -35,15 +36,19 @@ func initGetIncidents() []api.ServerTool {
 }
 
 // handleGetIncidents retrieves incidents from the HTTPS backends configured in
-// observability/metrics, honoring its auth_mode and insecure settings and using
-// the shared metrics CA fallback behavior.
+// observability/metrics, falling back to observability/incidents only when the
+// metrics configuration is absent. It honors the selected auth_mode and insecure
+// settings and uses the shared metrics CA fallback behavior.
 // It returns the analyzer's explanatory text alongside structured incident data.
 func handleGetIncidents(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
-	rawConfig, _ := params.GetToolsetConfig(metrics.ToolsetName)
+	rawConfig, found := toolcfg.From(params, metrics.ToolsetName)
+	if !found {
+		rawConfig, _ = toolcfg.From(params, ToolsetName)
+	}
 	cfg, ok := rawConfig.(*metrics.Config)
 	if !ok || cfg == nil || cfg.PrometheusURL == "" || cfg.AlertmanagerURL == "" {
 		return api.NewToolCallResult("", errors.New(
-			"get_incidents requires prometheus_url and alertmanager_url in observability/metrics toolset configuration",
+			"get_incidents requires prometheus_url and alertmanager_url in observability/metrics or observability/incidents toolset configuration",
 		)), nil
 	}
 
