@@ -87,7 +87,10 @@ func (p *Provider) ListResourcesFiltered(ctx context.Context, gvk schema.GroupVe
 	limit := api.ResultLimit(ctx)
 	remaining := limit
 	truncated := false
-	err := p.VisitResources(ctx, gvk, namespace, opts, func(obj *unstructured.Unstructured) bool {
+	accepted := 0
+	visitOpts := opts
+	visitOpts.Limit = 0
+	err := p.VisitResources(ctx, gvk, namespace, visitOpts, func(obj *unstructured.Unstructured) bool {
 		if match != nil && !match(obj) {
 			return true
 		}
@@ -103,7 +106,8 @@ func (p *Provider) ListResourcesFiltered(ctx context.Context, gvk schema.GroupVe
 			return false
 		}
 		result.Items = append(result.Items, *obj)
-		return true
+		accepted++
+		return opts.Limit <= 0 || accepted < opts.Limit
 	})
 	if err == nil && truncated {
 		err = ErrListTruncated
@@ -354,9 +358,9 @@ func (p *Provider) readGzipFile(path string) (string, error) {
 
 // TailLines returns the last n lines of a string
 func TailLines(content string, n int) string {
-	lines := strings.Split(content, "\n")
+	lines := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
 	if len(lines) <= n {
-		return content
+		return strings.Join(lines, "\n")
 	}
 	return strings.Join(lines[len(lines)-n:], "\n")
 }

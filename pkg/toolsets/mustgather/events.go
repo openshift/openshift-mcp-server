@@ -17,6 +17,8 @@ import (
 
 var eventGVK = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Event"}
 
+const partialEventOrderWarning = "[partial archive scan: chronological selection across the archive cannot be guaranteed]\n"
+
 func initEvents() []api.ServerTool {
 	return []api.ServerTool{
 		{
@@ -152,7 +154,7 @@ func mustgatherEventsList(params api.ToolHandlerParams) (*api.ToolCallResult, er
 
 	if len(filtered) == 0 {
 		if cut {
-			return api.NewToolCallResult(api.ResultTruncationNotice, nil), nil
+			return api.NewToolCallResult(partialEventOrderWarning+api.ResultTruncationNotice, nil), nil
 		}
 		return api.NewToolCallResult("No events found matching the criteria", nil), nil
 	}
@@ -170,6 +172,9 @@ func mustgatherEventsList(params api.ToolHandlerParams) (*api.ToolCallResult, er
 		output.WriteString(api.ResultTruncationNotice)
 	}
 
+	if cut {
+		return api.NewToolCallResult(partialEventOrderWarning+output.String(), nil), nil
+	}
 	return api.NewToolCallResult(output.String(), nil), nil
 }
 
@@ -217,7 +222,7 @@ func mustgatherEventsByResource(params api.ToolHandlerParams) (*api.ToolCallResu
 
 	if len(matched) == 0 {
 		if cut {
-			return api.NewToolCallResult(api.ResultTruncationNotice, nil), nil
+			return api.NewToolCallResult(partialEventOrderWarning+api.ResultTruncationNotice, nil), nil
 		}
 		return api.NewToolCallResult(fmt.Sprintf("No events found for resource %s", name), nil), nil
 	}
@@ -235,6 +240,9 @@ func mustgatherEventsByResource(params api.ToolHandlerParams) (*api.ToolCallResu
 		output.WriteString(api.ResultTruncationNotice)
 	}
 
+	if cut {
+		return api.NewToolCallResult(partialEventOrderWarning+output.String(), nil), nil
+	}
 	return api.NewToolCallResult(output.String(), nil), nil
 }
 
@@ -315,7 +323,7 @@ func mustgatherEventsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, 
 
 	if len(filtered) == 0 {
 		if cut {
-			return api.NewToolCallResult(api.ResultTruncationNotice, nil), nil
+			return api.NewToolCallResult(partialEventOrderWarning+api.ResultTruncationNotice, nil), nil
 		}
 		msg := fmt.Sprintf("No events found between %s and ", sinceStr)
 		if hasUntil {
@@ -346,6 +354,9 @@ func mustgatherEventsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, 
 		output.WriteString(api.ResultTruncationNotice)
 	}
 
+	if cut {
+		return api.NewToolCallResult(partialEventOrderWarning+output.String(), nil), nil
+	}
 	return api.NewToolCallResult(output.String(), nil), nil
 }
 
