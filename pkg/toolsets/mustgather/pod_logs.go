@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
-	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
 	"github.com/google/jsonschema-go/jsonschema"
 	"k8s.io/utils/ptr"
@@ -173,11 +172,7 @@ func mustgatherPodLogsGet(params api.ToolHandlerParams) (*api.ToolCallResult, er
 	}
 	defer func() { _ = f.Close() }()
 
-	backendLimit, err := kubernetes.BackendLimit(params.Config)
-	if err != nil {
-		return api.NewToolCallResult("", err), nil
-	}
-	scanner := bufio.NewScanner(kubernetes.LimitResponseBody(f, backendLimit))
+	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), maxScanLineSize)
 
 	var logs string
@@ -300,12 +295,10 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 	var matchingLines []string
 	var ringIdx int
 	totalMatches := 0
+	retainedBytes := 0
+	outputCut := false
 
-	backendLimit, err := kubernetes.BackendLimit(params.Config)
-	if err != nil {
-		return api.NewToolCallResult("", err), nil
-	}
-	scanner := bufio.NewScanner(kubernetes.LimitResponseBody(f, backendLimit))
+	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), maxScanLineSize)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -325,7 +318,18 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 				ringIdx = (ringIdx + 1) % tail
 			}
 		} else {
-			matchingLines = append(matchingLines, line)
+			if !outputCut {
+				separator := 0
+				if len(matchingLines) > 0 {
+					separator = 1
+				}
+				if len(line)+separator > maxOutputSize-retainedBytes {
+					outputCut = true
+				} else {
+					matchingLines = append(matchingLines, line)
+					retainedBytes += len(line) + separator
+				}
+			}
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -362,7 +366,11 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 		return api.NewToolCallResult(header+"No matching lines found.", nil), nil
 	}
 
-	return api.NewToolCallResult(api.LimitString(params.Context, header+capOutput(strings.Join(matchingLines, "\n"), maxOutputSize)), nil), nil
+	logs := strings.Join(matchingLines, "\n")
+	if outputCut {
+		logs += outputTruncatedNotice(maxOutputSize)
+	}
+	return api.NewToolCallResult(api.LimitString(params.Context, header+capOutput(logs, maxOutputSize)), nil), nil
 }
 
 func mustgatherPodLogsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -424,11 +432,10 @@ func mustgatherPodLogsByTime(params api.ToolHandlerParams) (*api.ToolCallResult,
 	defer func() { _ = f.Close() }()
 
 	var matchingLines []string
-	backendLimit, err := kubernetes.BackendLimit(params.Config)
-	if err != nil {
-		return api.NewToolCallResult("", err), nil
-	}
-	scanner := bufio.NewScanner(kubernetes.LimitResponseBody(f, backendLimit))
+	maxOutputSize := configFromParams(params).maxOutputSize()
+	retainedBytes := 0
+	outputCut := false
+	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), maxScanLineSize)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -449,7 +456,16 @@ func mustgatherPodLogsByTime(params api.ToolHandlerParams) (*api.ToolCallResult,
 		if hasUntil && lineTime.After(untilTime) {
 			continue
 		}
+		separator := 0
+		if len(matchingLines) > 0 {
+			separator = 1
+		}
+		if len(line)+separator > maxOutputSize-retainedBytes {
+			outputCut = true
+			break
+		}
 		matchingLines = append(matchingLines, line)
+		retainedBytes += len(line) + separator
 		if limit > 0 && len(matchingLines) >= limit {
 			break
 		}
@@ -472,9 +488,13 @@ func mustgatherPodLogsByTime(params api.ToolHandlerParams) (*api.ToolCallResult,
 	}
 	header += fmt.Sprintf(":\n\nFound %d matching line(s)\n\n", len(matchingLines))
 
-	if len(matchingLines) == 0 {
+	if len(matchingLines) == 0 && !outputCut {
 		return api.NewToolCallResult(header+"No matching lines found.", nil), nil
 	}
 
-	return api.NewToolCallResult(api.LimitString(params.Context, header+capOutput(strings.Join(matchingLines, "\n"), configFromParams(params).maxOutputSize())), nil), nil
+	logs := strings.Join(matchingLines, "\n")
+	if outputCut {
+		logs += outputTruncatedNotice(maxOutputSize)
+	}
+	return api.NewToolCallResult(api.LimitString(params.Context, header+capOutput(logs, maxOutputSize)), nil), nil
 }

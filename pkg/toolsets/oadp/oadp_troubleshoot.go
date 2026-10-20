@@ -778,6 +778,9 @@ func filterLogLines(logs string, keywords []string, result *api.BuilderWithBudge
 			}
 		}
 	}
+	if result.Truncated() {
+		return result.String()
+	}
 	return strings.TrimSuffix(result.String(), "\n")
 }
 

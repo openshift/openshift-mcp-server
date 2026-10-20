@@ -109,40 +109,34 @@ func mustgatherEventsList(params api.ToolHandlerParams) (*api.ToolCallResult, er
 	reasonFilter := getString(args, "reason", "")
 	limit := getInt(args, "limit", 100)
 
-	list, err := p.ListResources(params.Context, eventGVK, namespace, mg.ListOptions{})
-	if err != nil && !errors.Is(err, mg.ErrListTruncated) {
-		return api.NewToolCallResult("", err), nil
-	}
-	cut := errors.Is(err, mg.ErrListTruncated)
-
-	// Filter and collect events
-	var filtered []unstructured.Unstructured
-	for i := range list.Items {
-		event := &list.Items[i]
-
+	list, err := p.ListResourcesFiltered(params.Context, eventGVK, namespace, mg.ListOptions{}, func(event *unstructured.Unstructured) bool {
 		if typeFilter != "all" {
 			eventType, _, _ := unstructured.NestedString(event.Object, "type")
 			if eventType != typeFilter {
-				continue
+				return false
 			}
 		}
 
 		if resourceFilter != "" {
 			involvedName, _, _ := unstructured.NestedString(event.Object, "involvedObject", "name")
 			if !strings.Contains(strings.ToLower(involvedName), strings.ToLower(resourceFilter)) {
-				continue
+				return false
 			}
 		}
 
 		if reasonFilter != "" {
 			reason, _, _ := unstructured.NestedString(event.Object, "reason")
 			if !strings.Contains(strings.ToLower(reason), strings.ToLower(reasonFilter)) {
-				continue
+				return false
 			}
 		}
-
-		filtered = append(filtered, *event)
+		return true
+	})
+	if err != nil && !errors.Is(err, mg.ErrListTruncated) {
+		return api.NewToolCallResult("", err), nil
 	}
+	cut := errors.Is(err, mg.ErrListTruncated)
+	filtered := list.Items
 
 	// Sort by lastTimestamp descending
 	sort.Slice(filtered, func(i, j int) bool {
@@ -195,28 +189,24 @@ func mustgatherEventsByResource(params api.ToolHandlerParams) (*api.ToolCallResu
 		return api.NewToolCallResult("", fmt.Errorf("name is required")), nil
 	}
 
-	list, err := p.ListResources(params.Context, eventGVK, namespace, mg.ListOptions{})
-	if err != nil && !errors.Is(err, mg.ErrListTruncated) {
-		return api.NewToolCallResult("", err), nil
-	}
-	cut := errors.Is(err, mg.ErrListTruncated)
-
-	// Filter events for the specific resource
-	var matched []unstructured.Unstructured
-	for i := range list.Items {
-		event := &list.Items[i]
+	list, err := p.ListResourcesFiltered(params.Context, eventGVK, namespace, mg.ListOptions{}, func(event *unstructured.Unstructured) bool {
 		involvedName, _, _ := unstructured.NestedString(event.Object, "involvedObject", "name")
 		if involvedName != name {
-			continue
+			return false
 		}
 		if kindFilter != "" {
 			involvedKind, _, _ := unstructured.NestedString(event.Object, "involvedObject", "kind")
 			if !strings.EqualFold(involvedKind, kindFilter) {
-				continue
+				return false
 			}
 		}
-		matched = append(matched, *event)
+		return true
+	})
+	if err != nil && !errors.Is(err, mg.ErrListTruncated) {
+		return api.NewToolCallResult("", err), nil
 	}
+	cut := errors.Is(err, mg.ErrListTruncated)
+	matched := list.Items
 
 	// Sort chronologically
 	sort.Slice(matched, func(i, j int) bool {
@@ -280,42 +270,37 @@ func mustgatherEventsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, 
 		}
 	}
 
-	list, err := p.ListResources(params.Context, eventGVK, namespace, mg.ListOptions{})
-	if err != nil && !errors.Is(err, mg.ErrListTruncated) {
-		return api.NewToolCallResult("", err), nil
-	}
-	cut := errors.Is(err, mg.ErrListTruncated)
-
-	var filtered []unstructured.Unstructured
-	for i := range list.Items {
-		event := &list.Items[i]
-
+	list, err := p.ListResourcesFiltered(params.Context, eventGVK, namespace, mg.ListOptions{}, func(event *unstructured.Unstructured) bool {
 		lastTimestamp, _, _ := unstructured.NestedString(event.Object, "lastTimestamp")
 		if lastTimestamp == "" {
-			continue
+			return false
 		}
 
 		eventTime, err := time.Parse(time.RFC3339, lastTimestamp)
 		if err != nil {
-			continue
+			return false
 		}
 
 		if eventTime.Before(sinceTime) {
-			continue
+			return false
 		}
 		if hasUntil && eventTime.After(untilTime) {
-			continue
+			return false
 		}
 
 		if typeFilter != "all" {
 			eventType, _, _ := unstructured.NestedString(event.Object, "type")
 			if eventType != typeFilter {
-				continue
+				return false
 			}
 		}
-
-		filtered = append(filtered, *event)
+		return true
+	})
+	if err != nil && !errors.Is(err, mg.ErrListTruncated) {
+		return api.NewToolCallResult("", err), nil
 	}
+	cut := errors.Is(err, mg.ErrListTruncated)
+	filtered := list.Items
 
 	// Sort chronologically (oldest first)
 	sort.Slice(filtered, func(i, j int) bool {

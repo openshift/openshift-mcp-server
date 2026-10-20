@@ -110,7 +110,7 @@ func mustgatherNodeDiagnosticsGet(params api.ToolHandlerParams) (*api.ToolCallRe
 	shouldInclude := func(name string) bool {
 		return includeAll || includeMap[name]
 	}
-	diag, err := p.GetNodeDiagnosticsSelected(node, shouldInclude, api.ResultLimit(params.Context))
+	diag, err := p.GetNodeDiagnosticsSelected(node, shouldInclude, api.ResultLimit(params.Context), kubeletTail)
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get node diagnostics: %w", err)), nil
 	}
@@ -121,13 +121,11 @@ func mustgatherNodeDiagnosticsGet(params api.ToolHandlerParams) (*api.ToolCallRe
 
 	if shouldInclude("kubelet") && diag.KubeletLog != "" {
 		output.WriteString("## Kubelet Logs")
-		log := diag.KubeletLog
 		if kubeletTail > 0 {
 			output.WriteString(fmt.Sprintf(" (last %d lines)", kubeletTail))
-			log = mg.TailLines(log, kubeletTail)
 		}
 		output.WriteString("\n\n")
-		output.WriteString(log)
+		output.WriteString(diag.KubeletLog)
 		output.WriteString("\n\n")
 	}
 
@@ -175,7 +173,7 @@ func mustgatherNodeKubeletLogs(params api.ToolHandlerParams) (*api.ToolCallResul
 		return api.NewToolCallResult("", fmt.Errorf("node is required")), nil
 	}
 
-	diag, err := p.GetNodeDiagnosticsSelected(node, func(key string) bool { return key == "kubelet" }, 0)
+	diag, err := p.GetNodeDiagnosticsSelected(node, func(key string) bool { return key == "kubelet" }, 0, 0)
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get node diagnostics: %w", err)), nil
 	}
@@ -218,7 +216,7 @@ func mustgatherNodeKubeletLogsGrep(params api.ToolHandlerParams) (*api.ToolCallR
 		return api.NewToolCallResult("", fmt.Errorf("filter string is required")), nil
 	}
 
-	diag, err := p.GetNodeDiagnosticsSelected(node, func(key string) bool { return key == "kubelet" }, 0)
+	diag, err := p.GetNodeDiagnosticsSelected(node, func(key string) bool { return key == "kubelet" }, 0, 0)
 	if err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get node diagnostics: %w", err)), nil
 	}

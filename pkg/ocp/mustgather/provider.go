@@ -77,10 +77,20 @@ func (p *Provider) GetResource(gvk schema.GroupVersionKind, name, namespace stri
 
 // ListResources returns resources matching the given criteria
 func (p *Provider) ListResources(ctx context.Context, gvk schema.GroupVersionKind, namespace string, opts ListOptions) (*unstructured.UnstructuredList, error) {
+	return p.ListResourcesFiltered(ctx, gvk, namespace, opts, nil)
+}
+
+// ListResourcesFiltered applies match during traversal, before consuming the
+// result budget. A nil match accepts every resource.
+func (p *Provider) ListResourcesFiltered(ctx context.Context, gvk schema.GroupVersionKind, namespace string, opts ListOptions, match func(*unstructured.Unstructured) bool) (*unstructured.UnstructuredList, error) {
 	result := &unstructured.UnstructuredList{}
-	remaining := api.ResultLimit(ctx)
+	limit := api.ResultLimit(ctx)
+	remaining := limit
 	truncated := false
 	err := p.VisitResources(ctx, gvk, namespace, opts, func(obj *unstructured.Unstructured) bool {
+		if match != nil && !match(obj) {
+			return true
+		}
 		if remaining > 0 {
 			data, err := json.Marshal(obj.Object)
 			if err != nil || int64(len(data)) >= remaining {
@@ -88,7 +98,7 @@ func (p *Provider) ListResources(ctx context.Context, gvk schema.GroupVersionKin
 				return false
 			}
 			remaining -= int64(len(data))
-		} else if api.ResultLimit(ctx) > 0 {
+		} else if limit > 0 {
 			truncated = true
 			return false
 		}
@@ -207,12 +217,13 @@ func (p *Provider) ListPodContainers(namespace, pod string) ([]string, error) {
 
 // GetNodeDiagnostics reads all diagnostic data for a node
 func (p *Provider) GetNodeDiagnostics(nodeName string) (*NodeDiagnostics, error) {
-	return p.GetNodeDiagnosticsSelected(nodeName, nil, 0)
+	return p.GetNodeDiagnosticsSelected(nodeName, nil, 0, 0)
 }
 
 // GetNodeDiagnosticsSelected reads only requested sections and stops once the
 // retained diagnostic text fills budget. A nil include selects every section.
-func (p *Provider) GetNodeDiagnosticsSelected(nodeName string, include func(string) bool, budget int64) (*NodeDiagnostics, error) {
+// kubeletTail selects the final lines before applying the budget (0 keeps all).
+func (p *Provider) GetNodeDiagnosticsSelected(nodeName string, include func(string) bool, budget int64, kubeletTail int) (*NodeDiagnostics, error) {
 	nodeDir := filepath.Join(p.metadata.ContainerDir, "nodes", nodeName)
 	if _, err := os.Stat(nodeDir); os.IsNotExist(err) {
 		return nil, fmt.Errorf("node directory not found: %s", nodeName)
@@ -241,6 +252,9 @@ func (p *Provider) GetNodeDiagnosticsSelected(nodeName string, include func(stri
 	if selected("kubelet") {
 		kubeletGz := filepath.Join(nodeDir, nodeName+"_logs_kubelet.gz")
 		if content, err := p.readGzipFile(kubeletGz); err == nil {
+			if kubeletTail > 0 {
+				content = TailLines(content, kubeletTail)
+			}
 			var more bool
 			diag.KubeletLog, more = keep(content)
 			if !more {
