@@ -344,13 +344,16 @@ workflow pinned H `efd3cf05f607ab7804c4a16b543d916ebfc51a74`, followed by H2
 `601554bed0375083b88d62d115d3ed0cde324fed` pins immutable H3
 `4942815c1af74894f58640938c12c4f84623ec69`. H3 and C3 completed independent
 review and local repository gates. Those historical local checks do not
-establish integrated-tree validation, deployment, or maintainer risk approval.
-This local main integration intentionally retains the H3 pins as interim wiring:
-H4 has not been committed or validated. After independent integration review and
-mandatory gates, a separate C4 change must pin the actual immutable H4 commit and
-complete its own review and gates. Until then the workflow does not consume the
-integrated harness changes. No branch, artifact or label substitutes for the
-reviewed immutable harness.
+substitute for the integrated tree's own validation, deployment, or maintainer
+risk approval. The validated local H4
+`b918eee433d300093cc73b72f05d9a8e55a2a88e` is a signed history-preserving merge
+of published C3 and main `432c1f3cd76df74b0bdb9ca010643abbac996219`. H4 completed
+independent integration review and full precommit/postcommit local repository
+gates. This uncommitted C4 change pins that actual immutable H4.
+C4 review and mandatory gates are pending, followed by its separate local commit.
+H4 is not yet published; publication requires separate explicit approval.
+Neither local validation nor pinning deploys or activates credentialed workflows.
+No branch, artifact or label substitutes for the reviewed immutable harness.
 
 ### Operator-only Kiali multicluster
 
