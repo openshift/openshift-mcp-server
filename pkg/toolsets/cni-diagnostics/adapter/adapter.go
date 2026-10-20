@@ -6,6 +6,7 @@ import (
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	"github.com/containers/kubernetes-mcp-server/pkg/cluster-diagnostics/nodesdebug"
+	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 )
 
@@ -19,18 +20,18 @@ type RunPodExecCommandFunc = func(ctx context.Context, namespace, name, containe
 
 // NewRunDebugNodeCommand creates a RunDebugNodeCommandFunc that uses kubernetes-mcp-server's
 // nodesdebug.NodeDebug to execute commands on nodes via privileged debug pods.
-func NewRunDebugNodeCommand(k api.KubernetesClient) RunDebugNodeCommandFunc {
+func NewRunDebugNodeCommand(k api.KubernetesClient, cfg *config.Config) RunDebugNodeCommandFunc {
 	return func(ctx context.Context, namespace string, nodeName string, image string, command []string, hostPath string, mountPath string, timeout time.Duration) (string, string, error) {
-		nodeDebug := nodesdebug.NewNodeDebug(k)
+		nodeDebug := nodesdebug.NewNodeDebug(k, cfg)
 		return nodeDebug.NodesDebugExec(ctx, namespace, nodeName, image, command, hostPath, mountPath, timeout)
 	}
 }
 
 // NewRunPodExecCommand creates a RunPodExecCommandFunc that uses kubernetes-mcp-server's
 // kubernetes.Core to execute commands in existing pods.
-func NewRunPodExecCommand(k api.KubernetesClient) RunPodExecCommandFunc {
+func NewRunPodExecCommand(k api.KubernetesClient, cfg *config.Config) RunPodExecCommandFunc {
 	return func(ctx context.Context, namespace, name, container string, command []string) (string, string, error) {
 		core := kubernetes.NewCore(k)
-		return core.PodsExec(ctx, namespace, name, container, command)
+		return core.PodsExec(ctx, cfg, namespace, name, container, command)
 	}
 }

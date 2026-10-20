@@ -194,7 +194,7 @@ func getRouterConfig(params api.ToolHandlerParams) (*api.ToolCallResult, error) 
 		pod = resolved
 	}
 
-	out, _, err := kubernetes.NewCore(params).PodsExec(params.Context, ingressNamespace, pod, routerContainerName, []string{"cat", "/var/lib/haproxy/conf/haproxy.config"})
+	out, _, err := kubernetes.NewCore(params).PodsExec(params.Context, params.Config, ingressNamespace, pod, routerContainerName, []string{"cat", "/var/lib/haproxy/conf/haproxy.config"})
 	if err != nil {
 		results = append(results, fmt.Sprintf("# Router configuration (pod: %s)", pod))
 		results = append(results, fmt.Sprintf("Error showing router configuration from pod %q: %v", pod, err))
@@ -237,7 +237,7 @@ func getRouterInfo(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		pod = resolved
 	}
 
-	out, _, err := kubernetes.NewCore(params).PodsExec(params.Context, ingressNamespace, pod, routerContainerName, []string{"sh", "-c", "echo 'show info' | socat stdio /var/lib/haproxy/run/haproxy.sock"})
+	out, _, err := kubernetes.NewCore(params).PodsExec(params.Context, params.Config, ingressNamespace, pod, routerContainerName, []string{"sh", "-c", "echo 'show info' | socat stdio /var/lib/haproxy/run/haproxy.sock"})
 	if err != nil {
 		results = append(results, fmt.Sprintf("# Router HAProxy info (pod: %s)", pod))
 		results = append(results, fmt.Sprintf("Error getting HAProxy info from pod %q: %v", pod, err))
@@ -273,7 +273,7 @@ func getRouterSessions(params api.ToolHandlerParams) (*api.ToolCallResult, error
 		pod = resolved
 	}
 
-	out, _, err := kubernetes.NewCore(params).PodsExec(params.Context, ingressNamespace, pod, routerContainerName, []string{"sh", "-c", "echo 'show sess all' | socat stdio /var/lib/haproxy/run/haproxy.sock"})
+	out, _, err := kubernetes.NewCore(params).PodsExec(params.Context, params.Config, ingressNamespace, pod, routerContainerName, []string{"sh", "-c", "echo 'show sess all' | socat stdio /var/lib/haproxy/run/haproxy.sock"})
 	if err != nil {
 		results = append(results, fmt.Sprintf("# Router active sessions (pod: %s)", pod))
 		results = append(results, fmt.Sprintf("Error getting active sessions from pod %q: %v", pod, err))
