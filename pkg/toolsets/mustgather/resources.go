@@ -7,6 +7,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
 	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
 	"github.com/google/jsonschema-go/jsonschema"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
@@ -63,43 +64,66 @@ func mustgatherResourcesList(params api.ToolHandlerParams) (*api.ToolCallResult,
 	}
 
 	gvk := parseGVK(apiVersion, kind)
-	list, err := p.ListResources(params.Context, gvk, namespace, mg.ListOptions{
+	result := api.NewBuilderWithBudget(api.ResultLimit(params.Context))
+	// Leave room for the header, which includes a count known only after the
+	// walk. The scratch bounds both the names and optional YAML details.
+	body := result.Scratch(len(kind) + 32)
+	if body.Truncated() {
+		result.WriteString(fmt.Sprintf("Found %s resource(s):\n\n", kind))
+		result.WriteString("\n")
+		return api.NewToolCallResult(result.String(), nil), nil
+	}
+	count := 0
+	err = p.VisitResources(params.Context, gvk, namespace, mg.ListOptions{
 		LabelSelector: labelSelector,
 		FieldSelector: fieldSelector,
 		Limit:         limit,
+	}, func(item *unstructured.Unstructured) bool {
+		if !body.Fits(0) {
+			body.WriteString("\n")
+			return false
+		}
+		count++
+		ns, name := item.GetNamespace(), item.GetName()
+		if ns != "" {
+			body.WriteString(fmt.Sprintf("- %s/%s\n", ns, name))
+		} else {
+			body.WriteString(fmt.Sprintf("- %s\n", name))
+		}
+		return !body.Truncated()
 	})
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
 
-	if len(list.Items) == 0 {
+	if count == 0 {
 		return api.NewToolCallResult(fmt.Sprintf("No %s resources found", kind), nil), nil
 	}
-
-	output := fmt.Sprintf("Found %d %s resource(s):\n\n", len(list.Items), kind)
-	for i := range list.Items {
-		item := &list.Items[i]
-		ns := item.GetNamespace()
-		name := item.GetName()
-		if ns != "" {
-			output += fmt.Sprintf("- %s/%s\n", ns, name)
-		} else {
-			output += fmt.Sprintf("- %s\n", name)
-		}
-	}
-
-	// Show full YAML for small result sets
-	if len(list.Items) <= 5 {
-		output += "\n---\n\n"
-		for i := range list.Items {
-			yamlBytes, err := yaml.Marshal(list.Items[i].Object)
-			if err == nil {
-				output += string(yamlBytes) + "\n---\n\n"
+	if count <= 5 && !body.Truncated() {
+		body.WriteString("\n---\n\n")
+		if !body.Truncated() {
+			err = p.VisitResources(params.Context, gvk, namespace, mg.ListOptions{
+				LabelSelector: labelSelector, FieldSelector: fieldSelector, Limit: limit,
+			}, func(item *unstructured.Unstructured) bool {
+				if !body.Fits(0) {
+					body.WriteString("\n")
+					return false
+				}
+				yamlBytes, err := yaml.Marshal(item.Object)
+				if err == nil {
+					body.WriteString(string(yamlBytes) + "\n---\n\n")
+				}
+				return !body.Truncated()
+			})
+			if err != nil {
+				return api.NewToolCallResult("", err), nil
 			}
 		}
 	}
-
-	return api.NewToolCallResult(output, nil), nil
+	result.WriteString(fmt.Sprintf("Found %d %s resource(s):\n\n", count, kind))
+	text, cut := body.Prefix()
+	result.WriteCut(text, cut)
+	return api.NewToolCallResult(result.String(), nil), nil
 }
 
 func parseGVK(apiVersion, kind string) schema.GroupVersionKind {

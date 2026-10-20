@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
 	"github.com/google/jsonschema-go/jsonschema"
 	"k8s.io/utils/ptr"
@@ -172,7 +173,11 @@ func mustgatherPodLogsGet(params api.ToolHandlerParams) (*api.ToolCallResult, er
 	}
 	defer func() { _ = f.Close() }()
 
-	scanner := bufio.NewScanner(f)
+	backendLimit, err := kubernetes.BackendLimit(params.Config)
+	if err != nil {
+		return api.NewToolCallResult("", err), nil
+	}
+	scanner := bufio.NewScanner(kubernetes.LimitResponseBody(f, backendLimit))
 	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), maxScanLineSize)
 
 	var logs string
@@ -232,7 +237,7 @@ func mustgatherPodLogsGet(params api.ToolHandlerParams) (*api.ToolCallResult, er
 	}
 	header += ":\n\n"
 
-	return api.NewToolCallResult(header+logs, nil), nil
+	return api.NewToolCallResult(api.LimitString(params.Context, header+logs), nil), nil
 }
 
 func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -296,7 +301,11 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 	var ringIdx int
 	totalMatches := 0
 
-	scanner := bufio.NewScanner(f)
+	backendLimit, err := kubernetes.BackendLimit(params.Config)
+	if err != nil {
+		return api.NewToolCallResult("", err), nil
+	}
+	scanner := bufio.NewScanner(kubernetes.LimitResponseBody(f, backendLimit))
 	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), maxScanLineSize)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -353,7 +362,7 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 		return api.NewToolCallResult(header+"No matching lines found.", nil), nil
 	}
 
-	return api.NewToolCallResult(header+capOutput(strings.Join(matchingLines, "\n"), maxOutputSize), nil), nil
+	return api.NewToolCallResult(api.LimitString(params.Context, header+capOutput(strings.Join(matchingLines, "\n"), maxOutputSize)), nil), nil
 }
 
 func mustgatherPodLogsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -415,7 +424,11 @@ func mustgatherPodLogsByTime(params api.ToolHandlerParams) (*api.ToolCallResult,
 	defer func() { _ = f.Close() }()
 
 	var matchingLines []string
-	scanner := bufio.NewScanner(f)
+	backendLimit, err := kubernetes.BackendLimit(params.Config)
+	if err != nil {
+		return api.NewToolCallResult("", err), nil
+	}
+	scanner := bufio.NewScanner(kubernetes.LimitResponseBody(f, backendLimit))
 	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), maxScanLineSize)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -463,5 +476,5 @@ func mustgatherPodLogsByTime(params api.ToolHandlerParams) (*api.ToolCallResult,
 		return api.NewToolCallResult(header+"No matching lines found.", nil), nil
 	}
 
-	return api.NewToolCallResult(header+capOutput(strings.Join(matchingLines, "\n"), configFromParams(params).maxOutputSize()), nil), nil
+	return api.NewToolCallResult(api.LimitString(params.Context, header+capOutput(strings.Join(matchingLines, "\n"), configFromParams(params).maxOutputSize())), nil), nil
 }

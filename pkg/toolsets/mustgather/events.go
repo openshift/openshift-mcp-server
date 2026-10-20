@@ -1,6 +1,7 @@
 package mustgather
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -109,9 +110,10 @@ func mustgatherEventsList(params api.ToolHandlerParams) (*api.ToolCallResult, er
 	limit := getInt(args, "limit", 100)
 
 	list, err := p.ListResources(params.Context, eventGVK, namespace, mg.ListOptions{})
-	if err != nil {
+	if err != nil && !errors.Is(err, mg.ErrListTruncated) {
 		return api.NewToolCallResult("", err), nil
 	}
+	cut := errors.Is(err, mg.ErrListTruncated)
 
 	// Filter and collect events
 	var filtered []unstructured.Unstructured
@@ -155,15 +157,26 @@ func mustgatherEventsList(params api.ToolHandlerParams) (*api.ToolCallResult, er
 	}
 
 	if len(filtered) == 0 {
+		if cut {
+			return api.NewToolCallResult(api.ResultTruncationNotice, nil), nil
+		}
 		return api.NewToolCallResult("No events found matching the criteria", nil), nil
 	}
 
-	output := fmt.Sprintf("Found %d events:\n\n", len(filtered))
+	output := api.NewBuilderWithBudget(api.ResultLimit(params.Context))
+	output.WriteString(fmt.Sprintf("Found %d events:\n\n", len(filtered)))
 	for i := range filtered {
-		output += formatEvent(&filtered[i])
+		if !output.Fits(0) {
+			output.WriteString("\n")
+			break
+		}
+		output.WriteString(formatEvent(&filtered[i]))
+	}
+	if cut && !output.Truncated() {
+		output.WriteString(api.ResultTruncationNotice)
 	}
 
-	return api.NewToolCallResult(output, nil), nil
+	return api.NewToolCallResult(output.String(), nil), nil
 }
 
 func mustgatherEventsByResource(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -183,9 +196,10 @@ func mustgatherEventsByResource(params api.ToolHandlerParams) (*api.ToolCallResu
 	}
 
 	list, err := p.ListResources(params.Context, eventGVK, namespace, mg.ListOptions{})
-	if err != nil {
+	if err != nil && !errors.Is(err, mg.ErrListTruncated) {
 		return api.NewToolCallResult("", err), nil
 	}
+	cut := errors.Is(err, mg.ErrListTruncated)
 
 	// Filter events for the specific resource
 	var matched []unstructured.Unstructured
@@ -212,15 +226,26 @@ func mustgatherEventsByResource(params api.ToolHandlerParams) (*api.ToolCallResu
 	})
 
 	if len(matched) == 0 {
+		if cut {
+			return api.NewToolCallResult(api.ResultTruncationNotice, nil), nil
+		}
 		return api.NewToolCallResult(fmt.Sprintf("No events found for resource %s", name), nil), nil
 	}
 
-	output := fmt.Sprintf("Found %d events for %s:\n\n", len(matched), name)
+	output := api.NewBuilderWithBudget(api.ResultLimit(params.Context))
+	output.WriteString(fmt.Sprintf("Found %d events for %s:\n\n", len(matched), name))
 	for i := range matched {
-		output += formatEvent(&matched[i])
+		if !output.Fits(0) {
+			output.WriteString("\n")
+			break
+		}
+		output.WriteString(formatEvent(&matched[i]))
+	}
+	if cut && !output.Truncated() {
+		output.WriteString(api.ResultTruncationNotice)
 	}
 
-	return api.NewToolCallResult(output, nil), nil
+	return api.NewToolCallResult(output.String(), nil), nil
 }
 
 func mustgatherEventsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -256,9 +281,10 @@ func mustgatherEventsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, 
 	}
 
 	list, err := p.ListResources(params.Context, eventGVK, namespace, mg.ListOptions{})
-	if err != nil {
+	if err != nil && !errors.Is(err, mg.ErrListTruncated) {
 		return api.NewToolCallResult("", err), nil
 	}
+	cut := errors.Is(err, mg.ErrListTruncated)
 
 	var filtered []unstructured.Unstructured
 	for i := range list.Items {
@@ -303,6 +329,9 @@ func mustgatherEventsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, 
 	}
 
 	if len(filtered) == 0 {
+		if cut {
+			return api.NewToolCallResult(api.ResultTruncationNotice, nil), nil
+		}
 		msg := fmt.Sprintf("No events found between %s and ", sinceStr)
 		if hasUntil {
 			msg += untilStr
@@ -312,19 +341,27 @@ func mustgatherEventsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, 
 		return api.NewToolCallResult(msg, nil), nil
 	}
 
-	output := fmt.Sprintf("Found %d events between %s and ", len(filtered), sinceStr)
+	output := api.NewBuilderWithBudget(api.ResultLimit(params.Context))
+	output.WriteString(fmt.Sprintf("Found %d events between %s and ", len(filtered), sinceStr))
 	if hasUntil {
-		output += untilStr
+		output.WriteString(untilStr)
 	} else {
-		output += "latest"
+		output.WriteString("latest")
 	}
-	output += ":\n\n"
+	output.WriteString(":\n\n")
 
 	for i := range filtered {
-		output += formatEvent(&filtered[i])
+		if !output.Fits(0) {
+			output.WriteString("\n")
+			break
+		}
+		output.WriteString(formatEvent(&filtered[i]))
+	}
+	if cut && !output.Truncated() {
+		output.WriteString(api.ResultTruncationNotice)
 	}
 
-	return api.NewToolCallResult(output, nil), nil
+	return api.NewToolCallResult(output.String(), nil), nil
 }
 
 func formatEvent(event *unstructured.Unstructured) string {

@@ -129,6 +129,12 @@ func planMustGatherHandler(params api.PromptHandlerParams) (*api.PromptCallResul
 		return nil, err
 	}
 
+	assistant := "I'll help you apply this must-gather plan to collect diagnostic data from your OpenShift cluster."
+	budget := api.NewPromptBudget(params.Context, assistant)
+	budget.WriteString("# Must-Gather Collection Plan\n\n")
+	budget.WriteString(result)
+	budget.WriteString("\n---\n\n")
+	budget.WriteString("**Please review the plan above and confirm if you want to proceed with applying these resources.**\n")
 	return api.NewPromptCallResult(
 		"Must-gather plan generated successfully",
 		[]api.PromptMessage{
@@ -136,14 +142,14 @@ func planMustGatherHandler(params api.PromptHandlerParams) (*api.PromptCallResul
 				Role: "user",
 				Content: api.PromptContent{
 					Type: "text",
-					Text: formatMustGatherPrompt(result),
+					Text: budget.String(),
 				},
 			},
 			{
 				Role: "assistant",
 				Content: api.PromptContent{
 					Type: "text",
-					Text: "I'll help you apply this must-gather plan to collect diagnostic data from your OpenShift cluster.",
+					Text: assistant,
 				},
 			},
 		},
