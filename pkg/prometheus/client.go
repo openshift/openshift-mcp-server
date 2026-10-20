@@ -5,26 +5,25 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 )
 
 const (
 	// DefaultTimeout is the default HTTP timeout.
 	DefaultTimeout = 30 * time.Second
-
-	// MaxResponseSize is the maximum response size (10MB).
-	MaxResponseSize = 10 * 1024 * 1024
 )
 
 // Client is an HTTP client for Prometheus and Alertmanager APIs.
 type Client struct {
-	baseURL     string
-	bearerToken string
-	tlsConfig   *tls.Config
-	timeout     time.Duration
+	baseURL      string
+	bearerToken  string
+	tlsConfig    *tls.Config
+	timeout      time.Duration
+	backendLimit int64
 }
 
 // NewClient creates a new Prometheus client with the specified base URL and options.
@@ -117,15 +116,9 @@ func (c *Client) executeRequest(ctx context.Context, endpoint string, params url
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	// Read response with size limit
-	limitedReader := io.LimitReader(resp.Body, MaxResponseSize+1)
-	body, err := io.ReadAll(limitedReader)
+	body, err := kubernetes.ReadCapped(resp.Body, c.backendLimit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	if len(body) > MaxResponseSize {
-		return nil, fmt.Errorf("response size exceeds maximum of %d bytes", MaxResponseSize)
 	}
 
 	// Check HTTP status

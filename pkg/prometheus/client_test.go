@@ -9,12 +9,37 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/stretchr/testify/suite"
 	"k8s.io/client-go/rest"
 )
 
 type PrometheusSuite struct {
 	suite.Suite
+}
+
+func (s *PrometheusSuite) TestBackendLimit() {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"status":"success"}`))
+	}))
+	defer server.Close()
+
+	s.Run("exact cap succeeds", func() {
+		client := NewClient(context.Background(), server.URL, WithBackendLimit(int64(len(`{"status":"success"}`))))
+		_, err := client.Query(context.Background(), "up", "")
+		s.NoError(err)
+	})
+	s.Run("over cap returns the typed error", func() {
+		client := NewClient(context.Background(), server.URL, WithBackendLimit(8))
+		_, err := client.Query(context.Background(), "up", "")
+		var tooLarge *kubernetes.BackendResponseTooLargeError
+		s.ErrorAs(err, &tooLarge)
+	})
+	s.Run("zero disables the cap", func() {
+		client := NewClient(context.Background(), server.URL, WithBackendLimit(0))
+		_, err := client.Query(context.Background(), "up", "")
+		s.NoError(err)
+	})
 }
 
 func (s *PrometheusSuite) TestNewClient() {

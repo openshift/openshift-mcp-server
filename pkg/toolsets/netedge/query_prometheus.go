@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sync"
+	"sort"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -14,6 +14,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/prometheus"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/netedge/internal/defaults"
 )
@@ -132,45 +133,51 @@ func handleDiagnosticTarget(params api.ToolHandlerParams, target string) (*api.T
 	if params.RESTConfig().Insecure {
 		opts = append(opts, prometheus.WithInsecure(true))
 	}
+	limit, err := kubernetes.BackendLimit(params.Config)
+	if err != nil {
+		return api.NewToolCallResult("", err), nil
+	}
+	opts = append(opts, prometheus.WithBackendLimit(limit))
 
 	client := prometheus.NewClient(params.Context, baseURL, opts...)
 
-	results := make([]DiagnosticResult, 0, len(queries))
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-
-	for name, q := range queries {
-		wg.Add(1)
-		go func(n, qStr string) {
-			defer wg.Done()
-			res := DiagnosticResult{
-				Name:      n,
-				Query:     qStr,
-				Timestamp: time.Now(),
-			}
-
-			// Using generic Query since these are instant queries
-			promResp, err := client.Query(params.Context, qStr, "")
-			if err != nil {
-				res.Error = err.Error()
-			} else {
-				res.Result = promResp.Data.Result
-			}
-
-			mu.Lock()
-			results = append(results, res)
-			mu.Unlock()
-		}(name, q)
+	result := api.NewBuilderWithBudget(api.ResultLimit(params.Context))
+	body := result.Scratch(2) // '[' and ']'
+	names := make([]string, 0, len(queries))
+	for name := range queries {
+		names = append(names, name)
 	}
-
-	wg.Wait()
-
-	jsonResult, err := json.MarshalIndent(results, "", "  ")
-	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to marshal diagnostic results: %v", err)), nil
+	sort.Strings(names)
+	for _, name := range names {
+		if !body.Fits(0) {
+			body.WriteString("\n")
+			break
+		}
+		q := queries[name]
+		res := DiagnosticResult{
+			Name:      name,
+			Query:     q,
+			Timestamp: time.Now(),
+		}
+		promResp, err := client.Query(params.Context, q, "")
+		if err != nil {
+			res.Error = err.Error()
+		} else {
+			res.Result = promResp.Data.Result
+		}
+		data, err := json.Marshal(res)
+		if err != nil {
+			return api.NewToolCallResult("", fmt.Errorf("failed to marshal diagnostic results: %v", err)), nil
+		}
+		if body.Len() > 0 {
+			body.WriteString(",")
+		}
+		body.WriteString(string(data))
 	}
-
-	return api.NewToolCallResult(string(jsonResult), nil), nil
+	result.WriteString("[")
+	text, cut := body.Prefix()
+	result.WriteCut(text+"]", cut)
+	return api.NewToolCallResult(result.String(), nil), nil
 }
 
 // getRouteURL retrieves the URL for an OpenShift route.

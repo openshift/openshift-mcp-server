@@ -277,7 +277,7 @@ func makeExecDNSInPodHandler(executor podExecutor) api.ToolHandlerFunc {
 				Output:  fmt.Sprintf("failed to retrieve pod logs: %v", err),
 				Phase:   phase,
 			}
-			return api.NewToolCallResultStructured(result, nil), nil
+			return budgetNetEdgeResult(params.Context, result), nil
 		}
 
 		result := ExecDNSResult{
@@ -286,6 +286,14 @@ func makeExecDNSInPodHandler(executor podExecutor) api.ToolHandlerFunc {
 			Phase:   phase,
 		}
 
-		return api.NewToolCallResultStructured(result, nil), nil
+		return budgetNetEdgeResult(params.Context, result), nil
 	}
+}
+
+func budgetNetEdgeResult(ctx context.Context, value any) *api.ToolCallResult {
+	result := api.NewToolCallResultStructured(value, nil)
+	if limit := api.ResultLimit(ctx); limit > 0 && int64(len(result.Content))*2 > limit {
+		return api.NewToolCallResult(api.LimitString(ctx, result.Content), nil)
+	}
+	return result
 }
