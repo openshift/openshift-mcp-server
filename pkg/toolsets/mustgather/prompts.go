@@ -176,15 +176,3 @@ func parseImages(value string) []string {
 	}
 	return images
 }
-
-// formatMustGatherPrompt formats the must-gather plan result into a prompt for the LLM.
-func formatMustGatherPrompt(planResult string) string {
-	var sb strings.Builder
-
-	sb.WriteString("# Must-Gather Collection Plan\n\n")
-	sb.WriteString(planResult)
-	sb.WriteString("\n---\n\n")
-	sb.WriteString("**Please review the plan above and confirm if you want to proceed with applying these resources.**\n")
-
-	return sb.String()
-}
