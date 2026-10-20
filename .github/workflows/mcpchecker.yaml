@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: 'Which task suite to run (core, helm, kubevirt, kiali, tekton, netobserv, argocd, netedge, or all)'
+        description: 'Which task suite to run (core, helm, kubevirt, kiali, tekton, netobserv, argocd, or all)'
         required: false
         default: 'core'
         type: choice
@@ -26,7 +26,6 @@ on:
           - tekton
           - netobserv
           - argocd
-          - netedge
           - all
       task-filter:
         description: 'Regular expression to filter tasks (optional)'
@@ -182,7 +181,7 @@ jobs:
 
               // Parse suite from the review body (trusted — fetched from API).
               const suiteMatch = triggerReview.body.match(
-                /\/run-mcpchecker\s+(core|helm|kubevirt|kiali|tekton|netobserv|argocd|netedge|all)/i,
+                /\/run-mcpchecker\s+(core|helm|kubevirt|kiali|tekton|netobserv|argocd|all)/i,
               );
               const suite = suiteMatch ? suiteMatch[1].toLowerCase() : '';
 
@@ -251,8 +250,7 @@ jobs:
             {"suite":"kiali-multicluster","eval-config":"evals/core-eval-testing/builtin-openai/eval-kiali-multicluster.yaml","toolsets":"core,config,kiali","mcp-config-dir":"dev/config/mcp-configs-multicluster","baseline-result":"openai-agent-multicluster-latest.json","job-display-name":"Run MCP Multicluster Evaluation"},
             {"suite":"tekton","eval-config":"evals/core-eval-testing/builtin-openai/eval-tekton.yaml","toolsets":"core,config,tekton"},
             {"suite":"netobserv","eval-config":"evals/core-eval-testing/builtin-openai/eval-netobserv.yaml","toolsets":"core,config,netobserv"},
-            {"suite":"argocd","eval-config":"evals/core-eval-testing/builtin-openai/eval-argo.yaml","toolsets":"core,config"},
-            {"suite":"netedge","eval-config":"evals/core-eval-testing/builtin-openai/eval-netedge.yaml","toolsets":"core,config,netedge,openshift/mustgather"}
+            {"suite":"argocd","eval-config":"evals/core-eval-testing/builtin-openai/eval-argo.yaml","toolsets":"core,config"}
           ]}
           EOFM
           )
@@ -274,9 +272,6 @@ jobs:
               ;;
             argocd)
               MATRIX=$(single_matrix argocd "${EVAL_DIR}/eval-argo.yaml" "core,config")
-              ;;
-            netedge)
-              MATRIX=$(single_matrix netedge "${EVAL_DIR}/eval-netedge.yaml" "core,config,netedge,openshift/mustgather")
               ;;
             all)
               MATRIX=$(append_kiali_multicluster "$(single_matrix all "${EVAL_DIR}/eval-all.yaml" "core,config,helm,kiali,kubevirt,tekton,netobserv")")
