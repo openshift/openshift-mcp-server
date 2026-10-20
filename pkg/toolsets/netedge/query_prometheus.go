@@ -137,20 +137,24 @@ func handleDiagnosticTarget(params api.ToolHandlerParams, target string) (*api.T
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
-	opts = append(opts, prometheus.WithBackendLimit(limit))
+	client := prometheus.NewClient(params.Context, baseURL, limit, opts...)
 
-	client := prometheus.NewClient(params.Context, baseURL, opts...)
-
-	result := api.NewBuilderWithBudget(api.ResultLimit(params.Context))
+	resultLimit := api.ResultLimit(params.Context)
+	if resultLimit > 0 && resultLimit < 2 {
+		return api.NewToolCallResult("", fmt.Errorf("result exceeds max_result_bytes (2 > %d)", resultLimit)), nil
+	}
+	result := api.NewBuilderWithBudget(resultLimit)
 	body := result.Scratch(2) // '[' and ']'
 	names := make([]string, 0, len(queries))
 	for name := range queries {
 		names = append(names, name)
 	}
 	sort.Strings(names)
+	cut := false
+	var marshalError error
 	for _, name := range names {
 		if !body.Fits(0) {
-			body.WriteString("\n")
+			cut = true
 			break
 		}
 		q := queries[name]
@@ -167,7 +171,16 @@ func handleDiagnosticTarget(params api.ToolHandlerParams, target string) (*api.T
 		}
 		data, err := json.Marshal(res)
 		if err != nil {
-			return api.NewToolCallResult("", fmt.Errorf("failed to marshal diagnostic results: %v", err)), nil
+			marshalError = fmt.Errorf("failed to marshal diagnostic results: %w", err)
+			break
+		}
+		needed := len(data)
+		if body.Len() > 0 {
+			needed++
+		}
+		if body.Remaining() >= 0 && int64(needed) > body.Remaining() {
+			cut = true
+			break
 		}
 		if body.Len() > 0 {
 			body.WriteString(",")
@@ -175,8 +188,11 @@ func handleDiagnosticTarget(params api.ToolHandlerParams, target string) (*api.T
 		body.WriteString(string(data))
 	}
 	result.WriteString("[")
-	text, cut := body.Prefix()
+	text, _ := body.Prefix()
 	result.WriteCut(text+"]", cut)
+	if marshalError != nil && !result.Truncated() {
+		result.WriteString("\n" + marshalError.Error())
+	}
 	return api.NewToolCallResult(result.String(), nil), nil
 }
 

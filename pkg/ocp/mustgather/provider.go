@@ -4,7 +4,6 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -24,8 +23,10 @@ type Provider struct {
 	readLimit int64
 }
 
-// ErrListTruncated means a list retained a prefix and stopped at the result budget.
-var ErrListTruncated = errors.New("must-gather list truncated at max_result_bytes")
+// ListTruncated reports whether a list stopped at the result budget.
+func ListTruncated(list *unstructured.UnstructuredList) bool {
+	return list != nil && list.Object["truncated"] == true
+}
 
 // NewProvider locates the archive; resources are read on demand rather than
 // permanently retaining the parsed contents of every YAML file.
@@ -96,7 +97,7 @@ func (p *Provider) ListResourcesFiltered(ctx context.Context, gvk schema.GroupVe
 		}
 		if remaining > 0 {
 			data, err := json.Marshal(obj.Object)
-			if err != nil || int64(len(data)) >= remaining {
+			if err != nil || int64(len(data)) > remaining {
 				truncated = true
 				return false
 			}
@@ -109,8 +110,12 @@ func (p *Provider) ListResourcesFiltered(ctx context.Context, gvk schema.GroupVe
 		accepted++
 		return opts.Limit <= 0 || accepted < opts.Limit
 	})
-	if err == nil && truncated {
-		err = ErrListTruncated
+	if kubernetes.IsResponseTooLarge(err) && len(result.Items) > 0 {
+		truncated = true
+		err = nil
+	}
+	if truncated {
+		result.Object = map[string]any{"truncated": true}
 	}
 	return result, err
 }

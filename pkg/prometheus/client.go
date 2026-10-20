@@ -26,12 +26,14 @@ type Client struct {
 	backendLimit int64
 }
 
-// NewClient creates a new Prometheus client with the specified base URL and options.
-func NewClient(ctx context.Context, baseURL string, opts ...ClientOption) *Client {
+// NewClient creates a Prometheus client with the per-call backend response limit.
+// A zero limit explicitly disables the cap.
+func NewClient(ctx context.Context, baseURL string, backendLimit int64, opts ...ClientOption) *Client {
 	c := &Client{
-		baseURL:   baseURL,
-		tlsConfig: newDefaultTLSConfig(),
-		timeout:   DefaultTimeout,
+		baseURL:      baseURL,
+		tlsConfig:    newDefaultTLSConfig(),
+		timeout:      DefaultTimeout,
+		backendLimit: backendLimit,
 	}
 
 	for _, opt := range opts {

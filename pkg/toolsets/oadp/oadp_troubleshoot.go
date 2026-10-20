@@ -335,27 +335,28 @@ func fetchDPAStatus(ctx context.Context, dynamicClient dynamic.Interface, namesp
 
 	result := api.NewBuilderWithBudget(api.ResultLimit(ctx))
 	result.WriteString("### DataProtectionApplication\n\n")
+	steps := make([]api.Step, 0, len(dpas.Items))
 	for _, dpa := range dpas.Items {
-		if !result.Fits(0) {
-			result.WriteString("\n")
-			break
-		}
-		status, found, err := unstructured.NestedMap(dpa.Object, "status")
-		if err != nil {
-			result.WriteString(fmt.Sprintf("#### %s\n\n*Error extracting status: %v*\n\n", dpa.GetName(), err))
-			continue
-		}
-		if !found {
-			result.WriteString(fmt.Sprintf("#### %s\n\n*No status found (DPA may still be reconciling)*\n\n", dpa.GetName()))
-			continue
-		}
-		yamlStr, err := output.MarshalYaml(status)
-		if err != nil {
-			result.WriteString(fmt.Sprintf("#### %s\n\n*Error marshaling status: %v*\n\n", dpa.GetName(), err))
-			continue
-		}
-		result.WriteString(fmt.Sprintf("#### %s\n\n```yaml\n%s```\n\n", dpa.GetName(), yamlStr))
+		steps = append(steps, func(result *api.BuilderWithBudget) error {
+			status, found, err := unstructured.NestedMap(dpa.Object, "status")
+			if err != nil {
+				result.WriteString(fmt.Sprintf("#### %s\n\n*Error extracting status: %v*\n\n", dpa.GetName(), err))
+				return nil
+			}
+			if !found {
+				result.WriteString(fmt.Sprintf("#### %s\n\n*No status found (DPA may still be reconciling)*\n\n", dpa.GetName()))
+				return nil
+			}
+			yamlStr, err := output.MarshalYaml(status)
+			if err != nil {
+				result.WriteString(fmt.Sprintf("#### %s\n\n*Error marshaling status: %v*\n\n", dpa.GetName(), err))
+				return nil
+			}
+			result.WriteString(fmt.Sprintf("#### %s\n\n```yaml\n%s```\n\n", dpa.GetName(), yamlStr))
+			return nil
+		})
 	}
+	_ = result.Sections(steps...)
 
 	return result.String()
 }
@@ -373,31 +374,32 @@ func fetchBSLStatus(ctx context.Context, dynamicClient dynamic.Interface, namesp
 
 	result := api.NewBuilderWithBudget(api.ResultLimit(ctx))
 	result.WriteString("### BackupStorageLocations\n\n")
+	steps := make([]api.Step, 0, len(bsls.Items))
 	for _, bsl := range bsls.Items {
-		if !result.Fits(0) {
-			result.WriteString("\n")
-			break
-		}
-		phase, _, err := unstructured.NestedString(bsl.Object, "status", "phase")
-		if err != nil {
-			phase = ""
-		}
-		lastValidation, _, err := unstructured.NestedString(bsl.Object, "status", "lastValidationTime")
-		if err != nil {
-			lastValidation = ""
-		}
-		provider, _, err := unstructured.NestedString(bsl.Object, "spec", "provider")
-		if err != nil {
-			provider = ""
-		}
-		bucket, _, err := unstructured.NestedString(bsl.Object, "spec", "objectStorage", "bucket")
-		if err != nil {
-			bucket = ""
-		}
+		steps = append(steps, func(result *api.BuilderWithBudget) error {
+			phase, _, err := unstructured.NestedString(bsl.Object, "status", "phase")
+			if err != nil {
+				phase = ""
+			}
+			lastValidation, _, err := unstructured.NestedString(bsl.Object, "status", "lastValidationTime")
+			if err != nil {
+				lastValidation = ""
+			}
+			provider, _, err := unstructured.NestedString(bsl.Object, "spec", "provider")
+			if err != nil {
+				provider = ""
+			}
+			bucket, _, err := unstructured.NestedString(bsl.Object, "spec", "objectStorage", "bucket")
+			if err != nil {
+				bucket = ""
+			}
 
-		result.WriteString(fmt.Sprintf("#### %s\n\n- **Phase:** %s\n- **Provider:** %s\n- **Bucket:** %s\n- **Last Validation:** %s\n\n",
-			bsl.GetName(), valueOrNA(phase), valueOrNA(provider), valueOrNA(bucket), valueOrNA(lastValidation)))
+			result.WriteString(fmt.Sprintf("#### %s\n\n- **Phase:** %s\n- **Provider:** %s\n- **Bucket:** %s\n- **Last Validation:** %s\n\n",
+				bsl.GetName(), valueOrNA(phase), valueOrNA(provider), valueOrNA(bucket), valueOrNA(lastValidation)))
+			return nil
+		})
 	}
+	_ = result.Sections(steps...)
 
 	return result.String()
 }
@@ -418,35 +420,36 @@ func fetchRecentBackups(ctx context.Context, dynamicClient dynamic.Interface, na
 	result.WriteString("| Name | Phase | Started | Completed | Errors | Warnings |\n")
 	result.WriteString("|------|-------|---------|-----------|--------|----------|\n")
 
+	steps := make([]api.Step, 0, len(backups.Items))
 	for _, backup := range backups.Items {
-		if !result.Fits(0) {
-			result.WriteString("\n")
-			break
-		}
-		phase, _, err := unstructured.NestedString(backup.Object, "status", "phase")
-		if err != nil {
-			phase = ""
-		}
-		startTime, _, err := unstructured.NestedString(backup.Object, "status", "startTimestamp")
-		if err != nil {
-			startTime = ""
-		}
-		completionTime, _, err := unstructured.NestedString(backup.Object, "status", "completionTimestamp")
-		if err != nil {
-			completionTime = ""
-		}
-		errors, _, err := unstructured.NestedInt64(backup.Object, "status", "errors")
-		if err != nil {
-			errors = 0
-		}
-		warnings, _, err := unstructured.NestedInt64(backup.Object, "status", "warnings")
-		if err != nil {
-			warnings = 0
-		}
+		steps = append(steps, func(result *api.BuilderWithBudget) error {
+			phase, _, err := unstructured.NestedString(backup.Object, "status", "phase")
+			if err != nil {
+				phase = ""
+			}
+			startTime, _, err := unstructured.NestedString(backup.Object, "status", "startTimestamp")
+			if err != nil {
+				startTime = ""
+			}
+			completionTime, _, err := unstructured.NestedString(backup.Object, "status", "completionTimestamp")
+			if err != nil {
+				completionTime = ""
+			}
+			errors, _, err := unstructured.NestedInt64(backup.Object, "status", "errors")
+			if err != nil {
+				errors = 0
+			}
+			warnings, _, err := unstructured.NestedInt64(backup.Object, "status", "warnings")
+			if err != nil {
+				warnings = 0
+			}
 
-		result.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %d | %d |\n",
-			backup.GetName(), valueOrNA(phase), valueOrNA(startTime), valueOrNA(completionTime), errors, warnings))
+			result.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %d | %d |\n",
+				backup.GetName(), valueOrNA(phase), valueOrNA(startTime), valueOrNA(completionTime), errors, warnings))
+			return nil
+		})
 	}
+	_ = result.Sections(steps...)
 	result.WriteString("\n")
 
 	return result.String()
@@ -508,39 +511,40 @@ func fetchRecentRestores(ctx context.Context, dynamicClient dynamic.Interface, n
 	result.WriteString("| Name | Phase | Backup | Started | Completed | Errors | Warnings |\n")
 	result.WriteString("|------|-------|--------|---------|-----------|--------|----------|\n")
 
+	steps := make([]api.Step, 0, len(restores.Items))
 	for _, restore := range restores.Items {
-		if !result.Fits(0) {
-			result.WriteString("\n")
-			break
-		}
-		phase, _, err := unstructured.NestedString(restore.Object, "status", "phase")
-		if err != nil {
-			phase = ""
-		}
-		backupName, _, err := unstructured.NestedString(restore.Object, "spec", "backupName")
-		if err != nil {
-			backupName = ""
-		}
-		startTime, _, err := unstructured.NestedString(restore.Object, "status", "startTimestamp")
-		if err != nil {
-			startTime = ""
-		}
-		completionTime, _, err := unstructured.NestedString(restore.Object, "status", "completionTimestamp")
-		if err != nil {
-			completionTime = ""
-		}
-		errors, _, err := unstructured.NestedInt64(restore.Object, "status", "errors")
-		if err != nil {
-			errors = 0
-		}
-		warnings, _, err := unstructured.NestedInt64(restore.Object, "status", "warnings")
-		if err != nil {
-			warnings = 0
-		}
+		steps = append(steps, func(result *api.BuilderWithBudget) error {
+			phase, _, err := unstructured.NestedString(restore.Object, "status", "phase")
+			if err != nil {
+				phase = ""
+			}
+			backupName, _, err := unstructured.NestedString(restore.Object, "spec", "backupName")
+			if err != nil {
+				backupName = ""
+			}
+			startTime, _, err := unstructured.NestedString(restore.Object, "status", "startTimestamp")
+			if err != nil {
+				startTime = ""
+			}
+			completionTime, _, err := unstructured.NestedString(restore.Object, "status", "completionTimestamp")
+			if err != nil {
+				completionTime = ""
+			}
+			errors, _, err := unstructured.NestedInt64(restore.Object, "status", "errors")
+			if err != nil {
+				errors = 0
+			}
+			warnings, _, err := unstructured.NestedInt64(restore.Object, "status", "warnings")
+			if err != nil {
+				warnings = 0
+			}
 
-		result.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s | %d | %d |\n",
-			restore.GetName(), valueOrNA(phase), valueOrNA(backupName), valueOrNA(startTime), valueOrNA(completionTime), errors, warnings))
+			result.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s | %d | %d |\n",
+				restore.GetName(), valueOrNA(phase), valueOrNA(backupName), valueOrNA(startTime), valueOrNA(completionTime), errors, warnings))
+			return nil
+		})
 	}
+	_ = result.Sections(steps...)
 	result.WriteString("\n")
 
 	return result.String()
@@ -605,26 +609,27 @@ func fetchVeleroPods(ctx context.Context, dynamicClient dynamic.Interface, names
 	result.WriteString("|------|-------|-------|----------|-----|\n")
 
 	appendPods := func(pods []unstructured.Unstructured) {
+		steps := make([]api.Step, 0, len(pods))
 		for _, pod := range pods {
-			if !result.Fits(0) {
-				result.WriteString("\n")
-				break
-			}
-			phase, _, err := unstructured.NestedString(pod.Object, "status", "phase")
-			if err != nil {
-				phase = ""
-			}
-			creationTime := pod.GetCreationTimestamp().Format("2006-01-02T15:04:05Z")
+			steps = append(steps, func(result *api.BuilderWithBudget) error {
+				phase, _, err := unstructured.NestedString(pod.Object, "status", "phase")
+				if err != nil {
+					phase = ""
+				}
+				creationTime := pod.GetCreationTimestamp().Format("2006-01-02T15:04:05Z")
 
-			// Get ready and restart counts from container statuses
-			ready, restarts := getPodReadyAndRestarts(&pod)
+				// Get ready and restart counts from container statuses
+				ready, restarts := getPodReadyAndRestarts(&pod)
 
-			result.WriteString(fmt.Sprintf("| %s | %s | %s | %d | %s |\n",
-				pod.GetName(), phase, ready, restarts, creationTime))
-			if !result.Truncated() {
-				podNames = append(podNames, pod.GetName())
-			}
+				result.WriteString(fmt.Sprintf("| %s | %s | %s | %d | %s |\n",
+					pod.GetName(), phase, ready, restarts, creationTime))
+				if !result.Truncated() {
+					podNames = append(podNames, pod.GetName())
+				}
+				return nil
+			})
 		}
+		_ = result.Sections(steps...)
 	}
 	appendPods(podList.Items)
 	if result.Fits(0) {
@@ -654,35 +659,38 @@ func fetchVeleroPodLogs(ctx context.Context, client api.KubernetesClient, namesp
 	result := api.NewBuilderWithBudget(api.ResultLimit(ctx))
 	result.WriteString("### Velero Pod Logs\n\n")
 
+	steps := make([]api.Step, 0, len(podNames))
 	for _, podName := range podNames {
-		if !result.Fits(0) {
-			result.WriteString("\n")
-			break
-		}
 		// Only fetch logs from velero server pods, not node-agent
 		if strings.HasPrefix(podName, "node-agent") {
 			continue
 		}
+		steps = append(steps, func(result *api.BuilderWithBudget) error {
+			result.WriteString(fmt.Sprintf("#### Pod: %s\n\n", podName))
+			if result.Truncated() {
+				return nil
+			}
+			logs, err := core.PodsLog(ctx, namespace, podName, "velero", false, 100)
+			if err != nil {
+				result.WriteString(fmt.Sprintf("*Error fetching logs: %v*\n\n", err))
+				return nil
+			}
 
-		result.WriteString(fmt.Sprintf("#### Pod: %s\n\n", podName))
-		if !result.Fits(0) {
-			result.WriteString("\n")
-			break
-		}
-		logs, err := core.PodsLog(ctx, namespace, podName, "velero", false, 100)
-		if err != nil {
-			result.WriteString(fmt.Sprintf("*Error fetching logs: %v*\n\n", err))
-			continue
-		}
-
-		// Filter for error/warning lines to keep output focused
-		errorLines := filterLogLines(logs, []string{"error", "level=error", "level=warning", "Failed", "forbidden"}, result.Scratch(len("**Error/Warning lines (last 100 log lines):**\n```\n\n```\n\n")))
-		if errorLines != "" {
-			result.WriteCut("**Error/Warning lines (last 100 log lines):**\n```\n"+strings.TrimSuffix(errorLines, api.ResultTruncationNotice)+"\n```\n\n", strings.HasSuffix(errorLines, api.ResultTruncationNotice))
-		} else {
-			result.WriteString("*No error or warning lines found in recent logs*\n\n")
-		}
+			// Filter for error/warning lines to keep output focused
+			lines := result.Scratch(len("**Error/Warning lines (last 100 log lines):**\n```\n\n```\n\n"))
+			filterLogLines(logs, []string{"error", "level=error", "level=warning", "Failed", "forbidden"}, lines)
+			if strings.TrimSpace(lines.String()) != "" {
+				result.CommitScratch("**Error/Warning lines (last 100 log lines):**\n```\n", "\n```\n\n", lines)
+			} else if lines.Truncated() {
+				result.WriteString("**Error/Warning lines (last 100 log lines):**\n```")
+				result.WriteString("\n")
+			} else {
+				result.WriteString("*No error or warning lines found in recent logs*\n\n")
+			}
+			return nil
+		})
 	}
+	_ = result.Sections(steps...)
 
 	return result.String()
 }
@@ -701,28 +709,33 @@ func fetchOADPEvents(ctx context.Context, client api.KubernetesClient, namespace
 
 	// Filter for warning events which indicate problems
 	result := api.NewBuilderWithBudget(api.ResultLimit(ctx))
-	result.WriteString("### Warning Events\n\n```yaml\n")
-	found := false
+	body := result.Scratch(len("### Warning Events\n\n```yaml\n```"))
+	steps := make([]api.Step, 0, len(eventMap))
 	for _, event := range eventMap {
-		if !result.Fits(len("```")) {
-			result.WriteString("\n")
-			break
-		}
 		eventType, _ := event["Type"].(string)
 		if eventType == "Warning" {
-			found = true
-			yamlStr, err := output.MarshalYaml(event)
-			if err != nil {
-				return fmt.Sprintf("### Events\n\n*Error marshaling events: %v*", err)
-			}
-			result.WriteString(yamlStr)
+			steps = append(steps, func(body *api.BuilderWithBudget) error {
+				yamlStr, err := output.MarshalYaml(event)
+				if err != nil {
+					body.WriteString(fmt.Sprintf("*Error marshaling event: %v*\n", err))
+					return nil
+				}
+				body.WriteString(yamlStr)
+				return nil
+			})
 		}
 	}
 
-	if !found && !result.Truncated() {
+	if len(steps) == 0 {
 		return "### Events\n\n*No Warning events found — this is good*"
 	}
-	result.WriteString("```")
+	if body.Truncated() {
+		result.WriteString("### Warning Events\n\n```yaml\n```")
+		result.WriteString("\n")
+		return result.String()
+	}
+	_ = body.Sections(steps...)
+	result.CommitScratch("### Warning Events\n\n```yaml\n", "```", body)
 	return result.String()
 }
 
@@ -764,24 +777,18 @@ func getPodReadyAndRestarts(pod *unstructured.Unstructured) (string, int64) {
 	return fmt.Sprintf("%d/%d", readyCount, totalContainers), totalRestarts
 }
 
-func filterLogLines(logs string, keywords []string, result *api.BuilderWithBudget) string {
+func filterLogLines(logs string, keywords []string, result *api.BuilderWithBudget) {
+	steps := make([]api.Step, 0)
 	for line := range strings.SplitSeq(logs, "\n") {
-		if !result.Fits(0) {
-			result.WriteString("\n")
-			break
-		}
 		lower := strings.ToLower(line)
 		for _, kw := range keywords {
 			if strings.Contains(lower, strings.ToLower(kw)) {
-				result.WriteString(line + "\n")
+				steps = append(steps, api.Text(line+"\n"))
 				break
 			}
 		}
 	}
-	if result.Truncated() {
-		return result.String()
-	}
-	return strings.TrimSuffix(result.String(), "\n")
+	_ = result.Sections(steps...)
 }
 
 // podGVR returns the Pod GVR

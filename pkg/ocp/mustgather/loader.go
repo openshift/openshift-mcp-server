@@ -2,12 +2,14 @@ package mustgather
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -25,6 +27,12 @@ type LoadResult struct {
 // directory (see FindContainerDir); a path that is itself the container
 // directory is not accepted, matching IsArchive.
 func Load(path string) (*LoadResult, error) {
+	return LoadWithLimits(path, config.DefaultMaxBackendResponseBytes, config.DefaultMaxResultBytes)
+}
+
+// LoadWithLimits retains a prefix of the archive within the result budget.
+// Callers with a live configuration pass its current limits here.
+func LoadWithLimits(path string, backendLimit, resultLimit int64) (*LoadResult, error) {
 	containerDir, err := FindContainerDir(path)
 	if err != nil {
 		return nil, err
@@ -36,19 +44,26 @@ func Load(path string) (*LoadResult, error) {
 	}
 
 	// Load metadata files
-	metadata.Version, metadata.Timestamp, _ = readMetadata(containerDir, 0)
-
-	// Load all resources
-	var resources []*unstructured.Unstructured
-
-	clusterResources, err := loadClusterScopedResources(containerDir)
-	if err == nil {
-		resources = append(resources, clusterResources...)
+	metadata.Version, metadata.Timestamp, err = readMetadata(containerDir, backendLimit)
+	if err != nil {
+		return nil, err
 	}
 
-	namespacedResources, err := loadNamespacedResources(containerDir)
-	if err == nil {
-		resources = append(resources, namespacedResources...)
+	var resources []*unstructured.Unstructured
+	var retained int64
+	err = walkResources(context.Background(), containerDir, backendLimit, func(obj *unstructured.Unstructured) bool {
+		if resultLimit > 0 {
+			data, err := json.Marshal(obj.Object)
+			if err != nil || retained+int64(len(data)) > resultLimit {
+				return false
+			}
+			retained += int64(len(data))
+		}
+		resources = append(resources, obj)
+		return true
+	})
+	if err != nil && !(len(resources) > 0 && kubernetes.IsResponseTooLarge(err)) {
+		return nil, err
 	}
 
 	metadata.ResourceCount = len(resources)
@@ -145,7 +160,7 @@ func FindContainerDir(basePath string) (string, error) {
 // version and timestamp are best-effort and may be empty even on success. Used
 // by discovery to list archives without paying the full load cost.
 func ReadArchiveMetadata(path string) (version, timestamp string, err error) {
-	return ReadArchiveMetadataWithLimit(path, 0)
+	return ReadArchiveMetadataWithLimit(path, config.DefaultMaxBackendResponseBytes)
 }
 
 // ReadArchiveMetadataWithLimit caps each metadata file read at limit bytes.
@@ -192,89 +207,6 @@ func readMetadata(containerDir string, limit int64) (version, timestamp string, 
 		return "", "", err
 	}
 	return version, timestamp, nil
-}
-
-func loadClusterScopedResources(containerDir string) ([]*unstructured.Unstructured, error) {
-	clusterDir := filepath.Join(containerDir, "cluster-scoped-resources")
-	if _, err := os.Stat(clusterDir); os.IsNotExist(err) {
-		return nil, nil
-	}
-
-	var resources []*unstructured.Unstructured
-	err := filepath.Walk(clusterDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil // skip errors
-		}
-		if info.IsDir() || (!strings.HasSuffix(path, ".yaml") && !strings.HasSuffix(path, ".yml")) {
-			return nil
-		}
-
-		loaded, loadErr := loadYAMLFile(path, "")
-		if loadErr != nil {
-			return nil // skip files that can't be parsed
-		}
-		resources = append(resources, loaded...)
-		return nil
-	})
-
-	return resources, err
-}
-
-func loadNamespacedResources(containerDir string) ([]*unstructured.Unstructured, error) {
-	namespacesDir := filepath.Join(containerDir, "namespaces")
-	if _, err := os.Stat(namespacesDir); os.IsNotExist(err) {
-		return nil, nil
-	}
-
-	var resources []*unstructured.Unstructured
-
-	nsEntries, err := os.ReadDir(namespacesDir)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, nsEntry := range nsEntries {
-		if !nsEntry.IsDir() {
-			continue
-		}
-		namespace := nsEntry.Name()
-		nsDir := filepath.Join(namespacesDir, namespace)
-
-		err := filepath.Walk(nsDir, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return nil
-			}
-			if info.IsDir() || (!strings.HasSuffix(path, ".yaml") && !strings.HasSuffix(path, ".yml")) {
-				return nil
-			}
-
-			// Skip pod log directories
-			rel, _ := filepath.Rel(nsDir, path)
-			if strings.HasPrefix(rel, "pods"+string(filepath.Separator)) {
-				return nil
-			}
-
-			loaded, loadErr := loadYAMLFile(path, namespace)
-			if loadErr != nil {
-				return nil
-			}
-			resources = append(resources, loaded...)
-			return nil
-		})
-		if err != nil {
-			continue
-		}
-	}
-
-	return resources, nil
-}
-
-func loadYAMLFile(path, namespace string) ([]*unstructured.Unstructured, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	return decodeYAMLResources(data, namespace)
 }
 
 func decodeYAMLResources(data []byte, namespace string) ([]*unstructured.Unstructured, error) {

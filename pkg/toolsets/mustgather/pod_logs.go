@@ -15,6 +15,48 @@ import (
 
 const maxScanLineSize = 1024 * 1024 // 1 MB
 
+// boundedLogTail keeps the last lines that fit the output cap, regardless of
+// how many lines the requested tail allows.
+type boundedLogTail struct {
+	lines   []string
+	start   int
+	count   int
+	bytes   int
+	omitted bool
+}
+
+func newBoundedLogTail(tail, maxBytes int) *boundedLogTail {
+	return &boundedLogTail{lines: make([]string, min(tail, maxBytes))}
+}
+
+func (r *boundedLogTail) add(line string, maxBytes int) {
+	if len(r.lines) == 0 || len(line) > maxBytes {
+		r.omitted = true
+		return
+	}
+	for r.count > 0 && (r.count == len(r.lines) || r.bytes+r.count+len(line) > maxBytes) {
+		if r.bytes+r.count+len(line) > maxBytes {
+			r.omitted = true
+		}
+		r.bytes -= len(r.lines[r.start])
+		r.lines[r.start] = ""
+		r.start = (r.start + 1) % len(r.lines)
+		r.count--
+	}
+	index := (r.start + r.count) % len(r.lines)
+	r.lines[index] = line
+	r.bytes += len(line)
+	r.count++
+}
+
+func (r *boundedLogTail) text() string {
+	lines := make([]string, r.count)
+	for i := range lines {
+		lines[i] = r.lines[(r.start+i)%len(r.lines)]
+	}
+	return strings.Join(lines, "\n")
+}
+
 // outputTruncatedNotice is the marker appended when aggregate log output is cut
 // off at the configured maximum size.
 func outputTruncatedNotice(maxOutputSize int) string {
@@ -177,24 +219,14 @@ func mustgatherPodLogsGet(params api.ToolHandlerParams) (*api.ToolCallResult, er
 
 	var logs string
 	if tail > 0 {
-		ring := make([]string, 0, tail)
-		var ringIdx int
+		ring := newBoundedLogTail(tail, maxOutputSize)
 		for scanner.Scan() {
-			if len(ring) < tail {
-				ring = append(ring, scanner.Text())
-			} else {
-				ring[ringIdx] = scanner.Text()
-				ringIdx = (ringIdx + 1) % tail
-			}
+			ring.add(scanner.Text(), maxOutputSize)
 		}
-		if len(ring) == tail {
-			ordered := make([]string, tail)
-			for i := range tail {
-				ordered[i] = ring[(ringIdx+i)%tail]
-			}
-			ring = ordered
+		logs = ring.text()
+		if ring.omitted {
+			logs = capOutput(logs+outputTruncatedNotice(maxOutputSize), maxOutputSize)
 		}
-		logs = capOutput(strings.Join(ring, "\n"), maxOutputSize)
 	} else {
 		var sb strings.Builder
 		lineCount := 0
@@ -293,7 +325,10 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 	}
 
 	var matchingLines []string
-	var ringIdx int
+	var ring *boundedLogTail
+	if tail > 0 {
+		ring = newBoundedLogTail(tail, maxOutputSize)
+	}
 	totalMatches := 0
 	retainedBytes := 0
 	outputCut := false
@@ -311,12 +346,7 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 		}
 		totalMatches++
 		if tail > 0 {
-			if len(matchingLines) < tail {
-				matchingLines = append(matchingLines, line)
-			} else {
-				matchingLines[ringIdx] = line
-				ringIdx = (ringIdx + 1) % tail
-			}
+			ring.add(line, maxOutputSize)
 		} else {
 			if !outputCut {
 				separator := 0
@@ -334,14 +364,6 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 	}
 	if err := scanner.Err(); err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to read log file: %w", err)), nil
-	}
-
-	if tail > 0 && len(matchingLines) == tail {
-		ordered := make([]string, tail)
-		for i := range tail {
-			ordered[i] = matchingLines[(ringIdx+i)%tail]
-		}
-		matchingLines = ordered
 	}
 
 	header := fmt.Sprintf("Logs for pod %s/%s filtered by '%s'", namespace, pod, filter)
@@ -367,6 +389,10 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 	}
 
 	logs := strings.Join(matchingLines, "\n")
+	if ring != nil {
+		logs = ring.text()
+		outputCut = ring.omitted
+	}
 	if outputCut {
 		logs += outputTruncatedNotice(maxOutputSize)
 	}

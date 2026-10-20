@@ -479,8 +479,19 @@ func ovsAppctl(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 
 func budgetOVSResult(ctx context.Context, value any, err error) *api.ToolCallResult {
 	result := api.NewToolCallResultStructured(value, err)
-	if limit := api.ResultLimit(ctx); err == nil && limit > 0 && int64(len(result.Content))*2 > limit {
-		return api.NewToolCallResult(api.LimitString(ctx, result.Content), nil)
+	if limit := api.ResultLimit(ctx); err == nil && limit > 0 {
+		if int64(len(result.Content)) > limit {
+			return api.NewToolCallResult("", fmt.Errorf("result exceeds max_result_bytes (%d > %d)", len(result.Content), limit))
+		}
+		// The adapter wraps array results in {"items": ...} when sending
+		// structuredContent; count that wrapper as well as the JSON text.
+		structuredSize := len(result.Content)
+		if len(result.Content) > 0 && result.Content[0] == '[' {
+			structuredSize += len(`{"items":}`)
+		}
+		if int64(len(result.Content)+structuredSize) > limit {
+			result.StructuredContent = nil
+		}
 	}
 	return result
 }

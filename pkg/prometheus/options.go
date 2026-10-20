@@ -17,13 +17,6 @@ import (
 // ClientOption is a function that configures a Client.
 type ClientOption func(context.Context, *Client)
 
-// WithBackendLimit sets the maximum response size in bytes. Zero disables it.
-func WithBackendLimit(limit int64) ClientOption {
-	return func(_ context.Context, c *Client) {
-		c.backendLimit = limit
-	}
-}
-
 // WithBearerToken sets the bearer token for authentication.
 func WithBearerToken(token string) ClientOption {
 	return func(_ context.Context, c *Client) {

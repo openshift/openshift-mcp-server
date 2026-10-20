@@ -292,8 +292,17 @@ func makeExecDNSInPodHandler(executor podExecutor) api.ToolHandlerFunc {
 
 func budgetNetEdgeResult(ctx context.Context, value any) *api.ToolCallResult {
 	result := api.NewToolCallResultStructured(value, nil)
-	if limit := api.ResultLimit(ctx); limit > 0 && int64(len(result.Content))*2 > limit {
-		return api.NewToolCallResult(api.LimitString(ctx, result.Content), nil)
+	if limit := api.ResultLimit(ctx); limit > 0 {
+		if int64(len(result.Content)) > limit {
+			return api.NewToolCallResult("", fmt.Errorf("result exceeds max_result_bytes (%d > %d)", len(result.Content), limit))
+		}
+		structuredSize := len(result.Content)
+		if len(result.Content) > 0 && result.Content[0] == '[' {
+			structuredSize += len(`{"items":}`)
+		}
+		if int64(len(result.Content)+structuredSize) > limit {
+			result.StructuredContent = nil
+		}
 	}
 	return result
 }
