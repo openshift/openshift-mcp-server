@@ -406,7 +406,7 @@ func ovsVsctl(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	}
 
 	_, result, err := srv.Vsctl(p.Context, nil, in)
-	return api.NewToolCallResultStructured(result, err), nil
+	return budgetOVSResult(p.Context, result, err), nil
 }
 
 // ovsOfctl delegates to the exported Ofctl handler in the upstream
@@ -437,7 +437,7 @@ func ovsOfctl(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	}
 
 	_, result, err := srv.Ofctl(p.Context, nil, in)
-	return api.NewToolCallResultStructured(result, err), nil
+	return budgetOVSResult(p.Context, result, err), nil
 }
 
 // ovsAppctl delegates to the exported Appctl handler in the upstream
@@ -474,5 +474,13 @@ func ovsAppctl(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	}
 
 	_, result, err := srv.Appctl(p.Context, nil, in)
-	return api.NewToolCallResultStructured(result, err), nil
+	return budgetOVSResult(p.Context, result, err), nil
+}
+
+func budgetOVSResult(ctx context.Context, value any, err error) *api.ToolCallResult {
+	result := api.NewToolCallResultStructured(value, err)
+	if limit := api.ResultLimit(ctx); err == nil && limit > 0 && int64(len(result.Content))*2 > limit {
+		return api.NewToolCallResult(api.LimitString(ctx, result.Content), nil)
+	}
+	return result
 }

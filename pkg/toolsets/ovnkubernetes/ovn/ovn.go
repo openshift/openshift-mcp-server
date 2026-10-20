@@ -391,7 +391,7 @@ func ovnShow(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
-	return api.NewToolCallResultStructured(result, nil), nil
+	return budgetOVNResult(params.Context, result), nil
 }
 
 func ovnGet(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -426,7 +426,7 @@ func ovnGet(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
-	return api.NewToolCallResultStructured(result, nil), nil
+	return budgetOVNResult(params.Context, result), nil
 }
 
 func ovnLFlowList(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -455,7 +455,7 @@ func ovnLFlowList(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
-	return api.NewToolCallResultStructured(result, nil), nil
+	return budgetOVNResult(params.Context, result), nil
 }
 
 func ovnTrace(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -488,7 +488,15 @@ func ovnTrace(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
-	return api.NewToolCallResultStructured(result, nil), nil
+	return budgetOVNResult(params.Context, result), nil
+}
+
+func budgetOVNResult(ctx context.Context, value any) *api.ToolCallResult {
+	result := api.NewToolCallResultStructured(value, nil)
+	if limit := api.ResultLimit(ctx); limit > 0 && int64(len(result.Content))*2 > limit {
+		return api.NewToolCallResult(api.LimitString(ctx, result.Content), nil)
+	}
+	return result
 }
 
 // newOVNServer creates an ovnmcp.MCPServer that executes OVN CLI commands
