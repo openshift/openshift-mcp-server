@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"regexp"
 	"strings"
 
 	"github.com/prometheus/client_golang/api"
@@ -30,7 +29,8 @@ func NewPrometheusClient(prometheusURL string) (api.Client, error) {
 }
 
 func NewPrometheusClientWithToken(prometheusURL string, token string) (api.Client, error) {
-	if !regexp.MustCompile(`^(http|https)://`).MatchString(prometheusURL) {
+	if !strings.HasPrefix(prometheusURL, "http://") &&
+		!strings.HasPrefix(prometheusURL, "https://") {
 		return nil, errors.New("invalid URL: must start with https:// or http://")
 	}
 
@@ -63,7 +63,8 @@ func NewPrometheusClientWithRoundTripper(prometheusURL string, roundTripper http
 	if roundTripper == nil {
 		return nil, errors.New("round tripper is required")
 	}
-	if !regexp.MustCompile(`^(http|https)://`).MatchString(prometheusURL) {
+	if !strings.HasPrefix(prometheusURL, "http://") &&
+		!strings.HasPrefix(prometheusURL, "https://") {
 		return nil, errors.New("invalid URL: must start with https:// or http://")
 	}
 	return api.NewClient(api.Config{
