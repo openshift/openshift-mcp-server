@@ -259,6 +259,8 @@ alertmanager_url = "https://alerts.example"
 func (s *ToolsetSuite) TestIncidentBackends() {
 	cases := []struct {
 		name      string
+		toolset   string
+		extra     string
 		settings  string
 		arguments string
 		trustCA   bool
@@ -267,6 +269,49 @@ func (s *ToolsetSuite) TestIncidentBackends() {
 		failPath  string
 		wantError string
 	}{
+		{
+			name:      "incidents configuration fallback",
+			toolset:   "observability/incidents",
+			arguments: `{}`, trustCA: true,
+			wantToken: "header-token", wantHours: 360,
+		},
+		{
+			name:      "incidents fallback authentication and TLS settings",
+			toolset:   "observability/incidents",
+			settings:  "auth_mode = \"kubeconfig\"",
+			arguments: `{}`, trustCA: true,
+			wantToken: "kubeconfig-token", wantHours: 360,
+		},
+		{
+			name:      "metrics configuration takes precedence",
+			settings:  "auth_mode = \"kubeconfig\"",
+			arguments: `{}`, trustCA: true,
+			wantToken: "kubeconfig-token", wantHours: 360,
+			extra: `
+[toolset_configs."observability/incidents"]
+prometheus_url = "http://unused.example"
+alertmanager_url = "http://unused.example"
+auth_mode = "header"
+insecure = false
+`,
+		},
+		{
+			name:      "empty metrics configuration prevents fallback",
+			toolset:   "observability/incidents",
+			arguments: `{}`,
+			extra:     `[toolset_configs."observability/metrics"]`,
+			wantError: "requires prometheus_url and alertmanager_url",
+		},
+		{
+			name:      "incomplete metrics configuration does not merge with incidents",
+			toolset:   "observability/incidents",
+			arguments: `{}`,
+			extra: `
+[toolset_configs."observability/metrics"]
+prometheus_url = "https://unused.example"
+`,
+			wantError: "requires prometheus_url and alertmanager_url",
+		},
 		{
 			name:      "default header authentication and time range",
 			arguments: `{}`, trustCA: true,
@@ -289,9 +334,9 @@ func (s *ToolsetSuite) TestIncidentBackends() {
 			wantToken: "header-token", wantHours: 360,
 		},
 		{
-			name:     "insecure permits an untrusted certificate",
+			name:     "insecure TLS is rejected",
 			settings: `insecure = true`, arguments: `{}`,
-			wantToken: "header-token", wantHours: 360,
+			wantError: "insecure TLS is not supported for observability backends",
 		},
 		{
 			name:      "certificate verification enabled by default",
@@ -346,12 +391,17 @@ func (s *ToolsetSuite) TestIncidentBackends() {
 					Type: "CERTIFICATE", Bytes: server.Certificate().Raw,
 				})
 			}
+			toolset := tc.toolset
+			if toolset == "" {
+				toolset = "observability/metrics"
+			}
 			tomlConfig := fmt.Sprintf(`
-[toolset_configs."observability/metrics"]
+[toolset_configs.%q]
 prometheus_url = %q
 alertmanager_url = %q
 %s
-`, server.URL, server.URL, tc.settings)
+%s
+`, toolset, server.URL, server.URL, tc.settings, tc.extra)
 			result := s.callIncidents(tomlConfig, tc.arguments, caData)
 			if tc.wantError != "" {
 				s.ErrorContains(result.Error, tc.wantError)

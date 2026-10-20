@@ -16,15 +16,12 @@ limitations under the License.
 package retry
 
 import (
-	"errors"
 	"hash/maphash"
-	"io"
 	"math"
 	"math/rand/v2"
 	"net"
 	"net/http"
 	"strconv"
-	"syscall"
 	"time"
 )
 
@@ -42,18 +39,11 @@ var DefaultPolicy Policy = &GenericPolicy{
 }
 
 // DefaultPredicate is a predicate that retries on 5xx errors, 429 Too Many
-// Requests, 408 Request Timeout, on network dial timeout, and on a connection
-// reset by peer or an unexpected EOF, which net/http does not retry on its own
-// when the connection was not reused.
+// Requests, 408 Request Timeout and on network dial timeout.
 var DefaultPredicate Predicate = func(resp *http.Response, err error) (bool, error) {
 	if err != nil {
 		// retry on Dial timeout
 		if err, ok := err.(net.Error); ok && err.Timeout() {
-			return true, nil
-		}
-		// retry on connection reset by peer and unexpected EOF, which
-		// net/http only retries on its own for a reused connection
-		if errors.Is(err, syscall.ECONNRESET) || errors.Is(err, io.ErrUnexpectedEOF) {
 			return true, nil
 		}
 		return false, err
@@ -119,13 +109,7 @@ func ExponentialBackoff(backoff time.Duration, factor, jitter float64) Backoff {
 
 		// do exponential backoff with jitter
 		temp := float64(backoff) * math.Pow(factor, float64(attempt))
-		interval := time.Duration(temp * (1 - jitter))
-		// skip the random term when the jitter range is zero,
-		// as rand.Int64N panics on a zero range
-		if jitterRange := int64(2 * jitter * temp); jitterRange > 0 {
-			interval += time.Duration(rand.Int64N(jitterRange))
-		}
-		return interval
+		return time.Duration(temp*(1-jitter)) + time.Duration(rand.Int64N(int64(2*jitter*temp)))
 	}
 }
 

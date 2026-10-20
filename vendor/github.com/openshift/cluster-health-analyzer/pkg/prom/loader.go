@@ -51,7 +51,7 @@ func NewLoaderWithRoundTripper(prometheusURL string, roundTripper http.RoundTrip
 }
 
 func (c *loader) LoadQuery(ctx context.Context, query string, t time.Time) ([]model.LabelSet, error) {
-	result, _, err := c.api.Query(ctx, query, t)
+	result, _, _, err := c.api.Query(ctx, query, t)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (c *loader) LoadQuery(ctx context.Context, query string, t time.Time) ([]mo
 }
 
 func (c *loader) LoadAlertsRange(ctx context.Context, start, end time.Time, step time.Duration) (RangeVector, error) {
-	result, _, err := c.api.QueryRange(ctx, `ALERTS{alertstate="firing"}`, v1.Range{
+	result, _, _, err := c.api.QueryRange(ctx, `ALERTS{alertstate="firing"}`, v1.Range{
 		Start: start,
 		End:   end,
 		Step:  step,
@@ -71,7 +71,7 @@ func (c *loader) LoadAlertsRange(ctx context.Context, start, end time.Time, step
 }
 
 func (c *loader) LoadVectorRange(ctx context.Context, query string, start, end time.Time, step time.Duration) (RangeVector, error) {
-	result, _, err := c.api.QueryRange(ctx, query, v1.Range{
+	result, _, _, err := c.api.QueryRange(ctx, query, v1.Range{
 		Start: start,
 		End:   end,
 		Step:  step,
