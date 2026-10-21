@@ -121,6 +121,6 @@ func makeProbeHTTPHandler(client httpDoer) api.ToolHandlerFunc {
 			LatencyMS:  latency.Milliseconds(),
 		}
 
-		return api.NewToolCallResultStructured(result, nil), nil
+		return budgetNetEdgeResult(params.Context, result), nil
 	}
 }

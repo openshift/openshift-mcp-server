@@ -135,31 +135,11 @@ func oadpTroubleshootHandler(params api.PromptHandlerParams) (*api.PromptCallRes
 
 	dynamicClient := params.DynamicClient()
 
-	// Fetch all relevant OADP resources
-	dpaYaml := fetchDPAStatus(ctx, dynamicClient, namespace)
-	bslYaml := fetchBSLStatus(ctx, dynamicClient, namespace)
-	veleroPodYaml, podNames := fetchVeleroPods(ctx, dynamicClient, namespace)
-	veleroLogsText := fetchVeleroPodLogs(ctx, params.KubernetesClient, namespace, podNames)
-	eventsYaml := fetchOADPEvents(ctx, params.KubernetesClient, namespace)
+	// Each section is fetched only after its preceding text fits. The nested
+	// budget also bounds item loops within each section.
+	guideTemplate := `# OADP Troubleshooting Guide
 
-	// Optionally fetch specific backup/restore details
-	backupYaml := ""
-	if backupName != "" {
-		backupYaml = fetchBackupDetails(ctx, dynamicClient, namespace, backupName)
-	} else {
-		backupYaml = fetchRecentBackups(ctx, dynamicClient, namespace)
-	}
-
-	restoreYaml := ""
-	if restoreName != "" {
-		restoreYaml = fetchRestoreDetails(ctx, dynamicClient, namespace, restoreName)
-	} else {
-		restoreYaml = fetchRecentRestores(ctx, dynamicClient, namespace)
-	}
-
-	guideText := fmt.Sprintf(`# OADP Troubleshooting Guide
-
-## Namespace: %s
+## Namespace: ` + namespace + `
 
 Use this guide to diagnose issues with OADP backups and restores. The relevant resource data has been collected below.
 
@@ -276,7 +256,49 @@ After completing troubleshooting and attempting fixes, report:
 - **Root Cause:** Description or "None found"
 - **Action Taken:** What was done to fix the issue (or "None" if no fix was needed/possible)
 - **Result:** Whether the fix was successful or further action is needed
-`, namespace, dpaYaml, bslYaml, backupYaml, restoreYaml, veleroPodYaml, veleroLogsText, eventsYaml)
+`
+	parts := strings.Split(guideTemplate, "%s")
+	guide := api.NewPromptBudget(ctx, "I'll analyze the collected OADP data to diagnose backup and restore issues systematically.")
+	var podNames []string
+	fetches := []func(context.Context) string{
+		func(ctx context.Context) string { return fetchDPAStatus(ctx, dynamicClient, namespace) },
+		func(ctx context.Context) string { return fetchBSLStatus(ctx, dynamicClient, namespace) },
+		func(ctx context.Context) string {
+			if backupName != "" {
+				return fetchBackupDetails(ctx, dynamicClient, namespace, backupName)
+			}
+			return fetchRecentBackups(ctx, dynamicClient, namespace)
+		},
+		func(ctx context.Context) string {
+			if restoreName != "" {
+				return fetchRestoreDetails(ctx, dynamicClient, namespace, restoreName)
+			}
+			return fetchRecentRestores(ctx, dynamicClient, namespace)
+		},
+		func(ctx context.Context) string {
+			text, names := fetchVeleroPods(ctx, dynamicClient, namespace)
+			podNames = names
+			return text
+		},
+		func(ctx context.Context) string {
+			return fetchVeleroPodLogs(ctx, params.KubernetesClient, namespace, podNames)
+		},
+		func(ctx context.Context) string { return fetchOADPEvents(ctx, params.KubernetesClient, namespace) },
+	}
+	steps := make([]api.Step, 0, len(parts)+len(fetches))
+	for i, fetch := range fetches {
+		steps = append(steps, api.Text(parts[i]))
+		steps = append(steps, func(b *api.BuilderWithBudget) error {
+			// A nested collector may have its own truncation notice. Commit
+			// only its prefix so the parent appends the notice once.
+			text := fetch(api.WithResultBudget(ctx, b.Remaining()))
+			returnCut := strings.HasSuffix(text, api.ResultTruncationNotice)
+			b.WriteCut(strings.TrimSuffix(text, api.ResultTruncationNotice), returnCut)
+			return nil
+		})
+	}
+	steps = append(steps, api.Text(parts[len(parts)-1]))
+	_ = guide.Sections(steps...)
 
 	return api.NewPromptCallResult(
 		"OADP troubleshooting guide generated",
@@ -285,7 +307,7 @@ After completing troubleshooting and attempting fixes, report:
 				Role: "user",
 				Content: api.PromptContent{
 					Type: "text",
-					Text: guideText,
+					Text: guide.String(),
 				},
 			},
 			{
@@ -311,25 +333,30 @@ func fetchDPAStatus(ctx context.Context, dynamicClient dynamic.Interface, namesp
 		return "### DataProtectionApplication\n\n*No DataProtectionApplication found — OADP may not be configured*"
 	}
 
-	var result strings.Builder
+	result := api.NewBuilderWithBudget(api.ResultLimit(ctx))
 	result.WriteString("### DataProtectionApplication\n\n")
+	steps := make([]api.Step, 0, len(dpas.Items))
 	for _, dpa := range dpas.Items {
-		status, found, err := unstructured.NestedMap(dpa.Object, "status")
-		if err != nil {
-			fmt.Fprintf(&result, "#### %s\n\n*Error extracting status: %v*\n\n", dpa.GetName(), err)
-			continue
-		}
-		if !found {
-			fmt.Fprintf(&result, "#### %s\n\n*No status found (DPA may still be reconciling)*\n\n", dpa.GetName())
-			continue
-		}
-		yamlStr, err := output.MarshalYaml(status)
-		if err != nil {
-			fmt.Fprintf(&result, "#### %s\n\n*Error marshaling status: %v*\n\n", dpa.GetName(), err)
-			continue
-		}
-		fmt.Fprintf(&result, "#### %s\n\n```yaml\n%s```\n\n", dpa.GetName(), yamlStr)
+		steps = append(steps, func(result *api.BuilderWithBudget) error {
+			status, found, err := unstructured.NestedMap(dpa.Object, "status")
+			if err != nil {
+				result.WriteString(fmt.Sprintf("#### %s\n\n*Error extracting status: %v*\n\n", dpa.GetName(), err))
+				return nil
+			}
+			if !found {
+				result.WriteString(fmt.Sprintf("#### %s\n\n*No status found (DPA may still be reconciling)*\n\n", dpa.GetName()))
+				return nil
+			}
+			yamlStr, err := output.MarshalYaml(status)
+			if err != nil {
+				result.WriteString(fmt.Sprintf("#### %s\n\n*Error marshaling status: %v*\n\n", dpa.GetName(), err))
+				return nil
+			}
+			result.WriteString(fmt.Sprintf("#### %s\n\n```yaml\n%s```\n\n", dpa.GetName(), yamlStr))
+			return nil
+		})
 	}
+	_ = result.Sections(steps...)
 
 	return result.String()
 }
@@ -345,32 +372,34 @@ func fetchBSLStatus(ctx context.Context, dynamicClient dynamic.Interface, namesp
 		return "### BackupStorageLocations\n\n*No BackupStorageLocations found*"
 	}
 
-	var result strings.Builder
+	result := api.NewBuilderWithBudget(api.ResultLimit(ctx))
 	result.WriteString("### BackupStorageLocations\n\n")
+	steps := make([]api.Step, 0, len(bsls.Items))
 	for _, bsl := range bsls.Items {
-		phase, _, err := unstructured.NestedString(bsl.Object, "status", "phase")
-		if err != nil {
-			phase = ""
-		}
-		lastValidation, _, err := unstructured.NestedString(bsl.Object, "status", "lastValidationTime")
-		if err != nil {
-			lastValidation = ""
-		}
-		provider, _, err := unstructured.NestedString(bsl.Object, "spec", "provider")
-		if err != nil {
-			provider = ""
-		}
-		bucket, _, err := unstructured.NestedString(bsl.Object, "spec", "objectStorage", "bucket")
-		if err != nil {
-			bucket = ""
-		}
+		steps = append(steps, func(result *api.BuilderWithBudget) error {
+			phase, _, err := unstructured.NestedString(bsl.Object, "status", "phase")
+			if err != nil {
+				phase = ""
+			}
+			lastValidation, _, err := unstructured.NestedString(bsl.Object, "status", "lastValidationTime")
+			if err != nil {
+				lastValidation = ""
+			}
+			provider, _, err := unstructured.NestedString(bsl.Object, "spec", "provider")
+			if err != nil {
+				provider = ""
+			}
+			bucket, _, err := unstructured.NestedString(bsl.Object, "spec", "objectStorage", "bucket")
+			if err != nil {
+				bucket = ""
+			}
 
-		fmt.Fprintf(&result, "#### %s\n\n", bsl.GetName())
-		fmt.Fprintf(&result, "- **Phase:** %s\n", valueOrNA(phase))
-		fmt.Fprintf(&result, "- **Provider:** %s\n", valueOrNA(provider))
-		fmt.Fprintf(&result, "- **Bucket:** %s\n", valueOrNA(bucket))
-		fmt.Fprintf(&result, "- **Last Validation:** %s\n\n", valueOrNA(lastValidation))
+			result.WriteString(fmt.Sprintf("#### %s\n\n- **Phase:** %s\n- **Provider:** %s\n- **Bucket:** %s\n- **Last Validation:** %s\n\n",
+				bsl.GetName(), valueOrNA(phase), valueOrNA(provider), valueOrNA(bucket), valueOrNA(lastValidation)))
+			return nil
+		})
 	}
+	_ = result.Sections(steps...)
 
 	return result.String()
 }
@@ -386,36 +415,41 @@ func fetchRecentBackups(ctx context.Context, dynamicClient dynamic.Interface, na
 		return "### Recent Backups\n\n*No backups found*"
 	}
 
-	var result strings.Builder
+	result := api.NewBuilderWithBudget(api.ResultLimit(ctx))
 	result.WriteString("### Recent Backups\n\n")
 	result.WriteString("| Name | Phase | Started | Completed | Errors | Warnings |\n")
 	result.WriteString("|------|-------|---------|-----------|--------|----------|\n")
 
+	steps := make([]api.Step, 0, len(backups.Items))
 	for _, backup := range backups.Items {
-		phase, _, err := unstructured.NestedString(backup.Object, "status", "phase")
-		if err != nil {
-			phase = ""
-		}
-		startTime, _, err := unstructured.NestedString(backup.Object, "status", "startTimestamp")
-		if err != nil {
-			startTime = ""
-		}
-		completionTime, _, err := unstructured.NestedString(backup.Object, "status", "completionTimestamp")
-		if err != nil {
-			completionTime = ""
-		}
-		errors, _, err := unstructured.NestedInt64(backup.Object, "status", "errors")
-		if err != nil {
-			errors = 0
-		}
-		warnings, _, err := unstructured.NestedInt64(backup.Object, "status", "warnings")
-		if err != nil {
-			warnings = 0
-		}
+		steps = append(steps, func(result *api.BuilderWithBudget) error {
+			phase, _, err := unstructured.NestedString(backup.Object, "status", "phase")
+			if err != nil {
+				phase = ""
+			}
+			startTime, _, err := unstructured.NestedString(backup.Object, "status", "startTimestamp")
+			if err != nil {
+				startTime = ""
+			}
+			completionTime, _, err := unstructured.NestedString(backup.Object, "status", "completionTimestamp")
+			if err != nil {
+				completionTime = ""
+			}
+			errors, _, err := unstructured.NestedInt64(backup.Object, "status", "errors")
+			if err != nil {
+				errors = 0
+			}
+			warnings, _, err := unstructured.NestedInt64(backup.Object, "status", "warnings")
+			if err != nil {
+				warnings = 0
+			}
 
-		fmt.Fprintf(&result, "| %s | %s | %s | %s | %d | %d |\n",
-			backup.GetName(), valueOrNA(phase), valueOrNA(startTime), valueOrNA(completionTime), errors, warnings)
+			result.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %d | %d |\n",
+				backup.GetName(), valueOrNA(phase), valueOrNA(startTime), valueOrNA(completionTime), errors, warnings))
+			return nil
+		})
 	}
+	_ = result.Sections(steps...)
 	result.WriteString("\n")
 
 	return result.String()
@@ -441,19 +475,21 @@ func fetchBackupDetails(ctx context.Context, dynamicClient dynamic.Interface, na
 		spec = nil
 	}
 
-	var result strings.Builder
-	fmt.Fprintf(&result, "### Backup: %s\n\n", name)
+	result := api.NewBuilderWithBudget(api.ResultLimit(ctx))
+	result.WriteString(fmt.Sprintf("### Backup: %s\n\n", name))
 
 	if spec != nil {
 		specYaml, err := output.MarshalYaml(spec)
 		if err == nil {
-			fmt.Fprintf(&result, "**Spec:**\n```yaml\n%s```\n\n", specYaml)
+			result.WriteString(fmt.Sprintf("**Spec:**\n```yaml\n%s```\n\n", specYaml))
 		}
 	}
 
-	statusYaml, err := output.MarshalYaml(status)
-	if err == nil {
-		fmt.Fprintf(&result, "**Status:**\n```yaml\n%s```\n\n", statusYaml)
+	if result.Fits(0) {
+		statusYaml, err := output.MarshalYaml(status)
+		if err == nil {
+			result.WriteString(fmt.Sprintf("**Status:**\n```yaml\n%s```\n\n", statusYaml))
+		}
 	}
 
 	return result.String()
@@ -470,40 +506,45 @@ func fetchRecentRestores(ctx context.Context, dynamicClient dynamic.Interface, n
 		return "### Recent Restores\n\n*No restores found*"
 	}
 
-	var result strings.Builder
+	result := api.NewBuilderWithBudget(api.ResultLimit(ctx))
 	result.WriteString("### Recent Restores\n\n")
 	result.WriteString("| Name | Phase | Backup | Started | Completed | Errors | Warnings |\n")
 	result.WriteString("|------|-------|--------|---------|-----------|--------|----------|\n")
 
+	steps := make([]api.Step, 0, len(restores.Items))
 	for _, restore := range restores.Items {
-		phase, _, err := unstructured.NestedString(restore.Object, "status", "phase")
-		if err != nil {
-			phase = ""
-		}
-		backupName, _, err := unstructured.NestedString(restore.Object, "spec", "backupName")
-		if err != nil {
-			backupName = ""
-		}
-		startTime, _, err := unstructured.NestedString(restore.Object, "status", "startTimestamp")
-		if err != nil {
-			startTime = ""
-		}
-		completionTime, _, err := unstructured.NestedString(restore.Object, "status", "completionTimestamp")
-		if err != nil {
-			completionTime = ""
-		}
-		errors, _, err := unstructured.NestedInt64(restore.Object, "status", "errors")
-		if err != nil {
-			errors = 0
-		}
-		warnings, _, err := unstructured.NestedInt64(restore.Object, "status", "warnings")
-		if err != nil {
-			warnings = 0
-		}
+		steps = append(steps, func(result *api.BuilderWithBudget) error {
+			phase, _, err := unstructured.NestedString(restore.Object, "status", "phase")
+			if err != nil {
+				phase = ""
+			}
+			backupName, _, err := unstructured.NestedString(restore.Object, "spec", "backupName")
+			if err != nil {
+				backupName = ""
+			}
+			startTime, _, err := unstructured.NestedString(restore.Object, "status", "startTimestamp")
+			if err != nil {
+				startTime = ""
+			}
+			completionTime, _, err := unstructured.NestedString(restore.Object, "status", "completionTimestamp")
+			if err != nil {
+				completionTime = ""
+			}
+			errors, _, err := unstructured.NestedInt64(restore.Object, "status", "errors")
+			if err != nil {
+				errors = 0
+			}
+			warnings, _, err := unstructured.NestedInt64(restore.Object, "status", "warnings")
+			if err != nil {
+				warnings = 0
+			}
 
-		fmt.Fprintf(&result, "| %s | %s | %s | %s | %s | %d | %d |\n",
-			restore.GetName(), valueOrNA(phase), valueOrNA(backupName), valueOrNA(startTime), valueOrNA(completionTime), errors, warnings)
+			result.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s | %d | %d |\n",
+				restore.GetName(), valueOrNA(phase), valueOrNA(backupName), valueOrNA(startTime), valueOrNA(completionTime), errors, warnings))
+			return nil
+		})
 	}
+	_ = result.Sections(steps...)
 	result.WriteString("\n")
 
 	return result.String()
@@ -529,19 +570,21 @@ func fetchRestoreDetails(ctx context.Context, dynamicClient dynamic.Interface, n
 		spec = nil
 	}
 
-	var result strings.Builder
-	fmt.Fprintf(&result, "### Restore: %s\n\n", name)
+	result := api.NewBuilderWithBudget(api.ResultLimit(ctx))
+	result.WriteString(fmt.Sprintf("### Restore: %s\n\n", name))
 
 	if spec != nil {
 		specYaml, err := output.MarshalYaml(spec)
 		if err == nil {
-			fmt.Fprintf(&result, "**Spec:**\n```yaml\n%s```\n\n", specYaml)
+			result.WriteString(fmt.Sprintf("**Spec:**\n```yaml\n%s```\n\n", specYaml))
 		}
 	}
 
-	statusYaml, err := output.MarshalYaml(status)
-	if err == nil {
-		fmt.Fprintf(&result, "**Status:**\n```yaml\n%s```\n\n", statusYaml)
+	if result.Fits(0) {
+		statusYaml, err := output.MarshalYaml(status)
+		if err == nil {
+			result.WriteString(fmt.Sprintf("**Status:**\n```yaml\n%s```\n\n", statusYaml))
+		}
 	}
 
 	return result.String()
@@ -559,37 +602,47 @@ func fetchVeleroPods(ctx context.Context, dynamicClient dynamic.Interface, names
 		return fmt.Sprintf("### Velero Pods\n\n*Error listing pods: %v*", err), nil
 	}
 
-	// Also fetch NodeAgent pods
-	nodeAgentList, err := dynamicClient.Resource(gvr).Namespace(namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: "name=node-agent",
-	})
-	if err == nil && len(nodeAgentList.Items) > 0 {
-		podList.Items = append(podList.Items, nodeAgentList.Items...)
-	}
-
-	if len(podList.Items) == 0 {
-		return "### Velero Pods\n\n*No Velero pods found — the OADP operator may not be installed or the DPA may not be configured*", nil
-	}
-
-	var result strings.Builder
+	result := api.NewBuilderWithBudget(api.ResultLimit(ctx))
 	var podNames []string
 	result.WriteString("### Velero Pods\n\n")
 	result.WriteString("| Name | Phase | Ready | Restarts | Age |\n")
 	result.WriteString("|------|-------|-------|----------|-----|\n")
 
-	for _, pod := range podList.Items {
-		podNames = append(podNames, pod.GetName())
-		phase, _, err := unstructured.NestedString(pod.Object, "status", "phase")
-		if err != nil {
-			phase = ""
+	appendPods := func(pods []unstructured.Unstructured) {
+		steps := make([]api.Step, 0, len(pods))
+		for _, pod := range pods {
+			steps = append(steps, func(result *api.BuilderWithBudget) error {
+				phase, _, err := unstructured.NestedString(pod.Object, "status", "phase")
+				if err != nil {
+					phase = ""
+				}
+				creationTime := pod.GetCreationTimestamp().Format("2006-01-02T15:04:05Z")
+
+				// Get ready and restart counts from container statuses
+				ready, restarts := getPodReadyAndRestarts(&pod)
+
+				result.WriteString(fmt.Sprintf("| %s | %s | %s | %d | %s |\n",
+					pod.GetName(), phase, ready, restarts, creationTime))
+				if !result.Truncated() {
+					podNames = append(podNames, pod.GetName())
+				}
+				return nil
+			})
 		}
-		creationTime := pod.GetCreationTimestamp().Format("2006-01-02T15:04:05Z")
-
-		// Get ready and restart counts from container statuses
-		ready, restarts := getPodReadyAndRestarts(&pod)
-
-		fmt.Fprintf(&result, "| %s | %s | %s | %d | %s |\n",
-			pod.GetName(), phase, ready, restarts, creationTime)
+		_ = result.Sections(steps...)
+	}
+	appendPods(podList.Items)
+	if result.Fits(0) {
+		// Fetch node agents only if the section still has space.
+		nodeAgentList, err := dynamicClient.Resource(gvr).Namespace(namespace).List(ctx, metav1.ListOptions{
+			LabelSelector: "name=node-agent",
+		})
+		if err == nil {
+			appendPods(nodeAgentList.Items)
+		}
+	}
+	if len(podList.Items) == 0 && len(podNames) == 0 && !result.Truncated() {
+		return "### Velero Pods\n\n*No Velero pods found — the OADP operator may not be installed or the DPA may not be configured*", nil
 	}
 	result.WriteString("\n")
 
@@ -603,30 +656,41 @@ func fetchVeleroPodLogs(ctx context.Context, client api.KubernetesClient, namesp
 	}
 
 	core := kubernetes.NewCore(client)
-	var result strings.Builder
+	result := api.NewBuilderWithBudget(api.ResultLimit(ctx))
 	result.WriteString("### Velero Pod Logs\n\n")
 
+	steps := make([]api.Step, 0, len(podNames))
 	for _, podName := range podNames {
 		// Only fetch logs from velero server pods, not node-agent
 		if strings.HasPrefix(podName, "node-agent") {
 			continue
 		}
+		steps = append(steps, func(result *api.BuilderWithBudget) error {
+			result.WriteString(fmt.Sprintf("#### Pod: %s\n\n", podName))
+			if result.Truncated() {
+				return nil
+			}
+			logs, err := core.PodsLog(ctx, namespace, podName, "velero", false, 100)
+			if err != nil {
+				result.WriteString(fmt.Sprintf("*Error fetching logs: %v*\n\n", err))
+				return nil
+			}
 
-		fmt.Fprintf(&result, "#### Pod: %s\n\n", podName)
-		logs, err := core.PodsLog(ctx, namespace, podName, "velero", false, 100)
-		if err != nil {
-			fmt.Fprintf(&result, "*Error fetching logs: %v*\n\n", err)
-			continue
-		}
-
-		// Filter for error/warning lines to keep output focused
-		errorLines := filterLogLines(logs, []string{"error", "level=error", "level=warning", "Failed", "forbidden"})
-		if errorLines != "" {
-			fmt.Fprintf(&result, "**Error/Warning lines (last 100 log lines):**\n```\n%s\n```\n\n", errorLines)
-		} else {
-			result.WriteString("*No error or warning lines found in recent logs*\n\n")
-		}
+			// Filter for error/warning lines to keep output focused
+			lines := result.Scratch(len("**Error/Warning lines (last 100 log lines):**\n```\n\n```\n\n"))
+			filterLogLines(logs, []string{"error", "level=error", "level=warning", "Failed", "forbidden"}, lines)
+			if strings.TrimSpace(lines.String()) != "" {
+				result.CommitScratch("**Error/Warning lines (last 100 log lines):**\n```\n", "\n```\n\n", lines)
+			} else if lines.Truncated() {
+				result.WriteString("**Error/Warning lines (last 100 log lines):**\n```")
+				result.WriteString("\n")
+			} else {
+				result.WriteString("*No error or warning lines found in recent logs*\n\n")
+			}
+			return nil
+		})
 	}
+	_ = result.Sections(steps...)
 
 	return result.String()
 }
@@ -644,24 +708,35 @@ func fetchOADPEvents(ctx context.Context, client api.KubernetesClient, namespace
 	}
 
 	// Filter for warning events which indicate problems
-	var warningEvents []map[string]any
+	result := api.NewBuilderWithBudget(api.ResultLimit(ctx))
+	body := result.Scratch(len("### Warning Events\n\n```yaml\n```"))
+	steps := make([]api.Step, 0, len(eventMap))
 	for _, event := range eventMap {
 		eventType, _ := event["Type"].(string)
 		if eventType == "Warning" {
-			warningEvents = append(warningEvents, event)
+			steps = append(steps, func(body *api.BuilderWithBudget) error {
+				yamlStr, err := output.MarshalYaml(event)
+				if err != nil {
+					body.WriteString(fmt.Sprintf("*Error marshaling event: %v*\n", err))
+					return nil
+				}
+				body.WriteString(yamlStr)
+				return nil
+			})
 		}
 	}
 
-	if len(warningEvents) == 0 {
+	if len(steps) == 0 {
 		return "### Events\n\n*No Warning events found — this is good*"
 	}
-
-	yamlStr, err := output.MarshalYaml(warningEvents)
-	if err != nil {
-		return fmt.Sprintf("### Events\n\n*Error marshaling events: %v*", err)
+	if body.Truncated() {
+		result.WriteString("### Warning Events\n\n```yaml\n```")
+		result.WriteString("\n")
+		return result.String()
 	}
-
-	return fmt.Sprintf("### Warning Events\n\n```yaml\n%s```", yamlStr)
+	_ = body.Sections(steps...)
+	result.CommitScratch("### Warning Events\n\n```yaml\n", "```", body)
+	return result.String()
 }
 
 // Helper functions
@@ -702,18 +777,18 @@ func getPodReadyAndRestarts(pod *unstructured.Unstructured) (string, int64) {
 	return fmt.Sprintf("%d/%d", readyCount, totalContainers), totalRestarts
 }
 
-func filterLogLines(logs string, keywords []string) string {
-	var matched []string
-	for _, line := range strings.Split(logs, "\n") {
+func filterLogLines(logs string, keywords []string, result *api.BuilderWithBudget) {
+	steps := make([]api.Step, 0)
+	for line := range strings.SplitSeq(logs, "\n") {
 		lower := strings.ToLower(line)
 		for _, kw := range keywords {
 			if strings.Contains(lower, strings.ToLower(kw)) {
-				matched = append(matched, line)
+				steps = append(steps, api.Text(line+"\n"))
 				break
 			}
 		}
 	}
-	return strings.Join(matched, "\n")
+	_ = result.Sections(steps...)
 }
 
 // podGVR returns the Pod GVR

@@ -133,41 +133,50 @@ func mustgatherMonitoringPrometheusStatus(params api.ToolHandlerParams) (*api.To
 	replica := getString(args, "replica", "all")
 	replicas := mg.GetReplicaNumbers(replica)
 
-	output := "## Prometheus Status\n\n"
+	output := api.NewBuilderWithBudget(api.ResultLimit(params.Context))
+	output.WriteString("## Prometheus Status\n\n")
 
 	for _, r := range replicas {
-		output += fmt.Sprintf("### Replica prometheus-k8s-%d\n\n", r)
+		if !output.Fits(0) {
+			output.WriteString("\n")
+			break
+		}
+		output.WriteString(fmt.Sprintf("### Replica prometheus-k8s-%d\n\n", r))
 
 		runtime, err := p.GetPrometheusRuntimeInfo(r)
 		if err != nil {
-			output += fmt.Sprintf("Runtime info not available: %v\n\n", err)
+			output.WriteString(fmt.Sprintf("Runtime info not available: %v\n\n", err))
 		} else {
-			output += "#### Runtime Info\n\n"
-			output += fmt.Sprintf("Start Time:       %s\n", runtime.StartTime)
-			output += fmt.Sprintf("Storage Retention: %s\n", runtime.StorageRetention)
-			output += fmt.Sprintf("Config Reload:    %s (last: %s)\n",
-				healthSymbol(fmt.Sprintf("%v", runtime.ReloadConfigSuccess)), runtime.LastConfigTime)
-			output += fmt.Sprintf("Goroutines:       %d\n", runtime.GoroutineCount)
-			output += fmt.Sprintf("GOMAXPROCS:       %d\n", runtime.GOMAXPROCS)
+			output.WriteString("#### Runtime Info\n\n")
+			output.WriteString(fmt.Sprintf("Start Time:       %s\n", runtime.StartTime))
+			output.WriteString(fmt.Sprintf("Storage Retention: %s\n", runtime.StorageRetention))
+			output.WriteString(fmt.Sprintf("Config Reload:    %s (last: %s)\n",
+				healthSymbol(fmt.Sprintf("%v", runtime.ReloadConfigSuccess)), runtime.LastConfigTime))
+			output.WriteString(fmt.Sprintf("Goroutines:       %d\n", runtime.GoroutineCount))
+			output.WriteString(fmt.Sprintf("GOMAXPROCS:       %d\n", runtime.GOMAXPROCS))
 			if runtime.CorruptionCount > 0 {
-				output += fmt.Sprintf("Corruptions:      [WARNING] %d\n", runtime.CorruptionCount)
+				output.WriteString(fmt.Sprintf("Corruptions:      [WARNING] %d\n", runtime.CorruptionCount))
 			}
-			output += "\n"
+			output.WriteString("\n")
+		}
+		if !output.Fits(0) {
+			output.WriteString("\n")
+			break
 		}
 
 		tsdb, err := p.GetPrometheusTSDB(r)
 		if err != nil {
-			output += fmt.Sprintf("TSDB info not available: %v\n\n", err)
+			output.WriteString(fmt.Sprintf("TSDB info not available: %v\n\n", err))
 		} else {
-			output += "#### TSDB Head Stats\n\n"
-			output += fmt.Sprintf("Series:      %s\n", formatNumber(tsdb.HeadStats.NumSeries))
-			output += fmt.Sprintf("Label Pairs: %s\n", formatNumber(tsdb.HeadStats.NumLabelPairs))
-			output += fmt.Sprintf("Chunks:      %s\n", formatNumber(tsdb.HeadStats.ChunkCount))
-			output += "\n"
+			output.WriteString("#### TSDB Head Stats\n\n")
+			output.WriteString(fmt.Sprintf("Series:      %s\n", formatNumber(tsdb.HeadStats.NumSeries)))
+			output.WriteString(fmt.Sprintf("Label Pairs: %s\n", formatNumber(tsdb.HeadStats.NumLabelPairs)))
+			output.WriteString(fmt.Sprintf("Chunks:      %s\n", formatNumber(tsdb.HeadStats.ChunkCount)))
+			output.WriteString("\n")
 		}
 	}
 
-	return api.NewToolCallResult(output, nil), nil
+	return api.NewToolCallResult(output.String(), nil), nil
 }
 
 func mustgatherMonitoringPrometheusTargets(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -190,7 +199,6 @@ func mustgatherMonitoringPrometheusTargets(params api.ToolHandlerParams) (*api.T
 	}
 
 	var upCount, downCount, unknownCount int
-	var filtered []mg.ActiveTarget
 	for i := range targets {
 		t := &targets[i]
 		switch strings.ToLower(t.Health) {
@@ -201,31 +209,36 @@ func mustgatherMonitoringPrometheusTargets(params api.ToolHandlerParams) (*api.T
 		default:
 			unknownCount++
 		}
-		if healthFilter == "" || strings.EqualFold(t.Health, healthFilter) {
-			filtered = append(filtered, *t)
-		}
 	}
 
-	output := fmt.Sprintf("## Prometheus Targets (replica %d)\n\n", r)
-	output += fmt.Sprintf("Total: %d targets (Up: %d, Down: %d, Unknown: %d)\n\n",
-		len(targets), upCount, downCount, unknownCount)
+	output := api.NewBuilderWithBudget(api.ResultLimit(params.Context))
+	output.WriteString(fmt.Sprintf("## Prometheus Targets (replica %d)\n\n", r))
+	output.WriteString(fmt.Sprintf("Total: %d targets (Up: %d, Down: %d, Unknown: %d)\n\n",
+		len(targets), upCount, downCount, unknownCount))
 
 	if healthFilter != "" {
-		output += fmt.Sprintf("Showing targets with health: %s\n\n", healthFilter)
+		output.WriteString(fmt.Sprintf("Showing targets with health: %s\n\n", healthFilter))
 	}
 
-	for i := range filtered {
-		t := &filtered[i]
-		output += fmt.Sprintf("%s %s\n", healthSymbol(t.Health), t.ScrapePool)
-		output += fmt.Sprintf("  URL: %s\n", t.ScrapeURL)
-		output += fmt.Sprintf("  Last Scrape: %s (duration: %s)\n", t.LastScrape, formatDuration(t.LastScrapeDuration))
-		if t.LastError != "" {
-			output += fmt.Sprintf("  Error: %s\n", t.LastError)
+	for i := range targets {
+		if !output.Fits(0) {
+			output.WriteString("\n")
+			break
 		}
-		output += "\n"
+		t := &targets[i]
+		if healthFilter != "" && !strings.EqualFold(t.Health, healthFilter) {
+			continue
+		}
+		output.WriteString(fmt.Sprintf("%s %s\n", healthSymbol(t.Health), t.ScrapePool))
+		output.WriteString(fmt.Sprintf("  URL: %s\n", t.ScrapeURL))
+		output.WriteString(fmt.Sprintf("  Last Scrape: %s (duration: %s)\n", t.LastScrape, formatDuration(t.LastScrapeDuration)))
+		if t.LastError != "" {
+			output.WriteString(fmt.Sprintf("  Error: %s\n", t.LastError))
+		}
+		output.WriteString("\n")
 	}
 
-	return api.NewToolCallResult(output, nil), nil
+	return api.NewToolCallResult(output.String(), nil), nil
 }
 
 func mustgatherMonitoringPrometheusTSDB(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -241,27 +254,38 @@ func mustgatherMonitoringPrometheusTSDB(params api.ToolHandlerParams) (*api.Tool
 
 	replicas := mg.GetReplicaNumbers(replica)
 
-	output := "## Prometheus TSDB Statistics\n\n"
+	output := api.NewBuilderWithBudget(api.ResultLimit(params.Context))
+	output.WriteString("## Prometheus TSDB Statistics\n\n")
 
 	for _, r := range replicas {
+		if !output.Fits(0) {
+			output.WriteString("\n")
+			break
+		}
 		tsdb, err := p.GetPrometheusTSDB(r)
 		if err != nil {
-			output += fmt.Sprintf("### Replica %d: not available (%v)\n\n", r, err)
+			output.WriteString(fmt.Sprintf("### Replica %d: not available (%v)\n\n", r, err))
 			continue
 		}
 
-		output += fmt.Sprintf("### Replica prometheus-k8s-%d\n\n", r)
-		output += "#### Head Stats\n\n"
-		output += fmt.Sprintf("Series:      %s\n", formatNumber(tsdb.HeadStats.NumSeries))
-		output += fmt.Sprintf("Label Pairs: %s\n", formatNumber(tsdb.HeadStats.NumLabelPairs))
-		output += fmt.Sprintf("Chunks:      %s\n\n", formatNumber(tsdb.HeadStats.ChunkCount))
+		output.WriteString(fmt.Sprintf("### Replica prometheus-k8s-%d\n\n", r))
+		output.WriteString("#### Head Stats\n\n")
+		output.WriteString(fmt.Sprintf("Series:      %s\n", formatNumber(tsdb.HeadStats.NumSeries)))
+		output.WriteString(fmt.Sprintf("Label Pairs: %s\n", formatNumber(tsdb.HeadStats.NumLabelPairs)))
+		output.WriteString(fmt.Sprintf("Chunks:      %s\n\n", formatNumber(tsdb.HeadStats.ChunkCount)))
 
-		output += formatNameValueSection("Top Metrics by Series Count", tsdb.SeriesCountByMetricName, limit)
-		output += formatNameValueSection("Top Labels by Value Count", tsdb.LabelValueCountByLabelName, limit)
-		output += formatNameValueBytesSection("Top Labels by Memory Usage", tsdb.MemoryInBytesByLabelName, limit)
+		if output.Fits(0) {
+			output.WriteString(formatNameValueSection("Top Metrics by Series Count", tsdb.SeriesCountByMetricName, limit))
+		}
+		if output.Fits(0) {
+			output.WriteString(formatNameValueSection("Top Labels by Value Count", tsdb.LabelValueCountByLabelName, limit))
+		}
+		if output.Fits(0) {
+			output.WriteString(formatNameValueBytesSection("Top Labels by Memory Usage", tsdb.MemoryInBytesByLabelName, limit))
+		}
 	}
 
-	return api.NewToolCallResult(output, nil), nil
+	return api.NewToolCallResult(output.String(), nil), nil
 }
 
 func mustgatherMonitoringPrometheusAlerts(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -304,33 +328,39 @@ func mustgatherMonitoringPrometheusAlerts(params api.ToolHandlerParams) (*api.To
 		}
 	}
 
-	output := "## Prometheus Alerts\n\n"
+	output := api.NewBuilderWithBudget(api.ResultLimit(params.Context))
+	output.WriteString("## Prometheus Alerts\n\n")
 	if stateFilter != "" {
-		output += fmt.Sprintf("Filter: %s\n\n", stateFilter)
+		output.WriteString(fmt.Sprintf("Filter: %s\n\n", stateFilter))
 	}
-	output += fmt.Sprintf("Found %d active alert(s)\n\n", len(alerts))
+	output.WriteString(fmt.Sprintf("Found %d active alert(s)\n\n", len(alerts)))
 
 	if len(alerts) == 0 {
-		return api.NewToolCallResult(output+"No active alerts found.", nil), nil
+		output.WriteString("No active alerts found.")
+		return api.NewToolCallResult(output.String(), nil), nil
 	}
 
 	for _, a := range alerts {
+		if !output.Fits(0) {
+			output.WriteString("\n")
+			break
+		}
 		stateTag := "[" + strings.ToUpper(a.state) + "]"
-		output += fmt.Sprintf("%s %s %s\n", severitySymbol(a.severity), stateTag, a.name)
-		output += fmt.Sprintf("  Active Since: %s\n", a.activeAt)
+		output.WriteString(fmt.Sprintf("%s %s %s\n", severitySymbol(a.severity), stateTag, a.name))
+		output.WriteString(fmt.Sprintf("  Active Since: %s\n", a.activeAt))
 		if a.summary != "" {
-			output += fmt.Sprintf("  Summary: %s\n", a.summary)
+			output.WriteString(fmt.Sprintf("  Summary: %s\n", a.summary))
 		} else if a.message != "" {
-			output += fmt.Sprintf("  Message: %s\n", a.message)
+			output.WriteString(fmt.Sprintf("  Message: %s\n", a.message))
 		}
 		// Show namespace if present
 		if ns, ok := a.labels["namespace"]; ok {
-			output += fmt.Sprintf("  Namespace: %s\n", ns)
+			output.WriteString(fmt.Sprintf("  Namespace: %s\n", ns))
 		}
-		output += "\n"
+		output.WriteString("\n")
 	}
 
-	return api.NewToolCallResult(output, nil), nil
+	return api.NewToolCallResult(output.String(), nil), nil
 }
 
 func mustgatherMonitoringPrometheusRules(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -348,48 +378,65 @@ func mustgatherMonitoringPrometheusRules(params api.ToolHandlerParams) (*api.Too
 		return api.NewToolCallResult("", fmt.Errorf("failed to get Prometheus rules: %w", err)), nil
 	}
 
-	output := "## Prometheus Rules\n\n"
-	if typeFilter != "" {
-		output += fmt.Sprintf("Filter: %s rules only\n\n", typeFilter)
-	}
-
 	totalGroups := 0
 	totalRules := 0
-
 	for _, group := range rules.Groups {
-		var groupRules []mg.Rule
-		for i := range group.Rules {
-			rule := &group.Rules[i]
+		found := false
+		for _, rule := range group.Rules {
 			if typeFilter == "" || strings.EqualFold(rule.Type, typeFilter) {
-				groupRules = append(groupRules, *rule)
+				totalRules++
+				found = true
 			}
 		}
-		if len(groupRules) == 0 {
+		if found {
+			totalGroups++
+		}
+	}
+	output := api.NewBuilderWithBudget(api.ResultLimit(params.Context))
+	output.WriteString("## Prometheus Rules\n\n")
+	if typeFilter != "" {
+		output.WriteString(fmt.Sprintf("Filter: %s rules only\n\n", typeFilter))
+	}
+	output.WriteString(fmt.Sprintf("Total: %d groups, %d rules\n\n", totalGroups, totalRules))
+
+	for _, group := range rules.Groups {
+		if !output.Fits(0) {
+			output.WriteString("\n")
+			break
+		}
+		found := false
+		for _, rule := range group.Rules {
+			if typeFilter == "" || strings.EqualFold(rule.Type, typeFilter) {
+				found = true
+				break
+			}
+		}
+		if !found {
 			continue
 		}
 
-		totalGroups++
-		totalRules += len(groupRules)
+		output.WriteString(fmt.Sprintf("### %s (%s)\n\n", group.Name, group.File))
+		output.WriteString(fmt.Sprintf("Eval Interval: %.0fs | Last Eval: %s | Eval Time: %s\n\n",
+			group.Interval, group.LastEvaluation, formatDuration(group.EvaluationTime)))
 
-		output += fmt.Sprintf("### %s (%s)\n\n", group.Name, group.File)
-		output += fmt.Sprintf("Eval Interval: %.0fs | Last Eval: %s | Eval Time: %s\n\n",
-			group.Interval, group.LastEvaluation, formatDuration(group.EvaluationTime))
-
-		for i := range groupRules {
-			r := &groupRules[i]
-			output += fmt.Sprintf("- %s [%s] %s %s\n", healthSymbol(r.Health), r.Type, r.Name, r.State)
+		for i := range group.Rules {
+			if !output.Fits(0) {
+				output.WriteString("\n")
+				break
+			}
+			r := &group.Rules[i]
+			if typeFilter != "" && !strings.EqualFold(r.Type, typeFilter) {
+				continue
+			}
+			output.WriteString(fmt.Sprintf("- %s [%s] %s %s\n", healthSymbol(r.Health), r.Type, r.Name, r.State))
 			if r.LastError != "" {
-				output += fmt.Sprintf("  Error: %s\n", r.LastError)
+				output.WriteString(fmt.Sprintf("  Error: %s\n", r.LastError))
 			}
 		}
-		output += "\n"
+		output.WriteString("\n")
 	}
 
-	summary := fmt.Sprintf("Total: %d groups, %d rules\n\n", totalGroups, totalRules)
-	// Insert summary after header
-	output = strings.Replace(output, "\n\n", "\n\n"+summary, 1)
-
-	return api.NewToolCallResult(output, nil), nil
+	return api.NewToolCallResult(output.String(), nil), nil
 }
 
 // alertEntry holds formatted alert data for display
