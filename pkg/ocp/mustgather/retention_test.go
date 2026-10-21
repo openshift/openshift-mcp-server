@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/stretchr/testify/suite"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -28,6 +29,25 @@ func (s *RetentionSuite) archive(files map[string]string) string {
 		s.Require().NoError(os.WriteFile(path, []byte(content), 0o600))
 	}
 
+	return root
+}
+
+func (s *RetentionSuite) nodeArchive(files map[string]string, kubeletLog string) string {
+	root := s.archive(nil)
+	nodeDir := filepath.Join(root, "quay-sha256-test", "nodes", "node")
+	s.Require().NoError(os.MkdirAll(nodeDir, 0o755))
+	for name, content := range files {
+		s.Require().NoError(os.WriteFile(filepath.Join(nodeDir, name), []byte(content), 0o600))
+	}
+	if kubeletLog != "" {
+		f, err := os.Create(filepath.Join(nodeDir, "node_logs_kubelet.gz"))
+		s.Require().NoError(err)
+		gz := gzip.NewWriter(f)
+		_, err = gz.Write([]byte(kubeletLog))
+		s.Require().NoError(err)
+		s.Require().NoError(gz.Close())
+		s.Require().NoError(f.Close())
+	}
 	return root
 }
 
@@ -140,6 +160,37 @@ func (s *RetentionSuite) TestPodAndKubeletTails() {
 	diagnostics, err := p.GetNodeDiagnosticsSelected("node", func(key string) bool { return key == "kubelet" }, 16, 2)
 	s.Require().NoError(err)
 	s.Equal("second\nthird", diagnostics.KubeletLog)
+}
+
+func (s *RetentionSuite) TestNodeDiagnosticsKeepCappedTextAndSkipCappedJSON() {
+	root := s.nodeArchive(map[string]string{
+		"sysinfo.log":         "sysinfo is longer than the cap",
+		"cpu_affinities.json": strings.Repeat("x", 64),
+		"lspci":               "pci",
+	}, "kubelet is longer than the cap")
+	p, err := NewProvider(root)
+	s.Require().NoError(err)
+
+	diag, err := p.WithReadLimit(8).GetNodeDiagnostics("node")
+	s.Require().NoError(err)
+	s.Equal("kubelet "+kubernetes.BackendTruncationNotice, diag.KubeletLog)
+	s.Equal("sysinfo "+kubernetes.BackendTruncationNotice, diag.SysInfo)
+	s.Empty(diag.CPUAffinities)
+	s.Equal("pci", diag.Lspci)
+}
+
+func (s *RetentionSuite) TestNodeDiagnosticsExactBudgetHasNoNotice() {
+	root := s.nodeArchive(map[string]string{
+		"sysinfo.log": "exact",
+		"lscpu":       "later",
+	}, "")
+	p, err := NewProvider(root)
+	s.Require().NoError(err)
+
+	diag, err := p.GetNodeDiagnosticsSelected("node", nil, int64(len("exact")), 0)
+	s.Require().NoError(err)
+	s.Equal("exact", diag.SysInfo)
+	s.Empty(diag.Lscpu)
 }
 
 func TestRetentionSuite(t *testing.T) {

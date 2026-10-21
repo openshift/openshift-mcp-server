@@ -245,12 +245,12 @@ func (p *Provider) GetNodeDiagnosticsSelected(nodeName string, include func(stri
 		if budget <= 0 {
 			return content, true
 		}
-		if int64(len(content)) >= remaining {
+		if int64(len(content)) == remaining {
+			return content, false
+		}
+		if int64(len(content)) > remaining {
 			part := api.NewBuilderWithBudget(remaining)
 			part.WriteString(content)
-			if !part.Truncated() {
-				part.WriteString("\n")
-			}
 			return part.String(), false
 		}
 		remaining -= int64(len(content))
@@ -269,8 +269,6 @@ func (p *Provider) GetNodeDiagnosticsSelected(nodeName string, include func(stri
 			if !more {
 				return diag, nil
 			}
-		} else if kubernetes.IsResponseTooLarge(err) {
-			return nil, err
 		}
 	}
 
@@ -293,14 +291,21 @@ func (p *Provider) GetNodeDiagnosticsSelected(nodeName string, include func(stri
 		if !selected(file.key) {
 			continue
 		}
-		if content, err := p.readTextFile(filepath.Join(nodeDir, file.filename)); err == nil {
+		path := filepath.Join(nodeDir, file.filename)
+		var content string
+		var err error
+		if strings.HasSuffix(file.filename, ".json") {
+			// A partial JSON document cannot be used as diagnostic data.
+			content, err = p.readTextFile(path)
+		} else {
+			content, err = p.readTextFileLimited(path)
+		}
+		if err == nil {
 			var more bool
 			*file.target, more = keep(content)
 			if !more {
 				return diag, nil
 			}
-		} else if kubernetes.IsResponseTooLarge(err) {
-			return nil, err
 		}
 	}
 
@@ -330,6 +335,17 @@ func (p *Provider) readTextFile(path string) (string, error) {
 	return string(data), err
 }
 
+func (p *Provider) readTextFileLimited(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = f.Close() }()
+	data, err := kubernetes.ReadLimited(f, p.readLimit)
+	text, _, err := kubernetes.AcceptTruncated(data, err)
+	return text, err
+}
+
 func (p *Provider) readFile(path string) ([]byte, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -353,12 +369,13 @@ func (p *Provider) readGzipFile(path string) (string, error) {
 	}
 	defer func() { _ = reader.Close() }()
 
-	data, err := kubernetes.ReadCapped(io.NopCloser(reader), p.readLimit)
+	data, err := kubernetes.ReadLimited(io.NopCloser(reader), p.readLimit)
+	content, _, err := kubernetes.AcceptTruncated(data, err)
 	if err != nil {
 		return "", fmt.Errorf("failed to decompress %s: %w", path, err)
 	}
 
-	return string(data), nil
+	return content, nil
 }
 
 // TailLines returns the last n lines of a string

@@ -62,7 +62,7 @@ func LoadWithLimits(path string, backendLimit, resultLimit int64) (*LoadResult, 
 		resources = append(resources, obj)
 		return true
 	})
-	if err != nil && !(len(resources) > 0 && kubernetes.IsResponseTooLarge(err)) {
+	if err != nil && (len(resources) == 0 || !kubernetes.IsResponseTooLarge(err)) {
 		return nil, err
 	}
 
