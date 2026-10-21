@@ -38,7 +38,8 @@ Their round tripper is [`NewBackendResponseRoundTripper`](../../pkg/kubernetes/r
 
 A list whose body exceeds the cap is that error.
 There is no partial page.
-`resources_list`, `pods_list`, `pods_list_in_namespace`, `pods_top`, `nodes_top`, `namespaces_list`, `projects_list`, and `events_list` take `limit` and `continue` so the client can request the next Kubernetes list page.
+`resources_list`, `pods_list`, `pods_list_in_namespace`, `pods_top`, `nodes_top`, `namespaces_list`, `projects_list`, `events_list`, and `get_service_endpoints` take `limit` and `continue` so the client can request the next Kubernetes list page.
+`oadp-troubleshoot` takes the same arguments: `continue` pages its Warning events, and `limit` pages every Kubernetes list in that prompt.
 `helm_list` takes `limit` and `offset`.
 Helm applies those after it has loaded the release secrets, so a secret list that exceeds this cap still fails.
 

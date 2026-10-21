@@ -12,9 +12,11 @@ Generate a step-by-step troubleshooting guide for diagnosing OADP backup and res
 Gathers DPA status, BSL health, recent backup/restore status, Velero pod health, pod logs, and events into a single diagnostic workflow.
 
 **Arguments:**
-- `namespace` (optional): The OADP namespace (default: openshift-adp)
+- `namespace` (required): The OADP namespace
 - `backup` (optional): Name of a specific backup to troubleshoot
 - `restore` (optional): Name of a specific restore to troubleshoot
+- `limit` (optional): Maximum number of items to return. Omit or set to 0 to list everything, which fails if the response exceeds `max_backend_response_bytes`. Retry with a smaller limit when that happens. The API may return fewer items than requested. Applied to each Kubernetes list in this prompt.
+- `continue` (optional): Opaque token from the continue field of the previous page. Send it unchanged with the same limit and namespace to retrieve the next page. Omit on the first call. For this prompt the token pages Warning events (`# list: events`). Continue tokens printed for other lists belong to `resources_list`.
 
 **Example Usage:**
 ```text

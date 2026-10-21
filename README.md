@@ -655,7 +655,9 @@ In case multi-cluster support is enabled (default) and you have access to multip
 
 - **get_coredns_config** - Retrieve the current CoreDNS configuration (Corefile) from the cluster.
 
-- **get_service_endpoints** - Return EndpointSlice objects for a Service to verify backend pod availability.
+- **get_service_endpoints** - Return EndpointSlice objects for a Service to verify backend pod availability. Use limit and continue to retrieve a large list one page at a time.
+  - `continue` (`string`) - Opaque token from the continue field of the previous page. Send it unchanged with the same limit, namespace, and selectors to retrieve the next page. Omit on the first call.
+  - `limit` (`integer`) - Maximum number of items to return. Omit or set to 0 to list everything, which fails if the response exceeds max_backend_response_bytes. Retry with a smaller limit when that happens. The API may return fewer items than requested.
   - `namespace` (`string`) **(required)** - Service namespace
   - `service` (`string`) **(required)** - Service name
 
@@ -1799,10 +1801,12 @@ Example output:
 
 <summary>oadp</summary>
 
-- **oadp-troubleshoot** - Generate a step-by-step troubleshooting guide for diagnosing OADP backup and restore issues
+- **oadp-troubleshoot** - Generate a step-by-step troubleshooting guide for diagnosing OADP backup and restore issues. Use limit and continue to retrieve a large list one page at a time.
   - `namespace` (`string`) **(required)** - The OADP namespace
   - `backup` (`string`) - The name of a specific backup to troubleshoot
   - `restore` (`string`) - The name of a specific restore to troubleshoot
+  - `limit` (`string`) - Maximum number of items to return. Omit or set to 0 to list everything, which fails if the response exceeds max_backend_response_bytes. Retry with a smaller limit when that happens. The API may return fewer items than requested. Applied to each Kubernetes list in this prompt.
+  - `continue` (`string`) - Opaque token from the continue field of the previous page. Send it unchanged with the same limit, namespace, and selectors to retrieve the next page. Omit on the first call. For this prompt the token pages Warning events (`# list: events`). Continue tokens printed for other lists belong to resources_list.
 
 </details>
 

@@ -18,6 +18,7 @@ func (s *NetEdgeTestSuite) TestGetServiceEndpoints() {
 		service       string
 		existingObjs  []runtime.Object
 		expectedError string
+		extraArgs     map[string]any
 		validate      func(result string)
 	}{
 		{
@@ -76,6 +77,13 @@ func (s *NetEdgeTestSuite) TestGetServiceEndpoints() {
 			service:       "",
 			expectedError: "parameter required",
 		},
+		{
+			name:          "rejects a negative limit",
+			namespace:     "default",
+			service:       "myservice",
+			extraArgs:     map[string]any{"limit": float64(-1)},
+			expectedError: "limit must be greater than or equal to 0",
+		},
 	}
 
 	for _, tt := range tests {
@@ -95,6 +103,9 @@ func (s *NetEdgeTestSuite) TestGetServiceEndpoints() {
 			}
 			if tt.service != "" {
 				args["service"] = tt.service
+			}
+			for key, value := range tt.extraArgs {
+				args[key] = value
 			}
 
 			s.SetArgs(args)
