@@ -63,7 +63,7 @@ func (r *boundedLogTail) output(budget int, notice string) string {
 		return r.text()
 	}
 	if len(notice) > budget {
-		return notice[:budget]
+		return api.ResultTruncationNotice
 	}
 	for r.count > 0 && r.bytes+r.count-1 > budget-len(notice) {
 		r.bytes -= len(r.lines[r.start])
@@ -85,6 +85,47 @@ func logOutputBudget(params api.ToolHandlerParams, header string, maxOutputSize 
 // off at the configured maximum size.
 func outputTruncatedNotice(maxOutputSize int) string {
 	return fmt.Sprintf("\n... [output truncated at %s, use 'tail' parameter to limit]", formatBytes(int64(maxOutputSize)))
+}
+
+func logTruncationNotice(budget, maxOutputSize int) string {
+	if budget < maxOutputSize {
+		return api.ResultTruncationNotice
+	}
+	return outputTruncatedNotice(maxOutputSize)
+}
+
+// capLogOutput keeps complete lines and appends exactly one notice when a scan
+// or the result budget cuts the output.
+func capLogOutput(s string, budget int, notice string, cut bool) string {
+	if !cut && len(s) <= budget {
+		return s
+	}
+	if len(notice) > budget {
+		return api.ResultTruncationNotice
+	}
+	if len(s) > budget-len(notice) {
+		end := budget - len(notice)
+		if s[end] != '\n' {
+			if idx := strings.LastIndexByte(s[:end], '\n'); idx >= 0 {
+				end = idx
+			} else {
+				end = 0
+			}
+		}
+		s = s[:end]
+	}
+	return s + notice
+}
+
+func logResult(params api.ToolHandlerParams, header, logs string, budget int) *api.ToolCallResult {
+	if logs == api.ResultTruncationNotice && len(logs) > budget {
+		// The result-budget convention allows the whole notice beyond the cap.
+		if limit := api.ResultLimit(params.Context); limit > 0 && int64(len(header)) > limit {
+			return api.NewToolCallResult(api.LimitString(params.Context, header), nil)
+		}
+		return api.NewToolCallResult(header+logs, nil)
+	}
+	return api.NewToolCallResult(api.LimitString(params.Context, header+logs), nil)
 }
 
 // capOutput enforces maxOutputSize on an already-assembled string, trimming it
@@ -263,34 +304,35 @@ func mustgatherPodLogsGet(params api.ToolHandlerParams) (*api.ToolCallResult, er
 		for scanner.Scan() {
 			ring.add(scanner.Text(), budget)
 		}
-		notice := outputTruncatedNotice(maxOutputSize)
-		if budget < maxOutputSize {
-			notice = api.ResultTruncationNotice
-		}
-		logs = ring.output(budget, notice)
+		logs = ring.output(budget, logTruncationNotice(budget, maxOutputSize))
 	} else {
 		var sb strings.Builder
 		lineCount := 0
+		outputCut := false
 		for scanner.Scan() {
 			line := scanner.Text()
-			if sb.Len()+len(line)+1 > budget {
-				sb.WriteString(outputTruncatedNotice(maxOutputSize))
+			separator := 0
+			if lineCount > 0 {
+				separator = 1
+			}
+			if len(line)+separator > budget-sb.Len() {
+				outputCut = true
 				break
 			}
-			if lineCount > 0 {
+			if separator > 0 {
 				sb.WriteByte('\n')
 			}
 			sb.WriteString(line)
 			lineCount++
 		}
-		logs = capOutput(sb.String(), budget)
+		logs = capLogOutput(sb.String(), budget, logTruncationNotice(budget, maxOutputSize), outputCut)
 	}
 
 	if err := scanner.Err(); err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to read log file: %w", err)), nil
 	}
 
-	return api.NewToolCallResult(api.LimitString(params.Context, header+logs), nil), nil
+	return logResult(params, header, logs, budget), nil
 }
 
 func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -352,8 +394,14 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 
 	var matchingLines []string
 	var ring *boundedLogTail
+	// The match count is unknown until the scan finishes, so the final header
+	// cannot be budgeted yet. The payload cannot exceed the result limit.
+	scanBudget := maxOutputSize
+	if limit := api.ResultLimit(params.Context); limit > 0 {
+		scanBudget = int(min(int64(scanBudget), limit))
+	}
 	if tail > 0 {
-		ring = newBoundedLogTail(tail, maxOutputSize)
+		ring = newBoundedLogTail(tail, scanBudget)
 	}
 	totalMatches := 0
 	retainedBytes := 0
@@ -372,14 +420,14 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 		}
 		totalMatches++
 		if tail > 0 {
-			ring.add(line, maxOutputSize)
+			ring.add(line, scanBudget)
 		} else {
 			if !outputCut {
 				separator := 0
 				if len(matchingLines) > 0 {
 					separator = 1
 				}
-				if len(line)+separator > maxOutputSize-retainedBytes {
+				if len(line)+separator > scanBudget-retainedBytes {
 					outputCut = true
 				} else {
 					matchingLines = append(matchingLines, line)
@@ -417,18 +465,11 @@ func mustgatherPodLogsGrep(params api.ToolHandlerParams) (*api.ToolCallResult, e
 	budget := logOutputBudget(params, header, maxOutputSize)
 	logs := strings.Join(matchingLines, "\n")
 	if ring != nil {
-		notice := outputTruncatedNotice(maxOutputSize)
-		if budget < maxOutputSize {
-			notice = api.ResultTruncationNotice
-		}
-		logs = ring.output(budget, notice)
+		logs = ring.output(budget, logTruncationNotice(budget, maxOutputSize))
 	} else {
-		if outputCut {
-			logs += outputTruncatedNotice(maxOutputSize)
-		}
-		logs = capOutput(logs, budget)
+		logs = capLogOutput(logs, budget, logTruncationNotice(budget, maxOutputSize), outputCut)
 	}
-	return api.NewToolCallResult(api.LimitString(params.Context, header+logs), nil), nil
+	return logResult(params, header, logs, budget), nil
 }
 
 func mustgatherPodLogsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, error) {

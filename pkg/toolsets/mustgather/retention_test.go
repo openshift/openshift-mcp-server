@@ -93,6 +93,63 @@ func (s *LogRetentionSuite) TestResultBudgetKeepsNewestTailAfterHeader() {
 	s.LessOrEqual(len(result.Content), 110)
 }
 
+func (s *LogRetentionSuite) TestNonTailResultBudgetUsesOneCompleteNotice() {
+	params := s.logParams(strings.Repeat("match line\n", 30), 200)
+	params.Context = api.WithResultBudget(params.Context, 140)
+
+	s.Run("get", func() {
+		params.Request = logRequest{"archive_id": params.GetArguments()["archive_id"], "namespace": "ns", "pod": "pod", "container": "app"}
+		result, err := mustgatherPodLogsGet(params)
+		s.Require().NoError(err)
+		s.Equal(1, strings.Count(result.Content, api.ResultTruncationNotice))
+		s.NotContains(result.Content, outputTruncatedNotice(200))
+		s.LessOrEqual(len(result.Content), 140)
+	})
+
+	s.Run("grep", func() {
+		params.Request = logRequest{"archive_id": params.GetArguments()["archive_id"], "namespace": "ns", "pod": "pod", "container": "app", "filter": "match"}
+		result, err := mustgatherPodLogsGrep(params)
+		s.Require().NoError(err)
+		s.Equal(1, strings.Count(result.Content, api.ResultTruncationNotice))
+		s.NotContains(result.Content, outputTruncatedNotice(200))
+		s.LessOrEqual(len(result.Content), 140)
+	})
+}
+
+func (s *LogRetentionSuite) TestTinyResultBudgetKeepsNoticeWhole() {
+	params := s.logParams(strings.Repeat("match line\n", 30), 200)
+	params.Context = api.WithResultBudget(params.Context, 70)
+
+	s.Run("get", func() {
+		params.Request = logRequest{"archive_id": params.GetArguments()["archive_id"], "namespace": "ns", "pod": "pod", "container": "app", "tail": 100}
+		result, err := mustgatherPodLogsGet(params)
+		s.Require().NoError(err)
+		s.Equal(1, strings.Count(result.Content, api.ResultTruncationNotice))
+		s.True(strings.HasSuffix(result.Content, api.ResultTruncationNotice))
+	})
+
+	s.Run("grep", func() {
+		params.Context = api.WithResultBudget(params.Context, 110)
+		params.Request = logRequest{"archive_id": params.GetArguments()["archive_id"], "namespace": "ns", "pod": "pod", "container": "app", "filter": "match", "tail": 100}
+		result, err := mustgatherPodLogsGrep(params)
+		s.Require().NoError(err)
+		s.Contains(result.Content, "Found 30 matching line(s)")
+		s.Equal(1, strings.Count(result.Content, api.ResultTruncationNotice))
+		s.True(strings.HasSuffix(result.Content, api.ResultTruncationNotice))
+	})
+}
+
+func (s *LogRetentionSuite) TestGrepTailKeepsNewestWithinResultBudget() {
+	params := s.logParams(strings.Repeat("old match\n", 30)+"newest match\n", 200)
+	params.Context = api.WithResultBudget(params.Context, 155)
+	params.Request = logRequest{"archive_id": params.GetArguments()["archive_id"], "namespace": "ns", "pod": "pod", "container": "app", "filter": "match", "tail": 100}
+
+	result, err := mustgatherPodLogsGrep(params)
+	s.Require().NoError(err)
+	s.Contains(result.Content, "newest match"+api.ResultTruncationNotice)
+	s.LessOrEqual(len(result.Content), 155)
+}
+
 func TestLogRetentionSuite(t *testing.T) {
 	suite.Run(t, new(LogRetentionSuite))
 }
