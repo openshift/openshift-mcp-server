@@ -345,13 +345,19 @@ workflow pinned H `efd3cf05f607ab7804c4a16b543d916ebfc51a74`, followed by H2
 `4942815c1af74894f58640938c12c4f84623ec69`. H3 and C3 completed independent
 review and local repository gates. Those historical local checks do not
 substitute for the integrated tree's own validation, deployment, or maintainer
-risk approval. The validated local H4
+risk approval. The published H4
 `b918eee433d300093cc73b72f05d9a8e55a2a88e` is a signed history-preserving merge
 of published C3 and main `432c1f3cd76df74b0bdb9ca010643abbac996219`. H4 completed
 independent integration review and full precommit/postcommit local repository
-gates. This uncommitted C4 change pins that actual immutable H4.
-C4 review and mandatory gates are pending, followed by its separate local commit.
-H4 is not yet published; publication requires separate explicit approval.
+gates. Published C4 `4452cb14c4fb6767ee4c02ccbae7f38ab3db8e7e` pins H4;
+H4 and C4 completed independent review and local mandatory gates before publication.
+The validated local H5 `aa2cde6a978111cd162b79082084175bf5b0e820` is a
+signed child of published C4 containing the reviewed bootstrap, observability TLS,
+and app-message security corrections. H5 completed independent review and full
+local mandatory gates. This uncommitted C5 change pins that actual immutable H5.
+C5 review and mandatory gates are pending, followed by its separate local commit
+and publication phase. H5 is not yet published; no new external SECURITY result
+has been established by these local checks.
 Neither local validation nor pinning deploys or activates credentialed workflows.
 No branch, artifact or label substitutes for the reviewed immutable harness.
 
