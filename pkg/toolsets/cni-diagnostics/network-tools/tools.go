@@ -159,7 +159,7 @@ func tcpdumpHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		return api.NewToolCallResult("", fmt.Errorf("failed to capture packets: %w", err)), nil
 	}
 
-	return api.NewToolCallResult(utils.FormatCommandOutput(result.Output, result.Stderr), nil), nil
+	return api.NewToolCallResult(utils.FormatCommandOutputBudget(params.Context, result.Output, result.Stderr), nil), nil
 }
 
 // initPwruTool creates the pwru tool.
@@ -259,5 +259,5 @@ func pwruHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		return api.NewToolCallResult("", fmt.Errorf("failed to trace packets: %w", err)), nil
 	}
 
-	return api.NewToolCallResult(utils.FormatCommandOutput(result.Output, result.Stderr), nil), nil
+	return api.NewToolCallResult(utils.FormatCommandOutputBudget(params.Context, result.Output, result.Stderr), nil), nil
 }

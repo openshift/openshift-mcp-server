@@ -118,7 +118,7 @@ func conntrackHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error)
 		return api.NewToolCallResult("", fmt.Errorf("failed to get conntrack data: %w", err)), nil
 	}
 
-	return api.NewToolCallResult(result.Data, nil), nil
+	return api.NewToolCallResult(api.LimitString(params.Context, result.Data), nil), nil
 }
 
 // initIPtablesTool creates the get-iptables tool.
@@ -230,7 +230,7 @@ func iptablesHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) 
 		return api.NewToolCallResult("", fmt.Errorf("failed to get iptables data: %w", err)), nil
 	}
 
-	return api.NewToolCallResult(result.Data, nil), nil
+	return api.NewToolCallResult(api.LimitString(params.Context, result.Data), nil), nil
 }
 
 // initNFTTool creates the get-nft tool.
@@ -336,7 +336,7 @@ func nftHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get nftables data: %w", err)), nil
 	}
 
-	return api.NewToolCallResult(result.Data, nil), nil
+	return api.NewToolCallResult(api.LimitString(params.Context, result.Data), nil), nil
 }
 
 // initIPTool creates the get-ip tool.
@@ -450,5 +450,5 @@ func ipHandler(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		return api.NewToolCallResult("", fmt.Errorf("failed to get ip command output: %w", err)), nil
 	}
 
-	return api.NewToolCallResult(result.Data, nil), nil
+	return api.NewToolCallResult(api.LimitString(params.Context, result.Data), nil), nil
 }

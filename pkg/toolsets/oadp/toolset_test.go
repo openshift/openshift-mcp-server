@@ -46,11 +46,26 @@ func (s *ToolsetSuite) TestGetPrompts() {
 		s.Equal("oadp-troubleshoot", prompts[0].Prompt.Name)
 	})
 
-	s.Run("prompt has three arguments", func() {
+	s.Run("prompt has list pagination arguments", func() {
 		t := &Toolset{}
 		prompts := t.GetPrompts(s.T().Context(), api.ToolsetContext{})
 		s.Require().Len(prompts, 1)
-		s.Len(prompts[0].Prompt.Arguments, 3)
+		names := make([]string, 0, len(prompts[0].Prompt.Arguments))
+		for _, arg := range prompts[0].Prompt.Arguments {
+			names = append(names, arg.Name)
+		}
+		s.Equal([]string{"namespace", "backup", "restore", "limit", "continue"}, names)
+	})
+
+	s.Run("limit must be a non-negative integer", func() {
+		_, err := promptListPage(map[string]string{"limit": "nope"})
+		s.EqualError(err, "limit parameter must be an integer")
+		_, err = promptListPage(map[string]string{"limit": "-1"})
+		s.EqualError(err, "limit must be greater than or equal to 0")
+		page, err := promptListPage(map[string]string{"limit": "2", "continue": "next"})
+		s.NoError(err)
+		s.Equal(int64(2), page.Limit)
+		s.Equal("next", page.Continue)
 	})
 
 	s.Run("prompt has a handler", func() {

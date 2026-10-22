@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/stretchr/testify/suite"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
@@ -39,6 +40,7 @@ func (s *NetEdgeTestSuite) SetupTest() {
 	}
 	s.params = api.ToolHandlerParams{
 		Context:          context.Background(),
+		Config:           config.New(),
 		Request:          s.mockReq,
 		KubernetesClient: s.mockClient,
 	}
