@@ -57,5 +57,6 @@ func backendTransport(restConfig *rest.Config, endpoint, caFile string) (http.Ro
 	cfg.Insecure = false
 	cfg.CAData = nil
 	cfg.CAFile = caFile
+	cfg.ServerName = ""
 	return rest.TransportFor(cfg)
 }
