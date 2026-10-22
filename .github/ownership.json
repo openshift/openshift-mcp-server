@@ -65,7 +65,8 @@
         "/pkg/obs/tools/",
         "/pkg/obs/toolcfg/"
       ],
-      "reviewers": []
+      "reviewers": [],
+      "approvers": ["@andreasgerstmayr", "@iNecas", "@saswatamcode", "@slashpai"]
     },
     {
       "toolset": "observability/metrics",
@@ -76,7 +77,8 @@
         "/pkg/obs/tools/",
         "/pkg/obs/toolcfg/"
       ],
-      "reviewers": []
+      "reviewers": [],
+      "approvers": ["@andreasgerstmayr", "@iNecas", "@saswatamcode", "@slashpai"]
     },
     {
       "toolset": "netobserv",
@@ -93,7 +95,8 @@
     {
       "toolset": "observability/otelcol",
       "paths": ["/pkg/toolsets/otelcol/", "/pkg/obs/tools/", "/pkg/obs/toolcfg/"],
-      "reviewers": []
+      "reviewers": [],
+      "approvers": ["@andreasgerstmayr", "@iNecas", "@saswatamcode", "@slashpai"]
     },
     {
       "toolset": "tekton",
@@ -116,7 +119,8 @@
         "/pkg/obs/tools/",
         "/pkg/obs/toolcfg/"
       ],
-      "reviewers": []
+      "reviewers": [],
+      "approvers": ["@andreasgerstmayr", "@iNecas", "@saswatamcode", "@slashpai"]
     }
   ]
 }
