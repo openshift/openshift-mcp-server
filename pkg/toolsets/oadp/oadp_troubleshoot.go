@@ -3,6 +3,7 @@ package oadp
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,6 +16,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/oadp"
 	"github.com/containers/kubernetes-mcp-server/pkg/output"
+	coretoolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/core"
 )
 
 // initOADPTroubleshoot initializes the OADP troubleshooting prompt
@@ -24,7 +26,7 @@ func initOADPTroubleshoot() []api.ServerPrompt {
 			Prompt: config.Prompt{
 				Name:        "oadp-troubleshoot",
 				Title:       "OADP Troubleshoot",
-				Description: "Generate a step-by-step troubleshooting guide for diagnosing OADP backup and restore issues",
+				Description: "Generate a step-by-step troubleshooting guide for diagnosing OADP backup and restore issues." + coretoolset.ListPageSentence,
 				Arguments: []config.PromptArgument{
 					{
 						Name:        "namespace",
@@ -39,6 +41,16 @@ func initOADPTroubleshoot() []api.ServerPrompt {
 					{
 						Name:        "restore",
 						Description: "The name of a specific restore to troubleshoot",
+						Required:    false,
+					},
+					{
+						Name:        "limit",
+						Description: coretoolset.LimitDescription + " Applied to each Kubernetes list in this prompt.",
+						Required:    false,
+					},
+					{
+						Name:        "continue",
+						Description: coretoolset.ContinueDescription + " For this prompt the token pages Warning events (`# list: events`). Continue tokens printed for other lists belong to resources_list.",
 						Required:    false,
 					},
 				},
@@ -127,6 +139,10 @@ func oadpTroubleshootHandler(params api.PromptHandlerParams) (*api.PromptCallRes
 	}
 	backupName := args["backup"]
 	restoreName := args["restore"]
+	page, err := promptListPage(args)
+	if err != nil {
+		return nil, err
+	}
 
 	ctx := params.Context
 	if ctx == nil {
@@ -261,29 +277,31 @@ After completing troubleshooting and attempting fixes, report:
 	guide := api.NewPromptBudget(ctx, "I'll analyze the collected OADP data to diagnose backup and restore issues systematically.")
 	var podNames []string
 	fetches := []func(context.Context) string{
-		func(ctx context.Context) string { return fetchDPAStatus(ctx, dynamicClient, namespace) },
-		func(ctx context.Context) string { return fetchBSLStatus(ctx, dynamicClient, namespace) },
+		func(ctx context.Context) string { return fetchDPAStatus(ctx, dynamicClient, namespace, page) },
+		func(ctx context.Context) string { return fetchBSLStatus(ctx, dynamicClient, namespace, page) },
 		func(ctx context.Context) string {
 			if backupName != "" {
 				return fetchBackupDetails(ctx, dynamicClient, namespace, backupName)
 			}
-			return fetchRecentBackups(ctx, dynamicClient, namespace)
+			return fetchRecentBackups(ctx, dynamicClient, namespace, page)
 		},
 		func(ctx context.Context) string {
 			if restoreName != "" {
 				return fetchRestoreDetails(ctx, dynamicClient, namespace, restoreName)
 			}
-			return fetchRecentRestores(ctx, dynamicClient, namespace)
+			return fetchRecentRestores(ctx, dynamicClient, namespace, page)
 		},
 		func(ctx context.Context) string {
-			text, names := fetchVeleroPods(ctx, dynamicClient, namespace)
+			text, names := fetchVeleroPods(ctx, dynamicClient, namespace, page)
 			podNames = names
 			return text
 		},
 		func(ctx context.Context) string {
 			return fetchVeleroPodLogs(ctx, params.KubernetesClient, namespace, podNames)
 		},
-		func(ctx context.Context) string { return fetchOADPEvents(ctx, params.KubernetesClient, namespace) },
+		func(ctx context.Context) string {
+			return fetchOADPEvents(ctx, params.KubernetesClient, namespace, page)
+		},
 	}
 	steps := make([]api.Step, 0, len(parts)+len(fetches))
 	for i, fetch := range fetches {
@@ -323,10 +341,10 @@ After completing troubleshooting and attempting fixes, report:
 }
 
 // fetchDPAStatus fetches all DPA resources and returns their status as YAML
-func fetchDPAStatus(ctx context.Context, dynamicClient dynamic.Interface, namespace string) string {
-	dpas, err := oadp.ListDataProtectionApplications(ctx, dynamicClient, namespace, metav1.ListOptions{})
+func fetchDPAStatus(ctx context.Context, dynamicClient dynamic.Interface, namespace string, page metav1.ListOptions) string {
+	dpas, err := oadp.ListDataProtectionApplications(ctx, dynamicClient, namespace, metav1.ListOptions{Limit: page.Limit})
 	if err != nil {
-		return fmt.Sprintf("### DataProtectionApplication\n\n*Error listing DPAs: %v*", err)
+		return fmt.Sprintf("### DataProtectionApplication\n\n*Error listing DPAs: %v*", coretoolset.ListErr(err))
 	}
 
 	if len(dpas.Items) == 0 {
@@ -358,14 +376,14 @@ func fetchDPAStatus(ctx context.Context, dynamicClient dynamic.Interface, namesp
 	}
 	_ = result.Sections(steps...)
 
-	return result.String()
+	return prependPageNote(result.String(), "dataprotectionapplications", dpas)
 }
 
 // fetchBSLStatus fetches all BSL resources and returns their status as YAML
-func fetchBSLStatus(ctx context.Context, dynamicClient dynamic.Interface, namespace string) string {
-	bsls, err := oadp.ListBackupStorageLocations(ctx, dynamicClient, namespace, metav1.ListOptions{})
+func fetchBSLStatus(ctx context.Context, dynamicClient dynamic.Interface, namespace string, page metav1.ListOptions) string {
+	bsls, err := oadp.ListBackupStorageLocations(ctx, dynamicClient, namespace, metav1.ListOptions{Limit: page.Limit})
 	if err != nil {
-		return fmt.Sprintf("### BackupStorageLocations\n\n*Error listing BSLs: %v*", err)
+		return fmt.Sprintf("### BackupStorageLocations\n\n*Error listing BSLs: %v*", coretoolset.ListErr(err))
 	}
 
 	if len(bsls.Items) == 0 {
@@ -401,14 +419,14 @@ func fetchBSLStatus(ctx context.Context, dynamicClient dynamic.Interface, namesp
 	}
 	_ = result.Sections(steps...)
 
-	return result.String()
+	return prependPageNote(result.String(), "backupstoragelocations", bsls)
 }
 
 // fetchRecentBackups fetches the most recent backups and summarizes their status
-func fetchRecentBackups(ctx context.Context, dynamicClient dynamic.Interface, namespace string) string {
-	backups, err := oadp.ListBackups(ctx, dynamicClient, namespace, metav1.ListOptions{})
+func fetchRecentBackups(ctx context.Context, dynamicClient dynamic.Interface, namespace string, page metav1.ListOptions) string {
+	backups, err := oadp.ListBackups(ctx, dynamicClient, namespace, metav1.ListOptions{Limit: page.Limit})
 	if err != nil {
-		return fmt.Sprintf("### Recent Backups\n\n*Error listing backups: %v*", err)
+		return fmt.Sprintf("### Recent Backups\n\n*Error listing backups: %v*", coretoolset.ListErr(err))
 	}
 
 	if len(backups.Items) == 0 {
@@ -452,7 +470,7 @@ func fetchRecentBackups(ctx context.Context, dynamicClient dynamic.Interface, na
 	_ = result.Sections(steps...)
 	result.WriteString("\n")
 
-	return result.String()
+	return prependPageNote(result.String(), "backups", backups)
 }
 
 // fetchBackupDetails fetches a specific backup and returns full details
@@ -496,10 +514,10 @@ func fetchBackupDetails(ctx context.Context, dynamicClient dynamic.Interface, na
 }
 
 // fetchRecentRestores fetches the most recent restores and summarizes their status
-func fetchRecentRestores(ctx context.Context, dynamicClient dynamic.Interface, namespace string) string {
-	restores, err := oadp.ListRestores(ctx, dynamicClient, namespace, metav1.ListOptions{})
+func fetchRecentRestores(ctx context.Context, dynamicClient dynamic.Interface, namespace string, page metav1.ListOptions) string {
+	restores, err := oadp.ListRestores(ctx, dynamicClient, namespace, metav1.ListOptions{Limit: page.Limit})
 	if err != nil {
-		return fmt.Sprintf("### Recent Restores\n\n*Error listing restores: %v*", err)
+		return fmt.Sprintf("### Recent Restores\n\n*Error listing restores: %v*", coretoolset.ListErr(err))
 	}
 
 	if len(restores.Items) == 0 {
@@ -547,7 +565,7 @@ func fetchRecentRestores(ctx context.Context, dynamicClient dynamic.Interface, n
 	_ = result.Sections(steps...)
 	result.WriteString("\n")
 
-	return result.String()
+	return prependPageNote(result.String(), "restores", restores)
 }
 
 // fetchRestoreDetails fetches a specific restore and returns full details
@@ -591,15 +609,14 @@ func fetchRestoreDetails(ctx context.Context, dynamicClient dynamic.Interface, n
 }
 
 // fetchVeleroPods fetches the Velero server and NodeAgent pods
-func fetchVeleroPods(ctx context.Context, dynamicClient dynamic.Interface, namespace string) (string, []string) {
+func fetchVeleroPods(ctx context.Context, dynamicClient dynamic.Interface, namespace string, page metav1.ListOptions) (string, []string) {
 	gvr := podGVR()
 
 	// Fetch Velero server pods
-	podList, err := dynamicClient.Resource(gvr).Namespace(namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/name=velero",
-	})
+	podOpts := metav1.ListOptions{Limit: page.Limit, LabelSelector: "app.kubernetes.io/name=velero"}
+	podList, err := dynamicClient.Resource(gvr).Namespace(namespace).List(ctx, podOpts)
 	if err != nil {
-		return fmt.Sprintf("### Velero Pods\n\n*Error listing pods: %v*", err), nil
+		return fmt.Sprintf("### Velero Pods\n\n*Error listing pods: %v*", coretoolset.ListErr(err)), nil
 	}
 
 	result := api.NewBuilderWithBudget(api.ResultLimit(ctx))
@@ -632,21 +649,27 @@ func fetchVeleroPods(ctx context.Context, dynamicClient dynamic.Interface, names
 		_ = result.Sections(steps...)
 	}
 	appendPods(podList.Items)
+	var nodeAgentList *unstructured.UnstructuredList
 	if result.Fits(0) {
 		// Fetch node agents only if the section still has space.
-		nodeAgentList, err := dynamicClient.Resource(gvr).Namespace(namespace).List(ctx, metav1.ListOptions{
-			LabelSelector: "name=node-agent",
-		})
+		nodeOpts := metav1.ListOptions{Limit: page.Limit, LabelSelector: "name=node-agent"}
+		nodeAgentList, err = dynamicClient.Resource(gvr).Namespace(namespace).List(ctx, nodeOpts)
 		if err == nil {
 			appendPods(nodeAgentList.Items)
 		}
 	}
+	var text string
 	if len(podList.Items) == 0 && len(podNames) == 0 && !result.Truncated() {
-		return "### Velero Pods\n\n*No Velero pods found — the OADP operator may not be installed or the DPA may not be configured*", nil
+		text = "### Velero Pods\n\n*No Velero pods found — the OADP operator may not be installed or the DPA may not be configured*"
+	} else {
+		result.WriteString("\n")
+		text = result.String()
 	}
-	result.WriteString("\n")
-
-	return result.String(), podNames
+	text = prependPageNote(text, "pods", podList)
+	if nodeAgentList != nil {
+		text = prependPageNote(text, "node-agent pods", nodeAgentList)
+	}
+	return text, podNames
 }
 
 // fetchVeleroPodLogs fetches logs from the Velero server pod
@@ -696,15 +719,16 @@ func fetchVeleroPodLogs(ctx context.Context, client api.KubernetesClient, namesp
 }
 
 // fetchOADPEvents fetches events in the OADP namespace
-func fetchOADPEvents(ctx context.Context, client api.KubernetesClient, namespace string) string {
-	core := kubernetes.NewCore(client)
-	eventMap, err := core.EventsList(ctx, namespace, api.ListOptions{})
+func fetchOADPEvents(ctx context.Context, client api.KubernetesClient, namespace string, page metav1.ListOptions) string {
+	page.FieldSelector = "type=Warning"
+	kcore := kubernetes.NewCore(client)
+	eventMap, meta, err := kcore.EventsList(ctx, namespace, api.ListOptions{ListOptions: page})
 	if err != nil {
-		return fmt.Sprintf("### Events\n\n*Error listing events: %v*", err)
+		return fmt.Sprintf("### Events\n\n*Error listing events: %v*", coretoolset.ListErr(err))
 	}
 
 	if len(eventMap) == 0 {
-		return "### Events\n\n*No events found in namespace*"
+		return prependPageNote("### Events\n\n*No Warning events found — this is good*", "events", meta)
 	}
 
 	// Filter for warning events which indicate problems
@@ -727,16 +751,46 @@ func fetchOADPEvents(ctx context.Context, client api.KubernetesClient, namespace
 	}
 
 	if len(steps) == 0 {
-		return "### Events\n\n*No Warning events found — this is good*"
+		return prependPageNote("### Events\n\n*No Warning events found — this is good*", "events", meta)
 	}
 	if body.Truncated() {
 		result.WriteString("### Warning Events\n\n```yaml\n```")
 		result.WriteString("\n")
-		return result.String()
+		return prependPageNote(result.String(), "events", meta)
 	}
 	_ = body.Sections(steps...)
 	result.CommitScratch("### Warning Events\n\n```yaml\n", "```", body)
-	return result.String()
+	return prependPageNote(result.String(), "events", meta)
+}
+
+// promptListPage reads the prompt's string arguments. ApplyListPage only accepts
+// a JSON number, which prompt arguments are not.
+func promptListPage(args map[string]string) (metav1.ListOptions, error) {
+	opts := metav1.ListOptions{Continue: args["continue"]}
+	raw := strings.TrimSpace(args["limit"])
+	if raw == "" {
+		return opts, nil
+	}
+	limit, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return metav1.ListOptions{}, fmt.Errorf("limit parameter must be an integer")
+	}
+	if limit < 0 {
+		return metav1.ListOptions{}, fmt.Errorf("limit must be greater than or equal to 0")
+	}
+	opts.Limit = limit
+	return opts, nil
+}
+
+func prependPageNote(text, label string, listed any) string {
+	note, _ := coretoolset.WithListPage("", nil, listed)
+	if note == "" {
+		return text
+	}
+	if label != "" {
+		note = "# list: " + label + "\n" + note
+	}
+	return note + text
 }
 
 // Helper functions

@@ -89,11 +89,13 @@ Retrieve the current CoreDNS configuration (`Corefile`) from the `dns-default` C
 
 #### get_service_endpoints
 
-Return `EndpointSlice` objects for a Service to verify backend pod availability.
+Return `EndpointSlice` objects for a Service to verify backend pod availability. Use `limit` and `continue` to retrieve a large list one page at a time.
 
 **Parameters:**
 - `namespace` (string, required) — Service namespace.
 - `service` (string, required) — Service name.
+- `limit` (integer, optional) — Maximum number of items to return. Omit or set to 0 to list everything, which fails if the response exceeds `max_backend_response_bytes`. Retry with a smaller limit when that happens. The API may return fewer items than requested.
+- `continue` (string, optional) — Opaque token from the `continue` field of the previous page. Send it unchanged with the same limit, namespace, and service. Omit on the first call.
 
 #### exec_dns_in_pod
 
