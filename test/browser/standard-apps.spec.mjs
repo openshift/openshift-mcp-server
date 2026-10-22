@@ -14,7 +14,7 @@ test.beforeEach(async ({ page }) => {
   await page.goto(testOrigin + "/");
 });
 
-async function openApp(page, kind = "table") {
+async function openApp(page, kind = "table", noReferrer = false) {
   await page.setContent("<iframe></iframe>");
   await page.evaluate(origin => {
     const appWindow = document.querySelector("iframe").contentWindow;
@@ -25,7 +25,18 @@ async function openApp(page, kind = "table") {
     });
   }, testOrigin);
   const frame = page.frames()[1];
-  await frame.setContent(template.replace("{{KIND}}", kind).replace("{{STYLES}}", styles).replace("{{SCRIPT}}", script));
+  const html = template.replace("{{KIND}}", kind).replace("{{STYLES}}", styles).replace("{{SCRIPT}}", script);
+  if (noReferrer) {
+    await page.route(testOrigin + "/app", route => route.fulfill({ contentType: "text/html", body: html }));
+    await page.locator("iframe").evaluate(frame => {
+      frame.referrerPolicy = "no-referrer";
+      frame.src = "/app";
+    });
+    await frame.waitForURL(testOrigin + "/app");
+    await frame.waitForLoadState();
+  } else {
+    await frame.setContent(html);
+  }
   return frame;
 }
 
@@ -329,6 +340,25 @@ test("generic resource details expand nested fields and safely render metadata",
 });
 
 for (const kind of ["table", "metrics", "resource"]) {
+  for (const noReferrer of [false, true]) {
+    test(`${kind} rejects unexpected origins with ${noReferrer ? "no" : "a"} referrer`, async ({ page }) => {
+      const app = await openApp(page, kind, noReferrer);
+      expect(await app.evaluate(() => document.referrer === "")).toBe(noReferrer);
+      await send(page, { id: 1, result: { protocolVersion: "2026-01-26" } });
+      await expect.poll(() => page.evaluate(() => window.messages.some(m => m.method === "ui/notifications/initialized"))).toBe(true);
+      await app.evaluate(() => {
+        window.dispatchEvent(new MessageEvent("message", {
+          source: parent,
+          origin: "https://unexpected.example",
+          data: { jsonrpc: "2.0", method: "ui/notifications/tool-cancelled", params: { reason: "spoofed" } },
+        }));
+      });
+      await expect(app.locator("#app")).toHaveText("Loading data…");
+      await send(page, { method: "ui/notifications/tool-cancelled", params: { reason: "from host" } });
+      await expect(app.locator("#app")).toHaveText("Tool execution cancelled: from host");
+    });
+  }
+
   test(`${kind} responds to ping and recovers from tool cancellation`, async ({ page }) => {
     const app = await openApp(page, kind);
     for (const id of [0, 1, "host-ping"]) {
