@@ -358,10 +358,14 @@ local mandatory gates. Published C5
 `ec4b1c715e7cbbfbd568a99d3c27798952cb3550` pins that actual immutable H5;
 C5 also completed independent review and local mandatory gates before publication.
 The subsequent Prow jobs failed during cloning/merging with newer main, before
-tests or a new security scan executed. The local integration with main
-`87f6e7c0f60b122de54e5becbf57314d59f7c3dc` is not yet committed or validated
-as a new harness. The workflow retains H5 until a reviewed, validated H6 exists
-and a separately reviewed candidate update pins its actual SHA. No new external
+tests or a new security scan executed. Signed LOCAL H6
+`5f781f327f3a0d349c3afe457a5f04a622afcbd1` integrates published C5 with main
+`87f6e7c0f60b122de54e5becbf57314d59f7c3dc`, preserving both histories. H6
+completed independent review and full local mandatory gates. The workflow now
+pins that actual immutable H6; this C6 implementation checkpoint is unstaged
+and uncommitted, pending independent review and its own full mandatory gates.
+H6 and this candidate update are not yet published; published C5 still pins H5.
+No new external
 SECURITY clearance has been established by these local checks.
 Neither local validation nor pinning deploys or activates credentialed workflows.
 No branch, artifact or label substitutes for the reviewed immutable harness.
