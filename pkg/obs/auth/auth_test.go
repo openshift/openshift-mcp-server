@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"encoding/pem"
 	"fmt"
 	"net"
 	"net/http"
@@ -14,6 +15,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/client-go/rest"
 )
+
+func TestRejectInsecureBeforeTokenLookup(t *testing.T) {
+	for _, useTLS := range []bool{false, true} {
+		rt, err := BuildRoundTripper(t.Context(), &rest.Config{BearerTokenFile: "/owned-fixture-token-must-not-be-read"}, AuthModeKubeConfig, useTLS, true)
+		require.ErrorContains(t, err, "insecure=true is no longer supported")
+		require.Nil(t, rt)
+	}
+}
 
 func TestBuildRoundTripper(t *testing.T) {
 	// Mock HTTP server which returns the same auth header value
@@ -100,7 +109,12 @@ func TestBuildRoundTripper(t *testing.T) {
 				ctx = context.WithValue(ctx, kubernetes.OAuthAuthorizationHeader, tt.ctxValue)
 			}
 
-			rt, err := BuildRoundTripper(ctx, tt.restConfig, tt.authMode, true, true)
+			config := tt.restConfig
+			if config != nil {
+				config = rest.CopyConfig(config)
+				config.CAData = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})
+			}
+			rt, err := BuildRoundTripper(ctx, config, tt.authMode, true, false)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -154,7 +168,7 @@ func TestCreateHeaderAPIConfig(t *testing.T) {
 	ctx = ContextWithAuthFromRequest(ctx, req)
 
 	// Step 4: Create round tripper using the complete production code path
-	rt, err := BuildRoundTripper(ctx, &rest.Config{}, AuthModeHeader, true, true)
+	rt, err := BuildRoundTripper(ctx, &rest.Config{}, AuthModeHeader, true, false)
 	if err != nil {
 		t.Fatalf("failed to create round tripper: %v", err)
 	}

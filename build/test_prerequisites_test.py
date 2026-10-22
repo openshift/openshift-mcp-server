@@ -76,10 +76,6 @@ class TestPrerequisites(unittest.TestCase):
         patcher = mock.patch.object(TOOLS, "open_release", side_effect=local_open)
         patcher.start()
         self.addCleanup(patcher.stop)
-        original = TOOLS.usable
-        patcher = mock.patch.object(TOOLS, "usable", side_effect=lambda name, search: False if search == "missing" else original(name, search))
-        patcher.start()
-        self.addCleanup(patcher.stop)
 
     def prepare(self, manifest=None, system=None):
         return TOOLS.prepare(manifest or self.manifest, self.root / "cache", "missing", system or ("Linux", "x86_64"))
@@ -91,14 +87,14 @@ class TestPrerequisites(unittest.TestCase):
         self.assertEqual(3, len(self.requests))
         self.assertEqual(0o700, (self.root / "cache").stat().st_mode & 0o777)
 
-    def test_only_missing_tools_and_existing_path(self):
-        with mock.patch.object(TOOLS, "usable", side_effect=lambda name, search: name != "jq" or search != "missing"):
-            result = self.prepare()
-        self.assertEqual(["/jq"], self.requests)
+    def test_all_tools_are_verified_regardless_of_existing_path(self):
+        result = self.prepare()
+        self.assertEqual(["/node", "/jq", "/shellcheck"], self.requests)
         self.assertTrue(result.endswith(os.pathsep + "missing"))
-        with mock.patch.object(TOOLS, "usable", return_value=True):
-            self.assertEqual("original", TOOLS.prepare(self.manifest, self.root / "unused", "original", ("Darwin", "arm64")))
+        with self.assertRaisesRegex(RuntimeError, "Linux x86_64 only"):
+            TOOLS.prepare(self.manifest, self.root / "unused", result, ("Darwin", "arm64"))
         self.assertFalse((self.root / "unused").exists())
+        self.assertEqual(3, len(self.requests))
 
     def test_tampered_cache_is_not_executed_or_redownloaded(self):
         search = self.prepare()
@@ -160,14 +156,14 @@ class TestPrerequisites(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "Linux x86_64 only"):
             self.prepare(system=("Darwin", "arm64"))
 
-    def test_requirement_versions_and_redirect_rejection(self):
-        for name, version, expected in (("jq", "jq-1.5", False), ("jq", "jq-1.6", True), ("shellcheck", "version: 0.8.0", False), ("shellcheck", "version: 0.9.0", True)):
-            with self.subTest(name=name, version=version):
-                with mock.patch.object(TOOLS.shutil, "which", return_value=str(self.root / name)), mock.patch.object(TOOLS.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, version.encode(), b"")):
-                    self.assertEqual(expected, TOOLS.usable(name, "version-only-fixture"))
-        for returncode in (0, 1):
-            with mock.patch.object(TOOLS.shutil, "which", return_value=str(self.root / "node")), mock.patch.object(TOOLS.subprocess, "run", return_value=subprocess.CompletedProcess([], returncode, b"", b"")):
-                self.assertEqual(returncode == 0, TOOLS.usable("node", "version-only-fixture"))
+    def test_manifest_pins_and_redirect_rejection(self):
+        for digest in ("", "latest", "A" * 64, "0" * 63, "z" * 64):
+            with self.subTest(digest=digest):
+                manifest = copy.deepcopy(self.manifest)
+                manifest["node"]["binary_sha256"] = digest
+                with self.assertRaisesRegex(RuntimeError, "invalid test-tool manifest"):
+                    self.prepare(manifest)
+        self.assertEqual([], self.requests)
         with self.assertRaisesRegex(RuntimeError, "requires HTTPS"):
             TOOLS.HTTPSRedirect().redirect_request(None, None, 302, "", {}, "http://outside.invalid")
 
@@ -251,7 +247,7 @@ class TestPrerequisites(unittest.TestCase):
                     marker.unlink()
                 environment = dict(os.environ, PATH=str(binary), HOME=home, TMPDIR=str(temporary), GOFLAGS="-mod=readonly -p=1", XDG_DATA_HOME=str(data_directory), OWNED_MARKER=str(marker), OWNED_SENTINEL="retained", FIXTURE_EXIT=str(child_exit), FIXTURE_PORT=str(self.server_port), FIXTURE_PLATFORM=json.dumps(profile) if profile else "", KUBECONFIG="/dev/null", PYTHONDONTWRITEBYTECODE="1")
                 environment.pop("XDG_CACHE_HOME", None)
-                command = [str(binary / "python3"), "build/test-prerequisites.py", "--", "go", "test", "-race", "-count=1", "-v", "./..."] if direct else [str(binary / "make"), "test"]
+                command = [str(binary / "python3"), "build/test-prerequisites.py"] if direct else [str(binary / "make"), "test"]
                 result = subprocess.run(command, cwd=fixture, env=environment, capture_output=True, timeout=30)
                 self.assertEqual(child_exit if direct else (2 if child_exit else 0), result.returncode, result.stderr)
                 record = json.loads(marker.read_text())
@@ -293,41 +289,38 @@ class TestPrerequisites(unittest.TestCase):
         literal_arguments = ["; touch " + str(self.root / "shell-marker"), "$(touch shell-marker)", "`touch shell-marker`", "two words", "--flag=value"]
         for installed in (False, True):
             with self.subTest(generic_command_installed=installed):
+                marker.unlink()
                 if installed:
                     for name in ("node", "jq", "shellcheck"):
                         (binary / name).write_bytes(self.payloads["/" + name])
                         (binary / name).chmod(0o700)
                 result = subprocess.run([str(binary / "python3"), "build/test-prerequisites.py", "--", sys.executable, "-c", "import json,os,pathlib,sys; pathlib.Path(os.environ['OWNED_MARKER']).write_text(json.dumps(sys.argv[1:]))", *literal_arguments], cwd=fixture, env=environment, capture_output=True, timeout=30)
-                self.assertEqual(0, result.returncode, result.stderr)
-                self.assertEqual(literal_arguments, json.loads(marker.read_text()))
+                self.assertEqual(1, result.returncode, result.stderr)
+                self.assertIn(b"accepts no arguments", result.stderr)
+                self.assertFalse(marker.exists())
                 self.assertFalse((self.root / "shell-marker").exists())
                 self.assertFalse((fixture / "shell-marker").exists())
                 self.assertEqual([], list(temporary.iterdir()))
-                self.assertEqual(requests + ["/node", "/jq", "/shellcheck"], self.requests)
+                self.assertEqual(requests, self.requests)
+                marker.touch()
         result = subprocess.run([str(binary / "python3"), "-c", "import sys; print(sys.argv[1])", "unchanged argument"], cwd=fixture, env=environment, capture_output=True, timeout=30)
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual(b"unchanged argument\n", result.stdout)
 
-    def test_real_missing_tools_and_fixed_dispatch(self):
-        empty = self.root / "empty-path"
-        empty.mkdir()
-        with mock.patch.object(TOOLS.subprocess, "run", side_effect=AssertionError("missing executable must not run")):
-            for name in ("node", "jq", "shellcheck"):
-                self.assertFalse(TOOLS.usable(name, str(empty)))
-            with self.assertRaisesRegex(ValueError, "unsupported test executable"):
-                TOOLS.usable("unexpected", str(empty))
+    def test_path_prerequisites_are_not_probed_or_selected(self):
         executable_directory = self.root / "trusted path ; touch not-a-command"
         executable_directory.mkdir()
-        argument_record = self.root / "probe-arguments"
-        (executable_directory / "node").write_text("#!" + sys.executable + "\nimport json,pathlib,sys\npathlib.Path(" + repr(str(argument_record)) + ").write_text(json.dumps(sys.argv[1:]))\n")
-        (executable_directory / "node").chmod(0o700)
-        self.assertTrue(TOOLS.usable("node", str(executable_directory)))
-        self.assertEqual(["-e", "if(+process.versions.node.split('.')[0]<18||!Object.hasOwn({ok:1},'ok'))process.exit(1)"], json.loads(argument_record.read_text()))
-        argument_record.unlink()
-        (executable_directory / "jq").write_text("#!" + sys.executable + "\nimport json,pathlib,sys\nwith pathlib.Path(" + repr(str(argument_record)) + ").open('a') as record: record.write(json.dumps(sys.argv[1:])+'\\n')\nprint('jq-1.7.1')\n")
-        (executable_directory / "jq").chmod(0o700)
-        self.assertTrue(TOOLS.usable("jq", str(executable_directory)))
-        self.assertEqual([["--version"], ["-ne", '[1,2]|all(.[]; type=="number")']], [json.loads(line) for line in argument_record.read_text().splitlines()])
+        marker = self.root / "unverified-tool-executed"
+        for name in ("node", "jq", "shellcheck"):
+            executable = executable_directory / name
+            executable.write_text("#!" + sys.executable + "\nfrom pathlib import Path\nPath(" + repr(str(marker)) + ").touch()\n")
+            executable.chmod(0o700)
+        result = TOOLS.prepare(self.manifest, self.root / "cache", str(executable_directory), ("Linux", "x86_64"))
+        self.assertFalse(marker.exists())
+        for name, directory in zip(("node", "jq", "shellcheck"), result.split(os.pathsep)[:3]):
+            self.assertNotEqual(str(executable_directory), directory)
+            self.assertEqual(self.manifest[name]["binary_sha256"], hashlib.sha256((Path(directory) / name).read_bytes()).hexdigest())
+        self.assertEqual(["/node", "/jq", "/shellcheck"], self.requests)
         self.assertFalse((Path.cwd() / "not-a-command").exists())
 
     def test_explicit_cache_does_not_resolve_home(self):
@@ -562,11 +555,15 @@ class TestPrerequisites(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "size/time limit"):
                 TOOLS.download(self.manifest["node"])
 
-    def test_installed_tools_do_not_select_cache_or_download(self):
-        with mock.patch.object(TOOLS, "usable", return_value=True), mock.patch.object(TOOLS, "cache_directory", side_effect=AssertionError("cache is not needed")), mock.patch.object(TOOLS.subprocess, "call", return_value=17) as child, mock.patch.object(sys, "argv", ["test-prerequisites.py", "--", "bash", "-c", "exit 17"]):
-            self.assertEqual(17, TOOLS.main())
-        self.assertEqual(["bash", "-c", "exit 17"], child.call_args.args[0])
-        self.assertEqual(dict(os.environ), child.call_args.kwargs["env"])
+    def test_arbitrary_commands_fail_before_preparation_or_execution(self):
+        marker = self.root / "explicit-command"
+        commands = (["--", sys.executable, "-c", "from pathlib import Path; Path(" + repr(str(marker)) + ").touch()"], ["--", "bash", "-c", "exit 17"], ["--", "go", "test", "./..."], ["go"], ["--help"])
+        for arguments in commands:
+            with self.subTest(arguments=arguments), mock.patch.object(TOOLS, "cache_directory", side_effect=AssertionError("must reject before preparation")), mock.patch.object(TOOLS.subprocess, "call", side_effect=AssertionError("must reject before execution")), mock.patch.object(sys, "argv", ["test-prerequisites.py", *arguments]):
+                with self.assertRaisesRegex(RuntimeError, "accepts no arguments"):
+                    TOOLS.main()
+        self.assertFalse(marker.exists())
+        self.assertEqual([], self.requests)
 
     def test_persistent_corruption_never_falls_back(self):
         cache = self.root / "openshift-mcp-test-tools"
@@ -577,7 +574,7 @@ class TestPrerequisites(unittest.TestCase):
             if name in ("bash", "make", "tar", "sha256sum", "unzip"):
                 return "/baseline/" + name
             return original(name, path=path)
-        with mock.patch.dict(os.environ, {"XDG_CACHE_HOME": str(self.root), "PATH": "missing"}), mock.patch.object(TOOLS.json, "load", return_value=self.manifest), mock.patch.object(TOOLS.shutil, "which", side_effect=lookup), mock.patch.object(TOOLS.tempfile, "TemporaryDirectory", side_effect=AssertionError("corruption must not fall back")), mock.patch.object(TOOLS.subprocess, "call", side_effect=AssertionError("corruption must not start Go")), mock.patch.object(sys, "argv", ["test-prerequisites.py", "--", "go", "test", "-race", "-count=1", "-v", "./..."]):
+        with mock.patch.object(TOOLS.platform, "system", return_value="Linux"), mock.patch.object(TOOLS.platform, "machine", return_value="x86_64"), mock.patch.dict(os.environ, {"XDG_CACHE_HOME": str(self.root), "PATH": "missing"}), mock.patch.object(TOOLS.json, "load", return_value=self.manifest), mock.patch.object(TOOLS.shutil, "which", side_effect=lookup), mock.patch.object(TOOLS.tempfile, "TemporaryDirectory", side_effect=AssertionError("corruption must not fall back")), mock.patch.object(TOOLS.subprocess, "call", side_effect=AssertionError("corruption must not start Go")), mock.patch.object(sys, "argv", ["test-prerequisites.py"]):
             with self.assertRaisesRegex(RuntimeError, "checksum mismatch"):
                 TOOLS.main()
         self.assertEqual(3, len(self.requests))
@@ -597,7 +594,7 @@ class TestPrerequisites(unittest.TestCase):
             self.assertEqual(environment["GOFLAGS"], env["GOFLAGS"])
             self.assertEqual(environment["XDG_DATA_HOME"], env["XDG_DATA_HOME"])
             return 17
-        with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(TOOLS, "usable", return_value=False), mock.patch.object(TOOLS, "prepare", side_effect=prepare), mock.patch.object(TOOLS.subprocess, "call", side_effect=child), mock.patch.object(sys, "argv", ["test-prerequisites.py", "--", "go", "test", "-race", "-count=1", "-v", "./..."]):
+        with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(TOOLS, "prepare", side_effect=prepare), mock.patch.object(TOOLS.subprocess, "call", side_effect=child), mock.patch.object(sys, "argv", ["test-prerequisites.py"]):
             self.assertEqual(17, TOOLS.main())
         self.assertFalse(selected[0].parent.exists())
 

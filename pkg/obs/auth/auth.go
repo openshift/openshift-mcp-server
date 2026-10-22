@@ -45,6 +45,9 @@ func ParseAuthMode(mode string) (AuthMode, error) {
 
 // BuildRoundTripper creates an http.RoundTripper using the configured auth mode.
 func BuildRoundTripper(ctx context.Context, restConfig *rest.Config, authMode AuthMode, useTLS, insecure bool) (http.RoundTripper, error) {
+	if insecure {
+		return nil, fmt.Errorf("insecure=true is no longer supported; configure a trusted CA instead")
+	}
 	if restConfig == nil {
 		return nil, fmt.Errorf("no REST config available")
 	}
@@ -58,10 +61,10 @@ func BuildRoundTripper(ctx context.Context, restConfig *rest.Config, authMode Au
 		return nil, err
 	}
 
-	return createRoundTripperWithToken(restConfig, token, useTLS, insecure)
+	return createRoundTripperWithToken(restConfig, token, useTLS)
 }
 
-func createRoundTripperWithToken(restConfig *rest.Config, token string, useTLS, insecure bool) (http.RoundTripper, error) {
+func createRoundTripperWithToken(restConfig *rest.Config, token string, useTLS bool) (http.RoundTripper, error) {
 	defaultRt, ok := promapi.DefaultRoundTripper.(*http.Transport)
 	if !ok {
 		return nil, fmt.Errorf("unexpected RoundTripper type: %T, expected *http.Transport", promapi.DefaultRoundTripper)
@@ -73,20 +76,13 @@ func createRoundTripperWithToken(restConfig *rest.Config, token string, useTLS, 
 		return rt, nil
 	}
 
-	if insecure {
-		rt.TLSClientConfig = &tls.Config{
-			MinVersion:         tls.VersionTLS12,
-			InsecureSkipVerify: true,
-		}
-	} else {
-		certs, err := createCertPoolFromRESTConfig(restConfig)
-		if err != nil {
-			return nil, err
-		}
-		rt.TLSClientConfig = &tls.Config{
-			MinVersion: tls.VersionTLS12,
-			RootCAs:    certs,
-		}
+	certs, err := createCertPoolFromRESTConfig(restConfig)
+	if err != nil {
+		return nil, err
+	}
+	rt.TLSClientConfig = &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		RootCAs:    certs,
 	}
 
 	if token != "" {

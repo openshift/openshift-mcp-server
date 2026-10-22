@@ -1,15 +1,16 @@
 # Default test prerequisites
 
-`make test` prepares only missing or incompatible Node.js, jq and ShellCheck in
-an owned 0700 user cache, then runs the unchanged complete Go test command.
-Existing usable tools remain on PATH: Node >=18 with Object.hasOwn, jq >=1.6
-supporting the tested all/type query, and ShellCheck >=0.9. Python >=3.9, Bash, Make, tar,
-sha256sum and unzip must already exist. Python is not downloaded. The actual
+`make test` verifies pinned Node.js, jq and ShellCheck in an owned 0700 cache,
+then runs exactly `go test -race -count=1 -v ./...`. The helper accepts no
+arguments or alternative commands. Caller-provided prerequisite executables
+are never probed or reused: all three selected executables must match the
+committed manifest hashes. Python >=3.9, Go, Bash, Make, tar, sha256sum and unzip
+must already exist. Python and Go are not downloaded. The actual
 Prow src image provides Python 3.9; its complete inventory still needs validation.
 Capture/process-reaping coverage requires Linux child-subreaper support.
 
-The missing-tool bootstrap supports Linux x86_64. Other platforms without the
-required tools fail explicitly, not by skipping or tagging tests. No system
+The bootstrap supports Linux x86_64 only. Other platforms fail explicitly even
+with installed tools, not by skipping or tagging tests. No system
 packages, root access, Go version changes, or cross-repository edits are used.
 An explicit `XDG_CACHE_HOME` must be a safe physical owned writable path; invalid
 explicit settings fail closed. Without it, the bootstrap tries the home cache
@@ -43,12 +44,14 @@ Archives are verified before parsing and only one exact regular-file member is
 read, without filesystem extraction. Files are installed atomically after both
 checksums match. Partial preparation never runs tests with missing tools.
 
-The caller's PATH, loader configuration, proxy/TLS settings and explicit command
-are trusted inputs. Fixed version probes and generic CLI commands use argv, not
-shell interpretation; this wrapper intentionally executes the caller's selected
-program and does not restrict it to Go. Offline regressions test the actual Make
+The Go compiler is a trusted baseline tool selected by literal `go` through the
+caller's PATH, after verified prerequisite directories are prepended. The CI
+builder supplies Go; this helper does not establish compiler provenance. The
+caller's remaining PATH, loader configuration, proxy/TLS settings and Go
+environment (including GOFLAGS) are trusted inputs. This is a fixed test runner,
+not a sandbox for candidate Go tests. Offline regressions test the actual Make
 recipe using test-only platform overrides and fake release assets, with native
 Linux x86_64 positives and unsupported-platform negatives retained. They are not
 official-download evidence or proof of native macOS/ARM execution. Command-exec
-scanner warnings require security-owner disposition; no suppression or blanket
+scanner results still require a new scan; no suppression or blanket
 false-positive/clearance claim follows from these boundary tests.

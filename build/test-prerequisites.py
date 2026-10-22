@@ -31,34 +31,6 @@ def open_release(url, timeout):
     return urllib.request.build_opener(HTTPSRedirect()).open(url, timeout=timeout)
 
 
-def usable(name, search_path):
-    probes = {
-        "node": ["-e", "if(+process.versions.node.split('.')[0]<18||!Object.hasOwn({ok:1},'ok'))process.exit(1)"],
-        "jq": ["--version"],
-        "shellcheck": ["--version"],
-    }
-    if name not in probes:
-        raise ValueError("unsupported test executable: " + name)
-    executable = shutil.which(name, path=search_path)
-    if not executable:
-        return False
-    try:
-        result = subprocess.run([executable, *probes[name]], capture_output=True, timeout=10)
-        if result.returncode:
-            return False
-        if name == "shellcheck":
-            version = re.search(rb"version: (\d+)\.(\d+)\.(\d+)", result.stdout)
-            return bool(version and tuple(map(int, version.groups())) >= (0, 9, 0))
-        if name == "jq":
-            version = re.fullmatch(rb"jq-(\d+)\.(\d+)(?:\.\d+)?\s*", result.stdout)
-            if not version or tuple(map(int, version.groups())) < (1, 6):
-                return False
-            return subprocess.run([executable, "-ne", '[1,2]|all(.[]; type=="number")'], capture_output=True, timeout=10).returncode == 0
-        return True
-    except (OSError, subprocess.TimeoutExpired):
-        return False
-
-
 @contextmanager
 def checked_directory(directory, create=False, private=False):
     directory = Path(directory)
@@ -196,11 +168,8 @@ def download(entry):
 
 
 def prepare(manifest, cache, search_path, system=None):
-    missing = [name for name in ("node", "jq", "shellcheck") if not usable(name, search_path)]
-    if not missing:
-        return search_path
     if (system or (platform.system(), platform.machine())) != ("Linux", "x86_64"):
-        raise RuntimeError("missing test tools: pinned bootstrap supports Linux x86_64 only; install compatible tools explicitly on this platform")
+        raise RuntimeError("pinned bootstrap supports Linux x86_64 only; other platforms require reviewed release pins")
     import fcntl
     cache = Path(cache)
     private_directory(cache)
@@ -219,7 +188,7 @@ def prepare(manifest, cache, search_path, system=None):
                 if time.monotonic() >= deadline:
                     raise RuntimeError("test-tool cache lock timeout")
                 time.sleep(0.1)
-        for name in missing:
+        for name in ("node", "jq", "shellcheck"):
             entry = manifest[name]
             if not re.fullmatch(r"[a-f0-9]{64}", entry["binary_sha256"]):
                 raise RuntimeError("invalid test-tool manifest")
@@ -242,8 +211,6 @@ def prepare(manifest, cache, search_path, system=None):
                         os.unlink(temporary)
             verified_file(target, entry["binary_sha256"])
             private_directory(directory)
-            if not usable(name, str(directory)):
-                raise RuntimeError("verified test tool is incompatible with this runtime: " + name)
             paths.append(str(directory))
     return os.pathsep.join([*paths, search_path])
 
@@ -251,21 +218,19 @@ def prepare(manifest, cache, search_path, system=None):
 def main():
     if sys.version_info < (3, 9):
         raise RuntimeError("make test requires Python >=3.9")
+    if len(sys.argv) != 1:
+        raise RuntimeError("test-prerequisites.py accepts no arguments; only the fixed Go test recipe is supported")
     search_path = os.environ.get("PATH", "")
     required = ("bash", "make", "tar", "sha256sum", "unzip")
     missing = [name for name in required if not shutil.which(name, path=search_path)]
     if missing:
         raise RuntimeError("missing baseline test prerequisites: " + ", ".join(missing))
-    if sys.argv[1:2] != ["--"] or len(sys.argv) < 3:
-        raise RuntimeError("usage: test-prerequisites.py -- command [args...]")
     with Path(__file__).with_suffix(".json").open() as source:
         manifest = json.load(source)
     environment = os.environ.copy()
-    if all(usable(name, search_path) for name in ("node", "jq", "shellcheck")):
-        return subprocess.call(sys.argv[2:], env=environment)
     with cache_directory() as cache:
         environment["PATH"] = prepare(manifest, cache, search_path)
-        return subprocess.call(sys.argv[2:], env=environment)
+        return subprocess.call(["go", "test", "-race", "-count=1", "-v", "./..."], env=environment)
 
 
 if __name__ == "__main__":

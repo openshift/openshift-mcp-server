@@ -27,7 +27,7 @@ type Config struct {
 	// LokiURL is the URL of the Loki API endpoint.
 	LokiURL string `toml:"loki_url,omitempty"`
 
-	// Insecure controls whether to skip TLS certificate verification.
+	// Insecure is retained for configuration compatibility but true is rejected.
 	Insecure bool `toml:"insecure,omitempty"`
 
 	// UseRoute controls whether to use OpenShift Routes for discovering LokiStack endpoints.
@@ -52,6 +52,9 @@ var _ serverconfig.ExtendedConfig = (*Config)(nil)
 var DefaultConfig = &Config{}
 
 func (c *Config) Validate() error {
+	if c.Insecure {
+		return fmt.Errorf("insecure=true is no longer supported; configure a trusted CA instead")
+	}
 	if c.AuthMode != "" && c.AuthMode != auth.AuthModeHeader && c.AuthMode != auth.AuthModeKubeConfig {
 		return fmt.Errorf("invalid auth_mode: %q (valid options: %q, %q)", c.AuthMode, auth.AuthModeHeader, auth.AuthModeKubeConfig)
 	}

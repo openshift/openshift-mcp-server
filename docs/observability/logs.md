@@ -129,14 +129,14 @@ use_route = false
 |--------|------|---------|-------------|
 | `auth_mode` | string | `"header"` | Bearer token source: `"header"` or `"kubeconfig"` |
 | `loki_url` | string | — | Loki API endpoint URL (optional; use LokiStack discovery if unset) |
-| `insecure` | bool | `false` | Skip TLS certificate verification |
+| `insecure` | bool | `false` | Must be false; true is rejected. Configure verified CA trust instead. |
 | `use_route` | bool | `false` | Use OpenShift `Route` resources for LokiStack gateway URLs |
 
 ---
 
 ## Authentication and TLS
 
-Bearer token behavior matches the [metrics toolset](./metrics.md) (**Authentication and TLS** section): `auth_mode` chooses header vs kubeconfig, and TLS uses kubeconfig CA data, OpenShift service CA when in-cluster, then the system trust store. Set `insecure = true` only when you cannot install the correct CA (not recommended in production).
+Bearer token behavior matches the [metrics toolset](./metrics.md) (**Authentication and TLS** section): `auth_mode` chooses header vs kubeconfig, and TLS uses kubeconfig CA data, OpenShift service CA when in-cluster, then the system trust store. `insecure = true` is no longer supported and is rejected before token lookup or HTTP requests. Remove that option and configure the endpoint's issuing CA through the existing trust sources; expiry and hostname checks remain required.
 
 ### Loki URL resolution
 
