@@ -361,12 +361,21 @@
       "readOnlyHint": true,
       "title": "Get Service Endpoints"
     },
-    "description": "Return EndpointSlices for a Service from the live cluster or a selected must-gather archive. Set archive_id for offline analysis.",
+    "description": "Return EndpointSlices for a Service from the live cluster or a selected must-gather archive. Set archive_id for offline analysis. Use limit and continue to retrieve a large list one page at a time.",
     "inputSchema": {
       "properties": {
         "archive_id": {
           "description": "Must-gather archive ID from mustgather_list. Omit for the live cluster.",
           "type": "string"
+        },
+        "continue": {
+          "description": "Opaque token from the continue field of the previous page. Send it unchanged with the same limit, namespace, and selectors to retrieve the next page. Omit on the first call.",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Maximum number of items to return. Omit or set to 0 to list everything, which fails if the response exceeds max_backend_response_bytes. Retry with a smaller limit when that happens. The API may return fewer items than requested.",
+          "minimum": 0,
+          "type": "integer"
         },
         "namespace": {
           "description": "Service namespace",
