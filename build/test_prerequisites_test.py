@@ -351,6 +351,29 @@ class TestPrerequisites(unittest.TestCase):
         self.assertEqual(0o700, stat.S_IMODE(outside.stat().st_mode))
 
     def test_default_home_and_passwd_resolution(self):
+        for mode in (0o500, 0o600):
+            with self.subTest(owner_mode=oct(mode)):
+                home = self.root / ("mode-home-" + str(mode))
+                home.mkdir(mode=mode)
+                self.addCleanup(home.chmod, 0o700)
+                environment = dict(os.environ, HOME=str(home), TMPDIR=str(self.root))
+                environment.pop("XDG_CACHE_HOME", None)
+                original_mkdir = os.mkdir
+
+                def guarded_mkdir(path, *args, **kwargs):
+                    if os.fspath(path) == ".cache":
+                        self.fail("mode-denied HOME must be rejected before cache creation")
+                    return original_mkdir(path, *args, **kwargs)
+
+                with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(TOOLS.os, "access", return_value=True), mock.patch.object(TOOLS.os, "mkdir", side_effect=guarded_mkdir):
+                    with TOOLS.cache_directory() as cache:
+                        self.assertEqual(self.root, cache.parent.parent)
+                        self.assertEqual(0o700, stat.S_IMODE(cache.parent.stat().st_mode))
+                    self.assertFalse(cache.parent.exists())
+                    with self.assertRaisesRegex(RuntimeError, "owned and writable"):
+                        TOOLS.writable_cache_base(home)
+                home.chmod(0o700)
+                self.assertFalse((home / ".cache").exists())
         home = self.root / "home"
         home.mkdir(mode=0o700)
         environment = dict(os.environ, HOME=str(home))

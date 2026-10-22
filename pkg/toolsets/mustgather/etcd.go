@@ -68,28 +68,37 @@ func mustgatherETCDHealth(params api.ToolHandlerParams) (*api.ToolCallResult, er
 		return api.NewToolCallResult("", fmt.Errorf("failed to get ETCD health: %w", err)), nil
 	}
 
-	output := "## ETCD Cluster Health\n\n"
+	output := api.NewBuilderWithBudget(api.ResultLimit(params.Context))
+	output.WriteString("## ETCD Cluster Health\n\n")
 	if health.Healthy {
-		output += "Status: [OK] Healthy\n\n"
+		output.WriteString("Status: [OK] Healthy\n\n")
 	} else {
-		output += "Status: [FAIL] Unhealthy\n\n"
+		output.WriteString("Status: [FAIL] Unhealthy\n\n")
 	}
 
-	output += "### Endpoints\n\n"
+	output.WriteString("### Endpoints\n\n")
 	for _, ep := range health.Endpoints {
-		output += fmt.Sprintf("- %s %s\n", healthSymbol(ep.Health), ep.Address)
+		if !output.Fits(0) {
+			output.WriteString("\n")
+			break
+		}
+		output.WriteString(fmt.Sprintf("- %s %s\n", healthSymbol(ep.Health), ep.Address))
 	}
 
-	if len(health.Alarms) > 0 {
-		output += "\n### Active Alarms\n\n"
+	if len(health.Alarms) > 0 && !output.Truncated() {
+		output.WriteString("\n### Active Alarms\n\n")
 		for _, alarm := range health.Alarms {
-			output += fmt.Sprintf("- [WARNING] %s\n", alarm)
+			if !output.Fits(0) {
+				output.WriteString("\n")
+				break
+			}
+			output.WriteString(fmt.Sprintf("- [WARNING] %s\n", alarm))
 		}
 	} else {
-		output += "\nNo active alarms.\n"
+		output.WriteString("\nNo active alarms.\n")
 	}
 
-	return api.NewToolCallResult(output, nil), nil
+	return api.NewToolCallResult(output.String(), nil), nil
 }
 
 func mustgatherETCDObjectCount(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -126,7 +135,8 @@ func mustgatherETCDObjectCount(params api.ToolHandlerParams) (*api.ToolCallResul
 		entries = entries[:limit]
 	}
 
-	output := fmt.Sprintf("## ETCD Object Counts\n\nTotal objects: %s across %d resource types\n\n", formatNumber(total), len(counts))
+	output := api.NewBuilderWithBudget(api.ResultLimit(params.Context))
+	output.WriteString(fmt.Sprintf("## ETCD Object Counts\n\nTotal objects: %s across %d resource types\n\n", formatNumber(total), len(counts)))
 
 	// Find max resource name length for alignment
 	maxLen := 0
@@ -137,12 +147,16 @@ func mustgatherETCDObjectCount(params api.ToolHandlerParams) (*api.ToolCallResul
 	}
 
 	for _, e := range entries {
-		output += fmt.Sprintf("%-*s  %s\n", maxLen, e.resource, formatNumber(e.count))
+		if !output.Fits(0) {
+			output.WriteString("\n")
+			break
+		}
+		output.WriteString(fmt.Sprintf("%-*s  %s\n", maxLen, e.resource, formatNumber(e.count)))
 	}
 
 	if limit > 0 && len(counts) > limit {
-		output += fmt.Sprintf("\n... showing top %d of %d resource types\n", limit, len(counts))
+		output.WriteString(fmt.Sprintf("\n... showing top %d of %d resource types\n", limit, len(counts)))
 	}
 
-	return api.NewToolCallResult(output, nil), nil
+	return api.NewToolCallResult(output.String(), nil), nil
 }

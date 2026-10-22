@@ -25,6 +25,7 @@ type Config struct {
 	AuthMode auth.AuthMode `toml:"auth_mode,omitempty"`
 
 	// Insecure is retained for configuration compatibility but true is rejected.
+	// Configure a trusted CA instead of disabling certificate verification.
 	Insecure bool `toml:"insecure,omitempty"`
 
 	// TempoURL is the URL of the Tempo API endpoint.

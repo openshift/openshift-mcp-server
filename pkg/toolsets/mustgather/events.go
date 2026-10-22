@@ -16,6 +16,8 @@ import (
 
 var eventGVK = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Event"}
 
+const partialEventOrderWarning = "[partial archive scan: chronological selection across the archive cannot be guaranteed]\n"
+
 func initEvents() []api.ServerTool {
 	return []api.ServerTool{
 		{
@@ -108,39 +110,34 @@ func mustgatherEventsList(params api.ToolHandlerParams) (*api.ToolCallResult, er
 	reasonFilter := getString(args, "reason", "")
 	limit := getInt(args, "limit", 100)
 
-	list, err := p.ListResources(params.Context, eventGVK, namespace, mg.ListOptions{})
-	if err != nil {
-		return api.NewToolCallResult("", err), nil
-	}
-
-	// Filter and collect events
-	var filtered []unstructured.Unstructured
-	for i := range list.Items {
-		event := &list.Items[i]
-
+	list, err := p.ListResourcesFiltered(params.Context, eventGVK, namespace, mg.ListOptions{}, func(event *unstructured.Unstructured) bool {
 		if typeFilter != "all" {
 			eventType, _, _ := unstructured.NestedString(event.Object, "type")
 			if eventType != typeFilter {
-				continue
+				return false
 			}
 		}
 
 		if resourceFilter != "" {
 			involvedName, _, _ := unstructured.NestedString(event.Object, "involvedObject", "name")
 			if !strings.Contains(strings.ToLower(involvedName), strings.ToLower(resourceFilter)) {
-				continue
+				return false
 			}
 		}
 
 		if reasonFilter != "" {
 			reason, _, _ := unstructured.NestedString(event.Object, "reason")
 			if !strings.Contains(strings.ToLower(reason), strings.ToLower(reasonFilter)) {
-				continue
+				return false
 			}
 		}
-
-		filtered = append(filtered, *event)
+		return true
+	})
+	if err != nil {
+		return api.NewToolCallResult("", err), nil
 	}
+	cut := mg.ListTruncated(list)
+	filtered := list.Items
 
 	// Sort by lastTimestamp descending
 	sort.Slice(filtered, func(i, j int) bool {
@@ -155,15 +152,28 @@ func mustgatherEventsList(params api.ToolHandlerParams) (*api.ToolCallResult, er
 	}
 
 	if len(filtered) == 0 {
+		if cut {
+			return api.NewToolCallResult(api.LimitString(params.Context, partialEventOrderWarning+api.ResultTruncationNotice), nil), nil
+		}
 		return api.NewToolCallResult("No events found matching the criteria", nil), nil
 	}
 
-	output := fmt.Sprintf("Found %d events:\n\n", len(filtered))
-	for i := range filtered {
-		output += formatEvent(&filtered[i])
+	output := api.NewBuilderWithBudget(api.ResultLimit(params.Context))
+	if cut {
+		output.WriteString(partialEventOrderWarning)
 	}
-
-	return api.NewToolCallResult(output, nil), nil
+	output.WriteString(fmt.Sprintf("Found %d events:\n\n", len(filtered)))
+	for i := range filtered {
+		if !output.Fits(0) {
+			output.WriteString("\n")
+			break
+		}
+		output.WriteString(formatEvent(&filtered[i]))
+	}
+	if cut && !output.Truncated() {
+		output.WriteCut("\n", true)
+	}
+	return api.NewToolCallResult(output.String(), nil), nil
 }
 
 func mustgatherEventsByResource(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -182,27 +192,24 @@ func mustgatherEventsByResource(params api.ToolHandlerParams) (*api.ToolCallResu
 		return api.NewToolCallResult("", fmt.Errorf("name is required")), nil
 	}
 
-	list, err := p.ListResources(params.Context, eventGVK, namespace, mg.ListOptions{})
-	if err != nil {
-		return api.NewToolCallResult("", err), nil
-	}
-
-	// Filter events for the specific resource
-	var matched []unstructured.Unstructured
-	for i := range list.Items {
-		event := &list.Items[i]
+	list, err := p.ListResourcesFiltered(params.Context, eventGVK, namespace, mg.ListOptions{}, func(event *unstructured.Unstructured) bool {
 		involvedName, _, _ := unstructured.NestedString(event.Object, "involvedObject", "name")
 		if involvedName != name {
-			continue
+			return false
 		}
 		if kindFilter != "" {
 			involvedKind, _, _ := unstructured.NestedString(event.Object, "involvedObject", "kind")
 			if !strings.EqualFold(involvedKind, kindFilter) {
-				continue
+				return false
 			}
 		}
-		matched = append(matched, *event)
+		return true
+	})
+	if err != nil {
+		return api.NewToolCallResult("", err), nil
 	}
+	cut := mg.ListTruncated(list)
+	matched := list.Items
 
 	// Sort chronologically
 	sort.Slice(matched, func(i, j int) bool {
@@ -212,15 +219,28 @@ func mustgatherEventsByResource(params api.ToolHandlerParams) (*api.ToolCallResu
 	})
 
 	if len(matched) == 0 {
+		if cut {
+			return api.NewToolCallResult(api.LimitString(params.Context, partialEventOrderWarning+api.ResultTruncationNotice), nil), nil
+		}
 		return api.NewToolCallResult(fmt.Sprintf("No events found for resource %s", name), nil), nil
 	}
 
-	output := fmt.Sprintf("Found %d events for %s:\n\n", len(matched), name)
-	for i := range matched {
-		output += formatEvent(&matched[i])
+	output := api.NewBuilderWithBudget(api.ResultLimit(params.Context))
+	if cut {
+		output.WriteString(partialEventOrderWarning)
 	}
-
-	return api.NewToolCallResult(output, nil), nil
+	output.WriteString(fmt.Sprintf("Found %d events for %s:\n\n", len(matched), name))
+	for i := range matched {
+		if !output.Fits(0) {
+			output.WriteString("\n")
+			break
+		}
+		output.WriteString(formatEvent(&matched[i]))
+	}
+	if cut && !output.Truncated() {
+		output.WriteCut("\n", true)
+	}
+	return api.NewToolCallResult(output.String(), nil), nil
 }
 
 func mustgatherEventsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -255,41 +275,37 @@ func mustgatherEventsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, 
 		}
 	}
 
-	list, err := p.ListResources(params.Context, eventGVK, namespace, mg.ListOptions{})
-	if err != nil {
-		return api.NewToolCallResult("", err), nil
-	}
-
-	var filtered []unstructured.Unstructured
-	for i := range list.Items {
-		event := &list.Items[i]
-
+	list, err := p.ListResourcesFiltered(params.Context, eventGVK, namespace, mg.ListOptions{}, func(event *unstructured.Unstructured) bool {
 		lastTimestamp, _, _ := unstructured.NestedString(event.Object, "lastTimestamp")
 		if lastTimestamp == "" {
-			continue
+			return false
 		}
 
 		eventTime, err := time.Parse(time.RFC3339, lastTimestamp)
 		if err != nil {
-			continue
+			return false
 		}
 
 		if eventTime.Before(sinceTime) {
-			continue
+			return false
 		}
 		if hasUntil && eventTime.After(untilTime) {
-			continue
+			return false
 		}
 
 		if typeFilter != "all" {
 			eventType, _, _ := unstructured.NestedString(event.Object, "type")
 			if eventType != typeFilter {
-				continue
+				return false
 			}
 		}
-
-		filtered = append(filtered, *event)
+		return true
+	})
+	if err != nil {
+		return api.NewToolCallResult("", err), nil
 	}
+	cut := mg.ListTruncated(list)
+	filtered := list.Items
 
 	// Sort chronologically (oldest first)
 	sort.Slice(filtered, func(i, j int) bool {
@@ -303,6 +319,9 @@ func mustgatherEventsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, 
 	}
 
 	if len(filtered) == 0 {
+		if cut {
+			return api.NewToolCallResult(api.LimitString(params.Context, partialEventOrderWarning+api.ResultTruncationNotice), nil), nil
+		}
 		msg := fmt.Sprintf("No events found between %s and ", sinceStr)
 		if hasUntil {
 			msg += untilStr
@@ -312,19 +331,29 @@ func mustgatherEventsByTime(params api.ToolHandlerParams) (*api.ToolCallResult, 
 		return api.NewToolCallResult(msg, nil), nil
 	}
 
-	output := fmt.Sprintf("Found %d events between %s and ", len(filtered), sinceStr)
-	if hasUntil {
-		output += untilStr
-	} else {
-		output += "latest"
+	output := api.NewBuilderWithBudget(api.ResultLimit(params.Context))
+	if cut {
+		output.WriteString(partialEventOrderWarning)
 	}
-	output += ":\n\n"
+	output.WriteString(fmt.Sprintf("Found %d events between %s and ", len(filtered), sinceStr))
+	if hasUntil {
+		output.WriteString(untilStr)
+	} else {
+		output.WriteString("latest")
+	}
+	output.WriteString(":\n\n")
 
 	for i := range filtered {
-		output += formatEvent(&filtered[i])
+		if !output.Fits(0) {
+			output.WriteString("\n")
+			break
+		}
+		output.WriteString(formatEvent(&filtered[i]))
 	}
-
-	return api.NewToolCallResult(output, nil), nil
+	if cut && !output.Truncated() {
+		output.WriteCut("\n", true)
+	}
+	return api.NewToolCallResult(output.String(), nil), nil
 }
 
 func formatEvent(event *unstructured.Unstructured) string {

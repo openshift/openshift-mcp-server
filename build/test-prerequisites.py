@@ -79,7 +79,8 @@ def private_directory(directory):
 
 def writable_cache_base(base):
     with checked_directory(base, create=True) as descriptor:
-        if os.fstat(descriptor).st_uid != os.getuid() or not os.access(base, os.W_OK | os.X_OK):
+        info = os.fstat(descriptor)
+        if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) & 0o300 != 0o300 or not os.access(base, os.W_OK | os.X_OK):
             raise RuntimeError("test-tool cache base must be owned and writable")
 
 
@@ -100,6 +101,10 @@ def cache_directory():
         home = Path.home()
         if home == Path(home.anchor):
             raise RuntimeError("root is not a private cache home")
+        with checked_directory(home) as descriptor:
+            info = os.fstat(descriptor)
+            if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) & 0o300 != 0o300 or not os.access(home, os.W_OK | os.X_OK):
+                raise RuntimeError("test-tool home must be owned and writable")
         base = home / ".cache"
         writable_cache_base(base)
     except (KeyError, OSError, RuntimeError):

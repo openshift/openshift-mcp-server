@@ -1,0 +1,32 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: observability-monitoring-reader
+rules:
+  # Required for Prometheus API access with kubeconfig auth mode
+  # 'create' is needed because Prometheus uses HTTP POST for some query endpoints
+  # and the Kubernetes API proxy maps POST to 'create'.
+  - apiGroups: ["monitoring.coreos.com"]
+    resources: ["prometheuses/api"]
+    resourceNames: ["k8s"]
+    verbs: ["get", "create"]
+  # Required for Alertmanager API access (read-only)
+  - apiGroups: ["monitoring.coreos.com"]
+    resources: ["alertmanagers/api"]
+    resourceNames: ["main"]
+    verbs: ["get", "list"]
+---
+# RoleBinding scoped to openshift-monitoring namespace only
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: observability-monitoring-reader
+  namespace: openshift-monitoring
+subjects:
+  - kind: ServiceAccount
+    name: kubernetes-mcp-server
+    namespace: kubernetes-mcp-server
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: observability-monitoring-reader

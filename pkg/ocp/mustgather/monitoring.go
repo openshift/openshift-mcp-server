@@ -26,7 +26,7 @@ func (p *Provider) GetAlertManagerPath() string {
 // ReadPrometheusJSON reads and parses a JSON file from a Prometheus replica directory
 func (p *Provider) ReadPrometheusJSON(replicaPath, filename string, v any) error {
 	dataFile := filepath.Join(replicaPath, filename)
-	return ReadJSON(dataFile, v)
+	return p.readJSON(dataFile, v)
 }
 
 // GetPrometheusTSDB reads TSDB status for a replica
@@ -64,7 +64,7 @@ func (p *Provider) GetPrometheusRules() (*RuleGroupsResponse, error) {
 	promPath := p.GetPrometheusCommonPath()
 	rulesFile := filepath.Join(promPath, "rules.json")
 	var resp RuleGroupsAPIResponse
-	if err := ReadJSON(rulesFile, &resp); err != nil {
+	if err := p.readJSON(rulesFile, &resp); err != nil {
 		return nil, err
 	}
 	return &resp.Data, nil
@@ -75,7 +75,7 @@ func (p *Provider) GetAlertManagerStatus() (*AlertManagerStatus, error) {
 	amPath := p.GetAlertManagerPath()
 	statusFile := filepath.Join(amPath, "status.json")
 	var status AlertManagerStatus
-	if err := ReadJSON(statusFile, &status); err != nil {
+	if err := p.readJSON(statusFile, &status); err != nil {
 		return nil, err
 	}
 	return &status, nil
@@ -86,7 +86,7 @@ func (p *Provider) GetPrometheusConfig() (*ConfigResponse, error) {
 	promPath := p.GetPrometheusCommonPath()
 	configFile := filepath.Join(promPath, "status", "config.json")
 	var config ConfigResponse
-	if err := ReadJSON(configFile, &config); err != nil {
+	if err := p.readJSON(configFile, &config); err != nil {
 		return nil, err
 	}
 	return &config, nil
@@ -97,7 +97,7 @@ func (p *Provider) GetPrometheusFlags() (FlagsResponse, error) {
 	promPath := p.GetPrometheusCommonPath()
 	flagsFile := filepath.Join(promPath, "status", "flags.json")
 	var flags FlagsResponse
-	if err := ReadJSON(flagsFile, &flags); err != nil {
+	if err := p.readJSON(flagsFile, &flags); err != nil {
 		return nil, err
 	}
 	return flags, nil
@@ -106,6 +106,17 @@ func (p *Provider) GetPrometheusFlags() (FlagsResponse, error) {
 // ReadJSON reads and unmarshals a JSON file
 func ReadJSON(filePath string, v any) error {
 	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file %s: %w", filepath.Base(filePath), err)
+	}
+	if err := json.Unmarshal(data, v); err != nil {
+		return fmt.Errorf("failed to parse JSON from %s: %w", filepath.Base(filePath), err)
+	}
+	return nil
+}
+
+func (p *Provider) readJSON(filePath string, v any) error {
+	data, err := p.readFile(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to read file %s: %w", filepath.Base(filePath), err)
 	}

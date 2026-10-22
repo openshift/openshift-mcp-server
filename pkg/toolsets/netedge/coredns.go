@@ -43,7 +43,7 @@ func initCoreDNS(ctx context.Context, inspector api.ClusterInspector) []api.Serv
 				ResourceName: &api.RBACResourceName{Name: "dns-default"},
 			}),
 			Handler:                    getCoreDNSConfig,
-			TargetCompatibilityFilters: []func() bool{targetHasGVK(ctx, inspector, coreDNSConfigMapGVK)},
+			TargetCompatibilityFilters: []api.TargetCompatibilityFilter{targetHasGVK(inspector, coreDNSConfigMapGVK)},
 		},
 	}
 }
@@ -73,5 +73,5 @@ func getCoreDNSConfig(params api.ToolHandlerParams) (*api.ToolCallResult, error)
 		return api.NewToolCallResult("", fmt.Errorf("corefile not found in dns-default ConfigMap")), nil
 	}
 
-	return api.NewToolCallResult(corefile, nil), nil
+	return api.NewToolCallResult(api.LimitString(params.Context, corefile), nil), nil
 }

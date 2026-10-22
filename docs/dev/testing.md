@@ -21,7 +21,9 @@ absolute, physical (no symlink or `..` components), owned, and writable. Invalid
 explicit settings fail rather than silently switching caches. Without that
 setting, an unavailable or unsafe home cache (including `HOME=/`) uses a unique
 owned 0700 temporary directory instead. A set `TMPDIR` must name a safe physical
-writable directory; invalid settings fail. Otherwise `/tmp` is used. Root-owned
+writable directory; invalid settings fail. Otherwise `/tmp` is used only if it
+is a safe physical writable directory; a symlinked `/tmp` requires a safe explicit
+`TMPDIR` instead. Root-owned
 sticky temporary directories are allowed only with a unique private child, not
 a shared predictable cache. Temporary caches survive until the command finishes
 and are cleaned on normal success or failure; persistent tool-cache corruption
@@ -66,6 +68,21 @@ message binds its origin for the session. Opaque-origin parents still require
 `*` for replies and are distinguished by source window, not by the shared `null`
 origin string. This does not authenticate a malicious embedding host, and these
 Node fixtures are not evidence of execution in a real browser.
+
+## Browser test extensions
+
+`make browser-test` runs the existing browser tests and additional Playwright
+tests under `test/browser/extensions/` (for example, `*.spec.mjs` or
+`*.test.mjs`). Extensions are optional;
+downstream repositories can add suites there without editing the shared runner.
+The runner copies the entire extension directory, preserving nested folders,
+helpers, and fixtures under `_output/browser/playwright/extensions/`.
+
+Downstream Makefiles can add prerequisites to `browser-test` to prepare their
+assets. The target builds the server after these prerequisites complete, so
+the binary embeds the generated assets before browser testing begins.
+Run `make browser-test` as its own goal: combining it with `build` can trigger
+duplicate builds, which can interfere with each other when using `-j`.
 
 ## Test Framework
 

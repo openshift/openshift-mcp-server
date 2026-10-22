@@ -1,0 +1,137 @@
+# Generates synthetic log entries and pushes them to the LokiStack gateway
+# every few seconds. Uses a projected ServiceAccount token for authentication
+# and the OpenShift service CA for TLS verification.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: observability-log-generator
+  namespace: observability-loki
+---
+# The OPA sidecar on the LokiStack gateway authorises push requests using
+# SubjectAccessReviews.  For the "network" tenant mapped via
+# --openshift.mappings=network=loki.grafana.com the OPA checks "create" on
+# the "loki.grafana.com" API-group scoped to the namespaces carried in the
+# log labels (SrcK8S_Namespace / DstK8S_Namespace).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: observability-loki-log-generator
+rules:
+  # Allow the generator to "write" to the network tenant.
+  - apiGroups: ["loki.grafana.com"]
+    resources: ["network"]
+    resourceNames: ["logs"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: observability-loki-log-generator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: observability-loki-log-generator
+subjects:
+  - kind: ServiceAccount
+    name: observability-log-generator
+    namespace: observability-loki
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: observability-log-generator
+  namespace: observability-loki
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: observability-log-generator
+  template:
+    metadata:
+      labels:
+        app: observability-log-generator
+    spec:
+      serviceAccountName: observability-log-generator
+      containers:
+        - name: logger
+          image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          command: ["/bin/sh", "-c"]
+          env:
+            - name: TENANT_ID
+              value: network
+            - name: LOKI_PUSH_URL
+              value: "https://observability-loki-gateway-http.observability-loki.svc:8080/api/logs/v1/network/loki/api/v1/push"
+            - name: PUSH_INTERVAL
+              value: "5"
+            - name: BATCH_SIZE
+              value: "5"
+          args:
+            - |
+              echo "Starting log generator: tenant=${TENANT_ID} interval=${PUSH_INTERVAL}s batch=${BATCH_SIZE}"
+              seq_num=0
+              while true; do
+                # Build a batch of log entries
+                values=""
+                for j in $(seq 1 "${BATCH_SIZE}"); do
+                  ts_s=$(date +%s)
+                  ts_ns="${ts_s}000000000"
+                  msg="observability-loki-hack tenant=${TENANT_ID} seq=${seq_num}"
+                  if [ -n "${values}" ]; then
+                    values="${values},"
+                  fi
+                  values="${values}[\"${ts_ns}\",\"${msg}\"]"
+                  seq_num=$((seq_num + 1))
+                  sleep 1
+                done
+
+                payload="{\"streams\":[{\"stream\":{\"app\":\"observability-log-generator\",\"level\":\"info\",\"SrcK8S_Namespace\":\"observability-loki\",\"DstK8S_Namespace\":\"observability-loki\"},\"values\":[${values}]}]}"
+
+                token=$(cat /var/run/secrets/tokens/loki-token)
+                http_code=$(curl -s --connect-timeout 10 --max-time 30 -o /tmp/push_resp -w '%{http_code}' \
+                  -H "Authorization: Bearer ${token}" \
+                  -H "Content-Type: application/json" \
+                  --cacert /var/run/secrets/service-ca/service-ca.crt \
+                  -d "${payload}" \
+                  "${LOKI_PUSH_URL}" 2>/tmp/push_err)
+
+                if [ "${http_code}" = "204" ]; then
+                  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] pushed ${BATCH_SIZE} entries (seq ${seq_num})"
+                else
+                  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] push failed: HTTP ${http_code}"
+                  cat /tmp/push_resp 2>/dev/null; echo
+                  cat /tmp/push_err 2>/dev/null; echo
+                fi
+
+                sleep "${PUSH_INTERVAL}"
+              done
+          volumeMounts:
+            - name: sa-token
+              mountPath: /var/run/secrets/tokens
+              readOnly: true
+            - name: service-ca
+              mountPath: /var/run/secrets/service-ca
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: sa-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  expirationSeconds: 3600
+                  path: loki-token
+        - name: service-ca
+          configMap:
+            name: openshift-service-ca.crt
+        - name: tmp
+          emptyDir: {}

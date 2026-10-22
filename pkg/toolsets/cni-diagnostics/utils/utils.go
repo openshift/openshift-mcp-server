@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
@@ -128,6 +129,21 @@ func FormatCommandOutput(output, stderr string) string {
 		return output
 	}
 	return fmt.Sprintf("-- stdout --\n%s\n-- stderr --\n%s", output, stderr)
+}
+
+// FormatCommandOutputBudget retains at most the call's result budget while
+// combining the two streams returned by node-debug or pod exec.
+func FormatCommandOutputBudget(ctx context.Context, output, stderr string) string {
+	result := api.NewBuilderWithBudget(api.ResultLimit(ctx))
+	if stderr != "" {
+		result.WriteString("-- stdout --\n")
+	}
+	result.WriteString(output)
+	if stderr != "" {
+		result.WriteString("\n-- stderr --\n")
+		result.WriteString(stderr)
+	}
+	return result.String()
 }
 
 // AddHeadTailProperties adds head, tail, and apply_tail_first JSON schema properties to props.

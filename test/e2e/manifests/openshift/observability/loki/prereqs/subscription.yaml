@@ -1,0 +1,15 @@
+# Channel is set at apply time by setup-openshift.sh from the redhat-operators
+# PackageManifest defaultChannel (override with LOKI_OPERATOR_CHANNEL). A pinned
+# channel like stable-6.5 fails with ResolutionFailed when that channel is absent
+# from the cluster's OperatorHub snapshot (common on CI release:latest).
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: loki-operator
+  namespace: openshift-operators-redhat
+spec:
+  channel: stable-6.5
+  installPlanApproval: Automatic
+  name: loki-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace

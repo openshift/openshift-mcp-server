@@ -72,7 +72,7 @@ func (s *CompatibilityTestSuite) TestToolsetRegistersExactCompatibilityRequireme
 
 				provider.reset()
 				provider.kind = gvk.Kind
-				s.Equal(result, tool.TargetCompatibilityFilters[0](), "tool %s must propagate the provider result", name)
+				s.Equal(result, tool.TargetCompatibilityFilters[0](s.T().Context()), "tool %s must propagate the provider result", name)
 				s.Require().Len(provider.calls, 1, "tool %s must make one provider call", name)
 				s.Equal(gvk.GroupVersion().String(), provider.calls[0], "tool %s must request only its exact GVK", name)
 			}
@@ -96,12 +96,12 @@ func (s *CompatibilityTestSuite) TestInitQueryPrometheusUsesSuppliedProvider() {
 	provider := &recordingFilteringProvider{result: true, kind: "Route"}
 	ctx, cancel := context.WithCancel(s.T().Context())
 	defer cancel()
-	tools := InitQueryPrometheus(ctx, provider)
+	tools := InitQueryPrometheus(context.Background(), provider)
 	s.Empty(provider.calls)
 
 	s.Require().Len(tools, 1)
 	s.Require().Len(tools[0].TargetCompatibilityFilters, 1)
-	s.True(tools[0].TargetCompatibilityFilters[0]())
+	s.True(tools[0].TargetCompatibilityFilters[0](ctx))
 	s.Equal([]string{"route.openshift.io/v1"}, provider.calls)
 	s.Same(ctx, provider.contexts[0])
 }
@@ -131,12 +131,12 @@ func (s *CompatibilityTestSuite) TestDirectConstructorsUseExactKindsAndContext()
 				inspector := &recordingFilteringProvider{result: true, kind: kind}
 				ctx, cancel := context.WithCancel(s.T().Context())
 				defer cancel()
-				tools := contract.construct(ctx, inspector)
+				tools := contract.construct(context.Background(), inspector)
 				s.Empty(inspector.calls)
 				tool, found := indexToolsByName(tools)[contract.name]
 				s.Require().True(found)
 				s.Require().Len(tool.TargetCompatibilityFilters, 1)
-				s.Equal(kind == contract.kind, tool.TargetCompatibilityFilters[0]())
+				s.Equal(kind == contract.kind, tool.TargetCompatibilityFilters[0](ctx))
 				s.Equal([]string{contract.groupVersion}, inspector.calls)
 				s.Same(ctx, inspector.contexts[0])
 			}

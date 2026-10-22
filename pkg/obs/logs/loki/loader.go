@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 )
 
@@ -133,11 +133,8 @@ func (l *RealLoader) QueryRange(ctx context.Context, input QueryRangeInput) (Que
 	var response struct {
 		Status string `json:"status"`
 		Data   struct {
-			ResultType string `json:"resultType"`
-			Result     []struct {
-				Stream map[string]string `json:"stream"`
-				Values [][]string        `json:"values"`
-			} `json:"result"`
+			ResultType string          `json:"resultType"`
+			Result     json.RawMessage `json:"result"`
 		} `json:"data"`
 		Error string `json:"error"`
 	}
@@ -147,9 +144,23 @@ func (l *RealLoader) QueryRange(ctx context.Context, input QueryRangeInput) (Que
 	if response.Status != "success" {
 		return QueryRangeResult{}, fmt.Errorf("loki query_range request failed: %s", response.Error)
 	}
+	// Metric queries (e.g. count_over_time) return matrix samples with numeric
+	// timestamps, not log lines, so they cannot be decoded as streams.
+	if response.Data.ResultType != "streams" {
+		return QueryRangeResult{}, fmt.Errorf("loki query_range returned resultType %q: only log queries are supported, not metric queries", response.Data.ResultType)
+	}
+	var results []struct {
+		Stream map[string]string `json:"stream"`
+		Values [][]string        `json:"values"`
+	}
+	if len(response.Data.Result) > 0 {
+		if err := json.Unmarshal(response.Data.Result, &results); err != nil {
+			return QueryRangeResult{}, fmt.Errorf("failed to decode loki response: %w", err)
+		}
+	}
 
-	streams := make([]Stream, 0, len(response.Data.Result))
-	for _, result := range response.Data.Result {
+	streams := make([]Stream, 0, len(results))
+	for _, result := range results {
 		entries := make([]Entry, 0, len(result.Values))
 		for _, raw := range result.Values {
 			if len(raw) < 2 {
@@ -220,7 +231,7 @@ func (l *RealLoader) getJSON(ctx context.Context, endpoint string, params url.Va
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	slog.Debug("Backend call completed",
+	klogutil.FromContext(ctx).V(4).Info("Backend call completed",
 		"backend", "loki",
 		"endpoint", endpoint,
 		"status_code", resp.StatusCode,

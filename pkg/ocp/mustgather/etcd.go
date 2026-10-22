@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 )
 
 // GetETCDHealth reads ETCD health from the archive
@@ -16,7 +18,7 @@ func (p *Provider) GetETCDHealth() (*ETCDHealth, error) {
 
 	// Read endpoint health
 	healthFile := filepath.Join(etcdDir, "endpoint_health.json")
-	healthData, err := os.ReadFile(healthFile)
+	healthData, err := p.readFile(healthFile)
 	if err != nil {
 		return nil, fmt.Errorf("ETCD health data not found: %w", err)
 	}
@@ -41,7 +43,7 @@ func (p *Provider) GetETCDHealth() (*ETCDHealth, error) {
 
 	// Read alarms
 	alarmFile := filepath.Join(etcdDir, "alarm_list.json")
-	if alarmData, err := os.ReadFile(alarmFile); err == nil {
+	if alarmData, err := p.readFile(alarmFile); err == nil {
 		var alarmResponse struct {
 			Alarms []struct {
 				MemberID uint64 `json:"memberID"`
@@ -54,6 +56,8 @@ func (p *Provider) GetETCDHealth() (*ETCDHealth, error) {
 				health.Healthy = false
 			}
 		}
+	} else if kubernetes.IsResponseTooLarge(err) {
+		return nil, err
 	}
 
 	return health, nil
@@ -62,7 +66,7 @@ func (p *Provider) GetETCDHealth() (*ETCDHealth, error) {
 // GetETCDObjectCount reads ETCD object counts from the archive
 func (p *Provider) GetETCDObjectCount() (map[string]int64, error) {
 	countFile := filepath.Join(p.metadata.ContainerDir, "etcd_info", "object_count.json")
-	data, err := os.ReadFile(countFile)
+	data, err := p.readFile(countFile)
 	if err != nil {
 		return nil, fmt.Errorf("ETCD object count data not found: %w", err)
 	}
@@ -82,7 +86,7 @@ func (p *Provider) ReadETCDFile(filename string) ([]byte, error) {
 	if !strings.HasPrefix(filepath.Clean(filePath), filepath.Clean(etcdDir)+string(os.PathSeparator)) {
 		return nil, fmt.Errorf("invalid ETCD filename: %s", filename)
 	}
-	data, err := os.ReadFile(filePath)
+	data, err := p.readFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("ETCD file %s not found: %w", filename, err)
 	}

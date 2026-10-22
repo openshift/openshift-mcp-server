@@ -138,6 +138,6 @@ func makeProbeDNSLocalHandler(client dnsExchange) api.ToolHandlerFunc {
 			result.Answers = append(result.Answers, ans)
 		}
 
-		return api.NewToolCallResultStructured(result, nil), nil
+		return budgetNetEdgeResult(params.Context, result), nil
 	}
 }

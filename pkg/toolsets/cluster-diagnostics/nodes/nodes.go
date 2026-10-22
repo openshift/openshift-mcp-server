@@ -105,14 +105,20 @@ func nodesDebugExec(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		stdout = fmt.Sprintf("Command executed successfully on node %s but produced no output.", nodeName)
 	}
 
-	// Prefer stdout, fallback to stderr, or if both are present, concatenate them with a separator.
-	output := stdout
-	if stdout == "" {
-		output = stderr
-	} else if stderr != "" {
-		output = fmt.Sprintf("-- stdout --\n%s\n-- stderr --\n%s", stdout, stderr)
+	// PodsExec shares one backend budget across both streams. Keep the same
+	// prefix when their combined formatted result reaches the result budget.
+	result := api.NewBuilderWithBudget(api.ResultLimit(params.Context))
+	if stdout != "" && stderr != "" {
+		result.WriteString("-- stdout --\n")
+		result.WriteString(stdout)
+		result.WriteString("\n-- stderr --\n")
+		result.WriteString(stderr)
+	} else if stdout != "" {
+		result.WriteString(stdout)
+	} else {
+		result.WriteString(stderr)
 	}
-	return api.NewToolCallResult(output, execErr), nil
+	return api.NewToolCallResult(result.String(), execErr), nil
 }
 
 func toStringSlice(arg any) ([]string, error) {

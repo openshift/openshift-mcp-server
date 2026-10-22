@@ -1,0 +1,6 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - operators.yaml
+  # subscription.yaml is applied by setup-openshift.sh with a channel resolved
+  # from the redhat-operators PackageManifest (see _loki_operator_channel).

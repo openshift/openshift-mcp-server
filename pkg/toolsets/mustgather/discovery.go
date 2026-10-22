@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/klogutil"
+	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
 
 	"golang.org/x/sync/singleflight"
@@ -82,8 +83,21 @@ func absOr(path string) string {
 // (first-in-scan-order wins). Only this listing path pays for the metadata
 // reads; ID resolution uses the cheaper registry scan.
 func discoverArchives(ctx context.Context, dirs []string) []ArchiveInfo {
-	logger := klogutil.FromContext(ctx)
 	var archives []ArchiveInfo
+	visitArchives(ctx, dirs, func(info ArchiveInfo) bool {
+		archives = append(archives, info)
+		return true
+	})
+	return archives
+}
+
+// visitArchives stops metadata reads as soon as visit has enough archives.
+func visitArchives(ctx context.Context, dirs []string, visit func(ArchiveInfo) bool) {
+	_ = visitArchivesLimited(ctx, dirs, 0, visit)
+}
+
+func visitArchivesLimited(ctx context.Context, dirs []string, limit int64, visit func(ArchiveInfo) bool) error {
+	logger := klogutil.FromContext(ctx)
 	seen := make(map[string]bool)
 	for _, path := range walkArchives(dirs) {
 		id, err := mg.ArchiveIDFromLocalPath(path)
@@ -95,20 +109,25 @@ func discoverArchives(ctx context.Context, dirs []string) []ArchiveInfo {
 			klogutil.LogWarn(logger, "skipping must-gather archive with duplicate ID (first match wins)", klogutil.Field("path", path), klogutil.Field("archive_id", id))
 			continue
 		}
-		version, timestamp, err := mg.ReadArchiveMetadata(path)
+		version, timestamp, err := mg.ReadArchiveMetadataWithLimit(path, limit)
 		if err != nil {
+			if kubernetes.IsResponseTooLarge(err) {
+				return err
+			}
 			klogutil.LogWarn(logger, "skipping must-gather archive with unreadable metadata", klogutil.Field("path", path), klogutil.Err(err))
 			continue
 		}
 		seen[id] = true
-		archives = append(archives, ArchiveInfo{
+		if !visit(ArchiveInfo{
 			ID:        id,
 			Path:      path,
 			Version:   version,
 			Timestamp: timestamp,
-		})
+		}) {
+			return nil
+		}
 	}
-	return archives
+	return nil
 }
 
 // mgRegistry is the archive cache for a single parsed toolset configuration

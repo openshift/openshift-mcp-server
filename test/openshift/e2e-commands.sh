@@ -19,3 +19,26 @@ export MCP_SERVER_IMAGE="${IMAGE_OPENSHIFT_MCP_SERVER}"
 
 make e2e-ci-setup
 make e2e-ci-test
+
+# Observability e2e: install Tempo/Loki (+ platform monitoring already present),
+# run the full suite, always tear stacks down (ephemeral CI cluster).
+cleanup_observability_e2e() {
+    echo "==> Cleaning up observability e2e stacks"
+    make clean-observability-e2e || true
+}
+trap cleanup_observability_e2e EXIT
+
+# Install stacks individually so a missing operator (e.g. loki-operator not in
+# the OCP catalog) or a partial rollout does not block the entire job.
+# Propagate setup failures via SKIP_OBS_* so requireTempoStacks()/requireLokiStack()
+# skip explicitly (existence alone is not enough for a half-installed stack).
+if ! ./hack/e2e/observability/setup-openshift.sh tempo; then
+    echo "WARNING: Tempo setup failed; Tempo tests will be skipped"
+    export SKIP_OBS_TEMPO=1
+fi
+if ! ./hack/e2e/observability/setup-openshift.sh loki; then
+    echo "WARNING: Loki setup failed; Loki tests will be skipped"
+    export SKIP_OBS_LOKI=1
+fi
+
+make test-observability-e2e

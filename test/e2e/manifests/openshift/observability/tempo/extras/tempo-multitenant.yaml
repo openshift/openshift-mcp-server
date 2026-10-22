@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-tempo-multitenant
+  namespace: tracing
+stringData:
+  endpoint: http://minio:9000
+  bucket: bucket3
+  access_key_id: tempo
+  access_key_secret: supersecret
+type: Opaque
+---
+apiVersion: tempo.grafana.com/v1alpha1
+kind:  TempoStack
+metadata:
+  name: multitenant
+  namespace: tracing
+spec:
+  storage:
+    secret:
+      name: minio-tempo-multitenant
+      type: s3
+  storageSize: 1Gi
+  tenants:
+    mode: openshift
+    authentication:
+    - tenantName: project1
+      tenantId: 1610b0c3-c509-4592-a256-a1871353dbfa
+    - tenantName: project2
+      tenantId: 1610b0c3-c509-4592-a256-a1871353dbfb
+  template:
+    gateway:
+      enabled: true
+    queryFrontend:
+      jaegerQuery:
+        enabled: true

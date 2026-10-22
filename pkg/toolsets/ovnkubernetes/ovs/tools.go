@@ -406,7 +406,7 @@ func ovsVsctl(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	}
 
 	_, result, err := srv.Vsctl(p.Context, nil, in)
-	return api.NewToolCallResultStructured(result, err), nil
+	return budgetOVSResult(p.Context, result, err), nil
 }
 
 // ovsOfctl delegates to the exported Ofctl handler in the upstream
@@ -437,7 +437,7 @@ func ovsOfctl(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	}
 
 	_, result, err := srv.Ofctl(p.Context, nil, in)
-	return api.NewToolCallResultStructured(result, err), nil
+	return budgetOVSResult(p.Context, result, err), nil
 }
 
 // ovsAppctl delegates to the exported Appctl handler in the upstream
@@ -474,5 +474,24 @@ func ovsAppctl(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	}
 
 	_, result, err := srv.Appctl(p.Context, nil, in)
-	return api.NewToolCallResultStructured(result, err), nil
+	return budgetOVSResult(p.Context, result, err), nil
+}
+
+func budgetOVSResult(ctx context.Context, value any, err error) *api.ToolCallResult {
+	result := api.NewToolCallResultStructured(value, err)
+	if limit := api.ResultLimit(ctx); err == nil && limit > 0 {
+		if int64(len(result.Content)) > limit {
+			return api.NewToolCallResult("", fmt.Errorf("result exceeds max_result_bytes (%d > %d)", len(result.Content), limit))
+		}
+		// The adapter wraps array results in {"items": ...} when sending
+		// structuredContent; count that wrapper as well as the JSON text.
+		structuredSize := len(result.Content)
+		if len(result.Content) > 0 && result.Content[0] == '[' {
+			structuredSize += len(`{"items":}`)
+		}
+		if int64(len(result.Content)+structuredSize) > limit {
+			result.StructuredContent = nil
+		}
+	}
+	return result
 }

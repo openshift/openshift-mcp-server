@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	mg "github.com/containers/kubernetes-mcp-server/pkg/ocp/mustgather"
 )
 
@@ -23,7 +24,15 @@ func providerForArchive(params api.ToolHandlerParams, id string) (*mg.Provider, 
 	if err != nil {
 		return nil, err
 	}
-	return cfg.registry.loadProvider(path)
+	provider, err := cfg.registry.loadProvider(path)
+	if err != nil {
+		return nil, err
+	}
+	limit, err := kubernetes.BackendLimit(params.Config)
+	if err != nil {
+		return nil, err
+	}
+	return provider.WithReadLimit(limit), nil
 }
 
 // getString extracts a string argument with a default

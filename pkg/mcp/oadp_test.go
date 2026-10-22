@@ -65,8 +65,8 @@ func (s *OADPSuite) TestToolsetRegistration() {
 		for _, prompt := range prompts.Prompts {
 			if prompt.Name == "oadp-troubleshoot" {
 				found = true
-				s.Equal("Generate a step-by-step troubleshooting guide for diagnosing OADP backup and restore issues", prompt.Description)
-				s.Len(prompt.Arguments, 3)
+				s.Equal("Generate a step-by-step troubleshooting guide for diagnosing OADP backup and restore issues. Use limit and continue to retrieve a large list one page at a time.", prompt.Description)
+				s.Len(prompt.Arguments, 5)
 				break
 			}
 		}

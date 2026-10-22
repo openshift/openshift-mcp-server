@@ -1,0 +1,10 @@
+# OSSM install and mesh lifecycle scripts (downstream-only).
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- josunect
+- aljesusg
+
+reviewers:
+- josunect
+- aljesusg

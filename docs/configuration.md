@@ -10,6 +10,7 @@ For release-to-release migrations, see [Configuration Changes](configuration-cha
 
 - [Configuration Loading](#configuration-loading)
   - [Usage](#usage)
+  - [Reading the Configuration from stdin](#reading-the-configuration-from-stdin)
 - [Drop-in Configuration](#drop-in-configuration)
   - [How Drop-in Files Work](#how-drop-in-files-work)
   - [Example Directory Structure](#example-directory-structure)
@@ -49,7 +50,7 @@ For release-to-release migrations, see [Configuration Changes](configuration-cha
 Each option is resolved once per load. Later sources override earlier ones:
 
 1. **Defaults** — Built-in values (for example `list_output = "table"`)
-2. **Main configuration file** — `--config`, or `$MCP_CONFIG_PATH` if `--config` is unset. Optional when `--config-dir` supplies the files
+2. **Main configuration file** — `--config` (or stdin with `--config -`), or `$MCP_CONFIG_PATH` if `--config` is unset. Optional when `--config-dir` supplies the files
 3. **`--config-dir` files** — lexical `.toml` files. Can be the only file source. Omitted means no directory is read
 4. **Environment variables** — Only where an option declares an env name. An empty or unset variable does not override
 5. **CLI** — Only `--config` / `--config-dir` / `--version`. These select files; they are not runtime option overrides
@@ -58,7 +59,7 @@ Unknown TOML keys fail the load (startup and SIGHUP exit non-zero). Registered `
 
 String options (including each element of a string list, and duration strings) have surrounding whitespace stripped at load from TOML and env. `tls_cert = " /certs/tls.crt "` is the same as `tls_cert = "/certs/tls.crt"`.
 
-After validation (startup and SIGHUP, success or failure) the server logs every option with its resolved value and source (file path, `<Env>`, or `<Default>`). Sensitive values are redacted. Independent validation errors are all reported. On SIGHUP the same dump includes `changed=true` and `previous` when a value differs from the prior config. A failed SIGHUP reload dumps when a config was produced, then the process exits.
+After validation (startup and SIGHUP, success or failure) the server logs every option with its resolved value and source (file path, `<Stdin>`, `<Env>`, or `<Default>`). Sensitive values are redacted. Independent validation errors are all reported. On SIGHUP the same dump includes `changed=true` and `previous` when a value differs from the prior config. A failed SIGHUP reload dumps when a config was produced, then the process exits.
 
 Empty `port` (stdio) with `require_oauth = true` fails the load. OAuth is HTTP-only; the default (`port=""`, `require_oauth=false`) still works.
 
@@ -76,7 +77,21 @@ kubernetes-mcp-server --config-dir /etc/kubernetes-mcp-server/conf.d/
 # Use both main config and explicit drop-in directory
 kubernetes-mcp-server --config /etc/kubernetes-mcp-server/config.toml \
                       --config-dir /etc/kubernetes-mcp-server/config.d/
+
+# Read the main configuration from stdin (HTTP mode only)
+cat <<EOF | kubernetes-mcp-server --config -
+port = "8080"
+read_only = true
+EOF
 ```
+
+### Reading the Configuration from stdin
+
+`--config -` reads the main configuration from stdin, up to end of input, instead of from a file. Everything else works as for a file: `--config-dir` drop-ins and environment variables still override it, and options it sets are logged with the source `<Stdin>`. Relative paths in it are resolved against the working directory.
+
+The stdio transport also uses stdin, so `--config -` only works in HTTP mode. If neither stdin nor a drop-in sets `port`, the server exits with an error instead of starting in stdio mode.
+
+The server reads stdin once, at startup. A `SIGHUP` reload applies the same stdin configuration again and re-reads the `--config-dir` files and environment variables.
 
 ## Drop-in Configuration
 
@@ -156,7 +171,7 @@ pkill -HUP kubernetes-mcp-server
 
 ### What Gets Reloaded
 
-SIGHUP re-reads the main file and drop-ins, re-applies environment variables, re-validates, and logs every option again (marking values that changed, with the previous value). Whitespace padding on string values is ignored, so it is not a change.
+SIGHUP re-reads the main file and drop-ins, re-applies environment variables, re-validates, and logs every option again (marking values that changed, with the previous value). Whitespace padding on string values is ignored, so it is not a change. A main configuration read from stdin (`--config -`) is not read again; the copy read at startup is applied with the reloaded drop-ins.
 
 Reloadable settings take effect immediately (log level, toolsets, OAuth/token-exchange, confirmation rules, most HTTP body/rate-limit settings, `max_backend_response_bytes`, `max_in_flight`, `max_result_bytes`, and so on). Toolset registries are rebuilt.
 
@@ -192,7 +207,7 @@ SIGHUP is not available on Windows; restart the process.
 | `tls_cert` | string | `""` | Path to TLS certificate file for HTTPS. When set along with `tls_key`, the server serves HTTPS instead of HTTP. |
 | `tls_key` | string | `""` | Path to TLS private key file for HTTPS. Must be set together with `tls_cert`. |
 | `require_tls` | boolean | `false` | When `true`, enforces TLS for all connections. Server refuses to start without TLS certificates, and outbound connections to non-HTTPS endpoints (e.g., Kiali) are rejected. |
-| `tls_min_version` | string | `""` | Minimum TLS version (e.g., `"1.2"`, `"1.3"`; `"1.0"` and `"1.1"` are accepted for operator parity but not recommended). Defaults to TLS 1.2 if not set. Overridden by `TLS_MIN_VERSION` when that env var is non-empty. Applies to inbound HTTPS and outbound clients (Kiali, NetObserv, OAuth, token exchange, well-known metadata). |
+| `tls_min_version` | string | `""` | Minimum TLS version (e.g., `"1.2"`, `"1.3"`; `"1.0"` and `"1.1"` are accepted for operator parity but not recommended). Defaults to TLS 1.2 if not set. Overridden by `TLS_MIN_VERSION` when that env var is non-empty. Applies to inbound HTTPS and outbound clients (Kiali, NetObserv, observability backends, OAuth, token exchange, well-known metadata). |
 | `tls_cipher_suites` | array | `[]` | TLS 1.2 cipher suites (TLS 1.3 cipher suites are not configurable). If empty, Go's defaults are used. Overridden by `TLS_CIPHER_SUITES` (comma-separated) when that env var is non-empty. Applies to inbound HTTPS and outbound clients. |
 
 The Streamable HTTP handler (go-sdk) rejects requests accepted on a loopback address (`127.0.0.1`, `::1`) when `Host` is not localhost. That blocks browser DNS rebinding against a local MCP server. It also 403s the usual in-pod sidecar pattern: kube-rbac-proxy `--upstream=http://127.0.0.1:8080/` keeps `Host: <service>:<port>`. Set `disable_localhost_protection = true` in that case.
@@ -236,14 +251,14 @@ tls_cipher_suites = [
 
 `TLS_MIN_VERSION` and `TLS_CIPHER_SUITES` configure TLS for **both** inbound and outbound connections. They are applied at load time (startup and SIGHUP) and override the corresponding TOML values when set:
 
-| Setting | Inbound (HTTP server) | Outbound (Kiali, NetObserv, OAuth, token exchange, well-known metadata) |
+| Setting | Inbound (HTTP server) | Outbound (Kiali, NetObserv, observability backends, OAuth, token exchange, well-known metadata) |
 |---------|----------------------|-------------------------------------------------------------------------|
 | `tls_min_version` / `tls_cipher_suites` (TOML) | ✅ | ✅ |
 | `TLS_MIN_VERSION` / `TLS_CIPHER_SUITES` (env) | ✅ overrides TOML | ✅ overrides TOML |
 
 When neither TOML nor env is set, both inbound and outbound default to TLS 1.2 with Go's default cipher suites.
 
-Inbound TLS is not reloadable: a SIGHUP that would change `tls_min_version` / `tls_cipher_suites` (or their env overrides) is rejected and the process exits. Outbound clients (OAuth, token exchange, well-known metadata) pick up a successfully applied reload; Kiali and NetObserv re-read TLS settings on each tool invocation.
+Inbound TLS is not reloadable: a SIGHUP that would change `tls_min_version` / `tls_cipher_suites` (or their env overrides) is rejected and the process exits. Outbound clients (OAuth, token exchange, well-known metadata) pick up a successfully applied reload; Kiali, NetObserv, and observability backends re-read TLS settings on each tool invocation. Observability backends verify certificates and hostnames using the combined system trust store, Kubernetes REST config CA data and CA file (when configured), and mounted service CA (when present); an unreadable or invalid CA source fails the connection. Setting an observability toolset's `insecure = true` is rejected.
 
 ```bash
 # Example: Enforce TLS 1.3 minimum version (inbound + outbound)
@@ -307,7 +322,12 @@ Kiali, NetObserv, Loki, and Tempo apply it when they read the body.
 An exact fit is allowed.
 The next byte closes the body and returns an error, so client-go does not decode the rest.
 A list over that cap is the same error, with no partial page.
-Pagination is deferred to [kubernetes-mcp-server#1473](https://github.com/containers/kubernetes-mcp-server/issues/1473).
+`resources_list`, `pods_list`, `pods_list_in_namespace`, `pods_top`, `nodes_top`, `namespaces_list`, `projects_list`, `events_list`, and `get_service_endpoints` take `limit` and `continue`.
+Omit `limit` to list everything.
+Set it, and send the `continue` token from the previous page with the same selectors, to retrieve the next Kubernetes list page.
+`oadp-troubleshoot` takes the same arguments: `continue` pages its Warning events, and `limit` pages every Kubernetes list in that prompt.
+`helm_list` takes `limit` and `offset`.
+Helm applies those after it has loaded the release secrets, so a secret list that exceeds this cap still fails.
 NetObserv flow export is the exception: it keeps the bytes already read and appends a truncation notice.
 `0` leaves that read uncapped.
 Switching-protocol (`101`) responses and the (internal-only) openapi schema retrieval are skipped.
@@ -535,6 +555,9 @@ Toolsets group related tools together. Enable only the toolsets you need to redu
 # Enable specific toolsets
 toolsets = ["core", "config", "helm", "kubevirt"]
 ```
+
+Some tools require additional cluster APIs, resource instances, or permissions.
+See [Tool requirements](tool-requirements.md) for availability prerequisites.
 
 **Available Resources:**
 
@@ -984,7 +1007,7 @@ Empty or unset variables are ignored (they do not override TOML or defaults). No
 
 | Variable | TOML key | Notes |
 |----------|----------|-------|
-| `MCP_CONFIG_PATH` | — | Path to the main TOML file. Ignored if `--config` is set. |
+| `MCP_CONFIG_PATH` | — | Path to the main TOML file, or `-` to read it from stdin as with `--config -`. Ignored if `--config` is set. |
 | `TLS_MIN_VERSION` | `tls_min_version` | |
 | `TLS_CIPHER_SUITES` | `tls_cipher_suites` | Comma-separated list |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `telemetry.endpoint` | |
@@ -1008,7 +1031,7 @@ Empty or unset variables are ignored (they do not override TOML or defaults). No
 | Option | Description |
 |--------|-------------|
 | `--version` | Print version information and quit |
-| `--config` | Path of the main TOML configuration file. Overrides `$MCP_CONFIG_PATH` |
+| `--config` | Path of the main TOML configuration file, or `-` to read it from stdin (HTTP mode only). Overrides `$MCP_CONFIG_PATH` |
 | `--config-dir` | Directory of lexical `.toml` files. Usable alone or with `--config`. Omitted means no drop-ins. Relative paths are resolved against the working directory |
 
 HTTP mode, kubeconfig, toolsets, TLS, OAuth, and the rest of the runtime surface are TOML (and, where listed above, env). There are no runtime flags for those options.

@@ -68,10 +68,6 @@ build-all-platforms: clean tidy format lint ## Build the project for all platfor
 test: ## Run the tests
 	python3 build/test-prerequisites.py
 
-.PHONY: test-observability-e2e
-test-observability-e2e: ## Run obs-mcp e2e tests against an OpenShift cluster
-	go test -tags observability_e2e -count=1 -v ./pkg/observability/tests/
-
 .PHONY: test-update-snapshots
 test-update-snapshots: ## Update test snapshots for toolset tests
 	UPDATE_TOOLSETS_JSON=1 go test -count=1 -v ./pkg/mcp
@@ -100,6 +96,14 @@ lint: golangci-lint ## Lint the code
 update-readme-tools: ## Update the README.md and docs/configuration.md files with the latest toolsets
 	go run ./internal/tools/update-readme/main.go README.md
 	go run ./internal/tools/update-readme/main.go docs/configuration.md
+
+.PHONY: update-codeowners
+update-codeowners: ## Generate .github/CODEOWNERS from .github/ownership.json
+	go run ./internal/tools/update-codeowners/main.go
+
+.PHONY: check-codeowners
+check-codeowners: ## Check that .github/CODEOWNERS matches .github/ownership.json
+	go run ./internal/tools/update-codeowners/main.go -check
 
 ##@ Local Development
 

@@ -391,7 +391,7 @@ func ovnShow(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
-	return api.NewToolCallResultStructured(result, nil), nil
+	return budgetOVNResult(params.Context, result), nil
 }
 
 func ovnGet(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -426,7 +426,7 @@ func ovnGet(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
-	return api.NewToolCallResultStructured(result, nil), nil
+	return budgetOVNResult(params.Context, result), nil
 }
 
 func ovnLFlowList(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -455,7 +455,7 @@ func ovnLFlowList(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
-	return api.NewToolCallResultStructured(result, nil), nil
+	return budgetOVNResult(params.Context, result), nil
 }
 
 func ovnTrace(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -488,7 +488,24 @@ func ovnTrace(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
-	return api.NewToolCallResultStructured(result, nil), nil
+	return budgetOVNResult(params.Context, result), nil
+}
+
+func budgetOVNResult(ctx context.Context, value any) *api.ToolCallResult {
+	result := api.NewToolCallResultStructured(value, nil)
+	if limit := api.ResultLimit(ctx); limit > 0 {
+		if int64(len(result.Content)) > limit {
+			return api.NewToolCallResult("", fmt.Errorf("result exceeds max_result_bytes (%d > %d)", len(result.Content), limit))
+		}
+		structuredSize := len(result.Content)
+		if len(result.Content) > 0 && result.Content[0] == '[' {
+			structuredSize += len(`{"items":}`)
+		}
+		if int64(len(result.Content)+structuredSize) > limit {
+			result.StructuredContent = nil
+		}
+	}
+	return result
 }
 
 // newOVNServer creates an ovnmcp.MCPServer that executes OVN CLI commands
