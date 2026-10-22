@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/core"
 	"github.com/google/jsonschema-go/jsonschema"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -24,10 +25,10 @@ func initEndpoints(ctx context.Context, inspector api.ClusterInspector) []api.Se
 		{
 			Tool: api.Tool{
 				Name:        "get_service_endpoints",
-				Description: "Return EndpointSlice objects for a Service to verify backend pod availability.",
+				Description: "Return EndpointSlice objects for a Service to verify backend pod availability." + core.ListPageSentence,
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
-					Properties: map[string]*jsonschema.Schema{
+					Properties: core.PageProperties(map[string]*jsonschema.Schema{
 						"namespace": {
 							Type:        "string",
 							Description: "Service namespace",
@@ -36,7 +37,7 @@ func initEndpoints(ctx context.Context, inspector api.ClusterInspector) []api.Se
 							Type:        "string",
 							Description: "Service name",
 						},
-					},
+					}),
 					Required: []string{"namespace", "service"},
 				},
 				Annotations: api.ToolAnnotations{
@@ -78,12 +79,14 @@ func getServiceEndpoints(params api.ToolHandlerParams) (*api.ToolCallResult, err
 
 	// EndpointSlices are linked to a service via the "kubernetes.io/service-name" label
 	labelSelector := "kubernetes.io/service-name=" + serviceName
-
-	list, err := params.DynamicClient().Resource(gvr).Namespace(namespace).List(params.Context, metav1.ListOptions{
-		LabelSelector: labelSelector,
-	})
-	if err != nil {
+	opts := metav1.ListOptions{LabelSelector: labelSelector}
+	if err := core.ApplyListPage(api.WrapParams(params), &opts); err != nil {
 		return api.NewToolCallResult("", fmt.Errorf("failed to list EndpointSlices for service %s/%s: %w", namespace, serviceName, err)), nil
+	}
+
+	list, err := params.DynamicClient().Resource(gvr).Namespace(namespace).List(params.Context, opts)
+	if err != nil {
+		return api.NewToolCallResult("", fmt.Errorf("failed to list EndpointSlices for service %s/%s: %w", namespace, serviceName, core.ListErr(err))), nil
 	}
 
 	if len(list.Items) == 0 {
@@ -136,5 +139,10 @@ func getServiceEndpoints(params api.ToolHandlerParams) (*api.ToolCallResult, err
 		return api.NewToolCallResult("", fmt.Errorf("failed to marshal endpoint slices as yaml: %w", err)), nil
 	}
 
-	return api.NewToolCallResult(string(data), nil), nil
+	text := api.LimitString(params.Context, string(data))
+	if list.GetContinue() == "" {
+		return api.NewToolCallResult(text, nil), nil
+	}
+	paged, structured := core.WithListPage(text, resultObj, list)
+	return api.NewToolCallResultFull(paged, structured, nil), nil
 }

@@ -28,6 +28,7 @@ type Config struct {
 	LokiURL string `toml:"loki_url,omitempty"`
 
 	// Insecure is retained for configuration compatibility but true is rejected.
+	// Configure a trusted CA instead of disabling certificate verification.
 	Insecure bool `toml:"insecure,omitempty"`
 
 	// UseRoute controls whether to use OpenShift Routes for discovering LokiStack endpoints.

@@ -285,7 +285,7 @@ func makeExecDNSInPodHandler(executor podExecutor) api.ToolHandlerFunc {
 				Output:  fmt.Sprintf("failed to retrieve pod logs: %v", err),
 				Phase:   phase,
 			}
-			return api.NewToolCallResultStructured(result, nil), nil
+			return budgetNetEdgeResult(params.Context, result), nil
 		}
 
 		result := ExecDNSResult{
@@ -294,6 +294,23 @@ func makeExecDNSInPodHandler(executor podExecutor) api.ToolHandlerFunc {
 			Phase:   phase,
 		}
 
-		return api.NewToolCallResultStructured(result, nil), nil
+		return budgetNetEdgeResult(params.Context, result), nil
 	}
+}
+
+func budgetNetEdgeResult(ctx context.Context, value any) *api.ToolCallResult {
+	result := api.NewToolCallResultStructured(value, nil)
+	if limit := api.ResultLimit(ctx); limit > 0 {
+		if int64(len(result.Content)) > limit {
+			return api.NewToolCallResult("", fmt.Errorf("result exceeds max_result_bytes (%d > %d)", len(result.Content), limit))
+		}
+		structuredSize := len(result.Content)
+		if len(result.Content) > 0 && result.Content[0] == '[' {
+			structuredSize += len(`{"items":}`)
+		}
+		if int64(len(result.Content)+structuredSize) > limit {
+			result.StructuredContent = nil
+		}
+	}
+	return result
 }

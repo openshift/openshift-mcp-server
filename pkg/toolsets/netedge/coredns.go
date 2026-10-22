@@ -73,5 +73,5 @@ func getCoreDNSConfig(params api.ToolHandlerParams) (*api.ToolCallResult, error)
 		return api.NewToolCallResult("", fmt.Errorf("corefile not found in dns-default ConfigMap")), nil
 	}
 
-	return api.NewToolCallResult(corefile, nil), nil
+	return api.NewToolCallResult(api.LimitString(params.Context, corefile), nil), nil
 }

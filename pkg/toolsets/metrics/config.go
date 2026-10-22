@@ -30,6 +30,7 @@ type Config struct {
 
 	// Insecure is retained for configuration compatibility but true is rejected.
 	// Only false is supported (verify certificates).
+	// Configure a trusted CA instead of disabling certificate verification.
 	Insecure bool `toml:"insecure,omitempty"`
 
 	// Guardrails controls which query safety checks are enabled.

@@ -115,7 +115,7 @@ auth_mode = "kubeconfig"
 # loki_url = "https://logging-loki-gateway-http.openshift-logging.svc.cluster.local:8080"
 loki_url = ""
 
-# Skip TLS certificate verification (development only). Default: false
+# Must remain false; insecure=true is rejected. Configure a trusted CA instead.
 insecure = false
 
 # Resolve Loki query URLs via OpenShift Routes instead of in-cluster Services.

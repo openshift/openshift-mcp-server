@@ -223,7 +223,7 @@ func getRouterConfig(params api.ToolHandlerParams) (*api.ToolCallResult, error) 
 	results = append(results, truncated)
 	results = append(results, "```")
 
-	return api.NewToolCallResult(strings.Join(results, "\n"), nil), nil
+	return api.NewToolCallResult(api.LimitString(params.Context, strings.Join(results, "\n")), nil), nil
 }
 
 // getRouterInfo requires a live cluster as it queries the HAProxy admin socket
@@ -259,7 +259,7 @@ func getRouterInfo(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	results = append(results, out)
 	results = append(results, "```")
 
-	return api.NewToolCallResult(strings.Join(results, "\n"), nil), nil
+	return api.NewToolCallResult(api.LimitString(params.Context, strings.Join(results, "\n")), nil), nil
 }
 
 func getRouterSessions(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
@@ -302,7 +302,7 @@ func getRouterSessions(params api.ToolHandlerParams) (*api.ToolCallResult, error
 	results = append(results, truncated)
 	results = append(results, "```")
 
-	return api.NewToolCallResult(strings.Join(results, "\n"), nil), nil
+	return api.NewToolCallResult(api.LimitString(params.Context, strings.Join(results, "\n")), nil), nil
 }
 
 func configSectionType(line string) string {

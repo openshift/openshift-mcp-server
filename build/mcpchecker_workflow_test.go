@@ -46,7 +46,7 @@ const environment = {protection_rules:[{type:'required_reviewers',prevent_self_r
 const policies = {total_count:1,branch_policies:[{name:'main',type:'branch'}]};
 const job = {name:'Build Candidate',run_attempt:2,conclusion:'success',steps:[{name:'Upload candidate binary',conclusion:'success'}]};
 let permission = 'write', pulls = [pr], baseline = '[{"taskPassed":true}]';
-if(scenario.startsWith('baseline-large'))baseline=require('node:fs').readFileSync(require('node:path').join(require('node:path').dirname(process.argv[1]),'../evals/results/builtin-openai-core-latest.json'),'utf8')+(scenario==='baseline-large-newline'?'\n':'');
+if(scenario.startsWith('baseline-large'))baseline=require('node:fs').readFileSync(process.env.LARGE_BASELINE_FILE,'utf8')+(scenario==='baseline-large-newline'?'\n':'');
 switch(scenario) {
 case 'two-forks': pulls = [pr,{...pr,number:519,head:{ref:'feature',repo:{full_name:'other/fork'}}}]; break;
 case 'other-base': pulls = [pr,{...pr,number:519,base:{...pr.base,ref:'release-1'}}]; break;
@@ -203,8 +203,10 @@ func (suiteState *MCPCheckerWorkflowSuite) TestRESTCandidateIdentity() {
 }
 
 func (suiteState *MCPCheckerWorkflowSuite) TestArtifactAPIAndBaselineData() {
-	baseline, readErr := os.ReadFile(filepath.Join(filepath.Dir(workflowBuildPath(suiteState.T(), "mcpchecker-control.cjs")), "../evals/results/builtin-openai-core-latest.json"))
-	suiteState.Require().NoError(readErr)
+	baseline, marshalErr := json.Marshal([]map[string]any{{"taskPassed": true, "taskOutput": strings.Repeat("x", 1100000)}})
+	suiteState.Require().NoError(marshalErr)
+	baselineFile := filepath.Join(suiteState.T().TempDir(), "large-baseline.json")
+	suiteState.Require().NoError(os.WriteFile(baselineFile, baseline, 0o600))
 	for _, scenario := range []string{"baseline-large", "baseline-large-newline"} {
 		suiteState.Run(scenario, func() {
 			expectedBytes := len(baseline)
@@ -212,7 +214,7 @@ func (suiteState *MCPCheckerWorkflowSuite) TestArtifactAPIAndBaselineData() {
 				expectedBytes++
 			}
 			suiteState.Greater(expectedBytes, 1048576)
-			decoded, largeOutput, largeErr := suiteState.runControl("baseline", scenario)
+			decoded, largeOutput, largeErr := suiteState.runControl("baseline", scenario, "LARGE_BASELINE_FILE="+baselineFile)
 			suiteState.NoError(largeErr, largeOutput)
 			var outputs map[string]json.RawMessage
 			suiteState.Require().NoError(json.Unmarshal(decoded["outputs"], &outputs))
@@ -469,6 +471,37 @@ func workflowServerRootReady(serverRootPath, trusted string) bool {
 	return err == nil && string(serverRoot) == trusted+"\n"
 }
 
+func workflowServerPIDReady(serverPIDPath string) bool {
+	data, err := os.ReadFile(serverPIDPath)
+	if err != nil || !strings.HasSuffix(string(data), "\n") {
+		return false
+	}
+	pid, err := strconv.Atoi(strings.TrimSuffix(string(data), "\n"))
+	return err == nil && pid > 0
+}
+
+func (suiteState *MCPCheckerWorkflowSuite) TestServerPIDReadiness() {
+	serverPIDPath := filepath.Join(suiteState.T().TempDir(), "server-pid")
+	suiteState.False(workflowServerPIDReady(serverPIDPath))
+	for _, fixture := range []struct {
+		name, content string
+		ready         bool
+	}{
+		{name: "empty"},
+		{name: "partial", content: "12"},
+		{name: "malformed", content: "not-a-pid\n"},
+		{name: "zero", content: "0\n"},
+		{name: "negative", content: "-1\n"},
+		{name: "multiple", content: "12\n34\n"},
+		{name: "complete", content: "1234\n", ready: true},
+	} {
+		suiteState.Run(fixture.name, func() {
+			suiteState.Require().NoError(os.WriteFile(serverPIDPath, []byte(fixture.content), 0o600))
+			suiteState.Equal(fixture.ready, workflowServerPIDReady(serverPIDPath))
+		})
+	}
+}
+
 func (suiteState *MCPCheckerWorkflowSuite) TestServerRootReadiness() {
 	root := suiteState.T().TempDir()
 	serverRootPath, trusted := filepath.Join(root, "server-root"), filepath.Join(root, "trusted")
@@ -593,7 +626,7 @@ while :; do sleep 0.1; done
 				cleanupAssertions.True(os.IsNotExist(statErr), "owned supervisor survives live or zombie: %d", command.Process.Pid)
 				testingT.Logf("owned cleanup scenario=%s server=%d supervisor=%d absent=%t status=%q", scenario, pid, command.Process.Pid, os.IsNotExist(statErr), status)
 			})
-			suiteState.Require().Eventually(func() bool { _, statErr := os.Stat(filepath.Join(trusted, ".mcp-server.pid")); return statErr == nil }, 2*time.Second, 10*time.Millisecond)
+			suiteState.Require().Eventually(func() bool { return workflowServerPIDReady(filepath.Join(trusted, ".mcp-server.pid")) }, 2*time.Second, 10*time.Millisecond)
 			pidData, err := os.ReadFile(filepath.Join(trusted, ".mcp-server.pid"))
 			suiteState.Require().NoError(err)
 			pid, err := strconv.Atoi(strings.TrimSpace(string(pidData)))

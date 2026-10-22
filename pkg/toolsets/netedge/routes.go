@@ -129,5 +129,5 @@ func inspectRoute(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		return api.NewToolCallResult("", fmt.Errorf("failed to marshal route as yaml: %w", err)), nil
 	}
 
-	return api.NewToolCallResult(string(data), nil), nil
+	return api.NewToolCallResult(api.LimitString(params.Context, string(data)), nil), nil
 }

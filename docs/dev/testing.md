@@ -21,7 +21,9 @@ absolute, physical (no symlink or `..` components), owned, and writable. Invalid
 explicit settings fail rather than silently switching caches. Without that
 setting, an unavailable or unsafe home cache (including `HOME=/`) uses a unique
 owned 0700 temporary directory instead. A set `TMPDIR` must name a safe physical
-writable directory; invalid settings fail. Otherwise `/tmp` is used. Root-owned
+writable directory; invalid settings fail. Otherwise `/tmp` is used only if it
+is a safe physical writable directory; a symlinked `/tmp` requires a safe explicit
+`TMPDIR` instead. Root-owned
 sticky temporary directories are allowed only with a unique private child, not
 a shared predictable cache. Temporary caches survive until the command finishes
 and are cleaned on normal success or failure; persistent tool-cache corruption
