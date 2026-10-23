@@ -534,6 +534,9 @@ Toolsets group related tools together. Enable only the toolsets you need to redu
 toolsets = ["core", "config", "helm", "kubevirt"]
 ```
 
+Some tools require additional cluster APIs, resource instances, or permissions.
+See [Tool requirements](tool-requirements.md) for availability prerequisites.
+
 **Available Resources:**
 
 <!-- AVAILABLE-TOOLSETS-RESOURCES-START -->

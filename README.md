@@ -1058,7 +1058,7 @@ query: "{ <filters joined by &&> }"
 
 Filters:
 - service name:     resource.service.name="<value>" (string, use quotes)
-- HTTP status code: span.http.response.status_code=<code> (number, no quotes)
+- HTTP status code: span.http.response.status_code=&lt;code&gt; (number, no quotes)
 - duration:         duration><value like 100ms, 2s, 5m> (no quotes)
 - error status:     status=error (keyword, NO quotes — do NOT write status="error")
 
@@ -1186,6 +1186,10 @@ Use tempo_search_tags to discover available tag names.
 
 
 <!-- AVAILABLE-TOOLSETS-TOOLS-END -->
+
+<br>
+
+Some tools require additional cluster APIs, resource instances, or permissions. See [Tool requirements](docs/tool-requirements.md) for availability prerequisites.
 
 ### Prompts
 
