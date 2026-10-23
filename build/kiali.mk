@@ -2,10 +2,13 @@
 
 SHELL := /bin/bash
 
-ISTIOCTL = $(shell pwd)/_output/tools/bin/istioctl
-ISTIO_ADDONS_DIR = $(shell pwd)/_output/istio-addons
+ISTIOCTL = $(shell pwd -P)/_output/tools/bin/istioctl
+ISTIO_ADDONS_DIR = $(shell pwd -P)/_output/istio-addons
 ISTIO_VERSION = 1.31.0
 KIALI_VERSION = v2.33
+ISTIO_INSTALLER := $(shell pwd -P)/build/install-istio.sh
+ISTIO_CHECKSUM_MANIFEST := $(shell pwd -P)/build/istio-1.31.0.sha256
+export ISTIOCTL ISTIO_ADDONS_DIR ISTIO_VERSION ISTIO_INSTALLER ISTIO_CHECKSUM_MANIFEST
 # Multicluster evals call Kiali MCP tools (e.g. list_clusters) that exist only on
 # Kiali master today. Upstream setup-kind-in-ci.sh also hardcodes -kudi true for
 # MC, so a released -kv (e.g. v2.27) still tries to push a local image without
@@ -17,21 +20,7 @@ KIND ?= kind
 # Download and install istioctl (also copies samples/addons for install-istio)
 .PHONY: istioctl
 istioctl:
-	@{ \
-		set -e ;\
-		echo "Installing istioctl to $(ISTIOCTL)..." ;\
-		mkdir -p $(shell dirname $(ISTIOCTL)) ;\
-		TMPDIR=$$(mktemp -d) ;\
-		cd $$TMPDIR ;\
-		curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$(ISTIO_VERSION) sh - ; \
-		ISTIODIR=$$(ls -d istio-* | head -n1) ;\
-		cp $$ISTIODIR/bin/istioctl $(ISTIOCTL) ;\
-		mkdir -p $(ISTIO_ADDONS_DIR) ;\
-		cp $$ISTIODIR/samples/addons/jaeger.yaml $$ISTIODIR/samples/addons/prometheus.yaml $$ISTIODIR/samples/addons/kiali.yaml $(ISTIO_ADDONS_DIR)/ ;\
-		sed -i '/ tracing:/,/ identity:/ { s/ enabled: false/ enabled: true\n        in_cluster_url: "http:\/\/tracing.istio-system:16685\/jaeger"\n        use_grpc: true/ }' $(ISTIO_ADDONS_DIR)/kiali.yaml ;\
-		cd - >/dev/null ;\
-		rm -rf $$TMPDIR ;\
-	}
+	@bash "$$ISTIO_INSTALLER" "$$ISTIO_VERSION" "$$ISTIOCTL" "$$ISTIO_ADDONS_DIR" "$$ISTIO_CHECKSUM_MANIFEST"
 
 # Install Gateway API CRDs required for Gateway API eval tasks and Kiali AI tools
 .PHONY: install-gateway-api-crds
@@ -59,9 +48,9 @@ install-istio: istioctl kubectl
 install-bookinfo-demo: kubectl
 	$(KUBECTL) create ns bookinfo
 	$(KUBECTL) label namespace bookinfo istio-discovery=enabled istio.io/rev=default istio-injection=enabled
-	$(KUBECTL) apply -f https://raw.githubusercontent.com/openshift-service-mesh/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo.yaml -n bookinfo
-	$(KUBECTL) apply -n bookinfo -f https://raw.githubusercontent.com/istio-ecosystem/sail-operator/main/chart/samples/ingress-gateway.yaml
-	$(KUBECTL) apply -f https://raw.githubusercontent.com/openshift-service-mesh/istio/refs/heads/master/samples/bookinfo/networking/bookinfo-gateway.yaml -n bookinfo
+	$(KUBECTL) apply -f https://raw.githubusercontent.com/openshift-service-mesh/istio/b6fb5348dd66280245e3d98d8d93f416ece453c3/samples/bookinfo/platform/kube/bookinfo.yaml -n bookinfo
+	$(KUBECTL) apply -n bookinfo -f https://raw.githubusercontent.com/istio-ecosystem/sail-operator/0c7171a9fdc4762366a78e9a0e3f226ff6e6bbd3/chart/samples/ingress-gateway.yaml
+	$(KUBECTL) apply -f https://raw.githubusercontent.com/openshift-service-mesh/istio/b6fb5348dd66280245e3d98d8d93f416ece453c3/samples/bookinfo/networking/bookinfo-gateway.yaml -n bookinfo
 	$(KUBECTL) wait --for=condition=Ready pod --all -n bookinfo --timeout=300s
 
 # Update Kiali version

@@ -2,6 +2,73 @@
 
 This project follows specific testing patterns to ensure consistency, maintainability, and quality. When writing tests, adhere to the following guidelines.
 
+## Test Prerequisites and Cache
+
+`make test` verifies pinned Node, jq, and ShellCheck before running exactly
+`go test -race -count=1 -v ./...`. The bootstrap accepts no command arguments.
+Python 3.9 or newer, Go, Bash, Make, tar, sha256sum, and unzip are baseline
+prerequisites. Linux x86_64 is the only supported bootstrap platform, even when
+tools are already installed. All three tools must match the release and binary
+checksums in `build/test-prerequisites.json`; arbitrary PATH tools are not probed
+or reused. Go itself remains a trusted caller/CI compiler selected by literal
+`go` on PATH, after the verified tool directories. The caller's remaining PATH,
+loader options, proxy/TLS configuration, and Go environment are trusted inputs,
+not a sandbox boundary for candidate Go tests. Generic CLI execution through
+this helper is no longer supported.
+
+An explicitly set `XDG_CACHE_HOME` must be nonempty,
+absolute, physical (no symlink or `..` components), owned, and writable. Invalid
+explicit settings fail rather than silently switching caches. Without that
+setting, an unavailable or unsafe home cache (including `HOME=/`) uses a unique
+owned 0700 temporary directory instead. A set `TMPDIR` must name a safe physical
+writable directory; invalid settings fail. Otherwise `/tmp` is used only if it
+is a safe physical writable directory; a symlinked `/tmp` requires a safe explicit
+`TMPDIR` instead. Root-owned
+sticky temporary directories are allowed only with a unique private child, not
+a shared predictable cache. Temporary caches survive until the command finishes
+and are cleaned on normal success or failure; persistent tool-cache corruption
+fails closed and does not trigger fallback or an automatic redownload.
+
+Cache path components must be owned by the caller or the system administrator
+and not writable by other accounts, except for root-owned sticky temporary
+ancestors. Private cache directories remain caller-owned 0700. This prevents
+foreign accounts replacing cache ancestors, but does not isolate a malicious
+process running as the caller or the system administrator. Downloads and cached
+executables are checksum verified; this is not a universal atomic-execution or
+hard wall-clock guarantee.
+
+The offline Python regressions run through the ordinary Go build-helper suite.
+They include the actual Make recipe with deliberately missing tools and an
+unwritable home, isolated release-byte fixtures, cache safety and cleanup, and
+fixed Go argument/environment/exit behavior. Arbitrary command arguments and
+unverified PATH prerequisites are rejected or ignored before execution; pin
+validation and cache-tampering regressions fail closed. These tests do not
+depend on the host already having jq or ShellCheck installed.
+
+The actual Make consumer fixtures use a test-only `runpy` platform driver and
+isolated release-byte fixtures to exercise all eight command/environment/exit
+and private-cache cases even on native hosts outside Linux x86_64. Native Linux
+x86_64 also runs those cases without a platform override. Unsupported-platform
+negative cases reject bootstrap before downloads or child execution;
+on an unsupported native host that rejection is also exercised without an
+override. Temporary bases are physical paths rather than assuming `/tmp` is not
+a symlink. Caller-supplied command arguments, including shell metacharacters,
+are rejected before preparation or child execution. These offline fixtures
+do not replace official-asset CI coverage or establish macOS/ARM execution.
+The capture/process-reaping tests still require Linux child-subreaper support;
+portable bootstrap tests do not make the complete Go suite platform-independent.
+
+Standard MCP app message regressions execute the actual embedded application
+script through Node with an owned DOM/message-event fixture. They cover the
+browser-provided parent referrer origin, unrelated source windows, parent-origin
+drift, and replies targeted to the bound origin. Arbitrary cross-origin hosts
+remain supported. When referrer policy hides the parent URL, the existing parent
+WindowProxy identity is the trust anchor and the first valid parent JSON-RPC
+message binds its origin for the session. Opaque-origin parents still require
+`*` for replies and are distinguished by source window, not by the shared `null`
+origin string. This does not authenticate a malicious embedding host, and these
+Node fixtures are not evidence of execution in a real browser.
+
 ## Test Framework
 
 - **Use `testify/suite`** for organizing tests into suites

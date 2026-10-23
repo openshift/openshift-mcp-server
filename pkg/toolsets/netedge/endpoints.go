@@ -1,6 +1,7 @@
 package netedge
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
@@ -13,7 +14,13 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func initEndpoints() []api.ServerTool {
+var serviceEndpointSliceGVK = schema.GroupVersionKind{
+	Group:   "discovery.k8s.io",
+	Version: "v1",
+	Kind:    "EndpointSlice",
+}
+
+func initEndpoints(ctx context.Context, inspector api.ClusterInspector) []api.ServerTool {
 	return []api.ServerTool{
 		{
 			Tool: api.Tool{
@@ -48,7 +55,8 @@ func initEndpoints() []api.ServerTool {
 				}},
 				Namespace: &api.RBACNamespace{Argument: "namespace"},
 			}),
-			Handler: getServiceEndpoints,
+			Handler:                    getServiceEndpoints,
+			TargetCompatibilityFilters: []func() bool{targetHasGVK(ctx, inspector, serviceEndpointSliceGVK)},
 		},
 	}
 }

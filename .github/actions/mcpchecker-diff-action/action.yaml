@@ -1,0 +1,67 @@
+# Vendored from mcpchecker/mcpchecker v0.0.21 (commit 92e4e860817f00e1d48640b756762ccf3ad39532).
+# Local helpers use verified v0.0.22 binaries from the trusted action source.
+name: 'Run mcpchecker Diff'
+description: 'Compare MCP evaluation results to detect regressions and improvements'
+author: 'mcpchecker'
+
+inputs:
+  base-results:
+    description: 'Path to baseline results file'
+    required: true
+
+  current-results:
+    description: 'Path to current results file'
+    required: true
+
+  mcpchecker-version:
+    description: 'Verified version (v0.0.22 only)'
+    required: false
+    default: 'v0.0.22'
+
+  working-directory:
+    description: 'Working directory for running diff'
+    required: false
+    default: '.'
+
+outputs:
+  diagnostics-path:
+    description: 'Owned bounded diff diagnostics directory'
+    value: ${{ steps.run-diff.outputs.diagnostics-path }}
+  mcpchecker-path:
+    description: 'Verified checker path'
+    value: ${{ steps.setup.outputs.mcpchecker-path }}
+  agent-path:
+    description: 'Verified standalone agent path'
+    value: ${{ steps.setup.outputs.agent-path }}
+  version:
+    description: 'Verified checker and agent version'
+    value: ${{ steps.setup.outputs.version }}
+  diff-output:
+    description: 'The diff output in markdown format (for use in PR comments)'
+    value: ${{ steps.run-diff.outputs.diff-output }}
+
+  exit-code:
+    description: 'Exit code from the diff command'
+    value: ${{ steps.run-diff.outputs.exit-code }}
+
+
+runs:
+  using: composite
+  steps:
+    - name: Setup verified mcpchecker and agent
+      id: setup
+      shell: bash
+      env:
+        MCPCHECKER_VERSION: ${{ inputs.mcpchecker-version }}
+      run: bash "$GITHUB_ACTION_PATH/../../../build/setup-mcpchecker-action.sh"
+    - name: Run trusted helper
+      id: run-diff
+      shell: bash
+      env:
+        MCPCHECKER: ${{ steps.setup.outputs.mcpchecker-path }}
+        AGENT: ${{ steps.setup.outputs.agent-path }}
+        MCPCHECKER_VERSION: ${{ steps.setup.outputs.version }}
+        WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        BASE: ${{ inputs.base-results }}
+        CURRENT: ${{ inputs.current-results }}
+      run: bash "$GITHUB_ACTION_PATH/../../../build/run-mcpchecker-diff.sh"

@@ -20,6 +20,14 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+func TestRejectInsecureBeforeTokenLookup(t *testing.T) {
+	for _, useTLS := range []bool{false, true} {
+		rt, err := BuildRoundTripper(t.Context(), nil, &rest.Config{BearerTokenFile: "/owned-fixture-token-must-not-be-read"}, AuthModeKubeConfig, useTLS, true)
+		require.ErrorContains(t, err, "insecure=true is no longer supported")
+		require.Nil(t, rt)
+	}
+}
+
 func TestBuildRoundTripper(t *testing.T) {
 	// Mock HTTP server which returns the same auth header value
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -241,19 +249,21 @@ func TestBuildRoundTripperTLS(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, request(t, rt, server.URL))
 	})
-	t.Run("missing REST CA file fails even with valid CA data", func(t *testing.T) {
-		_, err := BuildRoundTripper(t.Context(), config.BaseDefault(), &rest.Config{TLSClientConfig: rest.TLSClientConfig{
+	t.Run("missing REST CA file is ignored with valid CA data", func(t *testing.T) {
+		rt, err := BuildRoundTripper(t.Context(), config.BaseDefault(), &rest.Config{TLSClientConfig: rest.TLSClientConfig{
 			CAData: caData, CAFile: t.TempDir() + "/missing.pem",
 		}}, AuthModeHeader, true, false)
-		require.ErrorContains(t, err, "failed to read REST config CA file")
+		require.NoError(t, err)
+		require.NoError(t, request(t, rt, server.URL))
 	})
-	t.Run("invalid REST CA file fails even with valid CA data", func(t *testing.T) {
+	t.Run("invalid REST CA file is ignored with valid CA data", func(t *testing.T) {
 		caFile := t.TempDir() + "/ca.pem"
 		require.NoError(t, os.WriteFile(caFile, []byte("invalid"), 0600))
-		_, err := BuildRoundTripper(t.Context(), config.BaseDefault(), &rest.Config{TLSClientConfig: rest.TLSClientConfig{
+		rt, err := BuildRoundTripper(t.Context(), config.BaseDefault(), &rest.Config{TLSClientConfig: rest.TLSClientConfig{
 			CAData: caData, CAFile: caFile,
 		}}, AuthModeHeader, true, false)
-		require.ErrorContains(t, err, "failed to parse REST config CA file")
+		require.NoError(t, err)
+		require.NoError(t, request(t, rt, server.URL))
 	})
 	t.Run("invalid CA fails closed", func(t *testing.T) {
 		_, err := BuildRoundTripper(t.Context(), config.BaseDefault(), &rest.Config{TLSClientConfig: rest.TLSClientConfig{CAData: []byte("invalid")}}, AuthModeHeader, true, false)
@@ -261,7 +271,7 @@ func TestBuildRoundTripperTLS(t *testing.T) {
 	})
 	t.Run("insecure mode is rejected", func(t *testing.T) {
 		_, err := BuildRoundTripper(t.Context(), config.BaseDefault(), &rest.Config{}, AuthModeHeader, true, true)
-		require.ErrorContains(t, err, "insecure TLS is not supported")
+		require.ErrorContains(t, err, "insecure=true is no longer supported")
 	})
 	t.Run("missing server config is rejected", func(t *testing.T) {
 		_, err := BuildRoundTripper(t.Context(), nil, &rest.Config{}, AuthModeHeader, true, false)

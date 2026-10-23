@@ -4,10 +4,7 @@ metadata:
   name: storage-pvc
   namespace: resize-pv
 spec:
-  # csi-hostpath-sc allows volume expansion (allowVolumeExpansion: true); Minikube's
-  # default `standard` StorageClass does not, so the resize would never take
-  # effect. Installed via `make csi-hostpath-install`.
-  storageClassName: csi-hostpath-sc
+  storageClassName: EXPANDABLE_STORAGE_CLASS
   accessModes:
     - ReadWriteOnce
   resources:
