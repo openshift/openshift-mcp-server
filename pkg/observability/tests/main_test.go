@@ -26,9 +26,10 @@ func ensurePrometheusK8sToken(t *testing.T) {
 		}
 	}
 
+	// Must outlive the longest observability_e2e go-test -timeout (30m) plus setup.
 	cmd := exec.Command(cli, "create", "token", "prometheus-k8s",
 		"-n", "openshift-monitoring",
-		"--duration=20m",
+		"--duration=45m",
 	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {

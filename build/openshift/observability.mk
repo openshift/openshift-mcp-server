@@ -2,11 +2,13 @@
 
 # Export a short-lived prometheus-k8s SA token when unset. CI kubeconfigs often
 # use client certs that the monitoring OAuth proxy rejects; Routes need a bearer.
+# Token lifetime must cover the longest go-test -timeout below (currently 30m)
+# plus suite setup slack; the API server may shorten the requested duration.
 define observability_e2e_with_token
 	@if [ -z "$${PROMETHEUS_K8S_TOKEN}" ]; then \
 		echo "exporting PROMETHEUS_K8S_TOKEN via oc/kubectl create token prometheus-k8s -n openshift-monitoring"; \
-		export PROMETHEUS_K8S_TOKEN="$$(oc create token prometheus-k8s -n openshift-monitoring --duration=20m 2>/dev/null \
-			|| kubectl create token prometheus-k8s -n openshift-monitoring --duration=20m)"; \
+		export PROMETHEUS_K8S_TOKEN="$$(oc create token prometheus-k8s -n openshift-monitoring --duration=45m 2>/dev/null \
+			|| kubectl create token prometheus-k8s -n openshift-monitoring --duration=45m)"; \
 	fi; \
 	PROMETHEUS_K8S_TOKEN="$${PROMETHEUS_K8S_TOKEN}" $(1)
 endef

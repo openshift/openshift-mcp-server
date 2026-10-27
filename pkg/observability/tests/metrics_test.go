@@ -76,9 +76,10 @@ func (s *MetricsE2ESuite) SetupSuite() {
 	s.T().Logf("Test metric: %s", s.testMetric)
 }
 
-// discoverTestMetric creates a temporary MCP server to call list_metrics
-// and returns the first CPU metric found. This also pre-warms the Thanos
-// Querier's metric name cache.
+// discoverTestMetric creates a temporary MCP server to list CPU metrics and
+// returns the first candidate that yields a nonempty instant-query vector.
+// list_metrics can include names with samples only in the past hour; those
+// would make TestExecuteInstantQuery flake. Also pre-warms the Thanos label cache.
 func (s *MetricsE2ESuite) discoverTestMetric() string {
 	cfg := s.buildConfig()
 
@@ -108,7 +109,27 @@ func (s *MetricsE2ESuite) discoverTestMetric() string {
 	if err := json.Unmarshal([]byte(textContent(result)), &output); err != nil || len(output.Metrics) == 0 {
 		return ""
 	}
-	return output.Metrics[0]
+
+	const maxCandidates = 20
+	for i, metric := range output.Metrics {
+		if i >= maxCandidates {
+			break
+		}
+		instant, err := client.CallTool("execute_instant_query", map[string]any{"query": metric})
+		if err != nil || instant.IsError {
+			s.T().Logf("instant query for %q failed during discovery: err=%v isError=%v", metric, err, instant != nil && instant.IsError)
+			continue
+		}
+		var iq instantQueryOutput
+		if err := json.Unmarshal([]byte(textContent(instant)), &iq); err != nil {
+			continue
+		}
+		if iq.ResultType == "vector" && len(iq.Result) > 0 {
+			return metric
+		}
+		s.T().Logf("skipping %q: instant query returned empty/non-vector resultType=%q len=%d", metric, iq.ResultType, len(iq.Result))
+	}
+	return ""
 }
 
 // discoverRoutesViaResolver uses the production MetricsRouteResolver so suite
