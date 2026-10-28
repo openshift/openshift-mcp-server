@@ -55,14 +55,14 @@ manifests and continue to use their event and target-branch filters.
 4. Create a new `Release` that references that `Snapshot` and `ReleasePlan`.
 
 ```bash
-git fetch --quiet origin main
+git fetch --quiet https://github.com/openshift/openshift-mcp-server.git main
 git show FETCH_HEAD:.konflux_release/<version>/releasePlan/<release-plan>.yaml | kubectl apply -f -
 kubectl apply -f .konflux_release/snapshot/<snapshot>.yaml
 kubectl create -f .konflux_release/releases/<release>.yaml
 ```
 
 `make -f Makefile-ocp.mk apply-releaseplan VERSION=<version> RELEASE_PLAN=<release-plan>.yaml`
-performs the same explicit upstream-main fetch and plan application. The
+performs the same explicit canonical-upstream-main fetch and plan application. The
 snapshot helper requires `SNAPSHOT_FILE=<path>`; it does not select a snapshot
 directory for you.
 
