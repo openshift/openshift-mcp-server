@@ -26,6 +26,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/logs"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/metrics"
 	mgToolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/mustgather"
+	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/netedge"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/otelcol"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/ovnkubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/tekton"
@@ -319,6 +320,7 @@ func (s *ToolsetsSuite) TestGranularToolsetsTools() {
 		&otelcol.Toolset{},
 		&tekton.Toolset{},
 		&traces.Toolset{},
+		&netedge.Toolset{},
 	}
 	for _, testCase := range testCases {
 		s.Run("Toolset "+testCase.GetName(), func() {

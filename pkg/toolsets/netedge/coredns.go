@@ -16,9 +16,12 @@ func initCoreDNS() []api.ServerTool {
 		{
 			Tool: api.Tool{
 				Name:        "get_coredns_config",
-				Description: "Retrieve the current CoreDNS configuration (Corefile) from the cluster.",
+				Description: "Retrieve the CoreDNS Corefile from the live cluster or a selected must-gather archive. Set archive_id for offline analysis.",
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
+					Properties: map[string]*jsonschema.Schema{
+						"archive_id": {Type: "string", Description: "Must-gather archive ID from mustgather_list. Omit for the live cluster."},
+					},
 				},
 				Annotations: api.ToolAnnotations{
 					Title:           "Get CoreDNS Config",
@@ -47,9 +50,24 @@ func getCoreDNSConfig(params api.ToolHandlerParams) (*api.ToolCallResult, error)
 		Resource: "configmaps",
 	}
 
-	cm, err := params.DynamicClient().Resource(gvr).Namespace("openshift-dns").Get(params.Context, "dns-default", metav1.GetOptions{})
+	var cm *unstructured.Unstructured
+	var err error
+
+	p, err := selectedArchive(params)
 	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to get dns-default ConfigMap: %w", err)), nil
+		return api.NewToolCallResult("", err), nil
+	}
+	if p != nil {
+		gvk := schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ConfigMap"}
+		cm = p.GetResource(gvk, "dns-default", "openshift-dns")
+		if cm == nil {
+			return api.NewToolCallResult("", fmt.Errorf("ConfigMap openshift-dns/dns-default not found in must-gather archive")), nil
+		}
+	} else {
+		cm, err = params.DynamicClient().Resource(gvr).Namespace("openshift-dns").Get(params.Context, "dns-default", metav1.GetOptions{})
+		if err != nil {
+			return api.NewToolCallResult("", fmt.Errorf("failed to get dns-default ConfigMap: %w", err)), nil
+		}
 	}
 
 	data, found, err := unstructured.NestedStringMap(cm.Object, "data")

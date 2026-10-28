@@ -4,9 +4,12 @@
   let rows = [], columns = [], sortColumn = "", descending = false;
   let resizeObserver, resizeFrame = 0, lastSize = "", tornDown = false;
   let hostContext = {};
+  // The parent window is the trusted host. Pin its origin on the first valid
+  // message, including when the host uses an opaque sandbox origin.
+  let hostOrigin;
 
   function send(message) {
-    parent.postMessage(message, "*");
+    parent.postMessage(message, hostOrigin && hostOrigin !== "null" ? hostOrigin : "*");
   }
 
   function applyHostContext(update) {
@@ -283,9 +286,11 @@
 
   window.addEventListener("message", event => {
     if (event.source !== parent) return;
+    if (hostOrigin !== undefined && event.origin !== hostOrigin) return;
     try {
       const message = event.data;
       if (!message || message.jsonrpc !== "2.0") return;
+      if (hostOrigin === undefined) hostOrigin = event.origin;
       if (message.method === "ping") {
         if (typeof message.id === "number" || typeof message.id === "string") {
           send({ jsonrpc: "2.0", id: message.id, result: {} });
