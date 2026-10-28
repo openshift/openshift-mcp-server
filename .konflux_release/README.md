@@ -27,11 +27,11 @@ this repository.
   a release plan.
 
 `main` is the authoritative source for these shared definitions. The release
-procedure must explicitly read the selected versioned `ReleasePlan` from the
-`main` revision; a copy that happens to exist in a release branch is not applied
-automatically and must not become an independent per-branch configuration
-source. The Pipeline-as-Code build files are separate from these manifests and
-continue to use their event and target-branch filters.
+procedure must fetch and explicitly read the selected versioned `ReleasePlan`
+from upstream `main`; a copy that happens to exist in a release branch is not
+applied automatically and must not become an independent per-branch
+configuration source. The Pipeline-as-Code build files are separate from these
+manifests and continue to use their event and target-branch filters.
 
 ## High-Level Flow
 
@@ -55,10 +55,27 @@ continue to use their event and target-branch filters.
 4. Create a new `Release` that references that `Snapshot` and `ReleasePlan`.
 
 ```bash
-git show main:.konflux_release/<version>/releasePlan/<release-plan>.yaml | kubectl apply -f -
+git fetch --quiet origin main
+git show FETCH_HEAD:.konflux_release/<version>/releasePlan/<release-plan>.yaml | kubectl apply -f -
 kubectl apply -f .konflux_release/snapshot/<snapshot>.yaml
 kubectl create -f .konflux_release/releases/<release>.yaml
 ```
+
+`make -f Makefile-ocp.mk apply-releaseplan VERSION=<version> RELEASE_PLAN=<release-plan>.yaml`
+performs the same explicit upstream-main fetch and plan application. The
+snapshot helper requires `SNAPSHOT_FILE=<path>`; it does not select a snapshot
+directory for you.
+
+## Required tenant resources
+
+Before applying a plan or expecting a branch-gated build to run, the target
+tenant must provide the matching Konflux application, component, build service
+account, and managed `ReleasePlanAdmission`. For 1.2 the proposed names are
+`mcp-server-12`, `openshift-mcp-server-release-12`,
+`build-pipeline-openshift-mcp-server-release-12`, and the stage/prod admissions
+`openshift-mcp-server-120-{stage,prod}`. These names are configuration
+proposals derived from the public 1.1 pattern; this repository does not assert
+that any of those tenant resources already exist.
 
 ## Notes
 
@@ -67,6 +84,7 @@ kubectl create -f .konflux_release/releases/<release>.yaml
   application repo.
 - Create a new manifest under `releases/` for each manual release request
   instead of reusing an old `Release` object.
-- No helper in this repository automatically applies a `ReleasePlan`, creates a
-  `Release`, or promotes a snapshot. Those remain deliberate release-procedure
-  actions.
+- No helper selects a release plan or snapshot implicitly, creates a `Release`,
+  or promotes a snapshot. The explicit `apply-releaseplan` helper fetches the
+  requested plan from upstream `main`; `apply-releases` exits with instructions
+  so a `Release` remains a deliberate `kubectl create` action.
