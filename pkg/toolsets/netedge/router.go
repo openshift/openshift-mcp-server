@@ -1,6 +1,7 @@
 package netedge
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -29,9 +30,15 @@ var podGVR = schema.GroupVersionResource{
 	Resource: "pods",
 }
 
+var routerPodGVK = schema.GroupVersionKind{
+	Group:   "",
+	Version: "v1",
+	Kind:    "Pod",
+}
+
 var haproxySectionKeywords = []string{"global", "defaults", "frontend", "backend", "listen"}
 
-func initRouter() []api.ServerTool {
+func initRouter(ctx context.Context, inspector api.ClusterInspector) []api.ServerTool {
 	return []api.ServerTool{
 		{
 			Tool: api.Tool{
@@ -83,7 +90,8 @@ func initRouter() []api.ServerTool {
 					Namespace: &api.RBACNamespace{Name: ingressNamespace},
 				},
 			),
-			Handler: getRouterConfig,
+			Handler:                    getRouterConfig,
+			TargetCompatibilityFilters: []func() bool{targetHasGVK(ctx, inspector, routerPodGVK)},
 		},
 		{
 			Tool: api.Tool{
@@ -120,7 +128,8 @@ func initRouter() []api.ServerTool {
 					Namespace: &api.RBACNamespace{Name: ingressNamespace},
 				},
 			),
-			Handler: getRouterInfo,
+			Handler:                    getRouterInfo,
+			TargetCompatibilityFilters: []func() bool{targetHasGVK(ctx, inspector, routerPodGVK)},
 		},
 		{
 			Tool: api.Tool{
@@ -167,7 +176,8 @@ func initRouter() []api.ServerTool {
 					Namespace: &api.RBACNamespace{Name: ingressNamespace},
 				},
 			),
-			Handler: getRouterSessions,
+			Handler:                    getRouterSessions,
+			TargetCompatibilityFilters: []func() bool{targetHasGVK(ctx, inspector, routerPodGVK)},
 		},
 	}
 }
