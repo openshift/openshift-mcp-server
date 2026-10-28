@@ -16,15 +16,22 @@ this repository.
   It is managed outside this repository in the Konflux configuration repo, so
   it is not stored under `.konflux_release/`.
 
-## Layout
+## Layout and authority
 
-- `releasePlan/`: developer-side `ReleasePlan` manifests
+- `<version>/releasePlan/`: developer-side `ReleasePlan` manifests for a
+  supported release stream. For example, `1.2/releasePlan/` contains the stage
+  and production plans for the 1.2 application.
 - `snapshot/`: `Snapshot` manifests that pin the exact image digest and source
-  revision to release
+  revision to release.
 - `releases/`: `Release` manifests that request promotion of a snapshot through
-  a release plan
+  a release plan.
 
-The exact filenames may change over time as new release requests are created.
+`main` is the authoritative source for these shared definitions. The release
+procedure must explicitly read the selected versioned `ReleasePlan` from the
+`main` revision; a copy that happens to exist in a release branch is not applied
+automatically and must not become an independent per-branch configuration
+source. The Pipeline-as-Code build files are separate from these manifests and
+continue to use their event and target-branch filters.
 
 ## High-Level Flow
 
@@ -40,14 +47,15 @@ The exact filenames may change over time as new release requests are created.
 
 ## Typical usage
 
-1. Update or create a `Snapshot` with the image digest and source revision you
+1. Choose the version directory that matches the snapshot's application and
+   component, then choose its `stage` or `prod` `ReleasePlan` as appropriate.
+2. Update or create a `Snapshot` with the image digest and source revision you
    want to promote.
-2. Apply or update the developer-side `ReleasePlan` if needed.
-3. Create a new `Release` that references the chosen `Snapshot` and
-   `ReleasePlan`.
+3. Apply the selected developer-side `ReleasePlan` from `main`.
+4. Create a new `Release` that references that `Snapshot` and `ReleasePlan`.
 
 ```bash
-kubectl apply -f .konflux_release/releasePlan/<release-plan>.yaml
+git show main:.konflux_release/<version>/releasePlan/<release-plan>.yaml | kubectl apply -f -
 kubectl apply -f .konflux_release/snapshot/<snapshot>.yaml
 kubectl create -f .konflux_release/releases/<release>.yaml
 ```
@@ -59,3 +67,6 @@ kubectl create -f .konflux_release/releases/<release>.yaml
   application repo.
 - Create a new manifest under `releases/` for each manual release request
   instead of reusing an old `Release` object.
+- No helper in this repository automatically applies a `ReleasePlan`, creates a
+  `Release`, or promotes a snapshot. Those remain deliberate release-procedure
+  actions.
