@@ -55,10 +55,19 @@ manifests and continue to use their event and target-branch filters.
 4. Create a new `Release` that references that `Snapshot` and `ReleasePlan`.
 
 ```bash
+# Replace the angle-bracket placeholders, then run this whole block as one command.
+# It exits before a snapshot or Release operation if fetching, reading, or applying
+# the ReleasePlan fails. It materializes the plan before applying it, so a failed
+# `git show` cannot start an apply with incomplete input.
+bash -euo pipefail <<'EOF'
+plan_file="$(mktemp)"
+trap 'rm -f "$plan_file"' EXIT
 git fetch --quiet https://github.com/openshift/openshift-mcp-server.git main
-git show FETCH_HEAD:.konflux_release/<version>/releasePlan/<release-plan>.yaml | kubectl apply -f -
+git show "FETCH_HEAD:.konflux_release/<version>/releasePlan/<release-plan>.yaml" >"$plan_file"
+kubectl apply -f "$plan_file"
 kubectl apply -f .konflux_release/snapshot/<snapshot>.yaml
 kubectl create -f .konflux_release/releases/<release>.yaml
+EOF
 ```
 
 `make -f Makefile-ocp.mk apply-releaseplan VERSION=<version> RELEASE_PLAN=<release-plan>.yaml`

@@ -13,8 +13,7 @@ apply-override-snapshot:
 apply-releaseplan:
 	@test -n "$(VERSION)" || { echo "VERSION is required (for example, 1.2)"; exit 2; }
 	@test -n "$(RELEASE_PLAN)" || { echo "RELEASE_PLAN is required (for example, openshift-mcp-server-releaseplan-120-stage.yaml)"; exit 2; }
-	git fetch --quiet https://github.com/openshift/openshift-mcp-server.git main
-	git show FETCH_HEAD:.konflux_release/$(VERSION)/releasePlan/$(RELEASE_PLAN) | kubectl apply -f -
+	@bash -euo pipefail -c 'plan_file=$$(mktemp); trap "rm -f \"$$plan_file\"" EXIT; git fetch --quiet https://github.com/openshift/openshift-mcp-server.git main; git show "FETCH_HEAD:.konflux_release/$(VERSION)/releasePlan/$(RELEASE_PLAN)" >"$$plan_file"; kubectl apply -f "$$plan_file"'
 
 .PHONY: apply-releases
 apply-releases:
