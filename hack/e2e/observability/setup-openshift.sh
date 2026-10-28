@@ -22,6 +22,122 @@ _wait_rollout() {
   $KUBECTL -n "${ns}" rollout status "${resource}" --timeout="${timeout}"
 }
 
+# Resolve Loki Operator channel from redhat-operators PackageManifest.
+# Pinning stable-6.5 fails with ResolutionFailed when that channel is missing from
+# the cluster catalog (common on OpenShift CI release:latest). Override with
+# LOKI_OPERATOR_CHANNEL when needed.
+_loki_operator_channel() {
+  if [[ -n "${LOKI_OPERATOR_CHANNEL:-}" ]]; then
+    echo "${LOKI_OPERATOR_CHANNEL}"
+    return
+  fi
+  local ch
+  ch="$($KUBECTL get packagemanifest -n openshift-marketplace -o json 2>/dev/null | python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+for item in data.get("items") or []:
+    if item.get("metadata", {}).get("name") != "loki-operator":
+        continue
+    status = item.get("status") or {}
+    if status.get("catalogSource") != "redhat-operators":
+        continue
+    ch = status.get("defaultChannel") or ""
+    if not ch:
+        names = [c.get("name") or "" for c in (status.get("channels") or []) if c.get("name")]
+        # Prefer highest stable-6.x when defaultChannel is unset.
+        stable = sorted((n for n in names if n.startswith("stable-6.")), reverse=True)
+        ch = stable[0] if stable else (names[0] if names else "")
+    print(ch)
+    break
+' 2>/dev/null || true)"
+  if [[ -z "${ch}" ]]; then
+    echo "warning: could not resolve loki-operator channel from PackageManifest; falling back to stable-6.5" >&2
+    ch="stable-6.5"
+  fi
+  echo "${ch}"
+}
+
+_dump_loki_operator() {
+  echo "==> Loki operator install diagnostics" >&2
+  $KUBECTL -n openshift-operators-redhat get subscription,csv,installplan,deploy,pods -o wide >&2 || true
+  $KUBECTL -n openshift-operators-redhat describe subscription loki-operator >&2 || true
+  $KUBECTL get packagemanifest -n openshift-marketplace -l catalog=redhat-operators 2>/dev/null \
+    | awk 'NR==1 || /loki-operator/' >&2 || true
+  $KUBECTL get packagemanifest -n openshift-marketplace -o json 2>/dev/null | python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+for item in data.get("items") or []:
+    if item.get("metadata", {}).get("name") != "loki-operator":
+        continue
+    status = item.get("status") or {}
+    if status.get("catalogSource") != "redhat-operators":
+        continue
+    chans = [c.get("name") for c in (status.get("channels") or [])]
+    print("redhat-operators loki-operator defaultChannel=%s channels=%s" % (
+        status.get("defaultChannel"), chans), file=sys.stderr)
+    break
+' 2>/dev/null || true
+}
+
+# Wait until Subscription resolves an installedCSV, then CSV reaches Succeeded.
+_wait_subscription_csv() {
+  local ns="$1" sub="$2" timeout="${3:-10m}"
+  local timeout_sec reason
+  timeout_sec="$(_duration_to_seconds "${timeout}")"
+  local deadline=$((SECONDS + timeout_sec))
+  local csv="" phase=""
+  while (( SECONDS < deadline )); do
+    csv="$($KUBECTL -n "${ns}" get subscription "${sub}" -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)"
+    if [[ -n "${csv}" ]]; then
+      phase="$($KUBECTL -n "${ns}" get csv "${csv}" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+      if [[ "${phase}" == "Succeeded" ]]; then
+        echo "CSV ${csv} Succeeded in ${ns}"
+        return 0
+      fi
+      if [[ "${phase}" == "Failed" ]]; then
+        echo "CSV ${csv} Failed in ${ns}" >&2
+        return 1
+      fi
+    fi
+    # Fail fast on catalog resolution errors instead of waiting the full timeout.
+    reason="$($KUBECTL -n "${ns}" get subscription "${sub}" -o jsonpath='{.status.conditions[?(@.type=="ResolutionFailed")].status}' 2>/dev/null || true)"
+    if [[ "${reason}" == "True" ]]; then
+      echo "Subscription ${sub} ResolutionFailed in ${ns}" >&2
+      $KUBECTL -n "${ns}" get subscription "${sub}" -o jsonpath='{.status.conditions[?(@.type=="ResolutionFailed")].message}{"\n"}' >&2 || true
+      return 1
+    fi
+    sleep 5
+  done
+  echo "timed out waiting for subscription/${sub} CSV Succeeded in ${ns} (installedCSV=${csv:-none} phase=${phase:-none})" >&2
+  return 1
+}
+
+# Convert kubectl-style durations (e.g. 10m, 1h30m, 90s) to seconds.
+_duration_to_seconds() {
+  local d="$1" total=0 num=""
+  # Plain integer → already seconds.
+  if [[ "${d}" =~ ^[0-9]+$ ]]; then
+    echo "${d}"
+    return
+  fi
+  while [[ -n "${d}" ]]; do
+    if [[ "${d}" =~ ^([0-9]+)([smhd])(.*)$ ]]; then
+      num="${BASH_REMATCH[1]}"
+      case "${BASH_REMATCH[2]}" in
+        s) total=$((total + num)) ;;
+        m) total=$((total + num * 60)) ;;
+        h) total=$((total + num * 3600)) ;;
+        d) total=$((total + num * 86400)) ;;
+      esac
+      d="${BASH_REMATCH[3]}"
+    else
+      echo "invalid duration: $1" >&2
+      return 1
+    fi
+  done
+  echo "${total}"
+}
+
 # LokiStack requires spec.storageClassName (block storage for PVCs).
 # Prefer LOKI_STORAGE_CLASS, else the cluster default StorageClass.
 _detect_storage_class() {
@@ -129,8 +245,23 @@ install_tempo() {
 
 install_loki() {
   echo "==> Installing Loki operator (OpenShift)"
-  $KUBECTL apply -k "${MANIFESTS}/loki/prereqs/"
-  _wait_rollout openshift-operators-redhat deployment/loki-operator-controller-manager 10m
+  local channel
+  channel="$(_loki_operator_channel)"
+  echo "==> Loki operator channel: ${channel}"
+
+  $KUBECTL apply -f "${MANIFESTS}/loki/prereqs/operators.yaml"
+  # Apply subscription with the resolved channel (manifest keeps a documented default).
+  sed "s|^  channel:.*|  channel: ${channel}|" "${MANIFESTS}/loki/prereqs/subscription.yaml" \
+    | $KUBECTL apply -f -
+
+  if ! _wait_subscription_csv openshift-operators-redhat loki-operator 10m; then
+    _dump_loki_operator
+    return 1
+  fi
+  if ! _wait_rollout openshift-operators-redhat deployment/loki-operator-controller-manager 10m; then
+    _dump_loki_operator
+    return 1
+  fi
   $KUBECTL wait --for=condition=Established crd/lokistacks.loki.grafana.com --timeout=15m
 
   echo "==> Deploying Loki extras"
