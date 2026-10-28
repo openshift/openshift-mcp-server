@@ -173,8 +173,7 @@ alertmanager_url = "https://alertmanager-main.openshift-monitoring.svc.cluster.l
 # Example for an external route:
 # alertmanager_url = "https://alertmanager-main-openshift-monitoring.apps.example.com"
 
-# Skip TLS certificate verification.
-# Set to true only for development or when using a self-signed cert you can't import.
+# Must remain false; insecure=true is rejected. Configure a trusted CA instead.
 # Default: false
 insecure = false
 
@@ -218,7 +217,7 @@ range_query_full_response = false
 | `auth_mode` | string | `"header"` | Token source: `"header"` (from request Authorization header) or `"kubeconfig"` (from kubeconfig/REST config) |
 | `prometheus_url` | string | `http://localhost:9090` | Prometheus or Thanos Querier endpoint URL |
 | `alertmanager_url` | string | — | Alertmanager endpoint URL (required for alert/silence tools) |
-| `insecure` | bool | `false` | Skip TLS certificate verification |
+| `insecure` | bool | `false` | Must be false; true is rejected. Configure verified CA trust instead. |
 | `guardrails` | string | `"all"` | Query safety checks (`"all"`, `"none"`, comma-separated names, or `!name` / `!tsdb` to disable from `"all"`) |
 | `max_metric_cardinality` | uint64 | `20000` | Max series per metric (requires `max-metric-cardinality` guardrail; `0` is not supported) |
 | `max_label_cardinality` | uint64 | `500` | Max label values before blanket regex is rejected (0 = always reject) |
@@ -233,15 +232,28 @@ The toolset authenticates using a bearer token. The `auth_mode` option controls 
 - `"header"` (default) — from the incoming request's Authorization header. Use when running remotely behind an OAuth proxy.
 - `"kubeconfig"` — from the kubeconfig / in-cluster REST config. Use when running **locally** (STDIO mode, e.g. via `npx` or the binary). Requires a token-based session (e.g. `oc login`) — client-certificate kubeconfigs will get a 401 from Thanos Querier.
 
-**TLS certificate resolution order:**
+**TLS trust sources and compatibility:**
 
-1. CA certificate embedded in the kubeconfig (`certificate-authority-data`)
-2. Service account CA file at `/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt`
-   (automatically present when running in a pod on OpenShift)
-3. System certificate pool (for publicly trusted certificates)
+The system certificate pool and the OpenShift service CA at
+`/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt`, when present,
+remain trusted alongside REST-config trust. These are combined roots, not a
+sequential fallback list.
 
-For endpoints with self-signed or private certificates that are not covered by the above, set
-`insecure = true` in the config (not recommended in production).
+Within the REST config, nonempty `CAData` (kubeconfig
+`certificate-authority-data`) takes precedence: `CAFile` (kubeconfig
+`certificate-authority`) is read only when `CAData` is empty. This changes the
+previous behavior that also read and trusted `CAFile` when `CAData` was present.
+With valid `CAData`, missing, malformed, or conflicting `CAFile` values are ignored;
+conflicting file roots are not added. Malformed nonempty `CAData` fails closed
+without falling back to a valid file. When `CAData` is absent, a configured
+`CAFile` that is missing or malformed fails closed. When neither is configured,
+system and service CA trust still apply.
+
+For private or self-signed endpoints, configure the issuing CA through these trust
+sources. `insecure = true` is rejected
+before token lookup or HTTP requests, including for otherwise trusted endpoints.
+Existing configurations must remove that opt-out and install the correct CA;
+certificate expiry and hostname verification cannot be disabled.
 
 ---
 
