@@ -392,7 +392,7 @@ type Config struct {
 	// Internal: which file last set toolset_configs
 	toolsetConfigsSource Source
 
-	// Internal: the config.toml directory, to help resolve relative file paths
+	// Internal: the directory relative file paths resolve against (see ConfigDirPath)
 	configDirPath string
 	// Internal: known provider strategies, set via WithProviderStrategies
 	providerStrategies []string
@@ -536,9 +536,10 @@ func (c *Config) tokenExchangeHasNonDefault() bool {
 	return found
 }
 
-// ConfigDirPath returns the directory of the main config file (or the drop-in
-// dir when --config-dir is used alone). Used to resolve relative paths in
-// extension parsers (e.g. Kiali CA files).
+// ConfigDirPath returns the directory of the main config file, the working
+// directory when the main config is read from stdin (--config -), or the
+// drop-in dir when --config-dir is used alone. Used to resolve relative paths
+// in extension parsers (e.g. Kiali CA files).
 func (c *Config) ConfigDirPath() string { return c.configDirPath }
 
 // ResolveClusterAuthMode returns the effective cluster auth mode.
@@ -670,21 +671,44 @@ func applyReadOpts(opts []ReadConfigOpt) loadSettings {
 // (only if that path is non-empty), then applies env.
 // Loading order: defaults → files → env. Empty dropInConfigDir means no drop-ins.
 func Read(ctx context.Context, configPath, dropInConfigDir string, opts ...ReadConfigOpt) (*Config, error) {
-	settings := applyReadOpts(opts)
-
 	var configFiles []string
 	var configDir string
-	logger := klogutil.FromContext(ctx)
-
 	if configPath != "" {
-		logger.V(2).Info("Loading main config", "path", configPath)
+		klogutil.FromContext(ctx).V(2).Info("Loading main config", "path", configPath)
 		configFiles = append(configFiles, configPath)
 		absPath, err := filepath.Abs(configPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve absolute path to config file: %w", err)
 		}
 		configDir = filepath.Dir(absPath)
+		if dropInConfigDir == "" {
+			if err := rejectStaleImplicitConfD(ctx, configDir); err != nil {
+				return nil, err
+			}
+		}
 	}
+	return read(ctx, nil, configFiles, configDir, dropInConfigDir, applyReadOpts(opts))
+}
+
+// ReadStdin is Read for a main config that was already read from stdin
+// (--config -): data is merged first, then the drop-ins from dropInConfigDir,
+// then env. There is no file to be relative to, so relative paths in data
+// resolve against the working directory.
+func ReadStdin(ctx context.Context, data []byte, dropInConfigDir string, opts ...ReadConfigOpt) (*Config, error) {
+	klogutil.FromContext(ctx).V(2).Info("Loading main config from stdin")
+	configDir, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve working directory: %w", err)
+	}
+	return read(ctx, data, nil, configDir, dropInConfigDir, applyReadOpts(opts))
+}
+
+// read merges the main config (stdinConfig or configFiles), the drop-ins from
+// dropInConfigDir and env. configDir is where relative paths resolve: the main
+// config's directory, the working directory for stdin, or empty when there is
+// no main config.
+func read(ctx context.Context, stdinConfig []byte, configFiles []string, configDir, dropInConfigDir string, settings loadSettings) (*Config, error) {
+	logger := klogutil.FromContext(ctx)
 
 	if dropInConfigDir != "" {
 		absDropIn, err := filepath.Abs(dropInConfigDir)
@@ -706,13 +730,9 @@ func Read(ctx context.Context, configPath, dropInConfigDir string, opts ...ReadC
 			logger.V(2).Info("Loading drop-in config file(s)", "num_config_files", len(dropInFiles), "config_dir", dropInConfigDir)
 		}
 		configFiles = append(configFiles, dropInFiles...)
-	} else if configDir != "" {
-		if err := rejectStaleImplicitConfD(ctx, configDir); err != nil {
-			return nil, err
-		}
 	}
 
-	merged, sources, err := mergeTOMLFiles(ctx, configFiles)
+	merged, sources, err := mergeTOMLFiles(ctx, stdinConfig, configFiles)
 	if err != nil {
 		return nil, err
 	}
@@ -802,23 +822,38 @@ func getSortedConfigFiles(ctx context.Context, dir string) ([]string, error) {
 }
 
 // mergeTOMLFiles reads and deep-merges TOML files in order, with later files
-// overriding earlier ones. sources maps each dotted key to the file that last set it.
-func mergeTOMLFiles(ctx context.Context, files []string) (map[string]any, map[string]string, error) {
+// overriding earlier ones. A main config read from stdin is merged first.
+// sources maps each dotted key to the file that last set it.
+func mergeTOMLFiles(ctx context.Context, stdinConfig []byte, files []string) (map[string]any, map[string]string, error) {
 	merged := map[string]any{}
 	sources := map[string]string{}
+	if len(stdinConfig) > 0 {
+		if err := mergeTOML(merged, sources, stdinConfig, string(SourceStdin)); err != nil {
+			return nil, nil, err
+		}
+	}
 	for _, file := range files {
 		klogutil.FromContext(ctx).V(3).Info("Merging config", "file_name", filepath.Base(file))
 		data, err := os.ReadFile(file)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to read config %s: %w", file, err)
 		}
-		dropIn := make(map[string]any)
-		if _, err = toml.NewDecoder(bytes.NewReader(data)).Decode(&dropIn); err != nil {
-			return nil, nil, fmt.Errorf("failed to decode config %s: %w", file, err)
+		if err := mergeTOML(merged, sources, data, file); err != nil {
+			return nil, nil, err
 		}
-		deepMerge(merged, dropIn, file, sources, "")
 	}
 	return merged, sources, nil
+}
+
+// mergeTOML decodes data and deep-merges it into merged, recording src as the
+// origin of every key it sets.
+func mergeTOML(merged map[string]any, sources map[string]string, data []byte, src string) error {
+	doc := make(map[string]any)
+	if _, err := toml.NewDecoder(bytes.NewReader(data)).Decode(&doc); err != nil {
+		return fmt.Errorf("failed to decode config %s: %w", src, err)
+	}
+	deepMerge(merged, doc, src, sources, "")
+	return nil
 }
 
 // deepMerge recursively merges src into dst.

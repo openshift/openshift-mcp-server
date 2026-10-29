@@ -17,9 +17,9 @@ config:
           - server: kubernetes
             toolPattern: ".*"
     # Observability tasks
-    - glob: ../tasks/observability/*/*.yaml
+    - glob: ../tasks/obs/*/*.yaml
       labelSelector:
-        suite: observability
+        suite: obs
       assertions:
         toolsUsed:
           - server: kubernetes
