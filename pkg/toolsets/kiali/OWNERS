@@ -1,0 +1,10 @@
+# OSSM (OpenShift Service Mesh) MCP toolset — Kiali integration.
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- josunect
+- aljesusg
+
+reviewers:
+- josunect
+- aljesusg
