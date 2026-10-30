@@ -24,7 +24,7 @@ evals/
 ```
 
 Tasks are grouped into suites via a `suite: <name>` label. The available suites are
-`core`, `config`, `helm`, `kiali`, `kubevirt`, `tekton`, `netobserv`, and `observability`.
+`core`, `config`, `helm`, `kiali`, `kubevirt`, `tekton`, and `netobserv`.
 
 A second, orthogonal `readonly: "true"` label marks tasks that are safe to run
 against a server started with `read_only = true`. It cuts across the `suite:` label
