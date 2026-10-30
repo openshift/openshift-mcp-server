@@ -4,14 +4,18 @@ include Makefile
 build-ocp: clean format
 	CGO_ENABLED=1 $(GO_BUILD_ENV) go build $(COMMON_BUILD_ARGS) -tags=strictfipsruntime -mod=vendor -a -o openshift-mcp-server ./cmd/kubernetes-mcp-server
 
-apply-override-snapshot:
-	kubectl apply -f .konflux_release/snapshot
 .PHONY: apply-override-snapshot
+apply-override-snapshot:
+	@test -n "$(SNAPSHOT_FILE)" || { echo "SNAPSHOT_FILE is required; select one explicit snapshot manifest"; exit 2; }
+	kubectl apply -f "$(SNAPSHOT_FILE)"
 
-apply-releaseplan:
-	kubectl apply -f .konflux_release/releasePlan
 .PHONY: apply-releaseplan
+apply-releaseplan:
+	@test -n "$(VERSION)" || { echo "VERSION is required (for example, 1.2)"; exit 2; }
+	@test -n "$(RELEASE_PLAN)" || { echo "RELEASE_PLAN is required (for example, openshift-mcp-server-releaseplan-120-stage.yaml)"; exit 2; }
+	@bash -euo pipefail -c 'plan_file=$$(mktemp); trap "rm -f \"$$plan_file\"" EXIT; git fetch --quiet https://github.com/openshift/openshift-mcp-server.git main; git show "FETCH_HEAD:.konflux_release/$(VERSION)/releasePlan/$(RELEASE_PLAN)" >"$$plan_file"; kubectl apply -f "$$plan_file"'
 
-apply-releases:
-	kubectl apply -f .konflux_release/releases
 .PHONY: apply-releases
+apply-releases:
+	@echo "Release creation is intentionally manual; use kubectl create for one selected Release manifest."
+	@exit 2
