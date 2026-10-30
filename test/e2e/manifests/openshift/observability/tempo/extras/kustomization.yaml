@@ -8,4 +8,5 @@ resources:
   - 05_tracegen.yaml
   - 06_rbac.yaml
   - 07_rbac_openshift.yaml
+  - 08_routes.yaml
   - tempo-multitenant.yaml

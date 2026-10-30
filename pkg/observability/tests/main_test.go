@@ -9,9 +9,7 @@ import (
 	"testing"
 )
 
-// ensurePrometheusK8sToken mints PROMETHEUS_K8S_TOKEN when unset. Call only from
-// metrics/route HTTP tests — stacks/otelcol tests use kubeconfig and must not
-// require token-creation permissions.
+// ensurePrometheusK8sToken mints PROMETHEUS_K8S_TOKEN when unset.
 func ensurePrometheusK8sToken(t *testing.T) {
 	t.Helper()
 	if strings.TrimSpace(os.Getenv("PROMETHEUS_K8S_TOKEN")) != "" {
@@ -26,7 +24,6 @@ func ensurePrometheusK8sToken(t *testing.T) {
 		}
 	}
 
-	// Must outlive the longest observability_e2e go-test -timeout (30m) plus setup.
 	cmd := exec.Command(cli, "create", "token", "prometheus-k8s",
 		"-n", "openshift-monitoring",
 		"--duration=45m",

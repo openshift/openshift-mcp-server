@@ -17,26 +17,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-// MetricsE2ESuite tests the observability/metrics toolset against a real
-// OpenShift cluster where Prometheus and Alertmanager are available
-// in the openshift-monitoring namespace.
-//
-// URLs are auto-discovered from OpenShift routes in the openshift-monitoring
-// namespace. Override with PROMETHEUS_URL / ALERTMANAGER_URL env vars if needed.
-// Run with:
-//
-//	make test-observability-e2e
-//
-// Or directly:
-//
-//	go test -tags observability_e2e ./pkg/observability/tests/ -v
-//
-// Optional environment variables:
-//
-//	PROMETHEUS_URL   - Override auto-discovered Prometheus/Thanos Querier URL
-//	ALERTMANAGER_URL - Override auto-discovered Alertmanager URL
-//	KUBECONFIG       - Path to kubeconfig file (defaults to ~/.kube/config)
-//	PROMETHEUS_K8S_TOKEN - Bearer for monitoring Route HTTP checks (CI)
+// MetricsE2ESuite tests observability/metrics against a live OpenShift cluster.
 type MetricsE2ESuite struct {
 	suite.Suite
 	*test.McpClient
@@ -47,6 +28,7 @@ type MetricsE2ESuite struct {
 }
 
 func (s *MetricsE2ESuite) SetupSuite() {
+	prepareObsE2EKubeconfig(s.T())
 	ensurePrometheusK8sToken(s.T())
 	s.prometheusURL = os.Getenv("PROMETHEUS_URL")
 	s.alertmanagerURL = os.Getenv("ALERTMANAGER_URL")
@@ -76,10 +58,8 @@ func (s *MetricsE2ESuite) SetupSuite() {
 	s.T().Logf("Test metric: %s", s.testMetric)
 }
 
-// discoverTestMetric creates a temporary MCP server to list CPU metrics and
-// returns the first candidate that yields a nonempty instant-query vector.
-// list_metrics can include names with samples only in the past hour; those
-// would make TestExecuteInstantQuery flake. Also pre-warms the Thanos label cache.
+// discoverTestMetric lists CPU metrics and returns the first with a nonempty
+// instant-query vector. Also pre-warms the Thanos label cache.
 func (s *MetricsE2ESuite) discoverTestMetric() string {
 	cfg := s.buildConfig()
 
@@ -101,7 +81,8 @@ func (s *MetricsE2ESuite) discoverTestMetric() string {
 
 	result, err := client.CallTool("list_metrics", map[string]any{"name_regex": ".*cpu.*"})
 	if err != nil || result.IsError {
-		s.T().Logf("list_metrics failed during discovery: err=%v, isError=%v", err, result != nil && result.IsError)
+		s.T().Logf("list_metrics failed during discovery: err=%v isError=%v body=%s",
+			err, result != nil && result.IsError, textContent(result))
 		return ""
 	}
 
@@ -132,9 +113,7 @@ func (s *MetricsE2ESuite) discoverTestMetric() string {
 	return ""
 }
 
-// discoverRoutesViaResolver uses the production MetricsRouteResolver so suite
-// setup and TestRouteDiscovery_* exercise the same code path (no duplicate
-// hand-rolled Route parsing).
+// discoverRoutesViaResolver uses the production MetricsRouteResolver.
 func (s *MetricsE2ESuite) discoverRoutesViaResolver() map[string]string {
 	result := make(map[string]string)
 	resolver := &openshift.MetricsRouteResolver{}
@@ -160,7 +139,6 @@ func (s *MetricsE2ESuite) buildConfig() *config.Config {
 		auth_mode = "%s"
 		prometheus_url = "%s"
 		alertmanager_url = "%s"
-		insecure = true
 		guardrails = "none"
 	`, metricsAuthMode(), s.prometheusURL, s.alertmanagerURL)
 

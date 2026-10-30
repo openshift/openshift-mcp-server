@@ -13,12 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // applyE2EDefaults pins the provider to the current kubeconfig context only.
-// Without this, the default kubeconfig strategy probes every context for GVK
-// filtering and floods logs with unreachable stale clusters.
 func applyE2EDefaults(cfg *config.Config) {
 	cfg.ClusterProviderStrategy.SetForTest(config.ClusterProviderDisabled)
 	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
@@ -27,10 +26,6 @@ func applyE2EDefaults(cfg *config.Config) {
 }
 
 // startServerFromTOML creates an in-process MCP server + client from TOML config.
-// clientOpts are passed to the MCP test client (e.g. mcpAuthOptions() for
-// monitoring Route bearer auth). Omit them so Kubernetes API calls use
-// kubeconfig credentials — required for TempoStack/LokiStack list tools,
-// since PROMETHEUS_K8S_TOKEN is the prometheus-k8s SA and lacks those RBAC verbs.
 func startServerFromTOML(t *testing.T, tomlCfg string, clientOpts ...test.McpClientOption) (*mcpserver.Server, *test.McpClient) {
 	t.Helper()
 	cfg, err := config.ReadToml(t.Context(), []byte(tomlCfg))
@@ -80,6 +75,34 @@ func namedResourceExists(t *testing.T, gvr schema.GroupVersionResource, namespac
 		return false
 	}
 	t.Fatalf("looking up %s %s/%s: %v", gvr.Resource, namespace, name, err)
+	return false
+}
+
+// namedResourceReady reports whether a namespaced CR has status Ready=True.
+func namedResourceReady(t *testing.T, gvr schema.GroupVersionResource, namespace, name string) bool {
+	t.Helper()
+	dyn := dynamicClient(t)
+	obj, err := dyn.Resource(gvr).Namespace(namespace).Get(t.Context(), name, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return false
+		}
+		t.Fatalf("looking up %s %s/%s: %v", gvr.Resource, namespace, name, err)
+		return false
+	}
+	conditions, found, err := unstructured.NestedSlice(obj.Object, "status", "conditions")
+	if err != nil || !found {
+		return false
+	}
+	for _, raw := range conditions {
+		cond, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if cond["type"] == "Ready" && cond["status"] == "True" {
+			return true
+		}
+	}
 	return false
 }
 

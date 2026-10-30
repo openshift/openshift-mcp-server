@@ -1,0 +1,35 @@
+# Expose Tempo query-frontend HTTP APIs via OpenShift Routes so out-of-cluster
+# e2e (OpenShift CI) can reach them. Without these, discovery falls back to
+# *.svc DNS which is not resolvable from the CI pod.
+#
+# Route names match the Service names used by pkg/obs/traces/discovery so
+# RouteClient.ResolveEndpoint finds them when use_route=true.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: tempo-tempo1-query-frontend
+  namespace: tracing
+spec:
+  to:
+    kind: Service
+    name: tempo-tempo1-query-frontend
+  port:
+    targetPort: 3200
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: tempo-tempo2-query-frontend
+  namespace: tracing
+spec:
+  to:
+    kind: Service
+    name: tempo-tempo2-query-frontend
+  port:
+    targetPort: 3200
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
