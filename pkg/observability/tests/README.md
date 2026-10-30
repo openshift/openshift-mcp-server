@@ -26,8 +26,13 @@ contexts in a shared `~/.kube/config`).
 | `KUBECONFIG` | No | Path to kubeconfig (default: `~/.kube/config`) |
 | `PROMETHEUS_URL` | No | Skip Thanos/Prometheus route discovery for metrics suite |
 | `ALERTMANAGER_URL` | No | Skip Alertmanager route discovery for metrics suite |
-| `PROMETHEUS_K8S_TOKEN` | Auto | Bearer for monitoring Route HTTP and metrics tool calls (`auth_mode=header`). Auto-created via `oc`/`kubectl create token prometheus-k8s -n openshift-monitoring` when unset. Needed because CI/ROSA kubeconfigs often use client certs that the monitoring OAuth proxy rejects (401). Not used by Tempo/Loki stack tests (those use kubeconfig). |
+| `PROMETHEUS_K8S_TOKEN` | Auto | Bearer for monitoring Route HTTP and metrics tool calls (`auth_mode=header`). Auto-created via `oc`/`kubectl create token prometheus-k8s -n openshift-monitoring` when unset. Needed because CI/ROSA kubeconfigs often use client certs that the monitoring OAuth proxy rejects (401). |
 | `LOKI_STORAGE_CLASS` | No | Block StorageClass for LokiStack PVCs during `setup-observability-e2e`. Defaults to the cluster default StorageClass. |
+
+Suite setup also rewrites `KUBECONFIG` once per process when needed:
+
+- Merges `openshift-config-managed/default-ingress-cert` so Route TLS verifies without `insecure=true`.
+- When the kubeconfig has only client certificates, mints SA `default/obs-e2e` (`cluster-reader` binding) and switches the context to that bearer token so Tempo/Loki gateway OAuth accepts `auth_mode=kubeconfig`.
 
 ## Running
 

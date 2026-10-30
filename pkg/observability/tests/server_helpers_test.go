@@ -18,8 +18,6 @@ import (
 )
 
 // applyE2EDefaults pins the provider to the current kubeconfig context only.
-// Without this, the default kubeconfig strategy probes every context for GVK
-// filtering and floods logs with unreachable stale clusters.
 func applyE2EDefaults(cfg *config.Config) {
 	cfg.ClusterProviderStrategy.SetForTest(config.ClusterProviderDisabled)
 	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
@@ -28,10 +26,6 @@ func applyE2EDefaults(cfg *config.Config) {
 }
 
 // startServerFromTOML creates an in-process MCP server + client from TOML config.
-// clientOpts are passed to the MCP test client (e.g. mcpAuthOptions() for
-// monitoring Route bearer auth). Omit them so Kubernetes API calls use
-// kubeconfig credentials — required for TempoStack/LokiStack list tools,
-// since PROMETHEUS_K8S_TOKEN is the prometheus-k8s SA and lacks those RBAC verbs.
 func startServerFromTOML(t *testing.T, tomlCfg string, clientOpts ...test.McpClientOption) (*mcpserver.Server, *test.McpClient) {
 	t.Helper()
 	cfg, err := config.ReadToml(t.Context(), []byte(tomlCfg))
@@ -84,9 +78,7 @@ func namedResourceExists(t *testing.T, gvr schema.GroupVersionResource, namespac
 	return false
 }
 
-// namedResourceReady reports whether a namespaced CR exists and has
-// status.conditions[type=Ready].status=True. Used so partial stack installs
-// (CR created, rollout not finished) skip rather than fail the suite.
+// namedResourceReady reports whether a namespaced CR has status Ready=True.
 func namedResourceReady(t *testing.T, gvr schema.GroupVersionResource, namespace, name string) bool {
 	t.Helper()
 	dyn := dynamicClient(t)

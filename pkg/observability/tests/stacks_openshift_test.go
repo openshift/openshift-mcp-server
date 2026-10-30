@@ -15,9 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// StacksOpenShiftE2ESuite covers OpenShift-specific Tempo / Loki / otelcol cases.
-// Requires stacks from: make setup-observability-e2e
-// Individual tests skip when the corresponding CRD / instances are missing.
+// StacksOpenShiftE2ESuite covers Tempo / Loki / otelcol against a live OpenShift cluster.
 type StacksOpenShiftE2ESuite struct {
 	suite.Suite
 }
@@ -32,10 +30,6 @@ func (s *StacksOpenShiftE2ESuite) useRouteTOML(extraToolsets ...string) string {
 		toolsets += `, "` + ts + `"`
 	}
 	toolsets += `]`
-	// kubeconfig auth for both K8s CR discovery and Route HTTP.
-	// Do not use PROMETHEUS_K8S_TOKEN here: that SA can hit monitoring Routes
-	// only and cannot list TempoStack/LokiStack. Callers must not pass
-	// mcpAuthOptions() into startServerFromTOML for these tests.
 	return `
 		toolsets = ` + toolsets + `
 		experimental_enable_target_compatibility_tool_filters = true
@@ -64,6 +58,7 @@ func (s *StacksOpenShiftE2ESuite) requireTempoStacks() {
 	if os.Getenv("SKIP_OBS_TEMPO") != "" {
 		s.T().Skip("SKIP_OBS_TEMPO set; Tempo setup failed")
 	}
+	prepareObsE2EKubeconfig(s.T())
 	if !crdExists(s.T(), "tempostacks.tempo.grafana.com") {
 		s.T().Skip("TempoStack CRD not installed; run make setup-observability-e2e")
 	}
@@ -82,6 +77,7 @@ func (s *StacksOpenShiftE2ESuite) requireLokiStack() {
 	if os.Getenv("SKIP_OBS_LOKI") != "" {
 		s.T().Skip("SKIP_OBS_LOKI set; Loki setup failed")
 	}
+	prepareObsE2EKubeconfig(s.T())
 	if !crdExists(s.T(), "lokistacks.loki.grafana.com") {
 		s.T().Skip("LokiStack CRD not installed; run make setup-observability-e2e")
 	}
@@ -388,8 +384,7 @@ func (s *StacksOpenShiftE2ESuite) TestOtelcolToolset() {
 	s.Equal(false, invalidOut["valid"])
 }
 
-// callUntilReady retries a tool call until ready returns true or the deadline expires.
-// Transient backend errors and empty results are retried for stack warm-up.
+// callUntilReady retries a tool call until ready or the deadline expires.
 func callUntilReady(t *testing.T, client *test.McpClient, tool string, args map[string]any, ready func(*mcpsdk.CallToolResult) bool) *mcpsdk.CallToolResult {
 	t.Helper()
 	deadline := time.Now().Add(60 * time.Second)
@@ -397,17 +392,22 @@ func callUntilReady(t *testing.T, client *test.McpClient, tool string, args map[
 		result, err := client.CallTool(tool, args)
 		require.NoError(t, err, "CallTool %s", tool)
 		if result.IsError {
+			body := textContent(result)
+			if isOutOfClusterBackendError(body) {
+				t.Skipf("%s unreachable out-of-cluster (need Route): %s", tool, body)
+			}
 			if !isRetryableToolError(result) {
-				t.Fatalf("%s error: %s", tool, textContent(result))
+				t.Fatalf("%s error: %s", tool, body)
 			}
 		} else if ready(result) {
 			return result
 		}
 		if time.Now().After(deadline) {
+			body := textContent(result)
 			if result.IsError {
-				t.Fatalf("%s still failing after retries: %s", tool, textContent(result))
+				t.Fatalf("%s still failing after retries: %s", tool, body)
 			}
-			t.Fatalf("%s did not become ready within 60s; last result: %s", tool, textContent(result))
+			t.Fatalf("%s did not become ready within 60s; last result: %s", tool, body)
 		}
 		time.Sleep(5 * time.Second)
 	}
@@ -422,6 +422,15 @@ func isRetryableToolError(result *mcpsdk.CallToolResult) bool {
 		strings.Contains(body, "temporary failure in name resolution") ||
 		strings.Contains(body, "TLS handshake timeout") ||
 		strings.Contains(body, "EOF")
+}
+
+// isOutOfClusterBackendError detects backends that only expose in-cluster .svc DNS.
+// Auth failures are not skipped: prepareObsE2EKubeconfig must supply a usable bearer.
+func isOutOfClusterBackendError(body string) bool {
+	return strings.Contains(body, ".svc") && (strings.Contains(body, "no such host") ||
+		strings.Contains(body, "lookup ") ||
+		strings.Contains(body, "i/o timeout") ||
+		strings.Contains(body, "connection refused"))
 }
 
 func anyStrings(in []any) []string {

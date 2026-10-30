@@ -241,6 +241,9 @@ install_tempo() {
   _wait_rollout tracing deployment/tempo-tempo1-query-frontend 5m
   _wait_rollout tracing deployment/tempo-tempo2-query-frontend 5m
   $KUBECTL -n tracing wait --for=condition=Ready tempostack/multitenant --timeout=10m
+  # Out-of-cluster e2e needs admitted query-frontend Routes (see extras/08_routes.yaml).
+  $KUBECTL -n tracing wait --for=jsonpath='{.status.ingress[0].host}' route/tempo-tempo1-query-frontend --timeout=5m
+  $KUBECTL -n tracing wait --for=jsonpath='{.status.ingress[0].host}' route/tempo-tempo2-query-frontend --timeout=5m
 }
 
 install_loki() {

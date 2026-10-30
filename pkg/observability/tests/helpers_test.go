@@ -18,10 +18,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// mcpAuthOptions returns MCP client options that forward PROMETHEUS_K8S_TOKEN as
-// Authorization when set. Pair with auth_mode = "header" in toolset config so
-// observability backends (Thanos/Alertmanager routes) accept the request.
-// Without PROMETHEUS_K8S_TOKEN, callers should use auth_mode = "kubeconfig".
+// mcpAuthOptions forwards PROMETHEUS_K8S_TOKEN as Authorization when set.
 func mcpAuthOptions() []test.McpClientOption {
 	if token := os.Getenv("PROMETHEUS_K8S_TOKEN"); token != "" {
 		return []test.McpClientOption{
@@ -62,14 +59,8 @@ func dynamicClient(t *testing.T) dynamic.Interface {
 	return client
 }
 
-// authenticatedHTTPClient returns an HTTP client for OpenShift monitoring Routes.
-//
-// Prefers PROMETHEUS_K8S_TOKEN because kubeconfigs that use client certificates
-// are rejected by the OAuth proxy on monitoring routes (401).
-//
-// TLS verification is skipped: out-of-cluster e2e clients typically lack the
-// cluster ingress CA. This client is test-only and uses a short timeout.
-// Matches metrics suite config (insecure = true).
+// authenticatedHTTPClient returns an HTTP client for direct Route HTTP checks.
+// InsecureSkipVerify is intentional for this smoke check only.
 func authenticatedHTTPClient(t *testing.T) *http.Client {
 	t.Helper()
 	ensurePrometheusK8sToken(t)
@@ -104,8 +95,7 @@ func (t *tokenRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 	return t.base.RoundTrip(req)
 }
 
-// assertValidRouteURL checks that a discovered route URL is an external OpenShift
-// Route host (https, dotted hostname, not in-cluster *.svc DNS).
+// assertValidRouteURL checks that a URL is an external Route host.
 func assertValidRouteURL(t *testing.T, raw string) {
 	t.Helper()
 	parsed, err := url.Parse(raw)
