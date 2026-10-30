@@ -36,11 +36,9 @@
         "/pkg/mcp/kiali*",
         "/build/kiali.mk",
         "/evals/tasks/kiali/",
-        "/docs/KIALI.md",
-        "/hack/kiali/"
+        "/docs/KIALI.md"
       ],
-      "reviewers": ["@aljesusg", "@josunect"],
-      "approvers": ["@aljesusg", "@josunect"]
+      "reviewers": ["@aljesusg", "@josunect"]
     },
     {
       "toolset": "kubevirt",
