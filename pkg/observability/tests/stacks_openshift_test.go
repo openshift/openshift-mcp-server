@@ -3,6 +3,7 @@
 package observability
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -60,6 +61,9 @@ var (
 
 func (s *StacksOpenShiftE2ESuite) requireTempoStacks() {
 	s.T().Helper()
+	if os.Getenv("SKIP_OBS_TEMPO") != "" {
+		s.T().Skip("SKIP_OBS_TEMPO set; Tempo setup failed")
+	}
 	if !crdExists(s.T(), "tempostacks.tempo.grafana.com") {
 		s.T().Skip("TempoStack CRD not installed; run make setup-observability-e2e")
 	}
@@ -67,16 +71,25 @@ func (s *StacksOpenShiftE2ESuite) requireTempoStacks() {
 		if !namedResourceExists(s.T(), tempoStackGVR, "tracing", name) {
 			s.T().Skipf("TempoStack tracing/%s not found; run make setup-observability-e2e", name)
 		}
+		if !namedResourceReady(s.T(), tempoStackGVR, "tracing", name) {
+			s.T().Skipf("TempoStack tracing/%s exists but is not Ready; skipping (partial install)", name)
+		}
 	}
 }
 
 func (s *StacksOpenShiftE2ESuite) requireLokiStack() {
 	s.T().Helper()
+	if os.Getenv("SKIP_OBS_LOKI") != "" {
+		s.T().Skip("SKIP_OBS_LOKI set; Loki setup failed")
+	}
 	if !crdExists(s.T(), "lokistacks.loki.grafana.com") {
 		s.T().Skip("LokiStack CRD not installed; run make setup-observability-e2e")
 	}
 	if !namedResourceExists(s.T(), lokiStackGVR, "observability-loki", "observability-loki") {
 		s.T().Skip("LokiStack observability-loki/observability-loki not found; run make setup-observability-e2e")
+	}
+	if !namedResourceReady(s.T(), lokiStackGVR, "observability-loki", "observability-loki") {
+		s.T().Skip("LokiStack observability-loki/observability-loki exists but is not Ready; skipping (partial install)")
 	}
 }
 

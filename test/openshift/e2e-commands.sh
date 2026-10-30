@@ -29,10 +29,16 @@ cleanup_observability_e2e() {
 trap cleanup_observability_e2e EXIT
 
 # Install stacks individually so a missing operator (e.g. loki-operator not in
-# the OCP catalog) does not block the entire job.  The Go tests call
-# requireTempoStacks()/requireLokiStack() and gracefully skip when the
-# corresponding CRDs or instances are absent.
-./hack/e2e/observability/setup-openshift.sh tempo || echo "WARNING: Tempo setup failed; Tempo tests will be skipped"
-./hack/e2e/observability/setup-openshift.sh loki  || echo "WARNING: Loki setup failed; Loki tests will be skipped"
+# the OCP catalog) or a partial rollout does not block the entire job.
+# Propagate setup failures via SKIP_OBS_* so requireTempoStacks()/requireLokiStack()
+# skip explicitly (existence alone is not enough for a half-installed stack).
+if ! ./hack/e2e/observability/setup-openshift.sh tempo; then
+    echo "WARNING: Tempo setup failed; Tempo tests will be skipped"
+    export SKIP_OBS_TEMPO=1
+fi
+if ! ./hack/e2e/observability/setup-openshift.sh loki; then
+    echo "WARNING: Loki setup failed; Loki tests will be skipped"
+    export SKIP_OBS_LOKI=1
+fi
 
 make test-observability-e2e

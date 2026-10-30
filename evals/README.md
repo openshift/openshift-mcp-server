@@ -14,7 +14,7 @@ evals/
 ├── core-eval-testing/              # Agent configs and per-suite eval configs (see below)
 ├── results/                        # Committed eval results (baselines)
 └── tasks/                          # Shared task library, grouped by suite (see tasks/README.md)
-    └── <suite>/                    # core, config, helm, kiali, kubevirt, tekton, netobserv, observability
+    └── <suite>/                    # core, config, helm, kiali, kubevirt, tekton, netobserv
         └── <task-name>/
             ├── <task-name>.yaml    # Task definition (prompt, verify, labels). kubevirt/tekton use task.yaml
             ├── setup.sh            # Optional pre-task cluster setup

@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -80,6 +81,36 @@ func namedResourceExists(t *testing.T, gvr schema.GroupVersionResource, namespac
 		return false
 	}
 	t.Fatalf("looking up %s %s/%s: %v", gvr.Resource, namespace, name, err)
+	return false
+}
+
+// namedResourceReady reports whether a namespaced CR exists and has
+// status.conditions[type=Ready].status=True. Used so partial stack installs
+// (CR created, rollout not finished) skip rather than fail the suite.
+func namedResourceReady(t *testing.T, gvr schema.GroupVersionResource, namespace, name string) bool {
+	t.Helper()
+	dyn := dynamicClient(t)
+	obj, err := dyn.Resource(gvr).Namespace(namespace).Get(t.Context(), name, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return false
+		}
+		t.Fatalf("looking up %s %s/%s: %v", gvr.Resource, namespace, name, err)
+		return false
+	}
+	conditions, found, err := unstructured.NestedSlice(obj.Object, "status", "conditions")
+	if err != nil || !found {
+		return false
+	}
+	for _, raw := range conditions {
+		cond, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if cond["type"] == "Ready" && cond["status"] == "True" {
+			return true
+		}
+	}
 	return false
 }
 
