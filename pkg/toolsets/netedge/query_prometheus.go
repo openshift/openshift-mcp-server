@@ -33,7 +33,15 @@ var routeGVR = schema.GroupVersionResource{
 	Resource: "routes",
 }
 
-func InitQueryPrometheus() []api.ServerTool {
+// Keep this GVK aligned with routeGVR and the compatibility tests if Route
+// lookup changes API version or begins negotiating versions.
+var queryPrometheusRouteGVK = schema.GroupVersionKind{
+	Group:   "route.openshift.io",
+	Version: "v1",
+	Kind:    "Route",
+}
+
+func InitQueryPrometheus(ctx context.Context, inspector api.ClusterInspector) []api.ServerTool {
 	return []api.ServerTool{
 		{
 			Tool: api.Tool{
@@ -67,7 +75,8 @@ func InitQueryPrometheus() []api.ServerTool {
 				Namespace:    &api.RBACNamespace{Name: defaultMonitoringNamespace},
 				ResourceName: &api.RBACResourceName{Name: thanosQuerierRoute},
 			}),
-			Handler: queryPrometheusHandler,
+			Handler:                    queryPrometheusHandler,
+			TargetCompatibilityFilters: []func() bool{targetHasGVK(ctx, inspector, queryPrometheusRouteGVK)},
 		},
 	}
 }
