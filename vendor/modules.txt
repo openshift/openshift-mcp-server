@@ -193,7 +193,7 @@ github.com/go-openapi/runtime/server-middleware/negotiate/header
 # github.com/go-openapi/spec v1.0.1
 ## explicit; go 1.26.0
 github.com/go-openapi/spec
-# github.com/go-openapi/strfmt v0.27.3
+# github.com/go-openapi/strfmt v0.27.4
 ## explicit; go 1.26.0
 github.com/go-openapi/strfmt
 github.com/go-openapi/strfmt/internal/bsonlite
@@ -503,7 +503,7 @@ github.com/prometheus/otlptranslator
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/parsers
-# github.com/prometheus/prometheus v0.315.0
+# github.com/prometheus/prometheus v0.315.1
 ## explicit; go 1.26.0
 github.com/prometheus/prometheus/model/exemplar
 github.com/prometheus/prometheus/model/histogram
@@ -881,7 +881,7 @@ google.golang.org/genproto/googleapis/api/httpbody
 ## explicit; go 1.26.0
 google.golang.org/genproto/googleapis/rpc/errdetails
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.83.2
+# google.golang.org/grpc v1.84.0
 ## explicit; go 1.25.0
 google.golang.org/grpc
 google.golang.org/grpc/attributes
@@ -1624,7 +1624,7 @@ k8s.io/utils/net
 k8s.io/utils/ptr
 k8s.io/utils/strings/slices
 k8s.io/utils/trace
-# knative.dev/pkg v0.0.0-20260727151759-521cb33b33dd
+# knative.dev/pkg v0.0.0-20260622140654-39ebae2ee2dc
 ## explicit; go 1.25.0
 knative.dev/pkg/apis
 knative.dev/pkg/apis/duck
@@ -1645,8 +1645,8 @@ knative.dev/pkg/observability/tracing
 knative.dev/pkg/ptr
 knative.dev/pkg/tracker
 knative.dev/pkg/webhook/resourcesemantics
-# oras.land/oras-go/v2 v2.6.2
-## explicit; go 1.25.0
+# oras.land/oras-go/v2 v2.6.3
+## explicit; go 1.26.0
 oras.land/oras-go/v2
 oras.land/oras-go/v2/content
 oras.land/oras-go/v2/content/memory
