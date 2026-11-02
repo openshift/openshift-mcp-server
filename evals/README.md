@@ -364,8 +364,8 @@ The subsequent Prow jobs failed during cloning/merging with newer main, before
 tests or a new security scan executed. Signed H6
 `5f781f327f3a0d349c3afe457a5f04a622afcbd1` integrates published C5 with main
 `87f6e7c0f60b122de54e5becbf57314d59f7c3dc`, preserving both histories. H6
-completed independent review and full local mandatory gates. The workflow now
-pins that actual immutable H6. Published PR518 head
+completed independent review and full local mandatory gates. The workflow at
+published PR518 head pinned that actual immutable H6. Published PR518 head
 `53b5691bb5d2535209cbffc38f74f9d53f8e79b4` already contains H6 and its pin.
 Subsequent helper-content corrections require independent review and full local
 mandatory gates for a new trusted harness commit before changing that pin;
