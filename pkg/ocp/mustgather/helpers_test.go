@@ -117,6 +117,10 @@ func (m *mockKubernetesClient) DiscoveryClient() discovery.CachedDiscoveryInterf
 	return m.discClient
 }
 
+func (m *mockKubernetesClient) RawDiscoveryClient() discovery.DiscoveryInterface {
+	return m.discClient
+}
+
 func (m *mockKubernetesClient) DynamicClient() dynamic.Interface {
 	return m.dynClient
 }

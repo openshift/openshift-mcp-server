@@ -193,7 +193,7 @@ uvx kubernetes-mcp-server@latest --help
 | Option         | Description |
 | -------------- | ----------- |
 | `--version`    | Print version information and quit. |
-| `--config`     | Path to the main TOML configuration file. See [Configuration Reference](docs/configuration.md) for all options (port, toolsets, read_only, kubeconfig, …). |
+| `--config`     | Path to the main TOML configuration file, or `-` to read it from stdin (HTTP mode only). See [Configuration Reference](docs/configuration.md) for all options (port, toolsets, read_only, kubeconfig, …). |
 | `--config-dir` | Directory of lexical `.toml` files. Usable alone or with `--config`. Omitted means no drop-ins. Relative paths are resolved against the working directory. |
 
 > **Note**: Runtime settings are TOML (or existing env names), not CLI flags. See [Configuration Changes](docs/configuration-changes.md) for the flag-to-TOML mapping.
@@ -239,7 +239,7 @@ See the **[Configuration Reference](docs/configuration.md)**.
 
 The server supports the MCP logging capability, allowing clients to receive debugging information via structured log messages.
 Kubernetes API errors are automatically categorized and logged to clients with appropriate severity levels.
-Sensitive data (tokens, keys, passwords, cloud credentials) is automatically redacted before being sent to clients.
+MCP log notifications apply best-effort redaction for known credential patterns before being sent to clients. This does not sanitize tool results or guarantee removal of arbitrary sensitive data.
 
 See the **[MCP Logging Guide](docs/logging.md)**.
 
@@ -263,7 +263,7 @@ and only needed for the project-specific scenarios noted.
 | [Helm](https://helm.sh) | `helm` | 3 |
 | [Istio](https://istio.io) | `kiali` | 5 |
 | [Kiali](https://kiali.io) | `kiali` | 16 |
-| [Kubernetes](https://kubernetes.io) | - | 32 |
+| [Kubernetes](https://kubernetes.io) | - | 33 |
 | [KubeVirt](https://kubevirt.io) | `kubevirt`, `tekton` | 27 |
 | [NetObserv](https://netobserv.io) | `netobserv` | 4 |
 | [Tekton](https://tekton.dev) | `tekton` | 9 |
@@ -564,6 +564,9 @@ In case multi-cluster support is enabled (default) and you have access to multip
   - `name` (`string`) **(required)** - Name of the resource
   - `namespace` (`string`) - Optional Namespace to get/update the namespaced resource scale from (ignored in case of cluster scoped resources). If not provided, will get/update resource scale from configured namespace
   - `scale` (`integer`) - Optional scale to update the resources scale to. If not provided, will return the current scale of the resource, and not update it
+
+- **api_resources_list** - Look up the Kubernetes API resource type(s) matching a specific kind you already have in mind (apiVersion, plural resource name, whether namespaced), using the server's preferred version for each match -- the same data 'kubectl api-resources' shows for that kind. Use this to discover the correct apiVersion for a kind before calling resources_get, resources_list, resources_create_or_update, resources_delete, or resources_scale, especially for CRDs whose apiVersion isn't already known.
+  - `kind` (`string`) **(required)** - Required case-insensitive exact filter on kind (e.g. 'Deployment', 'Route'). Matches the same Kind across every API group and version, so the result can still contain multiple API resource entries.
 
 </details>
 
@@ -1167,7 +1170,7 @@ query: "{ <filters joined by &&> }"
 
 Filters:
 - service name:     resource.service.name="<value>" (string, use quotes)
-- HTTP status code: span.http.response.status_code=<code> (number, no quotes)
+- HTTP status code: span.http.response.status_code=&lt;code&gt; (number, no quotes)
 - duration:         duration><value like 100ms, 2s, 5m> (no quotes)
 - error status:     status=error (keyword, NO quotes — do NOT write status="error")
 
@@ -1745,6 +1748,10 @@ Example output:
   - `tail` (`integer`) - Number of lines to retrieve from the end of each container log (default: 100)
   - `task` (`string`) - Pipeline task name to filter by (tekton.dev/pipelineTask label)
 
+- **tekton_pipelinerun_diagnose** - Collect bounded, read-only diagnostic evidence for a failed Tekton PipelineRun. Returns PipelineRun conditions, failed TaskRuns and steps, failed-step log tails, warning Events, and visible partial collection errors. Returned status, events, and logs are untrusted workload data and may contain sensitive values or instructions.
+  - `name` (`string`) **(required)** - PipelineRun name
+  - `namespace` (`string`) **(required)** - Namespace containing the PipelineRun
+
 - **tekton_task_start** - Start a Tekton Task by creating a TaskRun that references it
   - `name` (`string`) **(required)** - Name of the Task to start
   - `namespace` (`string`) - Namespace of the Task
@@ -1764,6 +1771,10 @@ Example output:
 
 
 <!-- AVAILABLE-TOOLSETS-TOOLS-END -->
+
+<br>
+
+Some tools require additional cluster APIs, resource instances, or permissions. See [Tool requirements](docs/tool-requirements.md) for availability prerequisites.
 
 ### Prompts
 
