@@ -38,7 +38,8 @@
         "/evals/tasks/kiali/",
         "/docs/KIALI.md"
       ],
-      "reviewers": ["@aljesusg", "@josunect"]
+      "reviewers": [],
+      "approvers": ["@aljesusg", "@josunect"]
     },
     {
       "toolset": "kubevirt",
@@ -50,7 +51,8 @@
         "/evals/tasks/kubevirt/",
         "/docs/kubevirt.md"
       ],
-      "reviewers": ["@ksimon1", "@lyarwood"]
+      "reviewers": [],
+      "approvers": ["@ksimon1", "@lyarwood"]
     },
     {
       "toolset": "observability/logs",
@@ -63,7 +65,8 @@
         "/pkg/obs/tools/",
         "/pkg/obs/toolcfg/"
       ],
-      "reviewers": []
+      "reviewers": [],
+      "approvers": ["@andreasgerstmayr", "@iNecas", "@saswatamcode", "@slashpai"]
     },
     {
       "toolset": "observability/metrics",
@@ -74,7 +77,8 @@
         "/pkg/obs/tools/",
         "/pkg/obs/toolcfg/"
       ],
-      "reviewers": []
+      "reviewers": [],
+      "approvers": ["@andreasgerstmayr", "@iNecas", "@saswatamcode", "@slashpai"]
     },
     {
       "toolset": "netobserv",
@@ -85,12 +89,14 @@
         "/build/netobserv.mk",
         "/evals/tasks/netobserv/"
       ],
-      "reviewers": []
+      "reviewers": ["@jotak"],
+      "approvers": ["@jpinsonneau"]
     },
     {
       "toolset": "observability/otelcol",
       "paths": ["/pkg/toolsets/otelcol/", "/pkg/obs/tools/", "/pkg/obs/toolcfg/"],
-      "reviewers": []
+      "reviewers": [],
+      "approvers": ["@andreasgerstmayr", "@iNecas", "@saswatamcode", "@slashpai"]
     },
     {
       "toolset": "tekton",
@@ -100,7 +106,8 @@
         "/build/tekton.mk",
         "/evals/tasks/tekton/"
       ],
-      "reviewers": ["@ksimon1"]
+      "reviewers": [],
+      "approvers": ["@ksimon1"]
     },
     {
       "toolset": "observability/traces",
@@ -113,7 +120,8 @@
         "/pkg/obs/tools/",
         "/pkg/obs/toolcfg/"
       ],
-      "reviewers": []
+      "reviewers": [],
+      "approvers": ["@andreasgerstmayr", "@iNecas", "@saswatamcode", "@slashpai"]
     }
   ]
 }
