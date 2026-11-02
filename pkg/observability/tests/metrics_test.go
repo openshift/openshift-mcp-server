@@ -202,6 +202,9 @@ func (s *MetricsE2ESuite) TestExecuteRangeQuery() {
 
 func (s *MetricsE2ESuite) TestShowTimeseries() {
 	s.Run("validates a range query for chart rendering", func() {
+		if !s.hasTool("show_timeseries") {
+			s.T().Skip("show_timeseries not registered (requires a Perses instance); skipping")
+		}
 		toolResult, err := s.CallTool("show_timeseries", map[string]any{
 			"query":    s.testMetric,
 			"step":     "1m",
@@ -211,6 +214,19 @@ func (s *MetricsE2ESuite) TestShowTimeseries() {
 		s.Require().NoError(err)
 		s.Require().False(toolResult.IsError, "tool returned error: %s", textContent(toolResult))
 	})
+}
+
+func (s *MetricsE2ESuite) hasTool(name string) bool {
+	tools, err := s.ListTools()
+	if err != nil || tools == nil {
+		return false
+	}
+	for _, tool := range tools.Tools {
+		if tool.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *MetricsE2ESuite) TestGetLabelNames() {
