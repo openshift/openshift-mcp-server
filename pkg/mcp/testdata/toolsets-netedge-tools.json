@@ -109,14 +109,9 @@
       "readOnlyHint": true,
       "title": "Get CoreDNS Config"
     },
-    "description": "Retrieve the CoreDNS Corefile from the live cluster or a selected must-gather archive. Set archive_id for offline analysis.",
+    "description": "Retrieve the current CoreDNS configuration (Corefile) from the cluster.",
     "inputSchema": {
-      "properties": {
-        "archive_id": {
-          "description": "Must-gather archive ID from mustgather_list. Omit for the live cluster.",
-          "type": "string"
-        }
-      },
+      "properties": {},
       "type": "object"
     },
     "name": "get_coredns_config",
@@ -361,13 +356,9 @@
       "readOnlyHint": true,
       "title": "Get Service Endpoints"
     },
-    "description": "Return EndpointSlices for a Service from the live cluster or a selected must-gather archive. Set archive_id for offline analysis. Use limit and continue to retrieve a large list one page at a time.",
+    "description": "Return EndpointSlice objects for a Service to verify backend pod availability. Use limit and continue to retrieve a large list one page at a time.",
     "inputSchema": {
       "properties": {
-        "archive_id": {
-          "description": "Must-gather archive ID from mustgather_list. Omit for the live cluster.",
-          "type": "string"
-        },
         "continue": {
           "description": "Opaque token from the continue field of the previous page. Send it unchanged with the same limit, namespace, and selectors to retrieve the next page. Omit on the first call.",
           "type": "string"
@@ -429,13 +420,9 @@
       "readOnlyHint": true,
       "title": "Inspect Route"
     },
-    "description": "Inspect an OpenShift Route in the live cluster or a selected must-gather archive. Set archive_id for offline analysis.",
+    "description": "Inspect an OpenShift Route to view its full configuration and status.",
     "inputSchema": {
       "properties": {
-        "archive_id": {
-          "description": "Must-gather archive ID from mustgather_list. Omit for the live cluster.",
-          "type": "string"
-        },
         "namespace": {
           "description": "Route namespace",
           "type": "string"

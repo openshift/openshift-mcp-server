@@ -19,7 +19,7 @@ func initEndpoints() []api.ServerTool {
 		{
 			Tool: api.Tool{
 				Name:        "get_service_endpoints",
-				Description: "Return EndpointSlices for a Service from the live cluster or a selected must-gather archive. Set archive_id for offline analysis." + core.ListPageSentence,
+				Description: "Return EndpointSlice objects for a Service to verify backend pod availability." + core.ListPageSentence,
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: core.PageProperties(map[string]*jsonschema.Schema{
@@ -31,7 +31,6 @@ func initEndpoints() []api.ServerTool {
 							Type:        "string",
 							Description: "Service name",
 						},
-						"archive_id": {Type: "string", Description: "Must-gather archive ID from mustgather_list. Omit for the live cluster."},
 					}),
 					Required: []string{"namespace", "service"},
 				},
@@ -81,11 +80,11 @@ func getServiceEndpoints(params api.ToolHandlerParams) (*api.ToolCallResult, err
 	var list *unstructured.UnstructuredList
 	var items []unstructured.Unstructured
 
-	p, err := selectedArchive(params)
+	p, offline, err := selectedArchive(params)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
-	if p != nil {
+	if offline {
 		gvk := schema.GroupVersionKind{Group: "discovery.k8s.io", Version: "v1", Kind: "EndpointSlice"}
 		list, err = p.ListResources(params.Context, gvk, namespace, mg.ListOptions{LabelSelector: labelSelector})
 		if err != nil {

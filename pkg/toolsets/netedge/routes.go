@@ -17,7 +17,7 @@ func initRoutes() []api.ServerTool {
 		{
 			Tool: api.Tool{
 				Name:        "inspect_route",
-				Description: "Inspect an OpenShift Route in the live cluster or a selected must-gather archive. Set archive_id for offline analysis.",
+				Description: "Inspect an OpenShift Route to view its full configuration and status.",
 				InputSchema: &jsonschema.Schema{
 					Type: "object",
 					Properties: map[string]*jsonschema.Schema{
@@ -29,7 +29,6 @@ func initRoutes() []api.ServerTool {
 							Type:        "string",
 							Description: "Route name",
 						},
-						"archive_id": {Type: "string", Description: "Must-gather archive ID from mustgather_list. Omit for the live cluster."},
 					},
 					Required: []string{"namespace", "route"},
 				},
@@ -71,11 +70,11 @@ func inspectRoute(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	}
 
 	var route *unstructured.Unstructured
-	p, err := selectedArchive(params)
+	p, offline, err := selectedArchive(params)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}
-	if p != nil {
+	if offline {
 		route = p.GetResource(schema.GroupVersionKind{Group: "route.openshift.io", Version: "v1", Kind: "Route"}, routeName, namespace)
 		if route == nil {
 			return api.NewToolCallResult("", fmt.Errorf("route %s/%s not found in selected must-gather archive", namespace, routeName)), nil

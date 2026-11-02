@@ -205,7 +205,7 @@ toolsets = ["netedge", "openshift/mustgather"]
 mustgather_dirs = ["/path/to/must-gathers"]
 ```
 
-Call `mustgather_list` to discover an archive's `archive_id`, then pass that ID to one of the three NetEdge tools. Omit `archive_id` to query the live cluster. An invalid or unknown ID returns an error and does not query the live cluster. Each call selects its own archive, so concurrent users can inspect different archives without changing a shared active archive.
+The three tools advertise the `archive_id` parameter and offline support only when `openshift/mustgather` is enabled. Call `mustgather_list` to discover an archive's `archive_id`, then pass that ID to one of the three NetEdge tools. Omit `archive_id` to query the live cluster. An invalid or unknown ID returns an error and does not query the live cluster. An archive request also returns an error if `openshift/mustgather` is disabled. Each call selects its own archive, so concurrent users can inspect different archives without changing a shared active archive.
 
 The other NetEdge tools still require a live cluster or a live network endpoint. This integration reads local archive directories; it does not download a remote Prow archive or run `omc`.
 
