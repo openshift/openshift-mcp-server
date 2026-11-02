@@ -410,7 +410,7 @@ func (suiteState *MCPCheckerWorkflowSuite) TestCandidateBuildFixedRecipeAndArtif
 	writeActionFixture(suiteState.T(), filepath.Join(bin, "go"), `#!/bin/bash
 set -eu
 [[ $1 == build && $2 == -ldflags && $4 == -o && $6 == ./cmd/kubernetes-mcp-server && $# == 6 ]]
-[[ -z ${MODEL_KEY:-} && -z ${JUDGE_API_KEY:-} && $GOENV == off && $GOWORK == off && -z $GOFLAGS ]]
+[[ -z ${MODEL_KEY:-} && -z ${JUDGE_API_KEY:-} && $GOENV == off && $GOWORK == off && $GOTOOLCHAIN == local && -z $GOFLAGS ]]
 printf '%s\0' "$@" > "$FIXTURE_ROOT/argv"
 cp "$FIXTURE_ROOT/fixture-elf" "$5"
 `, 0o755)
@@ -645,6 +645,25 @@ while :; do sleep 0.1; done
 	}
 }
 
+func workflowGoVersionMatchesModule(module []byte, version any) bool {
+	return strings.Contains(string(module), "\ngo 1.26.10\n") && version == "1.26.10"
+}
+
+func (suiteState *MCPCheckerWorkflowSuite) TestWorkflowGoVersionRejectsMismatches() {
+	module, err := os.ReadFile(workflowBuildPath(suiteState.T(), "../go.mod"))
+	suiteState.Require().NoError(err)
+	suiteState.Require().True(workflowGoVersionMatchesModule(module, "1.26.10"))
+	for _, version := range []any{"1.26.4", "1.26.9", "1.26", "1.26.x", "stable", "", nil} {
+		suiteState.Run(fmt.Sprint(version), func() {
+			suiteState.False(workflowGoVersionMatchesModule(module, version))
+		})
+	}
+	for _, version := range []string{"1.26.4", "1.26.9", "1.26.11"} {
+		wrongModule := strings.ReplaceAll(string(module), "\ngo 1.26.10\n", "\ngo "+version+"\n")
+		suiteState.False(workflowGoVersionMatchesModule([]byte(wrongModule), "1.26.10"))
+	}
+}
+
 func (suiteState *MCPCheckerWorkflowSuite) TestWorkflowTrustStructureAndLiteralHarness() {
 	data, err := os.ReadFile(workflowBuildPath(suiteState.T(), "../.github/workflows/mcpchecker.yaml"))
 	suiteState.Require().NoError(err)
@@ -767,12 +786,18 @@ func (suiteState *MCPCheckerWorkflowSuite) TestWorkflowTrustStructureAndLiteralH
 	}
 	module, err := os.ReadFile(workflowBuildPath(suiteState.T(), "../go.mod"))
 	suiteState.Require().NoError(err)
-	suiteState.Contains(string(module), "\ngo 1.26.4\n")
-	for _, step := range evaluation.Steps {
-		if strings.HasPrefix(step.Uses, "actions/setup-go@") {
-			suiteState.Equal("1.26.4", step.With["go-version"])
-			suiteState.Equal(false, step.With["cache"])
+	suiteState.Contains(string(module), "\ngo 1.26.10\n")
+	for _, jobName := range []string{"candidate-build", "run-evaluation"} {
+		toolchainSteps := 0
+		for _, step := range workflow.Jobs[jobName].Steps {
+			if strings.HasPrefix(step.Uses, "actions/setup-go@") {
+				toolchainSteps++
+				suiteState.Equal("1.26.10", step.With["go-version"])
+				suiteState.True(workflowGoVersionMatchesModule(module, step.With["go-version"]), jobName)
+				suiteState.Equal(false, step.With["cache"])
+			}
 		}
+		suiteState.Equal(1, toolchainSteps, jobName)
 	}
 	composite, err := os.ReadFile(workflowBuildPath(suiteState.T(), "../.github/actions/mcpchecker-action/action.yaml"))
 	suiteState.Require().NoError(err)

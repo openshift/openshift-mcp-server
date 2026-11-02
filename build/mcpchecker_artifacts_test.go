@@ -1,6 +1,8 @@
 package build_test
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -133,7 +135,12 @@ async function exercise(){
   if(scenario==='below-tasks')rows[3].taskPassed=false;
   if(scenario==='runner-bound'&&suite==='core')rows=JSON.parse(fs.readFileSync(process.env.INTEGRATION_RESULT,'utf8'));
   if(scenario==='zero-results')rows=[];
+  if(scenario==='result-depth')rows[0].taskOutput=Array(65).fill(0).reduce(value=>({child:value}),null);
+  if(scenario==='result-nodes')rows[0].taskOutput=Array.from({length:100},()=>Array(10000).fill(null));
+  if(scenario==='result-key-length')rows[0]['x'.repeat(1025)]=null;
+  if(scenario==='result-key-count')rows[0].taskOutput=Object.fromEntries(Array.from({length:10001},(_,index)=>['key'+index,null]));
   fs.writeFileSync(filename,scenario==='corrupt-result'?'{':JSON.stringify(rows),{mode:0o755});
+  if(scenario==='runner-bound'&&suite==='core')fs.copyFileSync(process.env.INTEGRATION_RESULT,filename);
   if(scenario.startsWith('diagnostic-')){
    const input=scenario==='diagnostic-expansion'?'s3'.repeat(550000):scenario==='diagnostic-split'?'x'.repeat(1048571)+'secret-model'+'x'.repeat(100):'x'.repeat(scenario==='diagnostic-below'?1048575:scenario==='diagnostic-at'?1048576:1048577);
    const output=path.join(results,'check.txt');
@@ -255,7 +262,7 @@ func (suiteState *MCPCheckerArtifactsSuite) TestIdentityRejectionBeforeCommentOr
 }
 
 func (suiteState *MCPCheckerArtifactsSuite) TestMalformedDataHonestReports() {
-	for _, scenario := range []string{"wrong-type", "rate", "negative", "incoherent", "status", "extra-key", "failed-status", "malformed", "oversized", "diff-oversize", "result-oversize", "context-link", "unexpected-path", "zero-results", "corrupt-result", "wrong-basename", "result-link", "missing-result", "result-script", "null-metrics", "missing-artifacts", "failed-workflow"} {
+	for _, scenario := range []string{"wrong-type", "rate", "negative", "incoherent", "status", "extra-key", "failed-status", "malformed", "oversized", "diff-oversize", "result-oversize", "result-depth", "result-nodes", "result-key-length", "result-key-count", "context-link", "unexpected-path", "zero-results", "corrupt-result", "wrong-basename", "result-link", "missing-result", "result-script", "null-metrics", "missing-artifacts", "failed-workflow"} {
 		suiteState.Run(scenario, func() {
 			data, err := suiteState.execute(scenario, "report", "core")
 			suiteState.Require().NoError(err, data)
@@ -324,7 +331,7 @@ func (suiteState *MCPCheckerArtifactsSuite) TestPinnedDownloadAndDiagnosticContr
 }
 
 func (suiteState *MCPCheckerArtifactsSuite) TestScheduledRejectionNoPartialWrites() {
-	for _, scenario := range []string{"mixed-late-invalid", "not-schedule", "pr-control", "duplicate", "artifact-run", "artifact-attempt", "artifact-time", "wrong-type", "negative", "status", "malformed", "oversized", "diff-oversize", "result-oversize", "context-link", "unexpected-path", "zero-results", "corrupt-result", "wrong-basename", "result-link", "missing-result", "result-script", "destination-link", "run-mismatch", "repo-mismatch", "attempt-mismatch", "extra-root", "root-traversal", "tamper-plan"} {
+	for _, scenario := range []string{"mixed-late-invalid", "not-schedule", "pr-control", "duplicate", "artifact-run", "artifact-attempt", "artifact-time", "wrong-type", "negative", "status", "malformed", "oversized", "diff-oversize", "result-oversize", "result-depth", "result-nodes", "result-key-length", "result-key-count", "context-link", "unexpected-path", "zero-results", "corrupt-result", "wrong-basename", "result-link", "missing-result", "result-script", "destination-link", "run-mismatch", "repo-mismatch", "attempt-mismatch", "extra-root", "root-traversal", "tamper-plan"} {
 		suiteState.Run(scenario, func() {
 			data, err := suiteState.execute(scenario, "schedule", "core")
 			suiteState.Error(err, data)
@@ -346,6 +353,24 @@ func (suiteState *MCPCheckerArtifactsSuite) TestRunnerGateReportAndScheduleInteg
 		{"tasksBelow", `[{"taskPassed":true,"assertionPassed":true},{"taskPassed":true,"assertionPassed":true},{"taskPassed":true,"assertionPassed":true},{"taskPassed":false,"assertionPassed":true},{"taskPassed":false,"assertionPassed":false}]`, 3, 4, 5, 0.6, 0.8, false},
 		{"assertionsBelow", `[{"taskPassed":true,"assertionPassed":true},{"taskPassed":true,"assertionPassed":true},{"taskPassed":true,"assertionPassed":true},{"taskPassed":true,"assertionPassed":false},{"taskPassed":false,"assertionPassed":false}]`, 4, 3, 5, 0.8, 0.6, false},
 	}
+	for _, boundary := range []struct {
+		name, content string
+	}{
+		{"singleBelow", strings.Repeat("x", 1048575)},
+		{"singleExact", strings.Repeat("x", 1048576)},
+		{"singleAbove", strings.Repeat("x", 1048577)},
+		{"unicodeBytesAbove", strings.Repeat("é", 524289)},
+		{"unicodeUnitsAbove", strings.Repeat("😀", 524289)},
+	} {
+		payload, err := json.Marshal([]map[string]any{{"taskPassed": true, "taskOutput": boundary.content}})
+		suiteState.Require().NoError(err)
+		cases = append(cases, struct {
+			name, payload                                 string
+			taskPassed, assertionsPassed, assertionsTotal int
+			taskRate, assertionRate                       float64
+			passed                                        bool
+		}{boundary.name, string(payload), 1, 0, 0, 1, 0, true})
+	}
 	for _, testCase := range cases {
 		for _, failOnError := range []string{"true", "false"} {
 			for _, mode := range []string{"report", "schedule"} {
@@ -361,6 +386,11 @@ func (suiteState *MCPCheckerArtifactsSuite) TestRunnerGateReportAndScheduleInteg
 							outputs[key] = value
 						}
 					}
+					complete, err := os.ReadFile(outputs["results-file"])
+					suiteState.Require().NoError(err)
+					var compact bytes.Buffer
+					suiteState.Require().NoError(json.Compact(&compact, complete))
+					suiteState.Equal(sha256.Sum256([]byte(testCase.payload)), sha256.Sum256(compact.Bytes()))
 					control := map[string]any{}
 					suiteState.Require().NoError(json.Unmarshal([]byte(workflowControlJSON()), &control))
 					if mode == "schedule" {
@@ -407,7 +437,7 @@ func (suiteState *MCPCheckerArtifactsSuite) TestRunnerGateReportAndScheduleInteg
 						suiteState.NotContains(body, "Invalid or incomplete artifact data")
 					} else {
 						copy := data["copies"].(map[string]any)["builtin-openai-core-latest.json"].(map[string]any)
-						suiteState.JSONEq(testCase.payload, copy["content"].(string))
+						suiteState.Equal(sha256.Sum256(complete), sha256.Sum256([]byte(copy["content"].(string))))
 					}
 				})
 			}

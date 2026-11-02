@@ -63,8 +63,7 @@ function resultData(bytes) {
   let nodes = 0;
   function bounded(data, depth) {
     requireData(++nodes <= 1000000 && depth <= 64);
-    if (typeof data === 'string') requireData(data.length <= 1048576);
-    else if (typeof data === 'number') requireData(Number.isFinite(data));
+    if (typeof data === 'number') requireData(Number.isFinite(data));
     else if (data && typeof data === 'object') {
       requireData(Object.keys(data).length <= 10000);
       for (const [key, child] of Object.entries(data)) { requireData(key.length <= 1024); bounded(child, depth + 1); }

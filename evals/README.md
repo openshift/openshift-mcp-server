@@ -361,13 +361,15 @@ local mandatory gates. Published C5
 `ec4b1c715e7cbbfbd568a99d3c27798952cb3550` pins that actual immutable H5;
 C5 also completed independent review and local mandatory gates before publication.
 The subsequent Prow jobs failed during cloning/merging with newer main, before
-tests or a new security scan executed. Signed LOCAL H6
+tests or a new security scan executed. Signed H6
 `5f781f327f3a0d349c3afe457a5f04a622afcbd1` integrates published C5 with main
 `87f6e7c0f60b122de54e5becbf57314d59f7c3dc`, preserving both histories. H6
 completed independent review and full local mandatory gates. The workflow now
-pins that actual immutable H6; this C6 implementation checkpoint is unstaged
-and uncommitted, pending independent review and its own full mandatory gates.
-H6 and this candidate update are not yet published; published C5 still pins H5.
+pins that actual immutable H6. Published PR518 head
+`53b5691bb5d2535209cbffc38f74f9d53f8e79b4` already contains H6 and its pin.
+Subsequent helper-content corrections require independent review and full local
+mandatory gates for a new trusted harness commit before changing that pin;
+the candidate pin wiring then requires its own review and mandatory gates.
 No new external
 SECURITY clearance has been established by these local checks.
 Neither local validation nor pinning deploys or activates credentialed workflows.
@@ -418,7 +420,8 @@ gate requires successful check, fresh valid nonempty results, successful summary
 and verification, and successful applicable diff. A missing baseline is an
 explicit optional absence; a corrupt present baseline fails. Task/assertion
 thresholds remain **0.8**, not 100% task success; task assertions, maxToolCalls,
-security defaults and CI Go versions are unchanged. Generic composite thresholds
+security defaults are unchanged. Both CI Go setup steps select exact Go 1.26.10
+to match the current module compiler requirement. Generic composite thresholds
 still default to 1.0. Reporter artifacts are bounded typed DATA, isolated per
 suite and API-bound to source run/attempt/current reviewed PR head; raw task/diff
 text is not rendered into comments. Trusted run-name metadata records the source
