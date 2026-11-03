@@ -340,6 +340,8 @@ github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJw
 github.com/opencontainers/image-spec v1.1.1/go.mod h1:qpqAh3Dmcf36wStyyWU+kCeDgrGnAve2nCC8+7h8Q0M=
 github.com/os-observability/redhat-opentelemetry-collector/configschemas v0.0.0-20260712195227-4e7d75e0d2ec h1:VJJl0vOhtCNE78lGxvoJetrxZWGEPfRTaCIbV87zP44=
 github.com/os-observability/redhat-opentelemetry-collector/configschemas v0.0.0-20260712195227-4e7d75e0d2ec/go.mod h1:ThsbZTM538g95wb3Aj/+XHfFfpW/YBHdO5o6W0f+IRw=
+github.com/ovn-kubernetes/ovn-kubernetes-mcp v0.1.0 h1:r2s9D5p8TYXJ7o0FUzDbnUSydsw7M02tmPiAqqI489s=
+github.com/ovn-kubernetes/ovn-kubernetes-mcp v0.1.0/go.mod h1:f1kKpNljFj4q4gJfbMW/KewCddoej+epqHMxs98VT3Y=
 github.com/pandatix/go-abnf v0.5.3 h1:LA9AaxAqwzdxfDe7+HIGUB6tzx2N6wYVEAChmfsoPgo=
 github.com/pandatix/go-abnf v0.5.3/go.mod h1:AE0KD3/VNoCjGzc1gqetRKshbI4SYErXQ/8kPenR5mc=
 github.com/pavolloffay/opentelemetry-mcp-server/modules/schemagen v0.0.0-20260710124846-8bb49fd6ccc7 h1:mUR6Z3GIYvOMUIkcs+2p0ggzkaK7La3ZF7Ki8X9Kx0A=
