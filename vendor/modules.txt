@@ -137,7 +137,7 @@ github.com/go-errors/errors
 # github.com/go-gorp/gorp/v3 v3.1.0
 ## explicit; go 1.18
 github.com/go-gorp/gorp/v3
-# github.com/go-jose/go-jose/v4 v4.1.6
+# github.com/go-jose/go-jose/v4 v4.1.7
 ## explicit; go 1.24.0
 github.com/go-jose/go-jose/v4
 github.com/go-jose/go-jose/v4/cipher
@@ -451,6 +451,9 @@ github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/utils/headtail
 github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/utils/ovndb
 github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/utils/pattern
 github.com/ovn-kubernetes/ovn-kubernetes-mcp/pkg/utils/timeout
+# github.com/pandatix/go-abnf v0.5.3
+## explicit; go 1.26.0
+github.com/pandatix/go-abnf
 # github.com/pavolloffay/opentelemetry-mcp-server/modules/schemagen v0.0.0-20260710124846-8bb49fd6ccc7
 ## explicit; go 1.25.0
 github.com/pavolloffay/opentelemetry-mcp-server/modules/schemagen
@@ -490,7 +493,7 @@ github.com/prometheus/client_golang/prometheus/promhttp/internal
 # github.com/prometheus/client_model v0.6.3
 ## explicit; go 1.23
 github.com/prometheus/client_model/go
-# github.com/prometheus/common v0.72.1
+# github.com/prometheus/common v0.73.1
 ## explicit; go 1.26.0
 github.com/prometheus/common/config
 github.com/prometheus/common/expfmt
