@@ -408,12 +408,10 @@ alertmanager_url = %q
 				return
 			}
 			s.Require().NoError(result.Error)
-			s.Contains(result.Content, "<DATA>")
-			s.Contains(result.Content, "<INSTRUCTIONS>")
 			structured, err := json.Marshal(result.StructuredContent)
 			s.Require().NoError(err)
 			s.JSONEq(`{"incidents":{"total":0,"items":[]}}`, string(structured))
-			s.Contains(result.Content, string(structured))
+			s.JSONEq(string(structured), result.Content)
 
 			s.Require().NotEmpty(requests)
 			close(requests)

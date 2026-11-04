@@ -24,25 +24,12 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-var (
-	// Format response with instructions for better LLM interpretation
-	getIncidentsResponseTemplate = `<DATA>
-%s
-</DATA>
-<INSTRUCTIONS>
-- An incident is a group of related alerts. Base your analysis on the alerts to understand the incident. 
-- Don't confuse or mix the concepts of incident and alert during your explanation.
-- For each incident, analyze its alerts to identify the affected components and the core problem. 
-- Whenever you print an incident ID, add also a short one-sentence summary of the incident (e.g. "etcd degradation", "ingress failure")
-- If the user asks about a problem you cannot find in the data, do not guess. State that you cannot find the cause and simply list the incidents.
-</INSTRUCTIONS>`
-)
-
 const (
 	// GetIncidentsDescription describes the get_incidents MCP tool.
 	GetIncidentsDescription = `List the current firing incidents in the cluster. 
 		One incident is a group of related alerts that are likely triggered by the same root cause.
 		Use this tool to analyze the cluster health status and determine why a component is failing or degraded.
+		Analyze the alerts within each incident to identify affected components and understand the reported problem.
 		`
 
 	getIncidentsToolName  = "get_incidents"
@@ -207,10 +194,9 @@ func (i *IncidentTool) GetIncidents(ctx context.Context, params GetIncidentsPara
 		return nil, nil, err
 	}
 
-	incidents := filterIncidentsBySeverity(
-		getAlertDataForIncidents(ctx, incidentsMap, silences, promLoader, queryTimeRange),
-		minSeverity,
-	)
+	incidents := getAlertDataForIncidents(ctx, incidentsMap, silences, promLoader, queryTimeRange)
+	reconcileFiringSeverity(incidents)
+	incidents = filterIncidentsBySeverity(incidents, minSeverity)
 
 	r := Response{
 		Incidents: Incidents{
@@ -225,10 +211,9 @@ func (i *IncidentTool) GetIncidents(ctx context.Context, params GetIncidentsPara
 		return nil, nil, err
 	}
 
-	response := fmt.Sprintf(getIncidentsResponseTemplate, string(data))
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
-			&mcp.TextContent{Text: response},
+			&mcp.TextContent{Text: string(data)},
 		},
 	}, r, nil
 }
@@ -259,6 +244,10 @@ func (i *IncidentTool) transformPromValueToIncident(dataVec prom.RangeVector,
 	clusterIDConsoleURL map[string]string) (map[string]Incident, error) {
 
 	incidents := make(map[string]Incident, len(dataVec))
+	// activeSeverity tracks the max severity of the currently firing alerts
+	// per incident, so that the severity of a firing incident reflects only
+	// the alerts that are still firing.
+	activeSeverity := make(map[string]processor.HealthValue, len(dataVec))
 	for _, v := range dataVec {
 
 		alertSeverity := v.Metric["src_severity"]
@@ -280,6 +269,12 @@ func (i *IncidentTool) transformPromValueToIncident(dataVec prom.RangeVector,
 		component := string(v.Metric["component"])
 		clusterName := string(v.Metric["cluster"])
 		clusterID := string(v.Metric[clusterIDStr])
+
+		if endTime.IsZero() {
+			// The series is still firing: it contributes to the current
+			// severity of the incident.
+			activeSeverity[groupId] = max(activeSeverity[groupId], healthyVal)
+		}
 
 		if existingInc, ok := incidents[groupId]; ok {
 			existingInc.ComponentsSet[component] = struct{}{}
@@ -332,6 +327,20 @@ func (i *IncidentTool) transformPromValueToIncident(dataVec prom.RangeVector,
 			}
 			incident.UpdateStatus()
 			incidents[groupId] = incident
+		}
+	}
+
+	// For incidents that are still firing, the severity is derived only from
+	// the currently firing alerts (getAlertDataForIncidents may further raise
+	// it based on the attached firing alerts). Otherwise (resolved incidents),
+	// the severity keeps reflecting the maximum severity reached during the
+	// incident lifetime.
+	for groupId, inc := range incidents {
+		if inc.EndTime == "" {
+			if sev, ok := activeSeverity[groupId]; ok {
+				inc.Severity = sev.String()
+				incidents[groupId] = inc
+			}
 		}
 	}
 	return incidents, nil
@@ -549,4 +558,30 @@ func filterIncidentsBySeverity(incidents []Incident, minSeverity processor.Healt
 		filteredList = append(filteredList, inc)
 	}
 	return filteredList
+}
+
+// reconcileFiringSeverity raises the severity of firing incidents based on
+// the firing alerts attached to them.
+//
+// The cluster_health_components_map series can lag behind the actual firing
+// alerts (e.g. an alert that stopped firing and re-fired again within the
+// processor interval). The attached firing alerts are therefore used as an
+// additional source for the current severity of a firing incident.
+func reconcileFiringSeverity(incidents []Incident) {
+	for i := range incidents {
+		inc := &incidents[i]
+		if inc.EndTime != "" {
+			// Resolved incidents keep the maximum severity reached
+			// during their lifetime.
+			continue
+		}
+		for _, alert := range inc.Alerts {
+			if string(alert["status"]) != "firing" {
+				continue
+			}
+			if sev := processor.ParseHealthValue(string(alert["severity"])); sev > processor.ParseHealthValue(inc.Severity) {
+				inc.Severity = sev.String()
+			}
+		}
+	}
 }
