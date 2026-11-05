@@ -1,0 +1,55 @@
+/* Shared OpenShift presentation, based on patternfly-mcp-app-shell. */
+:root { color-scheme: light; }
+:root.pf-v6-theme-dark { color-scheme: dark; }
+/* PatternFly's page defaults use viewport height. MCP Apps must instead report
+   their natural content height so expanded details grow the host iframe. */
+html, body { margin: 0; height: auto; min-height: 0; min-width: 0; }
+/* Only the card paints the outer app surface. Clear PatternFly page colors
+   and background images without changing the theme's native-control scheme. */
+html.pf-mcp-app-document, html.pf-mcp-app-document body,
+html.pf-mcp-app-document #app, html.pf-mcp-app-document .openshift-mcp-app { background: transparent; }
+body { padding: 0; color: var(--pf-t--global--text--color--regular); font-family: var(--pf-t--global--font--family--body); font-size: var(--pf-t--global--font--size--body--default); }
+*, *::before, *::after { box-sizing: border-box; }
+#app { overflow: visible; }
+.openshift-mcp-app { container: mcp-app / inline-size; min-inline-size: 0; padding: var(--pf-t--global--spacer--md); }
+.identity { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--pf-t--global--spacer--md); }
+.logo { display: block; inline-size: auto; block-size: var(--pf-t--global--icon--size--xl); }
+.logo-dark { display: none; }
+.pf-v6-theme-dark .logo-light { display: none; }
+.pf-v6-theme-dark .logo-dark { display: block; }
+.result-card { min-inline-size: 0; --pf-v6-c-card--BorderWidth: var(--pf-t--global--border--width--regular); --pf-v6-c-card--BorderColor: var(--pf-t--global--border--color--default); --pf-v6-c-card--BorderRadius: var(--pf-t--global--border--radius--large); }
+.result-card > .pf-v6-c-card__body { display: flex; flex-direction: column; gap: var(--pf-t--global--spacer--md); padding: var(--pf-t--global--spacer--lg); min-inline-size: 0; }
+.task-heading { position: relative; padding-inline-start: calc(var(--pf-t--global--spacer--md) + var(--pf-t--global--spacer--xs)); }
+.task-heading::before { content: ''; position: absolute; inset-block: 0; inset-inline-start: 0; inline-size: var(--pf-t--global--spacer--xs); border-radius: var(--pf-t--global--border--radius--pill); background-color: var(--rh-color-red-50); pointer-events: none; }
+.task-heading h1 { margin: 0; font-size: var(--pf-t--global--font--size--heading--md); line-height: var(--pf-t--global--font--line-height--heading); overflow-wrap: anywhere; }
+.task-heading p { color: var(--pf-t--global--text--color--subtle); margin-block: var(--pf-t--global--spacer--xs) 0; overflow-wrap: anywhere; }
+.title-skeleton { --pf-v6-c-skeleton--Height: calc(var(--pf-t--global--font--size--heading--md) * var(--pf-t--global--font--line-height--heading)); }
+.description-skeleton { margin-block-start: var(--pf-t--global--spacer--xs); }
+.result-content { min-inline-size: 0; }
+.table-scroll { min-inline-size: 0; max-inline-size: 100%; overflow-x: auto; }
+.table-scroll:focus-visible { outline: 2px solid var(--pf-t--global--focus-ring--color--default); outline-offset: 2px; }
+.table-scroll table { width: 100%; border-collapse: collapse; }
+.table-scroll th, .table-scroll td { min-width: 6rem; max-width: 26rem; padding-inline: var(--pf-t--global--spacer--sm); vertical-align: top; overflow-wrap: anywhere; }
+.table-scroll th { white-space: nowrap; }
+.table-scroll th button { font: inherit; }
+.table-scroll .pf-v6-c-table__button { padding-block: 0; }
+.table-scroll tr { background: transparent; }
+.table-scroll .pf-v6-c-table > tbody > tr:last-child { border-block-end: none; }
+.resource-name { font-weight: 600; }
+.namespace { display: inline-flex; align-items: center; gap: 6px; }
+.result-footer { color: var(--pf-t--global--text--color--subtle); font-size: var(--pf-t--global--font--size--body--sm); overflow-wrap: anywhere; }
+.loading { display: grid; gap: var(--pf-t--global--spacer--md); min-inline-size: 0; }
+.loading-row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: var(--pf-t--global--spacer--md); padding-block: var(--pf-t--global--spacer--sm); }
+.loading-fields { display: grid; grid-template-columns: 1fr 2fr; gap: var(--pf-t--global--spacer--md); }
+.error-state { color: var(--pf-t--global--text--color--status--danger--default); }
+.empty-state { color: var(--pf-t--global--text--color--subtle); }
+.resource-details { display: flex; flex-direction: column; gap: 20px; min-inline-size: 0; }
+.resource-details h2 { margin-bottom: 12px; }
+.resource-details .pf-v6-c-description-list { min-width: 0; }
+.resource-details dd, .resource-details dt { overflow-wrap: anywhere; }
+.resource-details pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+.resource-details ol { padding-inline-start: 20px; }
+.resource-details section, .resource-details details { margin: 0; }
+@container mcp-app (max-width: 447px) { .result-card > .pf-v6-c-card__body { padding: var(--pf-t--global--spacer--md); } }
+@media (prefers-reduced-motion: reduce) { .openshift-mcp-app .pf-v6-c-skeleton::after { animation: none; } }
+@media (forced-colors: active) { .task-heading::before { background-color: CanvasText; forced-color-adjust: none; } }
