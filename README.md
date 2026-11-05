@@ -276,26 +276,27 @@ The following sets of tools are available (toolsets marked with ✓ in the Defau
 
 <!-- AVAILABLE-TOOLSETS-START -->
 
-| Toolset               | Description                                                                                                                                                                                                                             | Default |
-|-----------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| cluster-diagnostics   | Tools for cluster diagnostics and troubleshooting                                                                                                                                                                                       |         |
-| cni-diagnostics       | Tools for Container Network Interface (CNI) diagnostics and troubleshooting                                                                                                                                                             |         |
-| config                | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                                                                                 | ✓       |
-| core                  | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                                                                                     | ✓       |
-| helm                  | Tools for managing Helm charts and releases                                                                                                                                                                                             |         |
-| kcp                   | Manage kcp workspaces and multi-tenancy features                                                                                                                                                                                        |         |
-| kubevirt              | OpenShift Virtualization tools for managing virtual machines, check the [OpenShift Virtualization documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/kubevirt.md) for more details.                        |         |
-| netedge               | NetEdge troubleshooting tools for OpenShift                                                                                                                                                                                             |         |
-| netobserv             | Network observability tools backed by the NetObserv console plugin API (flows, metrics, export). Check the [NetObserv documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/NETOBSERV.md) for more details. |         |
-| oadp                  | OADP (OpenShift API for Data Protection) tools for managing Velero backups, restores, and schedules                                                                                                                                     |         |
-| observability/logs    | Toolset for querying Loki logs                                                                                                                                                                                                          |         |
-| observability/metrics | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                                                                           |         |
-| observability/otelcol | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                                                                              |         |
-| observability/traces  | Distributed tracing tools for discovering Tempo instances, searching and retrieving traces, and exploring trace attributes.                                                                                                             |         |
-| openshift/mustgather  | Analyze OpenShift must-gather archives offline without a live cluster connection. Call mustgather_list first to discover available archives and their archive_id, then pass that ID to the other mustgather_* tools.                    |         |
-| ossm                  | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                                                                         |         |
-| ovn-kubernetes        | OVN-Kubernetes CNI network troubleshooting tools                                                                                                                                                                                        |         |
-| tekton                | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, TaskRuns, and troubleshooting.                                                                                                                                     |         |
+| Toolset                | Description                                                                                                                                                                                                                             | Default |
+|------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| cluster-diagnostics    | Tools for cluster diagnostics and troubleshooting                                                                                                                                                                                       |         |
+| cni-diagnostics        | Tools for Container Network Interface (CNI) diagnostics and troubleshooting                                                                                                                                                             |         |
+| config                 | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                                                                                 | ✓       |
+| core                   | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                                                                                     | ✓       |
+| helm                   | Tools for managing Helm charts and releases                                                                                                                                                                                             |         |
+| kcp                    | Manage kcp workspaces and multi-tenancy features                                                                                                                                                                                        |         |
+| kubevirt               | OpenShift Virtualization tools for managing virtual machines, check the [OpenShift Virtualization documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/kubevirt.md) for more details.                        |         |
+| netedge                | NetEdge troubleshooting tools for OpenShift                                                                                                                                                                                             |         |
+| netobserv              | Network observability tools backed by the NetObserv console plugin API (flows, metrics, export). Check the [NetObserv documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/NETOBSERV.md) for more details. |         |
+| oadp                   | OADP (OpenShift API for Data Protection) tools for managing Velero backups, restores, and schedules                                                                                                                                     |         |
+| observability/korrel8r | Correlate Kubernetes resources with logs, metrics, alerts, and traces using Korrel8r; inspect and update the caller's connected console.                                                                                                |         |
+| observability/logs     | Toolset for querying Loki logs                                                                                                                                                                                                          |         |
+| observability/metrics  | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                                                                           |         |
+| observability/otelcol  | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                                                                              |         |
+| observability/traces   | Distributed tracing tools for discovering Tempo instances, searching and retrieving traces, and exploring trace attributes.                                                                                                             |         |
+| openshift/mustgather   | Analyze OpenShift must-gather archives offline without a live cluster connection. Call mustgather_list first to discover available archives and their archive_id, then pass that ID to the other mustgather_* tools.                    |         |
+| ossm                   | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/OSSM.md) for more details.                                                                         |         |
+| ovn-kubernetes         | OVN-Kubernetes CNI network troubleshooting tools                                                                                                                                                                                        |         |
+| tekton                 | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, TaskRuns, and troubleshooting.                                                                                                                                     |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -905,6 +906,40 @@ Examples:
 <details>
 
 <summary>oadp</summary>
+
+</details>
+
+<details>
+
+<summary>observability/korrel8r</summary>
+
+- **korrel8r_instructions** - Return the Korrel8r MCP server instructions. Use this tool if your client does not expose or use the instructions provided during MCP initialization; it returns the same guidance for using Korrel8r tools.
+
+- **korrel8r_list_domains** - List available domains with descriptions. A domain groups signals or resources that share a query syntax and data store. Use 'korrel8r_list_domain_classes' or 'korrel8r_help' to explore a domain further.
+
+- **korrel8r_list_domain_classes** - List classes in a domain. A class represents objects with a specific structure. Full class names have the form "domain:class" and are used in queries and as goal parameters. Use 'korrel8r_help' for details on class and query syntax.
+  - `domain` (`string`) **(required)** - Name of the domain to list
+
+- **korrel8r_help** - Get help on domains, classes, and query syntax. Omit the domain parameter for help on all domains. Class names have the form "domain:class". Query strings have the form "domain:class:selector". Use this before constructing queries for other tools.
+  - `domain` (`string`) - If specified, get help for this domain only.
+
+- **korrel8r_create_neighbors_graph** - Follow correlation rules outward from start objects up to a given depth. Returns a graph of correlated classes with queries and result counts. Use for open-ended exploration like "what is related to this pod?" Depth 1 = direct correlations; depth 2-3 typically reaches logs, metrics, and alerts. Start queries use "domain:class:selector" format; see 'korrel8r_help' for syntax.
+  - `depth` (`integer`) **(required)** - Maximum number of correlation steps to follow from the start. Depth 1 returns direct correlations only.
+  - `start` (`object`) **(required)** - Starting point for the search.
+
+- **korrel8r_create_goals_graph** - Follow correlation paths from start objects to specific goal classes. Returns a graph of correlated classes with queries and result counts. Use for targeted queries like "find logs for this pod" or "what alerts fired for this deployment?" Start queries use "domain:class:selector" format; goals are class names like ["log:application"]. See 'korrel8r_help' for syntax.
+  - `goals` (``) **(required)** - Goal classes in DOMAIN:CLASS format, e.g. log:application, alert:alert.
+  - `start` (`object`) **(required)** - Starting point for the search.
+
+- **korrel8r_get_objects** - Execute a query and return matching objects as self-contained JSON (all labels/fields included per object). Query format is "domain:class:selector"; see 'korrel8r_help' for syntax. Use the constraint parameter (limit number of objects, start/end time as RFC 3339) to control result size, especially for high-volume domains like logs, metrics, and traces.
+  - `constraint` (``) - Optional constraint to limit results by time range and/or count.
+  - `query` (`string`) **(required)** - Query string in the form 'domain:class:selector'. Use 'korrel8r_help' to learn query syntax for each domain.
+
+- **korrel8r_get_console** - Get what the user is looking at in the console. Returns a view query (main console view) and/or search parameters (troubleshooting panel), either may be absent. Use these as context for further actions.
+
+- **korrel8r_show_in_console** - Update the console to display new data. Set 'view' to a query to update the main view, and/or set 'search' to display a correlation graph in the troubleshooting panel. See 'korrel8r_help' for query syntax.
+  - `search` (``) - The troubleshooting panel displays the results of this correlation search.
+  - `view` (`string`) - Query for the main console view, in DOMAIN:CLASS:SELECTOR format.
 
 </details>
 

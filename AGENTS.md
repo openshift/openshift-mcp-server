@@ -186,6 +186,7 @@ The `docs/` directory contains user-facing documentation:
 - `docs/observability/tracing.md` – Tracing toolset (Grafana Tempo via obs-mcp)
 - `docs/observability/logs.md` – Logs toolset (Grafana Loki via obs-mcp)
 - `docs/observability/otelcol.md` – OpenTelemetry Collector toolset (component discovery, schemas, and config validation via obs-mcp)
+- `docs/observability/korrel8r.md` – Korrel8r toolset (correlation search and OpenShift console troubleshooting panel integration)
 - `docs/KIALI.md` – Kiali toolset configuration
 - `docs/getting-started-kubernetes.md` – Kubernetes ServiceAccount setup
 - `docs/getting-started-claude-code.md` – Claude Code CLI integration

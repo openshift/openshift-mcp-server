@@ -28,6 +28,7 @@ Choose the guide that matches your needs:
 - **[Tracing](./observability/tracing.md)** - Grafana Tempo and TraceQL (`observability/traces` toolset, via [obs-mcp](https://github.com/rhobs/obs-mcp))
 - **[Logs](./observability/logs.md)** - Grafana Loki and LogQL (`observability/logs` toolset, via [obs-mcp](https://github.com/rhobs/obs-mcp))
 - **[OpenTelemetry Collector](./observability/otelcol.md)** - Component discovery, schemas, and config validation (`observability/otelcol` toolset, via [obs-mcp](https://github.com/rhobs/obs-mcp))
+- **[Korrel8r](./observability/korrel8r.md)** - Correlation graphs linking resources to logs, metrics, alerts and traces, with optional OpenShift console navigation (`observability/korrel8r` toolset, via [korrel8r](https://github.com/korrel8r/korrel8r))
 - **[OADP](OADP.md)** - Tools for OpenShift API for Data Protection (Velero backups, restores, schedules)
 - **[Kiali](KIALI.md)** - Tools for Kiali ServiceMesh with Istio
 - **[NetObserv](NETOBSERV.md)** - Network observability flows, metrics, and alerts (Helm on OpenShift)

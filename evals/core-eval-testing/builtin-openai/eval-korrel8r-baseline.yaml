@@ -1,0 +1,23 @@
+# Run with core+config only (no Korrel8r toolset configured in the MCP server).
+kind: Eval
+metadata:
+  name: korrel8r-existing-tools-baseline
+config:
+  agent:
+    type: file
+    path: agent.yaml
+  mcpConfigFile: ../../mcp-config.yaml
+  extensions:
+    kubernetes:
+      package: https://github.com/mcpchecker/kubernetes-extension@v0.0.4
+  llmJudge:
+    ref:
+      type: file
+      path: agent.yaml
+  taskSets:
+    - glob: ../../tasks/*/*/*.yaml
+      labelSelector:
+        suite: korrel8r
+      assertions:
+        minToolCalls: 1
+        maxToolCalls: 20
