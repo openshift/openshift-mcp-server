@@ -69,9 +69,21 @@ func inspectRoute(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 		Resource: "routes",
 	}
 
-	route, err := params.DynamicClient().Resource(gvr).Namespace(namespace).Get(params.Context, routeName, metav1.GetOptions{})
+	var route *unstructured.Unstructured
+	p, offline, err := selectedArchive(params)
 	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to get route %s/%s: %w", namespace, routeName, err)), nil
+		return api.NewToolCallResult("", err), nil
+	}
+	if offline {
+		route = p.GetResource(schema.GroupVersionKind{Group: "route.openshift.io", Version: "v1", Kind: "Route"}, routeName, namespace)
+		if route == nil {
+			return api.NewToolCallResult("", fmt.Errorf("route %s/%s not found in selected must-gather archive", namespace, routeName)), nil
+		}
+	} else {
+		route, err = params.DynamicClient().Resource(gvr).Namespace(namespace).Get(params.Context, routeName, metav1.GetOptions{})
+		if err != nil {
+			return api.NewToolCallResult("", fmt.Errorf("failed to get route %s/%s: %w", namespace, routeName, err)), nil
+		}
 	}
 
 	// Deep-copy the route so we can redact sensitive TLS fields without

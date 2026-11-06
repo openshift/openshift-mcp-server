@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dns-default
+  namespace: openshift-dns
+data:
+  Corefile: |
+    .:5353 {
+        errors
+        health
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+            pods insecure
+            upstream
+            fallthrough in-addr.arpa ip6.arpa
+        }
+        prometheus :9153
+        forward . /etc/resolv.conf
+        cache 30
+        loop
+        reload
+        loadbalance
+    }
