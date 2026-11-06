@@ -103,6 +103,9 @@ type TelemetryConfig struct {
 	// If nil (not set), telemetry is auto-enabled when Endpoint is configured.
 	// If explicitly set to false, telemetry is disabled even if env vars are set.
 	Enabled Option[*bool]
+	// ServiceName is the trace service name. Empty uses the supplied server name.
+	// Overridden by OTEL_SERVICE_NAME when that env var is non-empty.
+	ServiceName Option[string]
 	// Endpoint is the OTLP endpoint URL (e.g., "http://localhost:4317").
 	// Overridden by OTEL_EXPORTER_OTLP_ENDPOINT when that env var is non-empty.
 	Endpoint Option[string]
@@ -129,6 +132,7 @@ type TelemetryConfig struct {
 func newTelemetryConfig() TelemetryConfig {
 	return TelemetryConfig{
 		Enabled:          opt[*bool]("enabled", nil).desc("Explicitly enable or disable telemetry"),
+		ServiceName:      opt("service_name", "").env("OTEL_SERVICE_NAME", parseEnvString).desc("Trace service name (empty uses the server name)"),
 		Endpoint:         opt("endpoint", "").env("OTEL_EXPORTER_OTLP_ENDPOINT", parseEnvString).desc("OTLP endpoint URL"),
 		Protocol:         opt("protocol", "grpc").env("OTEL_EXPORTER_OTLP_PROTOCOL", parseEnvString).desc("OTLP protocol (grpc or http/protobuf)"),
 		TracesSampler:    opt("traces_sampler", "").env("OTEL_TRACES_SAMPLER", parseEnvString).desc("Trace sampling strategy"),
@@ -306,7 +310,11 @@ type Config struct {
 	// Toolsets lists the MCP toolsets to enable.
 	Toolsets Option[[]string]
 	// Tool configuration
-	EnabledTools  Option[[]string]
+	// EnabledTools is an explicit allowlist of tools to enable from enabled toolsets.
+	EnabledTools Option[[]string]
+	// OptInTools enables additional tools on top of the current tool selection.
+	// The owning toolset must be enabled; DisabledTools takes precedence.
+	OptInTools    Option[[]string]
 	DisabledTools Option[[]string]
 	ToolOverrides Option[map[string]ToolOverride]
 	// Prompt configuration
@@ -459,7 +467,8 @@ func newConfig() *Config {
 		EnableTargetCompatibilityToolFilters: opt("experimental_enable_target_compatibility_tool_filters", false).reload().
 			desc("Filter tools based on cluster target compatibility"),
 		Toolsets:      opt("toolsets", []string{"core", "config"}).reload().desc("MCP toolsets to enable"),
-		EnabledTools:  opt("enabled_tools", []string(nil)).reload().desc("If set, only these tools are exposed"),
+		EnabledTools:  opt("enabled_tools", []string(nil)).reload().desc("Explicit allowlist of tools to enable from enabled toolsets"),
+		OptInTools:    opt("opt_in_tools", []string(nil)).reload().desc("Additional tools to enable from enabled toolsets, on top of the current selection; disabled_tools takes precedence"),
 		DisabledTools: opt("disabled_tools", []string(nil)).reload().desc("Tools to hide"),
 		ToolOverrides: opt("tool_overrides", map[string]ToolOverride(nil)).reload().desc("Per-tool configuration overrides"),
 		Prompts:       opt("prompts", []Prompt(nil)).reload().desc("Custom MCP prompts"),
