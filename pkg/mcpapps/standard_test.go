@@ -2,6 +2,7 @@ package mcpapps_test
 
 import (
 	"errors"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -12,6 +13,26 @@ import (
 )
 
 type StandardAppSuite struct{ suite.Suite }
+
+func (s *StandardAppSuite) TestMessagePeerBoundary() {
+	for _, factory := range []struct {
+		name string
+		new  func(string, string, ...mcpapps.CustomOption) *api.ToolApp
+	}{
+		{"table", mcpapps.Table}, {"metrics", mcpapps.Metrics}, {"resource", mcpapps.Resource},
+	} {
+		s.Run(factory.name, func() {
+			app := factory.new("ui://example/"+factory.name, "Example")
+			content, err := app.Handler(api.ResourceHandlerParams{Context: s.T().Context()})
+			s.Require().NoError(err)
+			command := exec.CommandContext(s.T().Context(), "node", "testdata/standard-message.cjs")
+			command.Stdin = strings.NewReader(content.Text)
+			output, err := command.CombinedOutput()
+			s.Require().NoError(err, string(output))
+			s.Contains(string(output), "message peer boundary: PASS")
+		})
+	}
+}
 
 func (s *StandardAppSuite) TestStyleOverrides() {
 	for _, factory := range []struct {
