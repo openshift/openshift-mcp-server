@@ -1,0 +1,32 @@
+name: Upstream Sync Rules Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - hack/upstream-sync.rules
+      - hack/upstream-sync.rules.fixtures
+      - hack/sync-upstream.sh
+      - hack/test-upstream-sync-rules.sh
+      - build/openshift/sync-upstream.mk
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  check-rules:
+    name: Validate upstream-sync rules and fixtures
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+      - name: Validate rules and fixtures
+        run: make check-upstream-sync-rules

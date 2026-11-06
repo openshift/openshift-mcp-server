@@ -1,0 +1,22 @@
+# Parsed as inert text by sync-upstream.sh; never sourced or evaluated.
+# KIND|regex matches a complete repository-relative path using Bash EREs.
+# Rules must start with ^ and end with $. Escape literal dots with \.
+#
+# Rule kinds:
+#   GENERATED  Machine-written outputs. Merge conflicts in these paths may be
+#              resolved by running the generators; the candidate must still
+#              verify clean before anything is published.
+#   STAGE      Additional paths the sync may stage when the generators
+#              rewrite them (side effects on hand-maintained inputs such as
+#              go.mod via `go mod tidy`). Conflicts in STAGE-only paths still
+#              stop the sync. The staging set is GENERATED plus STAGE.
+
+# Machine-written outputs.
+GENERATED|^go\.sum$
+GENERATED|^vendor/.*$
+GENERATED|^pkg/mcp/testdata/[^/]*\.json$
+GENERATED|^README\.md$
+GENERATED|^docs/configuration\.md$
+
+# Generator side effects on hand-maintained inputs.
+STAGE|^go\.mod$
