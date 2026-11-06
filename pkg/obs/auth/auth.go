@@ -46,6 +46,9 @@ func ParseAuthMode(mode string) (AuthMode, error) {
 
 // BuildRoundTripper creates an http.RoundTripper using the configured auth mode.
 func BuildRoundTripper(ctx context.Context, cfg *config.Config, restConfig *rest.Config, authMode AuthMode, useTLS, insecure bool) (http.RoundTripper, error) {
+	if insecure {
+		return nil, fmt.Errorf("insecure=true is no longer supported; configure a trusted CA instead")
+	}
 	if cfg == nil {
 		return nil, fmt.Errorf("no server config available")
 	}
@@ -62,13 +65,10 @@ func BuildRoundTripper(ctx context.Context, cfg *config.Config, restConfig *rest
 		return nil, err
 	}
 
-	return createRoundTripperWithToken(ctx, cfg, restConfig, token, useTLS, insecure)
+	return createRoundTripperWithToken(ctx, cfg, restConfig, token, useTLS)
 }
 
-func createRoundTripperWithToken(ctx context.Context, cfg *config.Config, restConfig *rest.Config, token string, useTLS, insecure bool) (http.RoundTripper, error) {
-	if insecure {
-		return nil, fmt.Errorf("insecure TLS is not supported for observability backends; configure a trusted CA instead")
-	}
+func createRoundTripperWithToken(ctx context.Context, cfg *config.Config, restConfig *rest.Config, token string, useTLS bool) (http.RoundTripper, error) {
 	defaultRt, ok := promapi.DefaultRoundTripper.(*http.Transport)
 	if !ok {
 		return nil, fmt.Errorf("unexpected RoundTripper type: %T, expected *http.Transport", promapi.DefaultRoundTripper)
@@ -116,7 +116,7 @@ func createCertPoolFromRESTConfig(restConfig *rest.Config) (*x509.CertPool, erro
 			return nil, fmt.Errorf("failed to parse CA certificates from REST config CAData")
 		}
 	}
-	if restConfig.CAFile != "" {
+	if len(restConfig.CAData) == 0 && restConfig.CAFile != "" {
 		caPEM, err := os.ReadFile(restConfig.CAFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read REST config CA file: %w", err)
