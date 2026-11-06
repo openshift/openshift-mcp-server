@@ -1,0 +1,11 @@
+# Local eval / mcpchecker config for the observability/korrel8r toolset.
+# Default for a manually started local `korrel8r web --http :8090`.
+# `make run-korrel8r-evals` instead creates a temporary HTTPS Route and
+# overrides this URL in its generated config; no port-forward/proxy is needed.
+# Port 8090 avoids clashing with the MCP server on :8080.
+# Console tools need the same Korrel8r the console troubleshooting panel uses,
+# and a token for the same user. See docs/observability/korrel8r.md.
+
+[toolset_configs."observability/korrel8r"]
+url = "http://127.0.0.1:8090"
+auth_mode = "kubeconfig"

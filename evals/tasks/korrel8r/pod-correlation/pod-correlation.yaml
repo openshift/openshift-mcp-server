@@ -1,0 +1,21 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  labels:
+    suite: korrel8r
+    requires: korrel8r
+  name: "Find signals correlated with a failing pod"
+  category: "Troubleshooting & Diagnostics"
+  description: "Investigate correlations from a failing pod to logs and alerts."
+  difficulty: medium
+spec:
+  requires:
+  - extension: kubernetes
+    as: k8s
+  verify:
+  - llmJudge:
+      contains: "log:infrastructure"
+  - llmJudge:
+      contains: "k8s:Pod"
+  prompt:
+    inline: "First find an existing OpenShift pod in a namespace beginning with openshift-, preferably one showing signs of failure. Use correlation to find its related infrastructure logs and alerts, then explain which correlated signals might explain any failure. List every correlated class you found in DOMAIN:CLASS form (for example k8s:Pod, log:infrastructure) together with the queries you used."

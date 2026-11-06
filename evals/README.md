@@ -14,7 +14,7 @@ evals/
 ├── core-eval-testing/              # Agent configs and per-suite eval configs (see below)
 ├── results/                        # Committed eval results (baselines)
 └── tasks/                          # Shared task library, grouped by suite (see tasks/README.md)
-    └── <suite>/                    # core, config, helm, kiali, kubevirt, tekton, netobserv, obs
+    └── <suite>/                    # core, config, helm, kiali, kubevirt, tekton, netobserv, obs, korrel8r
         └── <task-name>/
             ├── <task-name>.yaml    # Task definition (prompt, verify, labels). kubevirt/tekton use task.yaml
             ├── setup.sh            # Optional pre-task cluster setup
@@ -24,7 +24,8 @@ evals/
 ```
 
 Tasks are grouped into suites via a `suite: <name>` label. The available suites are
-`core`, `config`, `helm`, `kiali`, `kubevirt`, `tekton`, `netobserv`, and `obs`.
+`core`, `config`, `helm`, `kiali`, `kubevirt`, `tekton`, `netobserv`, `obs`, and `korrel8r`
+(see the [Korrel8r toolset guide](../docs/observability/korrel8r.md) for the backend it needs).
 
 A second, orthogonal `readonly: "true"` label marks tasks that are safe to run
 against a server started with `read_only = true`. It cuts across the `suite:` label
@@ -250,4 +251,18 @@ knob is purely local.
 
 A successful run reports tasks passed, assertions passed (the expected tools were
 called), and verification passed (the cluster ends in the expected state). Results
-are written to `mcpchecker-<eval-name>-out.json`.
+are written to `mcpchecker-<eval-name>-out.json`. 
+
+`make run-evals` can exit successfully even if a task fails verification.
+To report failures and get a nonzero exit status if any task failed, run:
+
+```bash
+make check-evals                         # scan local mcpchecker-*-out.json files
+make check-evals EVAL_RESULTS=mcpchecker-korrel8r-e2e-out.json  # one run
+```
+
+`check-evals` requires at least one result file with a nonempty `results` array;
+it reports each task whose `taskPassed` is not `true`. This is a strict check
+(all tasks must pass), unlike CI's 80% pass-rate thresholds. It does not scan
+committed baselines under `evals/results/` unless you specify them with
+`EVAL_RESULTS`.
