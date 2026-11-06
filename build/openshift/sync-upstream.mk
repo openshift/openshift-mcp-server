@@ -23,3 +23,8 @@ sync-upstream-check: ## Inspect upstream sync plan without publishing
 .PHONY: sync-upstream-pr
 sync-upstream-pr: ## Create or update the upstream sync PR (requires gh CLI)
 	@bash hack/sync-upstream.sh publish
+
+.PHONY: check-upstream-sync-rules
+check-upstream-sync-rules: ## Validate upstream-sync rules and fixture expectations
+	@bash hack/sync-upstream.sh validate
+	@bash hack/test-upstream-sync-rules.sh

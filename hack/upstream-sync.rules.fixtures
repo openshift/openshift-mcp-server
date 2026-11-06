@@ -1,0 +1,24 @@
+# Fixture expectations for hack/upstream-sync.rules, checked by
+# hack/test-upstream-sync-rules.sh (make check-upstream-sync-rules).
+# Each line is "path|kinds": the comma-separated rule kinds that must match
+# the path, or "-" when no rule may match. The paths need not exist on disk;
+# they document the matching semantics the rules file is expected to have.
+
+go.sum|GENERATED
+go.mod|STAGE
+vendor/modules.txt|GENERATED
+vendor/k8s.io/apimachinery/pkg/util/runtime/runtime.go|GENERATED
+pkg/mcp/testdata/toolsets-core-tools.json|GENERATED
+README.md|GENERATED
+docs/configuration.md|GENERATED
+pkg/mcp/testdata/nested/toolsets-core-tools.json|-
+pkg/mcp/testdata/toolsets-core-tools.json.bak|-
+go.sum.bak|-
+vendorx/modules.txt|-
+cmd/kubernetes-mcp-server/main.go|-
+hack/sync-upstream.sh|-
+hack/upstream-sync.rules|-
+docs/openshift/upstream-sync.md|-
+build/openshift/sync-upstream.mk|-
+../go.sum|-
+/go.sum|-

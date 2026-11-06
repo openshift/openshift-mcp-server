@@ -11,7 +11,14 @@ set -Eeuo pipefail
 UPSTREAM_SYNC_ROOT=${BASH_SOURCE[0]%/*}
 [[ "$UPSTREAM_SYNC_ROOT" != "${BASH_SOURCE[0]}" ]] || UPSTREAM_SYNC_ROOT=.
 UPSTREAM_SYNC_ROOT=$(cd -- "$UPSTREAM_SYNC_ROOT" && pwd)
-ALLOWLIST_FILE=${UPSTREAM_SYNC_ALLOWLIST:-"$UPSTREAM_SYNC_ROOT/upstream-sync.allowlist"}
+RULES_FILE=${UPSTREAM_SYNC_RULES:-"$UPSTREAM_SYNC_ROOT/upstream-sync.rules"}
+# Rule storage, populated by load_rules. Declared empty up front so consumers
+# that run before loading fail closed with no matches instead of tripping
+# nounset on unset arrays.
+RULE_KIND=()
+RULE_REGEX=()
+RULE_TEXT=()
+RULE_SOURCE=()
 
 # Shared validation, configuration, and process lifecycle helpers.
 fail() {
@@ -30,6 +37,7 @@ validate_required_tools() {
 	case "$mode" in
 		plan) required+=(git) ;;
 		publish) required+=(git go gh make seq sleep) ;;
+		validate|explain) ;;
 		*) fail "cannot validate tools for unknown mode: $mode" ;;
 	esac
 	for tool in "${required[@]}"; do require_command "$tool"; done
@@ -74,7 +82,7 @@ initialize_config() {
 	SYNC_BRANCH_NAME=${SYNC_BRANCH_NAME:-upstream-sync}
 	SYNC_BASE_BRANCH=${SYNC_BASE_BRANCH:-main}
 	OWNER_REPO=${OWNER_REPO:-}
-	ALLOWLIST_FILE=${UPSTREAM_SYNC_ALLOWLIST:-${ALLOWLIST_FILE:-$UPSTREAM_SYNC_ROOT/upstream-sync.allowlist}}
+	RULES_FILE=${UPSTREAM_SYNC_RULES:-${RULES_FILE:-$UPSTREAM_SYNC_ROOT/upstream-sync.rules}}
 	valid_remote_name "$UPSTREAM_REMOTE" || fail "invalid upstream remote name: $UPSTREAM_REMOTE"
 	valid_remote_name "$ORIGIN_REMOTE" || fail "invalid downstream remote name: $ORIGIN_REMOTE"
 	if [[ -z "$OWNER_REPO" ]]; then
@@ -104,6 +112,9 @@ validate_remote() {
 initialize_runtime() {
 	TMP_DIR=$(mktemp -d)
 	WORKTREE=""
+	# Declared empty so the nounset clean-merge flow (which never enumerates
+	# unmerged paths) can still iterate the array.
+	CONFLICT_PATHS=()
 	trap cleanup EXIT
 	trap 'exit 1' HUP INT TERM
 }
@@ -117,53 +128,81 @@ cleanup() {
 	if [[ -n "${TMP_DIR:-}" ]]; then rm -rf "$TMP_DIR"; fi
 }
 
-# Plaintext allowlist parsing and generated-conflict resolution.
-load_allowlist() {
-	local file=${1:-$ALLOWLIST_FILE}
-	local line kind pattern regex line_number=0
-	GENERATED_PATTERNS=()
-	[[ -r "$file" ]] || fail "generated-content allowlist is missing: $file"
-	while IFS= read -r line || [[ -n "$line" ]]; do
-		line_number=$((line_number + 1))
-		line=${line%$'\r'}
-		[[ -z "$line" || "$line" == \#* ]] && continue
-		[[ "$line" == *'|'* ]] || fail "missing rule separator on allowlist line $line_number"
-		kind=${line%%|*}
-		pattern=${line#*|}
-		case "$kind" in
-			GENERATED)
-				[[ "$pattern" == ^* && "$pattern" == *'$' ]] || fail "regex must start with ^ and end with \$ on allowlist line $line_number"
-				# Group the rule so alternatives cannot bypass whole-path matching.
-				regex="^($pattern)$"
-				if [[ "" =~ $regex ]]; then
-					:
-				elif [[ $? -eq 2 ]]; then
-					fail "invalid regex on allowlist line $line_number"
-				fi
-				GENERATED_PATTERNS+=("$regex")
-				;;
-			*) fail "unknown allowlist rule '$kind' on line $line_number" ;;
-		esac
-	done < "$file"
-}
+# Plaintext rules: parsing, matching, and generated-conflict resolution.
+#
+# Rules are KIND|regex lines in one shared dialect: Bash extended regular
+# expressions anchored to the complete repository-relative path. Kinds are
+# tags with distinct semantics; consumers select the kinds they care about
+# through rule_matches. Adding a kind means registering it below and adding
+# a consumer for it; the parser itself does not change.
+KNOWN_RULE_KINDS=(GENERATED STAGE)
 
-allowlisted_conflict() {
-	local path=$1 pattern
-	valid_relative_path "$path" || return 1
-	[[ ${#GENERATED_PATTERNS[@]} -gt 0 ]] || return 1
-	for pattern in "${GENERATED_PATTERNS[@]}"; do
-		if [[ "$path" =~ $pattern ]]; then
+rule_kind_is_known() {
+	local kind
+	for kind in "${KNOWN_RULE_KINDS[@]}"; do
+		if [[ "$kind" == "$1" ]]; then
 			return 0
 		fi
 	done
 	return 1
 }
 
-all_conflicts_allowlisted() {
+load_rules() {
+	local file=${1:-$RULES_FILE}
+	local line kind pattern regex line_number=0
+	RULE_KIND=()
+	RULE_REGEX=()
+	RULE_TEXT=()
+	RULE_SOURCE=()
+	[[ -r "$file" ]] || fail "rules file is missing: $file"
+	while IFS= read -r line || [[ -n "$line" ]]; do
+		line_number=$((line_number + 1))
+		line=${line%$'\r'}
+		[[ -z "$line" || "$line" == \#* ]] && continue
+		[[ "$line" == *'|'* ]] || fail "missing rule separator on rules line $line_number"
+		kind=${line%%|*}
+		pattern=${line#*|}
+		rule_kind_is_known "$kind" || fail "unknown rule kind '$kind' on rules line $line_number"
+		[[ -n "$pattern" ]] || fail "empty pattern on rules line $line_number"
+		[[ "$pattern" == ^* && "$pattern" == *'$' ]] || fail "regex must start with ^ and end with \$ on rules line $line_number"
+		# Group the rule so alternatives cannot bypass whole-path matching.
+		regex="^($pattern)$"
+		if [[ "" =~ $regex ]]; then
+			:
+		elif [[ $? -eq 2 ]]; then
+			fail "invalid regex on rules line $line_number"
+		fi
+		RULE_KIND+=("$kind")
+		RULE_REGEX+=("$regex")
+		RULE_TEXT+=("$pattern")
+		RULE_SOURCE+=("$file:$line_number")
+	done < "$file"
+}
+
+# rule_matches <path> <kind> [<kind> ...]
+# Succeeds when the whole repository-relative path matches a rule of any of
+# the given kinds. Kinds compose at the call site: conflict resolution uses
+# GENERATED alone, while staging uses GENERATED plus STAGE.
+rule_matches() {
+	local path=$1 kind i
+	valid_relative_path "$path" || return 1
+	shift
+	for i in "${!RULE_KIND[@]}"; do
+		for kind in "$@"; do
+			[[ "${RULE_KIND[i]}" == "$kind" ]] || continue
+			if [[ "$path" =~ ${RULE_REGEX[i]} ]]; then
+				return 0
+			fi
+		done
+	done
+	return 1
+}
+
+all_conflicts_regenerable() {
 	local path
 	[[ ${#CONFLICT_PATHS[@]} -gt 0 ]] || return 1
 	for path in "${CONFLICT_PATHS[@]}"; do
-		if ! allowlisted_conflict "$path"; then return 1; fi
+		if ! rule_matches "$path" GENERATED; then return 1; fi
 	done
 	return 0
 }
@@ -196,8 +235,38 @@ conflict_markers_remain() {
 	return 1
 }
 
+# Stage the paths the generators are allowed to produce or rewrite: rules of
+# kind GENERATED (machine-written outputs) plus STAGE (declared side effects
+# on hand-maintained inputs such as go.mod). Changes outside those rules stay
+# unstaged so the caller's verification steps fail closed.
 stage_generated() {
-	git -C "$WORKTREE" add -- go.mod go.sum vendor/ README.md docs/configuration.md pkg/mcp/testdata/
+	local path
+	local -a stage_paths=()
+	# Conflicted paths are carried explicitly because their worktree content
+	# can otherwise look unchanged relative to HEAD. The remaining candidates
+	# are paths changed or deleted relative to HEAD and new untracked files.
+	git -C "$WORKTREE" diff --name-only -z HEAD > "$TMP_DIR/changed.paths" || return 1
+	git -C "$WORKTREE" ls-files --others --exclude-standard -z > "$TMP_DIR/untracked.paths" || return 1
+	for path in "${CONFLICT_PATHS[@]}"; do
+		if rule_matches "$path" GENERATED STAGE; then
+			stage_paths+=("$path")
+		fi
+	done
+	while IFS= read -r -d '' path; do
+		if rule_matches "$path" GENERATED STAGE; then
+			stage_paths+=("$path")
+		fi
+	done < "$TMP_DIR/changed.paths"
+	while IFS= read -r -d '' path; do
+		if rule_matches "$path" GENERATED STAGE; then
+			stage_paths+=("$path")
+		fi
+	done < "$TMP_DIR/untracked.paths"
+	# An empty pathspec would stage the whole tree; stage nothing instead.
+	if (( ${#stage_paths[@]} == 0 )); then
+		return 0
+	fi
+	git -C "$WORKTREE" add -- "${stage_paths[@]}"
 }
 
 # Git remotes, pinned refs, plan data, and mergeability operations.
@@ -254,6 +323,9 @@ print_plan() {
 	printf 'Upstream:   %s/%s (%s)\n' "$UPSTREAM_REMOTE" "$SYNC_BASE_BRANCH" "$UPSTREAM_SHA"
 	printf 'Downstream: %s/%s (%s)\n' "$ORIGIN_REMOTE" "$SYNC_BASE_BRANCH" "$DOWNSTREAM_SHA"
 	printf 'Behind:     %s commit(s)\n' "$BEHIND_COUNT"
+	printf 'Changelog:\n'
+	git -C "$REPO_DIR" log --pretty=format:'  - %h %s (%an)' "$DOWNSTREAM_SHA..$UPSTREAM_SHA"
+	printf '\n'
 	if [[ ${#OVERLAPS[@]} -gt 0 ]]; then
 		printf 'Overlapping paths (review semantics):\n'
 		printf '  %q\n' "${OVERLAPS[@]}"
@@ -340,7 +412,7 @@ merge_in_worktree() {
 			remove_worktree
 			return 2
 		fi
-		if ! all_conflicts_allowlisted; then
+		if ! all_conflicts_regenerable; then
 			INTEGRATION_NOTE="Merge conflicts include paths without regeneration rules."
 			git -C "$WORKTREE" merge --abort >/dev/null 2>&1 || true
 			remove_worktree
@@ -357,7 +429,7 @@ merge_in_worktree() {
 	if [[ "$has_conflicts" == 1 ]]; then
 		# A conflict outside generated regions must remain visible and block publishing.
 		if conflict_markers_remain; then
-			INTEGRATION_NOTE="Regeneration left conflict markers in an allowlisted file."
+			INTEGRATION_NOTE="Regeneration left conflict markers in a GENERATED path."
 			git -C "$WORKTREE" merge --abort >/dev/null 2>&1 || true
 			remove_worktree
 			return 2
@@ -462,20 +534,58 @@ clean_pr_body() {
 	}
 }
 
+# Rules introspection for maintainers and CI.
+summarize_rules() {
+	local kind i count
+	printf 'upstream-sync rules: %d rule(s) in %s\n' "${#RULE_KIND[@]}" "$RULES_FILE"
+	for kind in "${KNOWN_RULE_KINDS[@]}"; do
+		count=0
+		for i in "${!RULE_KIND[@]}"; do
+			if [[ "${RULE_KIND[i]}" == "$kind" ]]; then
+				count=$((count + 1))
+			fi
+		done
+		printf '  %-10s %d\n' "$kind" "$count"
+	done
+}
+
+explain_paths() {
+	local path i matches
+	for path in "$@"; do
+		printf '%s\n' "$path"
+		if ! valid_relative_path "$path"; then
+			printf '  invalid repository-relative path\n'
+			continue
+		fi
+		matches=0
+		for i in "${!RULE_KIND[@]}"; do
+			if [[ "$path" =~ ${RULE_REGEX[i]} ]]; then
+				printf '  %-10s %s  %s\n' "${RULE_KIND[i]}" "${RULE_SOURCE[i]}" "${RULE_TEXT[i]}"
+				matches=1
+			fi
+		done
+		if (( matches == 0 )); then
+			printf '  no matching rules\n'
+		fi
+	done
+}
+
 # Command orchestration and clean/conflict publication workflows.
 usage() {
-	cat <<'USAGE'
-Usage: hack/sync-upstream.sh [plan|publish]
+	cat <<USAGE
+Usage: ${0##*/} [plan|publish|validate|explain]
 
   plan     Fetch and describe the pinned sync plan without publishing (default).
   publish  Integrate, regenerate, push with a lease, and upsert the sync PR.
+  validate Parse and check the rules file, then summarize it.
+  explain  Print the rules matching each repository-relative path argument.
 
-The sibling upstream-sync.allowlist is parsed as data; it is never sourced.
+The sibling upstream-sync.rules is parsed as data; it is never sourced.
 USAGE
 }
 
 build_sync_plan() {
-	load_allowlist
+	load_rules
 	if [[ "$MODE" == publish ]]; then validate_publish_preconditions; fi
 	validate_remote "$UPSTREAM_REMOTE" "$UPSTREAM_REPO"
 	validate_remote "$ORIGIN_REMOTE" "$OWNER_REPO"
@@ -495,7 +605,24 @@ build_sync_plan() {
 
 main() {
 	MODE=${1:-plan}
-	case "$MODE" in plan|publish) ;; *) usage; fail "unknown mode: $MODE" ;; esac
+	case "$MODE" in
+		plan|publish) ;;
+		validate)
+			validate_required_tools validate
+			load_rules
+			summarize_rules
+			return 0
+			;;
+		explain)
+			shift
+			validate_required_tools explain
+			[[ $# -gt 0 ]] || { usage; fail "explain requires at least one repository-relative path"; }
+			load_rules
+			explain_paths "$@"
+			return 0
+			;;
+		*) usage; fail "unknown mode: $MODE" ;;
+	esac
 	validate_required_tools "$MODE"
 	initialize_config
 	initialize_runtime
