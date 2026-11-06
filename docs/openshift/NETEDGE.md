@@ -4,6 +4,63 @@ This toolset provides a ModelContextProtocol-based troubleshooting framework for
 
 It is registered into the openshift-mcp-server as the `netedge` toolset.
 
+## Compatibility and deployment requirements
+
+Compatibility filtering checks exact APIs, not deployment readiness. It does not
+check named objects, namespaces, platform identity, operators, RBAC, or socket
+availability. A visible tool can still fail when its deployment prerequisites are
+absent. In particular, core Pod and ConfigMap requirements are not OpenShift
+platform gates, and `exec_dns_in_pod` remains usable on generic Kubernetes.
+
+- `get_router_config`, `get_router_info`, and `get_router_sessions` use the fixed
+  `openshift-ingress` namespace and `router` container. Without an explicit `pod`,
+  they select a Running pod with label
+  `ingresscontroller.operator.openshift.io/deployment-ingresscontroller=default`.
+  An explicit pod changes only the pod name, not the namespace; a configured
+  namespace does not override this nonempty hardcoded namespace. Config reads
+  `/var/lib/haproxy/conf/haproxy.config`; runtime info and sessions require
+  `socat` and `/var/lib/haproxy/run/haproxy.sock` in that container.
+- `get_coredns_config` reads `data.Corefile` from the fixed
+  `openshift-dns/dns-default` ConfigMap. It has no namespace or name arguments and
+  does not look up a generic `kube-system/coredns` deployment.
+- `exec_dns_in_pod` requires explicit `namespace`, `target_server`, and
+  `target_name`. It creates a temporary core Pod, runs `dig`, reads its logs, and
+  deletes it. Admission, scheduling, image pull access, and runtime support for
+  `registry.redhat.io/openshift4/network-tools-rhel9` are required; the image does
+  not imply an OpenShift API dependency.
+
+### Compatibility filtering maintenance
+
+Keep each lazy exact-GVK requirement beside its handler. When an API dependency
+changes, update that literal, the independent constructor/registration contracts,
+and the MCP catalog negative tests together.
+
+| Tools | Exact group/version/kind |
+|---|---|
+| `query_prometheus` (toolset-name prefix), `inspect_route` | `route.openshift.io/v1`, `Route` |
+| `get_coredns_config` | core group `""`, `v1`, `ConfigMap` |
+| `get_service_endpoints` | `discovery.k8s.io/v1`, `EndpointSlice` |
+| `exec_dns_in_pod`, `get_router_config`, `get_router_info`, `get_router_sessions` | core group `""`, `v1`, `Pod` |
+| `probe_dns_local`, `probe_http` | None; both local probes remain ungated |
+
+These are eight gated tools and two ungated local probes. Any enumerated target
+supporting the exact GVK is sufficient. Confirmed absence hides only dependent
+tools; unknown discovery, 403, and transport errors fail open. Disabled filtering
+performs no compatibility discovery. Current ACM inspection enumerates managed
+targets; an empty target set hides gated tools, and error aggregation can continue
+through later targets. A positive target wins over absence or errors elsewhere.
+The discovery REST client has a bounded per-client timeout, not a global deadline
+guarantee for aggregate inspection. No provider/watcher policy or ordinary
+non-discovery HTTP behavior changes with these filters.
+
+### Constructor compatibility
+
+Go embedders must now call
+`InitQueryPrometheus(ctx context.Context, inspector api.ClusterInspector)` instead
+of the former no-argument constructor. This is a source-incompatible signature
+change. `Toolset.GetTools` supplies the current context and
+`ToolsetContext.Inspector`; the compatibility check stays lazy.
+
 ## Tools
 
 The NetEdge toolset is divided into four main categories: Diagnostics, Ingress & Routes, DNS & Services, and Connectivity Probes.

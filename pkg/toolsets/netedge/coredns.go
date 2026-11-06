@@ -1,6 +1,7 @@
 package netedge
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
@@ -11,7 +12,13 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func initCoreDNS() []api.ServerTool {
+var coreDNSConfigMapGVK = schema.GroupVersionKind{
+	Group:   "",
+	Version: "v1",
+	Kind:    "ConfigMap",
+}
+
+func initCoreDNS(ctx context.Context, inspector api.ClusterInspector) []api.ServerTool {
 	return []api.ServerTool{
 		{
 			Tool: api.Tool{
@@ -35,7 +42,8 @@ func initCoreDNS() []api.ServerTool {
 				Namespace:    &api.RBACNamespace{Name: "openshift-dns"},
 				ResourceName: &api.RBACResourceName{Name: "dns-default"},
 			}),
-			Handler: getCoreDNSConfig,
+			Handler:                    getCoreDNSConfig,
+			TargetCompatibilityFilters: []func() bool{targetHasGVK(ctx, inspector, coreDNSConfigMapGVK)},
 		},
 	}
 }
