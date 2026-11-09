@@ -1,0 +1,28 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "backend-reachability"
+  difficulty: easy
+  parallel: true
+  runs: 1
+  labels:
+    category: incidents
+    suite: incidents
+    requires: observability/incidents
+    toolType: smoke-test
+  description: |
+    Smoke test to verify the agent can reach the get_incidents tool through
+    the MCP server and get a valid response from the Prometheus/Alertmanager
+    backends.
+spec:
+  verify:
+    - llmJudge:
+        contains: |
+          The incidents tool responded successfully. The listed firing
+          incidents include the etcdHighFsyncDurations, KubePodCrashLooping,
+          and etcdMembersDown alerts.
+  prompt:
+    inline: |
+      Is incident data available for this cluster? Check whether the incident
+      retrieval works, report whether the call succeeded, and list any
+      currently firing incidents.

@@ -13,6 +13,7 @@ This directory hosts the reusable task scenarios that power MCP evaluations for 
 - [Tekton tasks](tekton/) – CI/CD workflows that exercise the Tekton toolset (pipelines, tasks, pipeline runs).
 - [NetObserv tasks](netobserv/) – network flow and metrics workflows that exercise the NetObserv MCP toolset (flows, metrics, export).
 - [Obs tasks](obs/) – observability workflows that exercise the metrics, traces, logs, and otelcol toolsets.
+- [Incidents tasks](incidents/) – OpenShift cluster health analyzer workflows that exercise the observability/incidents toolset (incident listing, severity and time-range filters, health assessment).
 
 ## Anatomy of a Task
 
