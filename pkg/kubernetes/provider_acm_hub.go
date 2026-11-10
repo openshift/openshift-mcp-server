@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -291,7 +292,7 @@ func newACMClusterProvider(ctx context.Context, m *Manager, cfg *ACMProviderConf
 		),
 	}
 
-	resourceVersion, err := provider.refreshClusters(ctx)
+	resourceVersion, _, err := provider.refreshClusters(ctx)
 	if err != nil {
 		klogutil.LogWarn(logger, "Failed to discover managed clusters", klogutil.Err(err))
 	}
@@ -464,7 +465,7 @@ func (p *acmHubClusterProvider) GetTokenExchangeStrategy() string {
 }
 
 func (p *acmHubClusterProvider) watchManagedClusters(resourceVersion string, onTargetsChanged func() error) {
-	logger := klog.FromContext(p.watchCtx)
+	logger := klogutil.FromContext(p.watchCtx)
 
 	gvr := schema.GroupVersionResource{
 		Group:    "cluster.open-cluster-management.io",
@@ -476,9 +477,25 @@ func (p *acmHubClusterProvider) watchManagedClusters(resourceVersion string, onT
 		initialDelay = 1 * time.Second
 		maxDelay     = 5 * time.Minute
 		backoffRate  = 2.0
+		// A watch open at least this long is treated as healthy even if it delivered no
+		// events (a quiet hub whose apiserver idle-closed the watch), so it does not
+		// trigger backoff.
+		minHealthyWatch = 30 * time.Second
 	)
 
 	delay := initialDelay
+
+	// backoff waits for the current delay and then grows it (capped at maxDelay),
+	// returning false if the watch context is cancelled while waiting.
+	backoff := func() bool {
+		select {
+		case <-p.watchCtx.Done():
+			return false
+		case <-time.After(delay):
+		}
+		delay = min(time.Duration(float64(delay)*backoffRate), maxDelay)
+		return true
+	}
 
 	for {
 		select {
@@ -486,6 +503,31 @@ func (p *acmHubClusterProvider) watchManagedClusters(resourceVersion string, onT
 			logger.V(2).Info("Watch goroutine cancelled, exiting")
 			return
 		default:
+		}
+
+		// Relist to obtain a fresh resourceVersion whenever we do not have a valid one:
+		// at startup gaps, or after an Expired/Gone watch error cleared it below.
+		// Watching from a stale resourceVersion is exactly what the API server rejects
+		// with 410 Gone, and reconnecting with that same RV is what caused the tight
+		// loop this guards against (per the Kubernetes watch contract: on Expired/Gone,
+		// relist and restart the watch from the new list resourceVersion).
+		if resourceVersion == "" {
+			rv, changed, err := p.refreshClusters(p.watchCtx)
+			if err != nil {
+				logger.Error(err, "Failed to relist managed clusters before watch")
+				if !backoff() {
+					return
+				}
+				continue
+			}
+			resourceVersion = rv
+			// Only notify when the relist actually changed the target set, so routine
+			// reconnects do not trigger redundant downstream work.
+			if changed {
+				if err := onTargetsChanged(); err != nil {
+					klogutil.LogWarn(logger, "Error in onTargetsChanged callback", klogutil.Err(err))
+				}
+			}
 		}
 
 		watchInterface, err := p.hubManager.kubernetes.DynamicClient().Resource(gvr).Watch(
@@ -496,16 +538,40 @@ func (p *acmHubClusterProvider) watchManagedClusters(resourceVersion string, onT
 		)
 		if err != nil {
 			logger.Error(err, "Failed to start watch on managed clusters")
+			// A 410 Gone / Expired can surface as the Watch() call error itself (not
+			// only as an in-stream event); clear the resourceVersion so the next
+			// iteration relists instead of retrying the same stale one forever.
+			if apierrors.IsResourceExpired(err) || apierrors.IsGone(err) {
+				resourceVersion = ""
+			}
 			logger.V(2).Info("Waiting before retrying watch", "delay", delay)
-			time.Sleep(delay)
-			delay = min(time.Duration(float64(delay)*backoffRate), maxDelay)
+			if !backoff() {
+				return
+			}
 			continue
 		}
 
-		delay = initialDelay
 		logger.V(2).Info("Started watching managed clusters for changes")
+		madeProgress := false
+		watchStart := time.Now()
 
 		for event := range watchInterface.ResultChan() {
+			// A watch ERROR event (e.g. 410 Gone / Expired when the resourceVersion is
+			// too old) does not carry an *unstructured.Unstructured object, so it used
+			// to be silently dropped here. Handle it explicitly: clear the
+			// resourceVersion to force a relist on the next iteration, and stop
+			// consuming this (now closed) stream.
+			if event.Type == watch.Error {
+				if status, ok := event.Object.(*metav1.Status); ok {
+					klogutil.LogWarn(logger, "Managed clusters watch error, will relist",
+						klogutil.Field("reason", status.Reason), klogutil.Field("code", status.Code), klogutil.Field("message", status.Message))
+				} else {
+					klogutil.LogWarn(logger, "Managed clusters watch error event", klogutil.Field("object", event.Object))
+				}
+				resourceVersion = ""
+				break
+			}
+
 			obj, ok := event.Object.(*unstructured.Unstructured)
 			if !ok {
 				continue
@@ -513,6 +579,8 @@ func (p *acmHubClusterProvider) watchManagedClusters(resourceVersion string, onT
 
 			clusterName := obj.GetName()
 			resourceVersion = obj.GetResourceVersion()
+			// A delivered event means the watch is healthy.
+			madeProgress = true
 
 			switch event.Type {
 			case watch.Added:
@@ -539,10 +607,24 @@ func (p *acmHubClusterProvider) watchManagedClusters(resourceVersion string, onT
 
 		watchInterface.Stop()
 		klogutil.LogWarn(logger, "Managed clusters watch closed, restarting")
+
+		// A watch that stayed open for a healthy duration counts as progress even with
+		// no events (a quiet hub whose apiserver idle-closed the watch), so it is not
+		// mistaken for a failure. Back off only when the watch ended quickly without
+		// progress (immediate close or a 410 ERROR event); otherwise reset so normal
+		// watch rotations reconnect promptly.
+		if time.Since(watchStart) >= minHealthyWatch {
+			madeProgress = true
+		}
+		if madeProgress {
+			delay = initialDelay
+		} else if !backoff() {
+			return
+		}
 	}
 }
 
-func (p *acmHubClusterProvider) refreshClusters(ctx context.Context) (string, error) {
+func (p *acmHubClusterProvider) refreshClusters(ctx context.Context) (string, bool, error) {
 	dynamicClient := p.hubManager.kubernetes.DynamicClient()
 
 	gvr := schema.GroupVersionResource{
@@ -553,14 +635,16 @@ func (p *acmHubClusterProvider) refreshClusters(ctx context.Context) (string, er
 
 	result, err := dynamicClient.Resource(gvr).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return "", fmt.Errorf("failed to list cluster managers: %w", err)
+		return "", false, fmt.Errorf("failed to list cluster managers: %w", err)
 	}
 
+	listed := make(map[string]bool, len(result.Items))
 	for _, item := range result.Items {
 		name := item.GetName()
-		if name != "" {
-			p.addCluster(name)
+		if name == "" {
+			continue
 		}
+		listed[name] = true
 
 		labels := item.GetLabels()
 		if labels[LocalClusterLabel] == "true" {
@@ -568,11 +652,46 @@ func (p *acmHubClusterProvider) refreshClusters(ctx context.Context) (string, er
 		}
 	}
 
+	// Reconcile against the authoritative list so clusters removed while the watch was
+	// down (e.g. during a 410 Gone gap, where the watch.Deleted event is never seen)
+	// are pruned rather than left behind as stale targets.
+	changed := p.reconcileClusters(listed)
+
 	resourceVersion := result.GetResourceVersion()
 	clusters, _ := p.GetTargets(ctx)
-	klog.FromContext(ctx).V(3).Info("Discovered managed clusters", "count", len(clusters), "clusters", clusters, "resource_version", resourceVersion)
+	klogutil.FromContext(ctx).V(3).Info("Discovered managed clusters", "count", len(clusters), "clusters", clusters, "resource_version", resourceVersion, "changed", changed)
 
-	return resourceVersion, nil
+	return resourceVersion, changed, nil
+}
+
+// reconcileClusters makes the known cluster set match listed: it adds entries that are
+// new and removes ones that are no longer present, returning true if the set changed.
+// Managers for pruned clusters are dropped, mirroring the watch.Deleted path.
+func (p *acmHubClusterProvider) reconcileClusters(listed map[string]bool) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Never treat an empty list as authoritative: a transient empty or partial relist
+	// (an API or cache blip) must not wipe every known target. An ACM hub always has
+	// at least the local-cluster, so an empty result is a signal to skip pruning.
+	if len(listed) == 0 {
+		return false
+	}
+
+	changed := false
+	for name := range listed {
+		if _, exists := p.clusterManagers[name]; !exists {
+			p.clusterManagers[name] = nil
+			changed = true
+		}
+	}
+	for name := range p.clusterManagers {
+		if !listed[name] {
+			delete(p.clusterManagers, name)
+			changed = true
+		}
+	}
+	return changed
 }
 
 func (p *acmHubClusterProvider) setHubClusterName(name string) {
