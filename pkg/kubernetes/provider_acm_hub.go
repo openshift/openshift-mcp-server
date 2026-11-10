@@ -557,8 +557,7 @@ func (p *acmHubClusterProvider) watchManagedClusters(resourceVersion string, onT
 
 		for event := range watchInterface.ResultChan() {
 			// A watch ERROR event (e.g. 410 Gone / Expired when the resourceVersion is
-			// too old) does not carry an *unstructured.Unstructured object, so it used
-			// to be silently dropped here. Handle it explicitly: clear the
+			// too old) does not carry an *unstructured.Unstructured object. Clear the
 			// resourceVersion to force a relist on the next iteration, and stop
 			// consuming this (now closed) stream.
 			if event.Type == watch.Error {
@@ -780,8 +779,15 @@ func (p *acmHubClusterProvider) managerForCluster(ctx context.Context, cluster s
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if existingManager := p.clusterManagers[cluster]; existingManager != nil {
-		return existingManager, nil
+	// If the cluster was pruned while we built the manager (e.g. a concurrent recovery
+	// relist), do not resurrect it: only cache the manager when the cluster key is
+	// still present. Otherwise GetTargets would keep returning a deleted cluster.
+	current, stillPresent := p.clusterManagers[cluster]
+	if !stillPresent {
+		return nil, fmt.Errorf("cluster %s not found", cluster)
+	}
+	if current != nil {
+		return current, nil
 	}
 
 	p.clusterManagers[cluster] = newManager
