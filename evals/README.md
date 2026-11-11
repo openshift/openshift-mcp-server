@@ -14,7 +14,7 @@ evals/
 ├── core-eval-testing/              # Agent configs and per-suite eval configs (see below)
 ├── results/                        # Committed eval results (baselines)
 └── tasks/                          # Shared task library, grouped by suite (see tasks/README.md)
-    └── <suite>/                    # core, config, helm, kiali, kubevirt, tekton, netobserv, obs, incidents
+    └── <suite>/                    # core, config, helm, kiali, kubevirt, tekton, netobserv, obs
         └── <task-name>/
             ├── <task-name>.yaml    # Task definition (prompt, verify, labels). kubevirt/tekton use task.yaml
             ├── setup.sh            # Optional pre-task cluster setup
@@ -24,8 +24,7 @@ evals/
 ```
 
 Tasks are grouped into suites via a `suite: <name>` label. The available suites are
-`core`, `config`, `helm`, `kiali`, `kubevirt`, `tekton`, `netobserv`, `obs`, and
-`incidents`.
+`core`, `config`, `helm`, `kiali`, `kubevirt`, `tekton`, `netobserv`, and `obs`.
 
 A second, orthogonal `readonly: "true"` label marks tasks that are safe to run
 against a server started with `read_only = true`. It cuts across the `suite:` label
