@@ -16,7 +16,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/miekg/dns v1.1.73
 	github.com/modelcontextprotocol/go-sdk v1.8.0
-	github.com/openshift/cluster-health-analyzer v1.2.1
+	github.com/openshift/cluster-health-analyzer v1.2.2
 	github.com/os-observability/redhat-opentelemetry-collector/configschemas v0.0.0-20260712195227-4e7d75e0d2ec
 	github.com/ovn-kubernetes/ovn-kubernetes-mcp v0.1.0
 	github.com/pavolloffay/opentelemetry-mcp-server/modules/schemagen v0.0.0-20260710124846-8bb49fd6ccc7

@@ -12,8 +12,12 @@ type Response struct {
 }
 
 type Incidents struct {
+	// Total is the number of incidents matching the query before any
+	// budget truncation; when truncated, len(items) is smaller.
 	Total     int        `json:"total"`
 	Incidents []Incident `json:"items"`
+	// Truncated indicates that incidents were omitted to fit the result budget.
+	Truncated bool `json:"truncated,omitempty"`
 }
 
 type Incident struct {

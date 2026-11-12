@@ -6,6 +6,7 @@ import (
 	"net/url"
 
 	"github.com/containers/kubernetes-mcp-server/pkg/api"
+	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/obs/auth"
 	"github.com/containers/kubernetes-mcp-server/pkg/obs/toolcfg"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/metrics"
@@ -39,7 +40,9 @@ func initGetIncidents() []api.ServerTool {
 // observability/metrics, falling back to observability/incidents only when the
 // metrics configuration is absent. It honors the selected auth_mode and insecure
 // settings and uses the shared metrics CA fallback behavior.
-// It returns the analyzer's explanatory text alongside structured incident data.
+// It returns the analyzer's explanatory text alongside structured incident data,
+// bounded by the result budget on the request context: the analyzer keeps the
+// most severe incidents that fit, counting text and structured content.
 func handleGetIncidents(params api.ToolHandlerParams) (*api.ToolCallResult, error) {
 	rawConfig, found := toolcfg.From(params, metrics.ToolsetName)
 	if !found {
@@ -74,6 +77,8 @@ func handleGetIncidents(params api.ToolHandlerParams) (*api.ToolCallResult, erro
 		return api.NewToolCallResult("", err), nil
 	}
 
+	transport = kubernetes.NewBackendResponseRoundTripper(transport, kubernetes.LiveBackendLimit(params.Config))
+
 	promLoader, err := prom.NewLoaderWithRoundTripper(cfg.PrometheusURL, transport)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
@@ -87,7 +92,9 @@ func handleGetIncidents(params api.ToolHandlerParams) (*api.ToolCallResult, erro
 	}
 
 	incidentTool := analyzer.NewIncidentsTool("", "")
-	result, response, err := incidentTool.GetIncidents(params.Context, args, promLoader, alertLoader)
+	result, response, err := incidentTool.GetIncidentsWithBudget(
+		params.Context, args, promLoader, alertLoader, api.ResultLimit(params.Context),
+	)
 	if err != nil {
 		return api.NewToolCallResult("", err), nil
 	}

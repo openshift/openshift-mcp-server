@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -158,9 +159,16 @@ func (s *ToolsetSuite) TestIncidentToolMetadata() {
 }
 
 func (s *ToolsetSuite) callIncidents(tomlConfig, arguments string, caData []byte) *api.ToolCallResult {
+	return s.callIncidentsBudget(tomlConfig, arguments, caData, 0)
+}
+
+func (s *ToolsetSuite) callIncidentsBudget(tomlConfig, arguments string, caData []byte, budget int64) *api.ToolCallResult {
 	ctx, cancel := context.WithTimeout(s.T().Context(), 5*time.Second)
 	defer cancel()
 	ctx = context.WithValue(ctx, kubernetes.OAuthAuthorizationHeader, "Bearer header-token")
+	if budget > 0 {
+		ctx = api.WithResultBudget(ctx, budget)
+	}
 
 	cfg, err := config.ReadToml(ctx, []byte(tomlConfig), config.WithBaseDefault())
 	s.Require().NoError(err)
@@ -427,6 +435,143 @@ alertmanager_url = %q
 			}
 		})
 	}
+}
+
+func (s *ToolsetSuite) TestIncidentBackendLimits() {
+	const bodySize = 256
+	for _, backend := range []struct {
+		name string
+		path string
+	}{
+		{"Prometheus", "/api/v1/query_range"},
+		{"Alertmanager", "/api/v2/alerts"},
+	} {
+		s.Run(backend.name, func() {
+			for _, tc := range []struct {
+				name      string
+				limit     int
+				chunked   bool
+				wantError bool
+			}{
+				{"under cap", bodySize + 1, false, false},
+				{"exact cap", bodySize, false, false},
+				{"over cap", bodySize - 1, false, true},
+				{"chunked over cap", bodySize - 1, true, true},
+				{"disabled cap", 0, false, false},
+			} {
+				s.Run(tc.name, func() {
+					server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						var body string
+						switch r.URL.Path {
+						case "/api/v1/query_range":
+							body = `{"status":"success","data":{"resultType":"matrix","result":[]}}`
+						case "/api/v1/query":
+							body = `{"status":"success","data":{"resultType":"vector","result":[]}}`
+						case "/api/v2/alerts":
+							body = `[]`
+						default:
+							http.NotFound(w, r)
+							return
+						}
+						w.Header().Set("Content-Type", "application/json")
+						if r.URL.Path == backend.path {
+							body = strings.Repeat(" ", bodySize-len(body)) + body
+							if tc.chunked {
+								w.(http.Flusher).Flush()
+							}
+						}
+						if _, err := fmt.Fprint(w, body); err != nil {
+							http.Error(w, err.Error(), http.StatusInternalServerError)
+						}
+					}))
+					s.T().Cleanup(server.Close)
+
+					caData := pem.EncodeToMemory(&pem.Block{
+						Type: "CERTIFICATE", Bytes: server.Certificate().Raw,
+					})
+					tomlConfig := fmt.Sprintf(`
+max_backend_response_bytes = %d
+[toolset_configs."observability/metrics"]
+prometheus_url = %q
+alertmanager_url = %q
+`, tc.limit, server.URL, server.URL)
+					result := s.callIncidents(tomlConfig, `{}`, caData)
+					if tc.wantError {
+						s.ErrorContains(result.Error, "response exceeded max_backend_response_bytes (255)")
+						return
+					}
+					s.Require().NoError(result.Error)
+					s.JSONEq(`{"incidents":{"total":0,"items":[]}}`, result.Content)
+				})
+			}
+		})
+	}
+}
+
+func (s *ToolsetSuite) TestIncidentResultBudget() {
+	incidentJSON := func(severity string, value string, group string) string {
+		return fmt.Sprintf(`{"metric":{"group_id":%q,"src_alertname":"Alert`+group+`","src_namespace":"ns","src_severity":%q,"component":"monitoring"},"values":[[%d,%q]]}`,
+			group, severity, time.Now().Add(-time.Minute).Unix(), value)
+	}
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		var body string
+		switch r.URL.Path {
+		case "/api/v1/query_range":
+			body = `{"status":"success","data":{"resultType":"matrix","result":[` +
+				incidentJSON("critical", "2", "1") + `,` + incidentJSON("warning", "1", "2") + `]}}`
+		case "/api/v1/query":
+			body = `{"status":"success","data":{"resultType":"vector","result":[]}}`
+		case "/api/v2/alerts":
+			body = `[]`
+		default:
+			http.NotFound(w, r)
+			return
+		}
+		_, err := fmt.Fprint(w, body)
+		s.Require().NoError(err)
+	}))
+	s.T().Cleanup(server.Close)
+	caData := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})
+	tomlConfig := fmt.Sprintf(`
+[toolset_configs."observability/metrics"]
+prometheus_url = %q
+alertmanager_url = %q
+`, server.URL, server.URL)
+
+	type incidentsPayload struct {
+		Incidents struct {
+			Total     int               `json:"total"`
+			Items     []json.RawMessage `json:"items"`
+			Truncated bool              `json:"truncated"`
+		} `json:"incidents"`
+	}
+
+	reference := s.callIncidentsBudget(tomlConfig, `{"min_severity":"info"}`, caData, 0)
+	s.Require().NoError(reference.Error)
+	var uncapped incidentsPayload
+	s.Require().NoError(json.Unmarshal([]byte(reference.Content), &uncapped))
+	s.Require().Len(uncapped.Incidents.Items, 2)
+	s.False(uncapped.Incidents.Truncated)
+
+	// The analyzer counts the envelope and each item twice (text and
+	// structured content); a budget for the envelope plus the longest item
+	// keeps exactly one incident.
+	envelope := len(`{"incidents":{"total":2,"items":null,"truncated":true}}`)
+	longest := max(len(uncapped.Incidents.Items[0]), len(uncapped.Incidents.Items[1]))
+	budget := int64(2 * (envelope + longest + 1))
+	bounded := s.callIncidentsBudget(tomlConfig, `{"min_severity":"info"}`, caData, budget)
+	s.Require().NoError(bounded.Error)
+	var capped incidentsPayload
+	s.Require().NoError(json.Unmarshal([]byte(bounded.Content), &capped))
+	s.Equal(2, capped.Incidents.Total)
+	s.True(capped.Incidents.Truncated)
+	s.Require().Len(capped.Incidents.Items, 1)
+	var kept struct {
+		Severity string `json:"severity"`
+	}
+	s.Require().NoError(json.Unmarshal(capped.Incidents.Items[0], &kept))
+	s.Equal("critical", kept.Severity, "the most severe incident must be kept")
 }
 
 func TestToolset(t *testing.T) {
