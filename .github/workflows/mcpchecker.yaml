@@ -45,7 +45,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  HARNESS_SHA: '0451c0dd32f7d9a40aad6ac214854b0969af507b'
+  HARNESS_SHA: '87ea56ac3db501b9825614fff45029d6aa2fda42'
   MINIKUBE_PROFILE: mcp-eval-cluster
 
 defaults:
@@ -82,7 +82,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: redhat-chai-bot/openshift_openshift-mcp-server
-          ref: '0451c0dd32f7d9a40aad6ac214854b0969af507b'
+          ref: '87ea56ac3db501b9825614fff45029d6aa2fda42'
           path: control-trusted
           persist-credentials: false
       - name: Check trigger conditions
@@ -110,7 +110,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: redhat-chai-bot/openshift_openshift-mcp-server
-          ref: '0451c0dd32f7d9a40aad6ac214854b0969af507b'
+          ref: '87ea56ac3db501b9825614fff45029d6aa2fda42'
           path: trusted-build
           persist-credentials: false
       - name: Checkout candidate only for compilation
@@ -177,7 +177,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: redhat-chai-bot/openshift_openshift-mcp-server
-          ref: '0451c0dd32f7d9a40aad6ac214854b0969af507b'
+          ref: '87ea56ac3db501b9825614fff45029d6aa2fda42'
           path: trusted
           persist-credentials: false
       - name: Validate candidate artifact origin
