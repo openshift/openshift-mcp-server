@@ -1,0 +1,26 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "critical-incidents"
+  difficulty: medium
+  parallel: true
+  runs: 1
+  labels:
+    category: incidents
+    suite: incidents
+    requires: observability/incidents
+    toolType: get-incidents
+  description: |
+    Tests if the agent uses the get_incidents tool with the min_severity
+    filter to retrieve only critical incidents, rather than fetching all
+    incidents and filtering client-side.
+spec:
+  verify:
+    - llmJudge:
+        contains: |
+          A list of currently firing critical incidents, or an explicit
+          statement that no critical firing incidents were returned. The
+          firing critical incidents include the etcdMembersDown alert.
+  prompt:
+    inline: |
+      Show me only the critical incidents currently firing in the cluster.

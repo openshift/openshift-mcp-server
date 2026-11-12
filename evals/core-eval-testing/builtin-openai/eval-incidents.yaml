@@ -1,0 +1,56 @@
+kind: Eval
+metadata:
+  name: "incidents-e2e"
+config:
+  agent:
+    type: "file"
+    path: agent.yaml
+  mcpConfigFile: ../../mcp-config.yaml
+  llmJudge:
+    ref:
+      type: file
+      path: agent.yaml
+  taskSets:
+    # Smoke test
+    - path: ../../tasks/incidents/backend-reachability/backend-reachability.yaml
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            tool: get_incidents
+        minToolCalls: 1
+        maxToolCalls: 5
+
+    - path: ../../tasks/incidents/list-incidents/list-incidents.yaml
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            tool: get_incidents
+        minToolCalls: 1
+        maxToolCalls: 5
+
+    # Parameter usage: min_severity filter
+    - path: ../../tasks/incidents/critical-incidents/critical-incidents.yaml
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            tool: get_incidents
+        minToolCalls: 1
+        maxToolCalls: 5
+
+    # Parameter usage: time_range filter
+    - path: ../../tasks/incidents/recent-incidents/recent-incidents.yaml
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            tool: get_incidents
+        minToolCalls: 1
+        maxToolCalls: 5
+
+    # Multi-step reasoning (hard)
+    - path: ../../tasks/incidents/cluster-health-summary/cluster-health-summary.yaml
+      assertions:
+        toolsUsed:
+          - server: kubernetes
+            tool: get_incidents
+        minToolCalls: 1
+        maxToolCalls: 10

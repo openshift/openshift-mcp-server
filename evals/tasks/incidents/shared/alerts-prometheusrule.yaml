@@ -1,0 +1,68 @@
+# Synthetic always-firing alerts so the incidents evals have deterministic
+# incidents to query. Reuses the PrometheusRule approach and alert identities
+# from the integration grouping tests (openshift/cluster-health-analyzer#174).
+#
+# Must be applied to the openshift-monitoring namespace before running the
+# incidents eval suite and removed afterwards; the test-type label scopes both
+# the readiness check and the cleanup.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: mcpchecker-eval-alerts
+  namespace: openshift-monitoring
+  labels:
+    app.kubernetes.io/name: kube-prometheus
+    app.kubernetes.io/part-of: openshift-monitoring
+    prometheus: k8s
+    role: alert-rules
+    test-type: mcpchecker-eval
+spec:
+  groups:
+    - name: mcpchecker-eval-alerts
+      interval: 30s
+      rules:
+        - alert: etcdHighFsyncDurations
+          expr: vector(1)
+          for: 30s
+          labels:
+            severity: warning
+            namespace: openshift-etcd
+            test_type: mcpchecker-eval
+            job: etcd
+            service: etcd
+            pod: etcd-master-0
+            container: etcd
+            node: master-0
+          annotations:
+            summary: Etcd member high fsync durations
+            description: High fsync durations on etcd member master-0 in openshift-etcd.
+        - alert: KubePodCrashLooping
+          expr: vector(1)
+          for: 30s
+          labels:
+            severity: warning
+            namespace: openshift-kube-apiserver
+            test_type: mcpchecker-eval
+            job: kube-state-metrics
+            service: kube-state-metrics
+            pod: kube-apiserver-master-0
+            container: kube-apiserver
+            node: master-0
+          annotations:
+            summary: Pod is crash looping.
+            description: 'Pod openshift-kube-apiserver/kube-apiserver-master-0 (kube-apiserver) is in waiting state (reason: "CrashLoopBackOff").'
+        - alert: etcdMembersDown
+          expr: vector(1)
+          for: 30s
+          labels:
+            severity: critical
+            namespace: openshift-etcd
+            test_type: mcpchecker-eval
+            job: etcd
+            service: etcd
+            pod: etcd-master-0
+            container: etcd
+            node: master-0
+          annotations:
+            summary: Etcd members down
+            description: One or more etcd members in openshift-etcd are down, risking quorum loss.

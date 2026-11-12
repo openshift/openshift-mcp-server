@@ -1,0 +1,26 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "recent-incidents"
+  difficulty: medium
+  parallel: true
+  runs: 1
+  labels:
+    category: incidents
+    suite: incidents
+    requires: observability/incidents
+    toolType: get-incidents
+  description: |
+    Tests if the agent uses the get_incidents tool with the time_range
+    parameter to limit results to incidents from the last 24 hours.
+spec:
+  verify:
+    - llmJudge:
+        contains: |
+          A list of incidents returned for the last 24 hours, or an explicit
+          statement that no incidents were returned for that window. The
+          incidents include the etcdHighFsyncDurations, KubePodCrashLooping,
+          and etcdMembersDown alerts.
+  prompt:
+    inline: |
+      Show me the incidents from the last 24 hours in the cluster.

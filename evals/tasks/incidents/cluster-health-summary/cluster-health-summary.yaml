@@ -1,0 +1,32 @@
+kind: Task
+apiVersion: mcpchecker/v1alpha2
+metadata:
+  name: "cluster-health-summary"
+  difficulty: hard
+  parallel: true
+  runs: 1
+  labels:
+    category: incidents
+    suite: incidents
+    requires: observability/incidents
+    toolType: multi-step
+  description: |
+    Tests if the agent can retrieve the incidents and reason about them to
+    produce an overall assessment of cluster health, identifying affected
+    components and likely root causes.
+spec:
+  verify:
+    - llmJudge:
+        contains: |
+          An incident-based health assessment. When incidents are present,
+          it prioritizes the most severe problems, identifies affected
+          components, and describes causes as likely or unknown rather
+          than proven. When no incidents were returned, it says so without
+          treating that as proof that the entire cluster is healthy. The
+          assessment covers the etcdHighFsyncDurations, KubePodCrashLooping,
+          and etcdMembersDown alerts.
+  prompt:
+    inline: |
+      What is the current health status of the cluster? Identify the most
+      critical problems, which components they affect, and summarize the
+      likely root causes.
