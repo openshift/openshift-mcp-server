@@ -61,7 +61,7 @@ sync-upstream-pr: ## Create/update PR to sync with upstream (requires gh CLI)
 	git diff --name-only "$$BASE_SHA" "$$DOWNSTREAM_SHA" > "$$TMP_DIR/downstream.paths.unsorted"; \
 	LC_ALL=C sort -u "$$TMP_DIR/upstream.paths.unsorted" > "$$TMP_DIR/upstream.paths"; \
 	LC_ALL=C sort -u "$$TMP_DIR/downstream.paths.unsorted" > "$$TMP_DIR/downstream.paths"; \
-	comm -12 "$$TMP_DIR/upstream.paths" "$$TMP_DIR/downstream.paths" > "$$TMP_DIR/committed-overlaps"; \
+	LC_ALL=C comm -12 "$$TMP_DIR/upstream.paths" "$$TMP_DIR/downstream.paths" > "$$TMP_DIR/committed-overlaps"; \
 	if [ -s "$$TMP_DIR/committed-overlaps" ]; then \
 		echo "⚠️  Paths changed on both sides since merge-base; review the sync PR carefully:"; \
 		while IFS= read -r path; do printf '  %s\n' "$$path"; done < "$$TMP_DIR/committed-overlaps"; \

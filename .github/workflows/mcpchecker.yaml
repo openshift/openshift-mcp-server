@@ -147,7 +147,7 @@ jobs:
           retention-days: 1
 
   run-evaluation:
-    name: 'Run MCP Evaluation (${{ matrix.suite }})'
+    name: 'Run MCP Evaluation (${{ matrix.suite }}) [PR ${{ needs.check-trigger.outputs.pr-number }} @ ${{ needs.check-trigger.outputs.pr-sha }}]'
     needs: [check-trigger, candidate-build]
     if: needs.check-trigger.outputs.should-run == 'true'
     runs-on: ubuntu-latest
@@ -228,7 +228,7 @@ jobs:
         timeout-minutes: 10
         run: make -C trusted setup-netobserv
       - name: Install ArgoCD CRDs
-        if: contains(matrix.toolsets, 'argocd')
+        if: matrix.suite == 'argocd' || matrix.suite == 'all'
         timeout-minutes: 10
         run: make -C trusted argocd-install
       - name: Revalidate live candidate and review immediately before launch

@@ -133,8 +133,9 @@ async function identity(github, context, scheduled) {
     if (!/^(eval-context-|mcpchecker-results-)/.test(artifact.name)) continue;
     const match = /^(eval-context|mcpchecker-results)-(core|helm|kubevirt|kiali|tekton|netobserv|argocd|all)$/.exec(artifact.name);
     requireData(match && selected.includes(match[2]) && positive(artifact.id) && artifact.expired === false && positive(artifact.size_in_bytes) && artifact.size_in_bytes <= 70000000 && artifact.workflow_run?.id === runID && artifact.workflow_run.head_sha === run.head_sha);
-    const job = jobs.filter(entry => entry.run_attempt === run.run_attempt && entry.name.startsWith(`Run MCP Evaluation (${match[2]})`));
+    const job = jobs.filter(entry => entry.run_attempt === run.run_attempt && entry.name === `Run MCP Evaluation (${match[2]}) [PR ${prNumber} @ ${candidate}]`);
     requireData(job.length === 1 && Array.isArray(job[0].steps));
+    requireData(job[0].status === 'completed' && ['success', 'failure', 'cancelled', 'timed_out', 'action_required', 'neutral', 'stale', 'startup_failure'].includes(job[0].conclusion));
     requireData(job[0].steps.some(step => step.name === (match[1] === 'eval-context' ? 'Upload PR context' : 'Run mcpchecker evaluation') && step.conclusion === 'success'));
     const start = Date.parse(job[0].started_at), end = Date.parse(job[0].completed_at), created = Date.parse(artifact.created_at);
     requireData(Number.isFinite(start) && Number.isFinite(end) && Number.isFinite(created) && created >= start && created < end + 1000);

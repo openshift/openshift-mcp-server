@@ -45,7 +45,7 @@ const reviews=[{id:44,state:'COMMENTED',commit_id:C,body:'/run-mcpchecker '+sele
 const listPulls=()=>{}, listReviews=()=>{}, listJobs=()=>{}, listArtifacts=()=>{};
 let artifacts=[], jobs=[];
 for(const suite of selectedSuites){
- jobs.push({name:'Run MCP Evaluation ('+suite+')',run_attempt:2,started_at:'2026-10-16T01:00:00Z',completed_at:'2026-10-16T01:10:00Z',steps:[{name:'Upload PR context',conclusion:'success'},{name:'Run mcpchecker evaluation',conclusion:'success'}]});
+ jobs.push({name:'Run MCP Evaluation ('+suite+') [PR '+(scheduled?0:518)+' @ '+(scheduled?B:C)+']',status:'completed',conclusion:'success',run_attempt:2,started_at:'2026-10-16T01:00:00Z',completed_at:'2026-10-16T01:10:00Z',steps:[{name:'Upload PR context',conclusion:'success'},{name:'Run mcpchecker evaluation',conclusion:'success'}]});
  if(scenario==='missing-artifacts'||(scenario==='partial'&&suite!=='core'))continue;
  for(const prefix of ['eval-context-','mcpchecker-results-'])artifacts.push({id:artifacts.length+1,name:prefix+suite,expired:false,size_in_bytes:500,created_at:'2026-10-16T01:05:00Z',workflow_run:{id:22,head_sha:B}});
 }
@@ -58,6 +58,12 @@ if(scenario==='artifact-head')artifacts[0].workflow_run.head_sha=C;
 if(scenario==='artifact-expired')artifacts[0].expired=true;
 if(scenario==='artifact-oversize')artifacts[0].size_in_bytes=70000001;
 if(scenario==='artifact-attempt')jobs[0].run_attempt=1;
+if(scenario==='job-unbound')jobs[0].name='Run MCP Evaluation (core)';
+if(scenario==='job-other-pr')jobs[0].name=jobs[0].name.replace(/PR [0-9]+ @/,'PR 519 @');
+if(scenario==='job-other-sha')jobs[0].name=jobs[0].name.replace(scheduled?B:C,'f'.repeat(40));
+if(scenario==='job-suffix')jobs[0].name+=' untrusted';
+if(scenario==='job-incomplete')jobs[0].status='in_progress';
+if(scenario==='job-skipped')jobs[0].conclusion='skipped';
 if(scenario==='artifact-time')artifacts[0].created_at='2026-10-15T01:05:00Z';
 if(scenario==='workflow-mismatch')source.workflow_id=9;
 if(scenario==='source-repo')source.repository.full_name='other/repo';
@@ -201,6 +207,19 @@ func (suiteState *MCPCheckerArtifactsSuite) TestAllSuiteReportConsumers() {
 				suiteState.NotContains(body, unsafe)
 			}
 		})
+	}
+}
+
+func (suiteState *MCPCheckerArtifactsSuite) TestExactJobIdentityBinding() {
+	for _, mode := range []string{"report", "schedule"} {
+		for _, scenario := range []string{"job-unbound", "job-other-pr", "job-other-sha", "job-suffix", "job-incomplete", "job-skipped"} {
+			suiteState.Run(mode+"/"+scenario, func() {
+				data, err := suiteState.execute(scenario, mode, "core")
+				suiteState.Error(err, data)
+				suiteState.Empty(data["comments"])
+				suiteState.Equal(data["originals"], data["copies"])
+			})
+		}
 	}
 }
 

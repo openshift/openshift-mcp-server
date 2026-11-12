@@ -65,7 +65,7 @@ class TestPrerequisites(unittest.TestCase):
         self.addCleanup(thread.join)
         self.addCleanup(server.server_close)
         self.addCleanup(server.shutdown)
-        opener = urllib.request.urlopen
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({})).open
 
         def local_open(url, timeout):
             self.assertEqual(10, timeout)
@@ -199,7 +199,7 @@ class TestPrerequisites(unittest.TestCase):
             " os.execv(sys.executable,[sys.executable,*sys.argv])\n"
             "selected=json.loads(os.environ['FIXTURE_PLATFORM']) if os.environ.get('FIXTURE_PLATFORM') else None\n"
             "platform_context=mock.patch.multiple(platform,system=lambda:selected[0],machine=lambda:selected[1]) if selected else nullcontext()\n"
-            "original=urllib.request.build_opener()\n"
+            "original=urllib.request.build_opener(urllib.request.ProxyHandler({}))\n"
             "class LocalRelease:\n"
             " def open(self,url,timeout):\n"
             "  if not url.startswith('https://official.invalid/'): raise RuntimeError('nonfixture network forbidden')\n"

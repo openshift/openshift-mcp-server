@@ -276,6 +276,65 @@ func (suiteState *MCPCheckerWorkflowSuite) TestIndependentLiteralSuiteMap() {
 	suiteState.Error(err, text)
 }
 
+func (suiteState *MCPCheckerWorkflowSuite) TestArgoCDSetupMatchesActualHarnessTasks() {
+	data, err := os.ReadFile(workflowBuildPath(suiteState.T(), "../.github/workflows/mcpchecker.yaml"))
+	suiteState.Require().NoError(err)
+	var workflow struct {
+		Env  map[string]string
+		Jobs map[string]struct {
+			Steps []struct{ Name, Run, If string }
+		}
+	}
+	suiteState.Require().NoError(yaml.Unmarshal(data, &workflow))
+	suiteState.Regexp(`^[a-f0-9]{40}$`, workflow.Env["HARNESS_SHA"])
+	controller, err := os.ReadFile(workflowBuildPath(suiteState.T(), "mcpchecker-control.cjs"))
+	suiteState.Require().NoError(err)
+	suiteState.Require().Equal("930270a687a4718a9775069675a7ac78d478ff493cf11179a3ea0f6bd1633320", fmt.Sprintf("%x", sha256.Sum256(controller)))
+	var condition string
+	for _, step := range workflow.Jobs["run-evaluation"].Steps {
+		if step.Name == "Install ArgoCD CRDs" {
+			suiteState.Equal("make -C trusted argocd-install", step.Run)
+			condition = step.If
+		}
+	}
+	suiteState.Require().NotEmpty(condition)
+	command := exec.Command("node", "-e", `const helper=require(process.argv[1]),vm=require('node:vm');
+console.log(JSON.stringify(['core','helm','kubevirt','kiali','tekton','netobserv','argocd','all'].map(name=>{
+const matrix=helper.suiteEntry(name);
+return {...matrix,install:vm.runInNewContext(process.argv[2],{matrix,contains:(value,part)=>value.includes(part)},{timeout:1000})};
+})));`, workflowBuildPath(suiteState.T(), "mcpchecker-control.cjs"), condition)
+	output, err := command.CombinedOutput()
+	suiteState.Require().NoError(err, string(output))
+	var entries []struct {
+		Suite      string
+		EvalConfig string `json:"eval-config"`
+		Install    bool
+	}
+	suiteState.Require().NoError(json.Unmarshal(output, &entries))
+	suiteState.Require().Len(entries, 8)
+	for _, entry := range entries {
+		suiteState.Run(entry.Suite, func() {
+			expected := entry.Suite == "argocd" || entry.Suite == "all"
+			suiteState.Equal(expected, entry.Install)
+			configuration, err := os.ReadFile(workflowBuildPath(suiteState.T(), "../"+entry.EvalConfig))
+			suiteState.Require().NoError(err)
+			var evaluation struct {
+				Config struct {
+					TaskSets []struct {
+						LabelSelector map[string]string `yaml:"labelSelector"`
+					} `yaml:"taskSets"`
+				}
+			}
+			suiteState.Require().NoError(yaml.Unmarshal(configuration, &evaluation))
+			selected := false
+			for _, tasks := range evaluation.Config.TaskSets {
+				selected = selected || tasks.LabelSelector["suite"] == "argocd"
+			}
+			suiteState.Equal(expected, selected)
+		})
+	}
+}
+
 func (suiteState *MCPCheckerWorkflowSuite) TestMulticlusterRemainsOperatorOnly() {
 	_, output, err := suiteState.runControl("control", "multicluster-review")
 	suiteState.Error(err, output)
@@ -702,6 +761,7 @@ func (suiteState *MCPCheckerWorkflowSuite) TestWorkflowTrustStructureAndLiteralH
 	evaluation := workflow.Jobs["run-evaluation"]
 	suiteState.Equal("mcpchecker-reviewed", evaluation.Environment["name"])
 	suiteState.Contains(evaluation.Name, "Run MCP Evaluation (")
+	suiteState.Equal("Run MCP Evaluation (${{ matrix.suite }}) [PR ${{ needs.check-trigger.outputs.pr-number }} @ ${{ needs.check-trigger.outputs.pr-sha }}]", evaluation.Name)
 	allowed := map[string]bool{"actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1": true, "actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e": true, "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9": true, "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333": true, "actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3": true, "./trusted/.github/actions/mcpchecker-action": true, "./trusted/.github/actions/mcpchecker-diff-action": true}
 	for jobName, job := range workflow.Jobs {
 		for _, step := range job.Steps {
