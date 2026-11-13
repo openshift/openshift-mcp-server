@@ -1,0 +1,19 @@
+kind: Task
+metadata:
+  name: get-service-endpoints-offline
+  labels:
+    suite: netedge
+steps:
+  verify:
+    contains: "10.128.0.5"
+  prompt:
+    inline: Use mustgather_list to find the archive at evals/testdata/must-gather. Pass its archive_id to get_service_endpoints for openshift-ingress/router-default and report the backend pod addresses and node names from that archive.
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "mustgather_list"
+      - server: kubernetes
+        toolPattern: "get_service_endpoints"
+        args:
+          namespace: "openshift-ingress"
+          service: "router-default"

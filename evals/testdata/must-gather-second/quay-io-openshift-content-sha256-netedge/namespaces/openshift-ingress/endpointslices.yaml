@@ -1,0 +1,14 @@
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: router-default-second
+  namespace: openshift-ingress
+  labels:
+    kubernetes.io/service-name: router-default
+endpoints:
+  - addresses:
+      - "10.129.0.9"
+    nodeName: "node-second"
+ports:
+  - name: https
+    port: 443

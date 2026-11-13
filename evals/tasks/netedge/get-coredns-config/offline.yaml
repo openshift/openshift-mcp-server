@@ -1,0 +1,16 @@
+kind: Task
+metadata:
+  name: get-coredns-config-offline
+  labels:
+    suite: netedge
+steps:
+  verify:
+    contains: "prometheus :9153"
+  prompt:
+    inline: Use mustgather_list to find the archive at evals/testdata/must-gather. Pass its archive_id to get_coredns_config and report the CoreDNS forward and metrics settings from that archive.
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "mustgather_list"
+      - server: kubernetes
+        toolPattern: "get_coredns_config"
