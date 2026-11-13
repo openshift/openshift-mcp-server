@@ -309,7 +309,9 @@ clean() {
     $KUBECTL delete -k "${MANIFESTS}/loki/extras" --ignore-not-found || true
   fi
   $KUBECTL delete -f "${MANIFESTS}/prometheus/rbac.yaml" --ignore-not-found || true
-  $KUBECTL delete namespace tracing obs-loki --ignore-not-found || true
+  $KUBECTL delete namespace tracing obs-loki observability-loki --ignore-not-found || true
+  # Pre-rename RBAC names (obs-loki rename); ignore if already gone.
+  $KUBECTL delete clusterrolebinding,clusterrole observability-lokistack-tenant-reader --ignore-not-found || true
   restore_user_workload_monitoring
 }
 

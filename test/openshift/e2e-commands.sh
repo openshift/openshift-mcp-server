@@ -20,10 +20,8 @@ export MCP_SERVER_IMAGE="${IMAGE_OPENSHIFT_MCP_SERVER}"
 make e2e-ci-setup
 make e2e-ci-test
 
-# Observability e2e: install Tempo/Loki (+ platform monitoring already present),
-# run shared TestObs* (Kind-compatible names + header auth via PROMETHEUS_K8S_TOKEN),
-# keep observability_e2e for OpenShift-only Route discovery until that moves upstream,
-# always tear stacks down (ephemeral CI cluster).
+# Observability: install Tempo/Loki for shared TestObs*, run TestObs*, then
+# OpenShift-only Route discovery / CMO metric checks. Always tear stacks down.
 cleanup_observability_e2e() {
     echo "==> Cleaning up observability e2e stacks"
     make clean-observability-e2e || true
@@ -32,19 +30,14 @@ trap cleanup_observability_e2e EXIT
 
 # Install stacks individually so a missing operator (e.g. loki-operator not in
 # the OCP catalog) or a partial rollout does not block the entire job.
-# Propagate setup failures via SKIP_OBS_* so requireTempoStacks()/requireLokiStack()
-# skip explicitly (existence alone is not enough for a half-installed stack).
 if ! ./hack/e2e/observability/setup-openshift.sh tempo; then
-    echo "WARNING: Tempo setup failed; Tempo tests will be skipped"
+    echo "WARNING: Tempo setup failed; Tempo TestObs* cases will be skipped"
     export SKIP_OBS_TEMPO=1
 fi
 if ! ./hack/e2e/observability/setup-openshift.sh loki; then
-    echo "WARNING: Loki setup failed; Loki tests will be skipped"
+    echo "WARNING: Loki setup failed; Loki TestObs* cases will be skipped"
     export SKIP_OBS_LOKI=1
 fi
 
-# Shared TestObs* suites (requires upstream OBS_PROMETHEUS_URL / OBS_ALERTMANAGER_URL helpers).
 make e2e-ci-test-obs
-
-# OpenShift-only Route discovery / in-process suite (until fully superseded by TestObs*).
-make test-observability-e2e
+make test-observability-e2e-routes
