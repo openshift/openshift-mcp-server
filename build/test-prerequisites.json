@@ -1,0 +1,23 @@
+{
+  "node": {
+    "version": "24.22.0",
+    "url": "https://nodejs.org/dist/v24.22.0/node-v24.22.0-linux-x64.tar.xz",
+    "sha256": "cc2f601cee82d9a5a233302fe307abc600727035fd7d2c3a3571755989e95008",
+    "member": "node-v24.22.0-linux-x64/bin/node",
+    "binary_sha256": "67ca5783febb8bf85736c79fcdd92c8d6d465a0eb2a082672bcdfa76a506751c"
+  },
+  "jq": {
+    "version": "1.7.1",
+    "url": "https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64",
+    "sha256": "5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5",
+    "member": null,
+    "binary_sha256": "5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5"
+  },
+  "shellcheck": {
+    "version": "0.10.0",
+    "url": "https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz",
+    "sha256": "6c881ab0698e4e6ea235245f22832860544f17ba386442fe7e9d629f8cbedf87",
+    "member": "shellcheck-v0.10.0/shellcheck",
+    "binary_sha256": "f35ae15a4677945428bdfe61ccc297490d89dd1e544cc06317102637638c6deb"
+  }
+}

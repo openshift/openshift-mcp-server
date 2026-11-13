@@ -268,7 +268,7 @@ Toolset Maintainers are given the privilege of being able to merge PRs within th
 
 This role describes people who review and give feedback and direction across the project as a whole.
 
-It is worth noting that anyone can review PRs without being a Core Reviwer. The Core Reviewer role is meant to denote people who are a 
+It is worth noting that anyone can review PRs without being a Core Reviwer. The Core Reviewer role is meant to denote people who are a
 technical authority in the area and who are willing to be pinged to provide reviews within that area.
 
 #### Requirements

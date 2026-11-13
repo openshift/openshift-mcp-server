@@ -1,0 +1,195 @@
+# Vendored from mcpchecker/mcpchecker v0.0.21 (commit 92e4e860817f00e1d48640b756762ccf3ad39532).
+# Local helpers use verified v0.0.22 binaries from the trusted action source.
+name: 'Run mcpchecker MCP Evaluation'
+description: 'Evaluate MCP servers using the mcpchecker framework'
+author: 'mcpchecker'
+
+inputs:
+  eval-config:
+    description: 'Path to eval.yaml configuration file'
+    required: true
+
+  mcpchecker-version:
+    description: 'Verified version (v0.0.22 only)'
+    required: false
+    default: 'v0.0.22'
+
+  task-filter:
+    description: 'Regular expression to filter tasks (passed to -run flag)'
+    required: false
+    default: ''
+
+  label-selector:
+    description: 'Label selector to filter tasks (e.g., "env=prod,tier=backend")'
+    required: false
+    default: ''
+
+  output-format:
+    description: 'Output format: text or json'
+    required: false
+    default: 'json'
+
+  verbose:
+    description: 'Enable verbose output'
+    required: false
+    default: 'false'
+
+  upload-artifacts:
+    description: 'Upload results as GitHub artifacts'
+    required: false
+    default: 'true'
+
+  artifact-name:
+    description: 'Name for uploaded artifacts'
+    required: false
+    default: 'mcpchecker-results'
+
+  fail-on-error:
+    description: 'Fail the workflow if evaluation fails'
+    required: false
+    default: 'true'
+
+  task-pass-threshold:
+    description: 'Minimum fraction of tasks that must pass verification (0.0 to 1.0). Default 1.0 means all tasks must pass.'
+    required: false
+    default: '1.0'
+
+  assertion-pass-threshold:
+    description: 'Minimum fraction of tasks that must pass assertions (0.0 to 1.0). Default 1.0 means all tasks must pass assertions.'
+    required: false
+    default: '1.0'
+
+  working-directory:
+    description: 'Working directory for running evaluations'
+    required: false
+    default: '.'
+
+  parallel:
+    description: 'Number of parallel workers for tasks marked as parallel (1 = sequential)'
+    required: false
+    default: '1'
+
+  expected-results-file:
+    description: 'Optional exact safe results basename'
+    required: false
+    default: ''
+
+outputs:
+  results-file:
+    description: 'Path to the JSON results file'
+    value: ${{ steps.run-eval.outputs.results-file }}
+
+  passed:
+    description: 'Whether evaluations met the thresholds (true/false)'
+    value: ${{ steps.run-eval.outputs.passed }}
+
+  task-pass-rate:
+    description: 'Fraction of tasks that passed verification (0.0 to 1.0)'
+    value: ${{ steps.run-eval.outputs.task-pass-rate }}
+
+  assertion-pass-rate:
+    description: 'Fraction of tasks that passed assertions (0.0 to 1.0)'
+    value: ${{ steps.run-eval.outputs.assertion-pass-rate }}
+
+  tasks-passed:
+    description: 'Number of tasks that passed verification'
+    value: ${{ steps.run-eval.outputs.tasks-passed }}
+
+  tasks-total:
+    description: 'Total number of tasks run'
+    value: ${{ steps.run-eval.outputs.tasks-total }}
+
+  assertions-passed:
+    description: 'Number of tasks that passed assertions'
+    value: ${{ steps.run-eval.outputs.assertions-passed }}
+
+  assertions-total:
+    description: 'Total number of tasks with assertions evaluated'
+    value: ${{ steps.run-eval.outputs.assertions-total }}
+
+  mcpchecker-path:
+    description: 'Path to the installed mcpchecker binary'
+    value: ${{ steps.setup.outputs.mcpchecker-path }}
+
+  agent-path:
+    description: 'Path to the installed agent binary'
+    value: ${{ steps.setup.outputs.agent-path }}
+
+  mcpchecker-version:
+    description: 'The version of mcpchecker that was installed'
+    value: ${{ steps.setup.outputs.version }}
+
+  version:
+    description: 'Verified checker and agent version'
+    value: ${{ steps.setup.outputs.version }}
+  check-exit:
+    description: 'Explicit runner status'
+    value: ${{ steps.run-eval.outputs.check-exit }}
+  summary-exit:
+    description: 'Explicit runner status'
+    value: ${{ steps.run-eval.outputs.summary-exit }}
+  verify-exit:
+    description: 'Explicit runner status'
+    value: ${{ steps.run-eval.outputs.verify-exit }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup verified mcpchecker and agent
+      id: setup
+      shell: bash
+      env:
+        MCPCHECKER_VERSION: ${{ inputs.mcpchecker-version }}
+        MODEL_BASE_URL: ''
+        MODEL_KEY: ''
+        JUDGE_BASE_URL: ''
+        JUDGE_API_KEY: ''
+        JUDGE_MODEL_NAME: ''
+        OPENAI_API_KEY: ''
+        ANTHROPIC_API_KEY: ''
+        GOOGLE_API_KEY: ''
+        GEMINI_API_KEY: ''
+        AZURE_OPENAI_API_KEY: ''
+      run: bash "$GITHUB_ACTION_PATH/../../../build/setup-mcpchecker-action.sh"
+    - name: Run trusted helper
+      id: run-eval
+      shell: bash
+      env:
+        MCPCHECKER: ${{ steps.setup.outputs.mcpchecker-path }}
+        AGENT: ${{ steps.setup.outputs.agent-path }}
+        MCPCHECKER_VERSION: ${{ steps.setup.outputs.version }}
+        WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        EVAL_CONFIG: ${{ inputs.eval-config }}
+        TASK_FILTER: ${{ inputs.task-filter }}
+        LABEL_SELECTOR: ${{ inputs.label-selector }}
+        OUTPUT_FORMAT: ${{ inputs.output-format }}
+        VERBOSE: ${{ inputs.verbose }}
+        UPLOAD_ARTIFACTS: ${{ inputs.upload-artifacts }}
+        FAIL_ON_ERROR: ${{ inputs.fail-on-error }}
+        TASK_THRESHOLD: ${{ inputs.task-pass-threshold }}
+        ASSERTION_THRESHOLD: ${{ inputs.assertion-pass-threshold }}
+        PARALLEL: ${{ inputs.parallel }}
+        EXPECTED_RESULTS_FILE: ${{ inputs.expected-results-file }}
+      run: bash "$GITHUB_ACTION_PATH/../../../build/run-mcpchecker-action.sh"
+    - name: Upload sanitized fresh artifacts
+      if: always() && inputs.upload-artifacts == 'true' && steps.run-eval.outputs.artifact-paths != ''
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      env:
+        MODEL_BASE_URL: ''
+        MODEL_KEY: ''
+        JUDGE_BASE_URL: ''
+        JUDGE_API_KEY: ''
+        JUDGE_MODEL_NAME: ''
+        OPENAI_API_KEY: ''
+        ANTHROPIC_API_KEY: ''
+        GOOGLE_API_KEY: ''
+        GEMINI_API_KEY: ''
+        AZURE_OPENAI_API_KEY: ''
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ steps.run-eval.outputs.artifact-paths }}
+        if-no-files-found: error
+
+branding:
+  icon: 'check-circle'
+  color: 'green'
