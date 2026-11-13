@@ -81,11 +81,11 @@ func (s *StacksOpenShiftE2ESuite) requireLokiStack() {
 	if !crdExists(s.T(), "lokistacks.loki.grafana.com") {
 		s.T().Skip("LokiStack CRD not installed; run make setup-observability-e2e")
 	}
-	if !namedResourceExists(s.T(), lokiStackGVR, "observability-loki", "observability-loki") {
-		s.T().Skip("LokiStack observability-loki/observability-loki not found; run make setup-observability-e2e")
+	if !namedResourceExists(s.T(), lokiStackGVR, "obs-loki", "obs-loki") {
+		s.T().Skip("LokiStack obs-loki/obs-loki not found; run make setup-observability-e2e")
 	}
-	if !namedResourceReady(s.T(), lokiStackGVR, "observability-loki", "observability-loki") {
-		s.T().Skip("LokiStack observability-loki/observability-loki exists but is not Ready; skipping (partial install)")
+	if !namedResourceReady(s.T(), lokiStackGVR, "obs-loki", "obs-loki") {
+		s.T().Skip("LokiStack obs-loki/obs-loki exists but is not Ready; skipping (partial install)")
 	}
 }
 
@@ -131,8 +131,8 @@ func (s *StacksOpenShiftE2ESuite) TestLokiListInstances_RouteURLs() {
 
 func lokiBaseArgs() map[string]any {
 	return map[string]any{
-		"lokiNamespace": "observability-loki",
-		"lokiName":      "observability-loki",
+		"lokiNamespace": "obs-loki",
+		"lokiName":      "obs-loki",
 		"tenant":        "network",
 	}
 }
@@ -185,7 +185,7 @@ func (s *StacksOpenShiftE2ESuite) TestLokiLabelValues() {
 
 	structured := structuredMap(s.T(), toolResult.StructuredContent)
 	values := anyStrings(structured["values"].([]any))
-	s.Contains(values, "observability-log-generator")
+	s.Contains(values, "obs-log-generator")
 }
 
 func (s *StacksOpenShiftE2ESuite) TestLokiQueryRange() {
@@ -193,7 +193,7 @@ func (s *StacksOpenShiftE2ESuite) TestLokiQueryRange() {
 	_, client := startServerFromTOML(s.T(), s.useRouteTOML("observability/logs"))
 
 	toolResult := callUntilReady(s.T(), client, "loki_query_range", mergeArgs(lokiBaseArgs(), map[string]any{
-		"query":    `{app="observability-log-generator"} |= "observability-loki-hack"`,
+		"query":    `{app="obs-log-generator"} |= "obs-loki-hack"`,
 		"duration": "15m",
 		"limit":    5,
 	}), func(r *mcpsdk.CallToolResult) bool {
@@ -211,12 +211,12 @@ func (s *StacksOpenShiftE2ESuite) TestLokiQueryRange() {
 	stream := streams[0].(map[string]any)
 	labels, ok := stream["labels"].(map[string]any)
 	s.Require().True(ok)
-	s.Equal("observability-log-generator", labels["app"])
+	s.Equal("obs-log-generator", labels["app"])
 
 	entries, ok := stream["entries"].([]any)
 	s.Require().True(ok && len(entries) > 0)
 	line, _ := entries[0].(map[string]any)["line"].(string)
-	s.Contains(line, "observability-loki-hack")
+	s.Contains(line, "obs-loki-hack")
 }
 
 func (s *StacksOpenShiftE2ESuite) TestTempoSearchTraces_Multitenant() {

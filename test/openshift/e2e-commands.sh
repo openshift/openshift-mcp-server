@@ -21,7 +21,9 @@ make e2e-ci-setup
 make e2e-ci-test
 
 # Observability e2e: install Tempo/Loki (+ platform monitoring already present),
-# run the full suite, always tear stacks down (ephemeral CI cluster).
+# run shared TestObs* (Kind-compatible names + header auth via PROMETHEUS_K8S_TOKEN),
+# keep observability_e2e for OpenShift-only Route discovery until that moves upstream,
+# always tear stacks down (ephemeral CI cluster).
 cleanup_observability_e2e() {
     echo "==> Cleaning up observability e2e stacks"
     make clean-observability-e2e || true
@@ -41,4 +43,8 @@ if ! ./hack/e2e/observability/setup-openshift.sh loki; then
     export SKIP_OBS_LOKI=1
 fi
 
+# Shared TestObs* suites (requires upstream OBS_PROMETHEUS_URL / OBS_ALERTMANAGER_URL helpers).
+make e2e-ci-test-obs
+
+# OpenShift-only Route discovery / in-process suite (until fully superseded by TestObs*).
 make test-observability-e2e

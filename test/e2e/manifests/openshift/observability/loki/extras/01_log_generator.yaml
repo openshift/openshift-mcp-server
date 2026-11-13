@@ -1,12 +1,14 @@
 # Generates synthetic log entries and pushes them to the LokiStack gateway
 # every few seconds. Uses a projected ServiceAccount token for authentication
 # and the OpenShift service CA for TLS verification.
+#
+# Resource and label names match Kind TestObs* (obs-loki / obs-log-generator).
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: observability-log-generator
-  namespace: observability-loki
+  name: obs-log-generator
+  namespace: obs-loki
 ---
 # The OPA sidecar on the LokiStack gateway authorises push requests using
 # SubjectAccessReviews.  For the "network" tenant mapped via
@@ -16,7 +18,7 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: observability-loki-log-generator
+  name: obs-loki-log-generator
 rules:
   # Allow the generator to "write" to the network tenant.
   - apiGroups: ["loki.grafana.com"]
@@ -27,32 +29,32 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: observability-loki-log-generator
+  name: obs-loki-log-generator
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: observability-loki-log-generator
+  name: obs-loki-log-generator
 subjects:
   - kind: ServiceAccount
-    name: observability-log-generator
-    namespace: observability-loki
+    name: obs-log-generator
+    namespace: obs-loki
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: observability-log-generator
-  namespace: observability-loki
+  name: obs-log-generator
+  namespace: obs-loki
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: observability-log-generator
+      app: obs-log-generator
   template:
     metadata:
       labels:
-        app: observability-log-generator
+        app: obs-log-generator
     spec:
-      serviceAccountName: observability-log-generator
+      serviceAccountName: obs-log-generator
       containers:
         - name: logger
           image: registry.access.redhat.com/ubi9/ubi-minimal:latest
@@ -70,7 +72,7 @@ spec:
             - name: TENANT_ID
               value: network
             - name: LOKI_PUSH_URL
-              value: "https://observability-loki-gateway-http.observability-loki.svc:8080/api/logs/v1/network/loki/api/v1/push"
+              value: "https://obs-loki-gateway-http.obs-loki.svc:8080/api/logs/v1/network/loki/api/v1/push"
             - name: PUSH_INTERVAL
               value: "5"
             - name: BATCH_SIZE
@@ -85,7 +87,7 @@ spec:
                 for j in $(seq 1 "${BATCH_SIZE}"); do
                   ts_s=$(date +%s)
                   ts_ns="${ts_s}000000000"
-                  msg="observability-loki-hack tenant=${TENANT_ID} seq=${seq_num}"
+                  msg="obs-loki-hack tenant=${TENANT_ID} seq=${seq_num}"
                   if [ -n "${values}" ]; then
                     values="${values},"
                   fi
@@ -94,7 +96,7 @@ spec:
                   sleep 1
                 done
 
-                payload="{\"streams\":[{\"stream\":{\"app\":\"observability-log-generator\",\"level\":\"info\",\"SrcK8S_Namespace\":\"observability-loki\",\"DstK8S_Namespace\":\"observability-loki\"},\"values\":[${values}]}]}"
+                payload="{\"streams\":[{\"stream\":{\"app\":\"obs-log-generator\",\"level\":\"info\",\"SrcK8S_Namespace\":\"obs-loki\",\"DstK8S_Namespace\":\"obs-loki\"},\"values\":[${values}]}]}"
 
                 token=$(cat /var/run/secrets/tokens/loki-token)
                 http_code=$(curl -s --connect-timeout 10 --max-time 30 -o /tmp/push_resp -w '%{http_code}' \

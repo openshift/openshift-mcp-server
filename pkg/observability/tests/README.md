@@ -63,4 +63,5 @@ then `make test-observability-e2e`, and tears stacks down on exit.
 
 Make targets: `build/openshift/observability.mk`.  
 Manifests: `test/e2e/manifests/openshift/observability/{tempo,loki,prometheus}/` (flat OpenShift-only layouts).  
+LokiStack / log-generator names match Kind `TestObs*` (`obs-loki`, `obs-log-generator`).  
 Setup: `hack/e2e/observability/setup-openshift.sh`.

@@ -26,7 +26,7 @@ func TestObsLogsTools(t *testing.T) {
 				withConfig(obsLogsConfig()),
 				withValues(obsLogsRBACValues()),
 			)
-			mcpClient := test.NewMcpClient(t, nil, test.WithEndpoint(dep.serverURL+"/mcp"))
+			mcpClient := test.NewMcpClient(t, nil, obsMcpClientOptions(dep.serverURL+"/mcp")...)
 			t.Cleanup(mcpClient.Close)
 			return obsLogsTS.set(ctx, &obsLogsState{dep: dep, mcpClient: mcpClient})
 		}).

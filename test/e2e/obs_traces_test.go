@@ -27,7 +27,7 @@ func TestObsTracesTools(t *testing.T) {
 				withConfig(obsTracesConfig()),
 				withValues(obsTracesRBACValues()),
 			)
-			mcpClient := test.NewMcpClient(t, nil, test.WithEndpoint(dep.serverURL+"/mcp"))
+			mcpClient := test.NewMcpClient(t, nil, obsMcpClientOptions(dep.serverURL+"/mcp")...)
 			t.Cleanup(mcpClient.Close)
 			return obsTracesTS.set(ctx, &obsTracesState{dep: dep, mcpClient: mcpClient})
 		}).
