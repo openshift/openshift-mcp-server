@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": { "build": "node build.mjs", "check": "node build.mjs --check" },
   "dependencies": {
-    "@patternfly/react-core": "6.6.1",
+    "@patternfly/react-core": "6.7.0",
     "@patternfly/react-table": "6.6.1",
     "@rhds/tokens": "3.2.0",
     "react": "19.3.1",
