@@ -35,8 +35,8 @@ func obsAlertmanagerURL() string {
 }
 
 // obsMcpClientOptions returns MCP client options for obs e2e.
-// When PROMETHEUS_K8S_TOKEN is set (OpenShift), forward it as Authorization so
-// metrics toolset auth_mode=header (Kind default) can reach monitoring backends.
+// When PROMETHEUS_K8S_TOKEN is set (e.g. OpenShift CI), forward it as Authorization
+// so metrics toolset auth_mode=header (default) can reach monitoring backends.
 func obsMcpClientOptions(endpoint string) []test.McpClientOption {
 	opts := []test.McpClientOption{test.WithEndpoint(endpoint)}
 	if token := strings.TrimSpace(os.Getenv("PROMETHEUS_K8S_TOKEN")); token != "" {
