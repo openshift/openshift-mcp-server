@@ -10,5 +10,5 @@
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },
-  "devDependencies": { "esbuild": "0.25.12" }
+  "devDependencies": { "esbuild": "0.28.2" }
 }
