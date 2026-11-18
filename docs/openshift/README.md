@@ -4,14 +4,19 @@ This directory contains OpenShift-specific documentation for the OpenShift MCP S
 
 ## Available Guides
 
-| Guide                           | Description                                                                                           |
-|---------------------------------|-------------------------------------------------------------------------------------------------------|
-| **[ACM Support](acm.md)** | Support for ACM and notes on its environment |
-| **[NetEdge Toolset](NETEDGE.md)** | Guide for the Network Ingress & DNS troubleshooting tools |
-| **[ACM Setup](acm_setup.md)**   | Setting up Advanced Cluster Management (ACM) and using the MCP Server with multi-cluster environments |
+| Guide | Description |
+|---|---|
+| **[User Guide](user-guide.md)** | End-to-end user guide covering architecture, downstream toolsets, and security guardrails |
+| **[OpenShift Core & Prompts](../OPENSHIFT.md)** | Project management tools and `plan_mustgather` diagnostic prompt |
+| **[OpenShift Service Mesh (OSSM)](../OSSM.md)** | Service mesh management and diagnostics tools backed by Kiali |
+| **[NetEdge Toolset](NETEDGE.md)** | Network Ingress & CoreDNS troubleshooting tools |
+| **[NetEdge Validation How-To](NETEDGE-validation-how-to.md)** | Step-by-step validation guide for the NetEdge toolset |
+| **[OVN-Kubernetes Toolset](ovn-kubernetes.md)** | OVN-Kubernetes CNI network troubleshooting tools (use with [CNI Diagnostics](cni-diagnostics.md)) |
+| **[CNI Diagnostics Toolset](cni-diagnostics.md)** | Container Network Interface (CNI) diagnostics and troubleshooting |
+| **[OADP Toolset](../OADP.md)** | OpenShift API for Data Protection backup and restore tools |
+| **[ACM Support](acm.md)** | Support for Red Hat Advanced Cluster Management (ACM) multi-cluster environments |
+| **[ACM Setup](acm_setup.md)** | Setting up ACM and using the MCP Server across managed clusters |
 | **[ACM with Keycloak Setup](acm_keycloak_setup.md)** | Setting up ACM with Keycloak-based OIDC authentication for secure multi-cluster access |
-| **[OVN-Kubernetes Toolset](ovn-kubernetes.md)** | Guide for OVN-Kubernetes CNI network troubleshooting tools (use with [CNI Diagnostics](cni-diagnostics.md) for a complete toolkit) |
-| **[CNI Diagnostics Toolset](cni-diagnostics.md)** | Tools for Container Network Interface (CNI) diagnostics and troubleshooting (enable with [OVN-Kubernetes](ovn-kubernetes.md) when troubleshooting OVN-Kubernetes) |
 
 ## Overview
 
