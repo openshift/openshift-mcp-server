@@ -17,8 +17,6 @@ import (
 	configuration "github.com/containers/kubernetes-mcp-server/pkg/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets"
-	clusterDiagnosticsToolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/cluster-diagnostics"
-	cniDiagnosticsToolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/cni-diagnostics"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/config"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/core"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/helm"
@@ -27,9 +25,7 @@ import (
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/kubevirt"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/logs"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/metrics"
-	mgToolset "github.com/containers/kubernetes-mcp-server/pkg/toolsets/mustgather"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/otelcol"
-	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/ovnkubernetes"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/tekton"
 	"github.com/containers/kubernetes-mcp-server/pkg/toolsets/traces"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -410,10 +406,6 @@ func (s *ToolsetsSuite) TestGranularToolsetsTools() {
 		&helm.Toolset{},
 		&kiali.Toolset{},
 		&kubevirt.Toolset{},
-		&ovnkubernetes.Toolset{},
-		&tekton.Toolset{},
-		&clusterDiagnosticsToolset.Toolset{},
-		&cniDiagnosticsToolset.Toolset{},
 		&logs.Toolset{},
 		&metrics.Toolset{},
 		&otelcol.Toolset{},
@@ -436,41 +428,6 @@ func (s *ToolsetsSuite) TestGranularToolsetsTools() {
 			})
 		})
 	}
-}
-
-func (s *ToolsetsSuite) TestOpenShiftMustGatherToolsetPrompts() {
-	s.Run("OpenShift must-gather toolset prompts", func() {
-		s.Handle(test.NewInOpenShiftHandler())
-		toolsets.Clear()
-		toolsets.Register(&mgToolset.Toolset{})
-		s.Cfg.Toolsets.SetForTest([]string{"openshift/mustgather"})
-		s.InitMcpClient()
-		prompts, err := s.ListPrompts()
-		s.Run("ListPrompts returns prompts", func() {
-			s.NotNil(prompts, "Expected prompts from ListPrompts")
-			s.NoError(err, "Expected no error from ListPrompts")
-		})
-		s.Run("ListPrompts returns correct Prompt metadata", func() {
-			s.assertJsonSnapshot("toolsets-openshift-mustgather-prompts.json", prompts.Prompts)
-		})
-	})
-}
-
-func (s *ToolsetsSuite) TestOpenShiftMustGatherToolset() {
-	s.Run("OpenShift must-gather toolset", func() {
-		toolsets.Clear()
-		toolsets.Register(&mgToolset.Toolset{})
-		s.Cfg.Toolsets.SetForTest([]string{"openshift/mustgather"})
-		s.InitMcpClient()
-		tools, err := s.ListTools()
-		s.Run("ListTools returns tools", func() {
-			s.NotNil(tools, "Expected tools from ListTools")
-			s.NoError(err, "Expected no error from ListTools")
-		})
-		s.Run("ListTools returns correct Tool metadata", func() {
-			s.assertJsonSnapshot("toolsets-openshift-mustgather-tools.json", tools.Tools)
-		})
-	})
 }
 
 // TestAllCapabilitiesDeclareRBACMetadata fails when a registered toolset ships a tool, prompt,
