@@ -405,10 +405,9 @@ Kiali, NetObserv, Loki, and Tempo apply it when they read the body.
 An exact fit is allowed.
 The next byte closes the body and returns an error, so client-go does not decode the rest.
 A list over that cap is the same error, with no partial page.
-`resources_list`, `pods_list`, `pods_list_in_namespace`, `pods_top`, `nodes_top`, `namespaces_list`, `projects_list`, `events_list`, and `get_service_endpoints` take `limit` and `continue`.
+`resources_list`, `pods_list`, `pods_list_in_namespace`, `pods_top`, `nodes_top`, `namespaces_list`, `projects_list`, and `events_list` take `limit` and `continue`.
 Omit `limit` to list everything.
 Set it, and send the `continue` token from the previous page with the same selectors, to retrieve the next Kubernetes list page.
-`oadp-troubleshoot` takes the same arguments: `continue` pages its Warning events, and `limit` pages every Kubernetes list in that prompt.
 `helm_list` takes `limit` and `offset`.
 Helm applies those after it has loaded the release secrets, so a secret list that exceeds this cap still fails.
 NetObserv flow export is the exception: it keeps the bytes already read and appends a truncation notice.
@@ -444,6 +443,7 @@ max_in_flight = 64
 |-------|------|---------|-------------|
 | `kubeconfig` 🔒 | string | `""` | Path to the Kubernetes configuration file. A non-empty path selects the kubeconfig provider (including from a pod). If empty, client-go uses in-cluster config or `$KUBECONFIG` / `~/.kube/config`. `$KUBECONFIG` is not a server option. |
 | `cluster_provider_strategy` | string | auto-detect | How the server finds clusters. Valid values: `kubeconfig`, `in-cluster`, `kcp`, `disabled`. Optional when `kubeconfig` is set. Use this to pin `in-cluster`, `kcp`, `disabled`, or a custom/downstream provider. |
+| `ca_refresh_interval` | duration | `"24h"` | How often a CA fetched via the `caURL` kubeconfig cluster extension is re-fetched so a rotated cluster CA is picked up without a restart. Use `0s` to disable automatic re-fetching; the CA is then only refreshed when a manager is rebuilt or via an on-demand SIGHUP re-fetch. |
 
 **Example:**
 ```toml
@@ -576,6 +576,35 @@ If the server starts but operations fail (e.g., `failed to list namespaces: unkn
 3. **Permissions** — The credentials in the kubeconfig must have sufficient RBAC permissions on the target cluster.
 4. **TLS certificates** — If the external cluster uses a private CA, the CA certificate must be included in the kubeconfig or mounted separately.
 
+#### CA served over HTTPS
+
+When a cluster's API-server CA is served over HTTPS (e.g. an endpoint mirroring the cluster CA for cross-cluster consumers), a kubeconfig cluster entry can point at that URL instead of embedding the CA:
+
+```yaml
+apiVersion: v1
+clusters:
+- name: production
+  cluster:
+    server: https://kubernetes.default.svc
+    extensions:
+    - name: kubernetes-mcp-server
+      extension:
+        caURL: https://ca.production.example.com/
+```
+
+At manager creation the server fetches the CA from `caURL`, caches it to a file and points the Kubernetes client at that file. Because the client reloads CA files it is pointed at, a rotated CA (e.g. after the cluster is re-provisioned) is picked up without a restart; `ca_refresh_interval` controls how often the cache is re-fetched (default `24h`, `0s` disables). Other tools ignore the extension entirely.
+
+Notes:
+
+- The URL must be `https`. A trust root fetched over cleartext could be swapped by a network attacker, who could then impersonate the cluster the CA is meant to authenticate. Redirects are followed only to other `https` URLs, and the chain is capped.
+- The endpoint serving `caURL` must present a certificate the MCP process **already trusts** — system roots or `SSL_CERT_FILE` — **not** the cluster CA being fetched. This is a different trust domain from “the URL must be https”: a private-CA-signed endpoint fails at manager creation. Point `caURL` at something trusted by the process, or add its certificate to the process trust store.
+- The response must be a PEM CA certificate; other content fails fast with a clear error.
+- client-go re-checks the cached file roughly every 5 minutes (the `ClientsAllowCARotation` feature, beta and enabled by default in client-go 1.36+), so a rotation converges once the refresher writes the new CA; setting `ca_refresh_interval` below that cadence does not speed it up. With that feature disabled (e.g. `KUBE_FEATURE_ClientsAllowCARotation=false`), the client no longer re-reads the file, so a changed CA is only picked up when a manager is rebuilt.
+- Sending SIGHUP to reload configuration also triggers an immediate CA re-fetch, so a rotated CA can be picked up without waiting out `ca_refresh_interval` or restarting.
+- The cache directory (a subdirectory of the system temp dir, which honors `$TMPDIR`) must be writable. With a read-only root filesystem, mount an emptyDir at `/tmp` or set `$TMPDIR` to writable storage. The cache directory is per user (its name includes the user's uid on unix), so different users on one host do not collide.
+- The initial fetch happens at manager creation; if it fails (unreachable endpoint, non-PEM response), manager creation fails rather than silently using an empty trust store. For the default context that is startup; lazily-created contexts (other targets) surface the error on first use.
+- Applies to every cluster provider strategy backed by a kubeconfig (`kubeconfig` and `kcp`).
+
 ### Cluster Authorization
 
 Kubernetes RBAC on the identity this server authenticates as is the access control to rely on for Kubernetes API calls. That identity is either the client's bearer token or a server credential such as a kubeconfig user or an in-cluster ServiceAccount. Scope a server credential with a Role or ClusterRole, as described in the [Kubernetes setup guide](getting-started-kubernetes.md). That boundary still holds when a tool annotation is wrong or the same credentials are used outside this process. [Tool RBAC metadata](tool-rbac-metadata.md) tells a client which permissions a tool may need so it can prepare that RBAC. The metadata does not grant access.
@@ -588,7 +617,7 @@ Non-Kubernetes backends enforce their own checks on the credential this server p
 - **Request denial.** `denied_resources` rejects matching group/version/kind calls on the Kubernetes client and omits those kinds from discovery. A match is by kind and API version. Verb, namespace, and name are ignored. An empty `kind` matches every kind in that group and version. Calls made with another HTTP client — Kiali, NetObserv, Prometheus, Loki, Tempo, and Helm registry fetches — do not consult this list.
 - **Prompts and pre-checks.** `confirmation_rules` prompt at tool invocation and on the Kubernetes client path. If the client cannot elicit a confirmation, the call proceeds unless `confirmation_fallback` is `"deny"` (the default is `"allow"`). With `validation_enabled`, the server sends a `SelfSubjectAccessReview` before the Kubernetes call. The API server still authorizes the real request. Schema validation from that flag checks the manifest.
 
-`experimental_enable_target_compatibility_tool_filters` hides tools whose required APIs are absent. See [Target compatibility](#target-compatibility). That filter reflects which APIs the cluster advertises.
+`enable_target_compatibility_tool_filters` (on by default) hides tools whose required APIs are absent. See [Target compatibility](#target-compatibility). That filter reflects which APIs the cluster advertises.
 
 OAuth settings (`require_oauth`, `authorization_url`, `skip_jwt_verification`, and the rest of [OAuth and Authorization](#oauth-and-authorization)), `cluster_auth_mode`, and TLS settings configure how clients authenticate to this server and which identity is sent to the cluster. Those settings stand apart from the guardrails in this section. With `cluster_auth_mode = "passthrough"` (the default when a bearer token is present), the API server authorizes that token, after token exchange when configured. With `cluster_auth_mode = "kubeconfig"`, or when no token is present and passthrough falls back, the API server authorizes the kubeconfig or in-cluster ServiceAccount identity.
 
@@ -624,27 +653,28 @@ Best-effort guardrail. It does not change the cluster permissions of the identit
 
 <!-- AVAILABLE-TOOLSETS-START -->
 
-| Toolset                 | Description                                                                                                                                                                                                                                                                                                                                                         | Default |
-|-------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| cluster-diagnostics     | Tools for cluster diagnostics and troubleshooting                                                                                                                                                                                                                                                                                                                   |         |
-| cni-diagnostics         | Tools for Container Network Interface (CNI) diagnostics and troubleshooting                                                                                                                                                                                                                                                                                         |         |
-| config                  | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                                                                                                                                                                                                             | ✓       |
-| core                    | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                                                                                                                                                                                                                 | ✓       |
-| helm                    | Tools for managing Helm charts and releases                                                                                                                                                                                                                                                                                                                         |         |
-| kcp                     | Manage kcp workspaces and multi-tenancy features                                                                                                                                                                                                                                                                                                                    |         |
-| kubevirt                | OpenShift Virtualization tools for managing virtual machines, check the [OpenShift Virtualization documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/kubevirt.md) for more details.                                                                                                                                                    |         |
-| netedge                 | NetEdge troubleshooting tools for OpenShift                                                                                                                                                                                                                                                                                                                         |         |
-| netobserv               | Network observability tools backed by the NetObserv console plugin API (flows, metrics, export). Check the [NetObserv documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/NETOBSERV.md) for more details.                                                                                                                             |         |
-| oadp                    | OADP (OpenShift API for Data Protection) tools for managing Velero backups, restores, and schedules                                                                                                                                                                                                                                                                 |         |
-| observability/incidents | List the current firing incidents in the cluster. One incident is a group of related alerts that are likely triggered by the same root cause. Use this tool to analyze the cluster health status and determine why a component is failing or degraded. Analyze the alerts within each incident to identify affected components and understand the reported problem. |         |
-| observability/logs      | Toolset for querying Loki logs                                                                                                                                                                                                                                                                                                                                      |         |
-| observability/metrics   | Toolset for querying Prometheus and Alertmanager endpoints in efficient ways.                                                                                                                                                                                                                                                                                       |         |
-| observability/otelcol   | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                                                                                                                                                                                                          |         |
-| observability/traces    | Distributed tracing tools for discovering Tempo instances, searching and retrieving traces, and exploring trace attributes.                                                                                                                                                                                                                                         |         |
-| openshift/mustgather    | Analyze OpenShift must-gather archives offline without a live cluster connection. Call mustgather_list first to discover available archives and their archive_id, then pass that ID to the other mustgather_* tools.                                                                                                                                                |         |
-| ossm                    | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/ossm.md) for more details.                                                                                                                                                                                                     |         |
-| ovn-kubernetes          | OVN-Kubernetes CNI network troubleshooting tools                                                                                                                                                                                                                                                                                                                    |         |
-| tekton                  | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, TaskRuns, and troubleshooting.                                                                                                                                                                                                                                                                 |         |
+| Toolset                        | Description                                                                                                                                                                                                                                                                                                                                                         | Default |
+|--------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| cluster-diagnostics            | Tools for cluster diagnostics and troubleshooting                                                                                                                                                                                                                                                                                                                   |         |
+| cni-diagnostics                | Tools for Container Network Interface (CNI) diagnostics and troubleshooting                                                                                                                                                                                                                                                                                         |         |
+| config                         | View and manage the current local Kubernetes configuration (kubeconfig)                                                                                                                                                                                                                                                                                             | ✓       |
+| core                           | Most common tools for Kubernetes management (Pods, Generic Resources, Events, etc.)                                                                                                                                                                                                                                                                                 | ✓       |
+| helm                           | Tools for managing Helm charts and releases                                                                                                                                                                                                                                                                                                                         |         |
+| kcp                            | Manage kcp workspaces and multi-tenancy features                                                                                                                                                                                                                                                                                                                    |         |
+| kubevirt                       | OpenShift Virtualization tools for managing virtual machines, check the [OpenShift Virtualization documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/kubevirt.md) for more details.                                                                                                                                                    |         |
+| netedge                        | NetEdge troubleshooting tools for OpenShift                                                                                                                                                                                                                                                                                                                         |         |
+| netobserv                      | Network observability tools backed by the NetObserv console plugin API (flows, metrics, export). Check the [NetObserv documentation](https://github.com/containers/kubernetes-mcp-server/blob/main/docs/NETOBSERV.md) for more details.                                                                                                                             |         |
+| oadp                           | OADP (OpenShift API for Data Protection) tools for managing Velero backups, restores, and schedules                                                                                                                                                                                                                                                                 |         |
+| observability/alert-management | Toolset for listing OpenShift alerts and managing alert rules via the monitoring-plugin management API.                                                                                                                                                                                                                                                             |         |
+| observability/incidents        | List the current firing incidents in the cluster. One incident is a group of related alerts that are likely triggered by the same root cause. Use this tool to analyze the cluster health status and determine why a component is failing or degraded. Analyze the alerts within each incident to identify affected components and understand the reported problem. |         |
+| observability/logs             | Toolset for querying Loki logs                                                                                                                                                                                                                                                                                                                                      |         |
+| observability/metrics          | Toolset for querying Prometheus and Alertmanager, including listing, creating, updating, and deleting silences.                                                                                                                                                                                                                                                     |         |
+| observability/otelcol          | Toolset for OpenTelemetry Collector configuration assistance including schema validation, component documentation, and version management.                                                                                                                                                                                                                          |         |
+| observability/traces           | Distributed tracing tools for discovering Tempo instances, searching and retrieving traces, and exploring trace attributes.                                                                                                                                                                                                                                         |         |
+| openshift/mustgather           | Analyze OpenShift must-gather archives offline without a live cluster connection. Call mustgather_list first to discover available archives and their archive_id, then pass that ID to the other mustgather_* tools.                                                                                                                                                |         |
+| ossm                           | Most common tools for managing OSSM, check the [OSSM documentation](https://github.com/openshift/openshift-mcp-server/blob/main/docs/ossm.md) for more details.                                                                                                                                                                                                     |         |
+| ovn-kubernetes                 | OVN-Kubernetes CNI network troubleshooting tools                                                                                                                                                                                                                                                                                                                    |         |
+| tekton                         | Tekton pipeline management tools for Pipelines, PipelineRuns, Tasks, TaskRuns, and troubleshooting.                                                                                                                                                                                                                                                                 |         |
 
 <!-- AVAILABLE-TOOLSETS-END -->
 
@@ -709,12 +739,14 @@ Hides tools that require API groups the target cluster does not advertise. This 
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `experimental_enable_target_compatibility_tool_filters` | boolean | `false` | When `true`, tools that require API groups absent from the cluster are hidden (for example OpenShift-only `projects_list`, or `pods_top` / `nodes_top` when the Metrics Server API is unavailable). **NOTE:** This feature is experimental, and this option is subject to change or removal in a future release. |
+| `enable_target_compatibility_tool_filters` | boolean | `true` | When `true`, tools that require API groups absent from the cluster are hidden (for example OpenShift-only `projects_list`, or `pods_top` / `nodes_top` when the Metrics Server API is unavailable). Set to `false` to turn this check off, so no tool is hidden for a missing API group (other settings such as `read_only` can still hide tools). |
+
+The old name `experimental_enable_target_compatibility_tool_filters` is deprecated and still read, with a warning in the log. See [Configuration Changes](configuration-changes.md#target-compatibility-filters-on-by-default).
 
 **Example:**
 ```toml
-# Probe every target for API-group compatibility
-experimental_enable_target_compatibility_tool_filters = true
+# Do not hide tools based on which API groups the target cluster(s) support
+enable_target_compatibility_tool_filters = false
 ```
 
 ### Tool Overrides
@@ -1060,6 +1092,8 @@ message = "Accessing a Secret."
 
 Some toolsets accept additional configuration via the `toolset_configs` map.
 
+For the opt-in alert management toolset, see [Alert management](alert-management.md).
+
 | Field | Type | Description |
 |-------|------|-------------|
 | `toolset_configs` | map | Toolset-specific configuration sections. |
@@ -1076,14 +1110,6 @@ token = "your-kiali-token"
 [toolset_configs.helm]
 allowed_registries = ["oci://ghcr.io/myorg", "https://charts.example.com"]
 storage_driver = "configmap"
-```
-
-**Example (OpenShift Must-Gather):**
-```toml
-[toolset_configs."openshift/mustgather"]
-mustgather_dirs = ["/var/data/must-gather", "/home/user/downloads/must-gather.local.123"]
-tail_limit = 1000
-max_output_size = 1048576
 ```
 
 #### Helm Configuration
@@ -1104,17 +1130,8 @@ The Helm toolset supports an optional `allowed_registries` allowlist to restrict
 
 **Accepted risk:** bare filesystem paths (e.g. `/absolute/path`, `./relative/path`) are not blocked when no allowlist is configured, because they are indistinguishable from Helm repository references at the string level. When the server runs in a container, the blast radius is limited to the container filesystem. To fully restrict chart sources, configure `allowed_registries`.
 
-#### OpenShift Must-Gather Configuration
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `mustgather_dirs` | string array | Directories the `openshift/mustgather` toolset scans for must-gather archives. Each entry may be a directory containing must-gather archives as sub-directories, or a directory that is itself an archive. Archives are addressed by the stable `archive_id` returned by `mustgather_list`. |
-| `tail_limit` | integer | Maximum number of lines the pod-log tools keep when a caller requests tailing (the `tail` parameter). A larger `tail` is capped to this value, bounding the allocation for the tail buffer. Defaults to `1000` when unset. |
-| `max_output_size` | integer | Maximum aggregate size, in bytes, of log output returned by a single pod-log tool call. Output beyond this is truncated. Defaults to `1048576` (1 MiB) when unset. |
-
 Refer to individual toolset documentation for available options:
 - [Kiali Configuration](KIALI.md)
-- [Metrics](observability/metrics.md), [Logs](observability/logs.md), [Tracing](observability/tracing.md), [OpenTelemetry Collector](observability/otelcol.md)
 
 ### Cluster Provider Configuration
 
@@ -1243,16 +1260,6 @@ traces_sampler_arg = 0.1
 # Toolset-specific configuration
 [toolset_configs.kiali]
 url = "https://kiali.example.com"
-
-# Observability toolsets — see docs/observability/{metrics,logs,tracing,otelcol}.md
-# [toolset_configs."observability/metrics"]
-# [toolset_configs."observability/logs"]
-# [toolset_configs."observability/traces"]
-# [toolset_configs."observability/otelcol"]
-
-# OpenShift must-gather toolset — directories scanned for must-gather archives
-# [toolset_configs."openshift/mustgather"]
-# mustgather_dirs = ["/var/data/must-gather"]
 
 [toolset_configs.helm]
 allowed_registries = ["oci://ghcr.io/myorg", "https://charts.example.com"]

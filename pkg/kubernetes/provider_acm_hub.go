@@ -397,6 +397,28 @@ func (p *acmHubClusterProvider) PublishKubernetesConfig(cfg *config.Config) {
 	}
 }
 
+// RefreshCAs re-fetches the CA of every held manager (the hub and all
+// managed clusters) now, so a rotated cluster CA is picked up on SIGHUP
+// config reload without waiting out ca_refresh_interval. The snapshot
+// keeps the fetch (bounded by caFetchMaxDuration) outside the lock so a
+// watch-triggered reset running meanwhile is not blocked on the network.
+func (p *acmHubClusterProvider) RefreshCAs() {
+	p.mu.RLock()
+	managers := make([]*Manager, 0, len(p.clusterManagers)+1)
+	if p.hubManager != nil {
+		managers = append(managers, p.hubManager)
+	}
+	for _, m := range p.clusterManagers {
+		if m != nil {
+			managers = append(managers, m)
+		}
+	}
+	p.mu.RUnlock()
+	for _, m := range managers {
+		m.RefreshCAs()
+	}
+}
+
 func (p *acmHubClusterProvider) Close() {
 	// Cancel the watch goroutine first
 	if p.watchCancel != nil {
