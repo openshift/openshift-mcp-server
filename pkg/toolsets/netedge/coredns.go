@@ -47,9 +47,24 @@ func getCoreDNSConfig(params api.ToolHandlerParams) (*api.ToolCallResult, error)
 		Resource: "configmaps",
 	}
 
-	cm, err := params.DynamicClient().Resource(gvr).Namespace("openshift-dns").Get(params.Context, "dns-default", metav1.GetOptions{})
+	var cm *unstructured.Unstructured
+	var err error
+
+	p, offline, err := selectedArchive(params)
 	if err != nil {
-		return api.NewToolCallResult("", fmt.Errorf("failed to get dns-default ConfigMap: %w", err)), nil
+		return api.NewToolCallResult("", err), nil
+	}
+	if offline {
+		gvk := schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ConfigMap"}
+		cm = p.GetResource(gvk, "dns-default", "openshift-dns")
+		if cm == nil {
+			return api.NewToolCallResult("", fmt.Errorf("ConfigMap openshift-dns/dns-default not found in must-gather archive")), nil
+		}
+	} else {
+		cm, err = params.DynamicClient().Resource(gvr).Namespace("openshift-dns").Get(params.Context, "dns-default", metav1.GetOptions{})
+		if err != nil {
+			return api.NewToolCallResult("", fmt.Errorf("failed to get dns-default ConfigMap: %w", err)), nil
+		}
 	}
 
 	data, found, err := unstructured.NestedStringMap(cm.Object, "data")

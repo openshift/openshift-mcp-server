@@ -1,0 +1,19 @@
+kind: Task
+metadata:
+  name: inspect-route-offline
+  labels:
+    suite: netedge
+steps:
+  verify:
+    contains: "console-openshift-console.apps.example.com"
+  prompt:
+    inline: Use mustgather_list to find the archive at evals/testdata/must-gather. Pass its archive_id to inspect_route for openshift-console/console, then report the host, TLS termination, and backend service from that archive.
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "mustgather_list"
+      - server: kubernetes
+        toolPattern: "inspect_route"
+        args:
+          namespace: "openshift-console"
+          route: "console"

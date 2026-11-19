@@ -1,0 +1,3 @@
+# Archives used by the NetEdge offline evaluation tasks.
+[toolset_configs."openshift/mustgather"]
+mustgather_dirs = ["evals/testdata/must-gather", "evals/testdata/must-gather-second"]

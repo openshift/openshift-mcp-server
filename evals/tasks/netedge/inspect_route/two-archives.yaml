@@ -1,0 +1,19 @@
+kind: Task
+metadata:
+  name: inspect-route-two-archives
+  labels:
+    suite: netedge
+steps:
+  verify:
+    contains: "console-second.apps.example.com"
+  prompt:
+    inline: Use mustgather_list to find the separate archives at evals/testdata/must-gather and evals/testdata/must-gather-second. Call inspect_route for openshift-console/console once with each archive_id. Report both hosts and their respective archive paths. Do not use the live cluster.
+  assertions:
+    toolsUsed:
+      - server: kubernetes
+        toolPattern: "mustgather_list"
+      - server: kubernetes
+        toolPattern: "inspect_route"
+        args:
+          namespace: "openshift-console"
+          route: "console"
