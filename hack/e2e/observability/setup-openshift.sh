@@ -285,14 +285,14 @@ patches:
       apiVersion: loki.grafana.com/v1
       kind: LokiStack
       metadata:
-        name: observability-loki
-        namespace: observability-loki
+        name: obs-loki
+        namespace: obs-loki
       spec:
         storageClassName: "${loki_sc}"
 EOF
   $KUBECTL apply -k "${overlay}"
-  _wait_rollout observability-loki deployment/minio 5m
-  $KUBECTL -n observability-loki wait --for=condition=Ready lokistack/observability-loki --timeout=15m
+  _wait_rollout obs-loki deployment/minio 5m
+  $KUBECTL -n obs-loki wait --for=condition=Ready lokistack/obs-loki --timeout=15m
 }
 
 install_prometheus_rbac() {
@@ -309,7 +309,9 @@ clean() {
     $KUBECTL delete -k "${MANIFESTS}/loki/extras" --ignore-not-found || true
   fi
   $KUBECTL delete -f "${MANIFESTS}/prometheus/rbac.yaml" --ignore-not-found || true
-  $KUBECTL delete namespace tracing observability-loki --ignore-not-found || true
+  $KUBECTL delete namespace tracing obs-loki observability-loki --ignore-not-found || true
+  # Pre-rename RBAC names (obs-loki rename); ignore if already gone.
+  $KUBECTL delete clusterrolebinding,clusterrole observability-lokistack-tenant-reader --ignore-not-found || true
   restore_user_workload_monitoring
 }
 
