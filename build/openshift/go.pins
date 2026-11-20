@@ -1,0 +1,18 @@
+# Downstream dependency pins, reapplied after taking upstream's go.mod
+# during upstream sync (see the RECONCILE rule for go.mod in
+# hack/upstream-sync.rules and the reconcile-go-mod target).
+# Update this file in the same PR that intentionally moves a dependency.
+
+# Downstream-only direct dependencies (never present upstream).
+github.com/miekg/dns@v1.1.73
+github.com/openshift/cluster-health-analyzer@v1.2.2
+github.com/ovn-kubernetes/ovn-kubernetes-mcp@v0.1.0
+
+# Kubernetes library set the downstream build is adapted to.
+k8s.io/api@v0.37.2
+k8s.io/apimachinery@v0.37.2
+k8s.io/cli-runtime@v0.37.2
+k8s.io/client-go@v0.37.2
+k8s.io/streaming@v0.37.2
+k8s.io/utils@v0.0.0-20261023123148-ca04ba58ecab
+knative.dev/pkg@v0.0.0-20260727151759-521cb33b33dd

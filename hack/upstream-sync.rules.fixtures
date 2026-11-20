@@ -5,7 +5,7 @@
 # they document the matching semantics the rules file is expected to have.
 
 go.sum|GENERATED
-go.mod|STAGE
+go.mod|RECONCILE
 vendor/modules.txt|GENERATED
 vendor/k8s.io/apimachinery/pkg/util/runtime/runtime.go|GENERATED
 pkg/mcp/testdata/toolsets-core-tools.json|GENERATED

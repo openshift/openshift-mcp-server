@@ -19,6 +19,7 @@ RULE_KIND=()
 RULE_REGEX=()
 RULE_TEXT=()
 RULE_SOURCE=()
+RULE_TARGET=()
 
 # Shared validation, configuration, and process lifecycle helpers.
 fail() {
@@ -128,14 +129,16 @@ cleanup() {
 	if [[ -n "${TMP_DIR:-}" ]]; then rm -rf "$TMP_DIR"; fi
 }
 
-# Plaintext rules: parsing, matching, and generated-conflict resolution.
+# Plaintext rules: parsing, matching, and conflict resolution.
 #
 # Rules are KIND|regex lines in one shared dialect: Bash extended regular
-# expressions anchored to the complete repository-relative path. Kinds are
-# tags with distinct semantics; consumers select the kinds they care about
-# through rule_matches. Adding a kind means registering it below and adding
-# a consumer for it; the parser itself does not change.
-KNOWN_RULE_KINDS=(GENERATED STAGE)
+# expressions anchored to the complete repository-relative path. RECONCILE
+# rules carry a third field naming the make target that reconstructs
+# downstream state after the upstream side is taken. Kinds are tags with
+# distinct semantics; consumers select the kinds they care about through
+# rule_matches. Adding a kind means registering it below and adding a
+# consumer for it; the parser itself does not change.
+KNOWN_RULE_KINDS=(GENERATED STAGE RECONCILE)
 
 rule_kind_is_known() {
 	local kind
@@ -149,11 +152,12 @@ rule_kind_is_known() {
 
 load_rules() {
 	local file=${1:-$RULES_FILE}
-	local line kind pattern regex line_number=0
+	local line kind pattern target regex line_number=0
 	RULE_KIND=()
 	RULE_REGEX=()
 	RULE_TEXT=()
 	RULE_SOURCE=()
+	RULE_TARGET=()
 	[[ -r "$file" ]] || fail "rules file is missing: $file"
 	while IFS= read -r line || [[ -n "$line" ]]; do
 		line_number=$((line_number + 1))
@@ -162,9 +166,22 @@ load_rules() {
 		[[ "$line" == *'|'* ]] || fail "missing rule separator on rules line $line_number"
 		kind=${line%%|*}
 		pattern=${line#*|}
+		# An optional second separator introduces the rule's make target.
+		if [[ "$pattern" == *'|'* ]]; then
+			target=${pattern#*|}
+			pattern=${pattern%%|*}
+		else
+			target=""
+		fi
 		rule_kind_is_known "$kind" || fail "unknown rule kind '$kind' on rules line $line_number"
 		[[ -n "$pattern" ]] || fail "empty pattern on rules line $line_number"
 		[[ "$pattern" == ^* && "$pattern" == *'$' ]] || fail "regex must start with ^ and end with \$ on rules line $line_number"
+		if [[ "$kind" == RECONCILE ]]; then
+			[[ -n "$target" ]] || fail "RECONCILE rules require a make target on rules line $line_number"
+			[[ "$target" =~ ^[a-z0-9][a-z0-9-]*$ ]] || fail "invalid make target '$target' on rules line $line_number"
+		else
+			[[ -z "$target" ]] || fail "$kind rules must not carry a make target on rules line $line_number"
+		fi
 		# Group the rule so alternatives cannot bypass whole-path matching.
 		regex="^($pattern)$"
 		if [[ "" =~ $regex ]]; then
@@ -176,13 +193,15 @@ load_rules() {
 		RULE_REGEX+=("$regex")
 		RULE_TEXT+=("$pattern")
 		RULE_SOURCE+=("$file:$line_number")
+		RULE_TARGET+=("$target")
 	done < "$file"
 }
 
 # rule_matches <path> <kind> [<kind> ...]
 # Succeeds when the whole repository-relative path matches a rule of any of
 # the given kinds. Kinds compose at the call site: conflict resolution uses
-# GENERATED alone, while staging uses GENERATED plus STAGE.
+# GENERATED plus RECONCILE, while staging uses GENERATED, STAGE, and
+# RECONCILE.
 rule_matches() {
 	local path=$1 kind i
 	valid_relative_path "$path" || return 1
@@ -202,9 +221,24 @@ all_conflicts_regenerable() {
 	local path
 	[[ ${#CONFLICT_PATHS[@]} -gt 0 ]] || return 1
 	for path in "${CONFLICT_PATHS[@]}"; do
-		if ! rule_matches "$path" GENERATED; then return 1; fi
+		if ! rule_matches "$path" GENERATED RECONCILE; then return 1; fi
 	done
 	return 0
+}
+
+# Space-separated conflicted paths that no GENERATED or RECONCILE rule
+# covers. Only meaningful once all_conflicts_regenerable has failed; the
+# failure note prints it so maintainers can see exactly what stopped the
+# sync instead of re-deriving the list from the merge.
+unresolvable_conflict_list() {
+	local path
+	local -a unresolvable=()
+	for path in "${CONFLICT_PATHS[@]}"; do
+		if ! rule_matches "$path" GENERATED RECONCILE; then
+			unresolvable+=("$path")
+		fi
+	done
+	( IFS=' '; printf '%s' "${unresolvable[*]}" )
 }
 
 load_unmerged_paths() {
@@ -237,8 +271,9 @@ conflict_markers_remain() {
 
 # Stage the paths the generators are allowed to produce or rewrite: rules of
 # kind GENERATED (machine-written outputs) plus STAGE (declared side effects
-# on hand-maintained inputs such as go.mod). Changes outside those rules stay
-# unstaged so the caller's verification steps fail closed.
+# on hand-maintained inputs) and RECONCILE (hand-maintained inputs the
+# reconcile targets rewrite). Changes outside those rules stay unstaged so
+# the caller's verification steps fail closed.
 stage_generated() {
 	local path
 	local -a stage_paths=()
@@ -248,17 +283,17 @@ stage_generated() {
 	git -C "$WORKTREE" diff --name-only -z HEAD > "$TMP_DIR/changed.paths" || return 1
 	git -C "$WORKTREE" ls-files --others --exclude-standard -z > "$TMP_DIR/untracked.paths" || return 1
 	for path in "${CONFLICT_PATHS[@]}"; do
-		if rule_matches "$path" GENERATED STAGE; then
+		if rule_matches "$path" GENERATED STAGE RECONCILE; then
 			stage_paths+=("$path")
 		fi
 	done
 	while IFS= read -r -d '' path; do
-		if rule_matches "$path" GENERATED STAGE; then
+		if rule_matches "$path" GENERATED STAGE RECONCILE; then
 			stage_paths+=("$path")
 		fi
 	done < "$TMP_DIR/changed.paths"
 	while IFS= read -r -d '' path; do
-		if rule_matches "$path" GENERATED STAGE; then
+		if rule_matches "$path" GENERATED STAGE RECONCILE; then
 			stage_paths+=("$path")
 		fi
 	done < "$TMP_DIR/untracked.paths"
@@ -267,6 +302,40 @@ stage_generated() {
 		return 0
 	fi
 	git -C "$WORKTREE" add -- "${stage_paths[@]}"
+}
+
+# Resolve conflicts in RECONCILE paths: take the upstream side of each
+# conflicted path, then run every distinct matched rule's make target so
+# downstream state (for example, the pinned dependency versions in go.mod)
+# is reconstructed on top of the upstream baseline. Targets run only when a
+# conflicted path matched, once each and in rule order, after every
+# conflicted path has been staged. A failing target fails the sync.
+reconcile_conflicts() {
+	local path i target existing scheduled
+	local -a targets=()
+	for path in "${CONFLICT_PATHS[@]}"; do
+		if rule_matches "$path" RECONCILE; then
+			git -C "$WORKTREE" checkout --theirs -- "$path" || return 1
+			git -C "$WORKTREE" add -- "$path" || return 1
+		fi
+	done
+	for i in "${!RULE_KIND[@]}"; do
+		[[ "${RULE_KIND[i]}" == RECONCILE ]] || continue
+		target=${RULE_TARGET[i]}
+		scheduled=0
+		for existing in "${targets[@]}"; do
+			[[ "$existing" == "$target" ]] && scheduled=1
+		done
+		[[ "$scheduled" == 1 ]] && continue
+		for path in "${CONFLICT_PATHS[@]}"; do
+			[[ "$path" =~ ${RULE_REGEX[i]} ]] || continue
+			targets+=("$target")
+			break
+		done
+	done
+	for target in "${targets[@]}"; do
+		make -C "$WORKTREE" "$target" || return 1
+	done
 }
 
 # Git remotes, pinned refs, plan data, and mergeability operations.
@@ -413,12 +482,20 @@ merge_in_worktree() {
 			return 2
 		fi
 		if ! all_conflicts_regenerable; then
-			INTEGRATION_NOTE="Merge conflicts include paths without regeneration rules."
+			INTEGRATION_NOTE="Merge conflicts include paths without regeneration rules: $(unresolvable_conflict_list)"
 			git -C "$WORKTREE" merge --abort >/dev/null 2>&1 || true
 			remove_worktree
 			return 2
 		fi
 		has_conflicts=1
+	fi
+	# Reconcile hand-maintained inputs (upstream side plus make targets)
+	# before the generators run, so generator steps such as tidy see a
+	# complete module set instead of conflict markers.
+	if ! reconcile_conflicts; then
+		INTEGRATION_NOTE="A reconcile make target failed; the isolated candidate was discarded."
+		remove_worktree
+		return 2
 	fi
 	# Let the generators replace conflicted outputs before staging any resolution.
 	if ! run_generators; then
@@ -536,16 +613,24 @@ clean_pr_body() {
 
 # Rules introspection for maintainers and CI.
 summarize_rules() {
-	local kind i count
+	local kind i count target scheduled_targets
 	printf 'upstream-sync rules: %d rule(s) in %s\n' "${#RULE_KIND[@]}" "$RULES_FILE"
 	for kind in "${KNOWN_RULE_KINDS[@]}"; do
 		count=0
+		scheduled_targets=""
 		for i in "${!RULE_KIND[@]}"; do
 			if [[ "${RULE_KIND[i]}" == "$kind" ]]; then
 				count=$((count + 1))
+				if [[ "$kind" == RECONCILE && "$scheduled_targets" != *" ${RULE_TARGET[i]} "* ]]; then
+					scheduled_targets+=" ${RULE_TARGET[i]}"
+				fi
 			fi
 		done
-		printf '  %-10s %d\n' "$kind" "$count"
+		if [[ -n "$scheduled_targets" ]]; then
+			printf '  %-10s %d  make target(s):%s\n' "$kind" "$count" "$scheduled_targets"
+		else
+			printf '  %-10s %d\n' "$kind" "$count"
+		fi
 	done
 }
 
@@ -560,7 +645,11 @@ explain_paths() {
 		matches=0
 		for i in "${!RULE_KIND[@]}"; do
 			if [[ "$path" =~ ${RULE_REGEX[i]} ]]; then
-				printf '  %-10s %s  %s\n' "${RULE_KIND[i]}" "${RULE_SOURCE[i]}" "${RULE_TEXT[i]}"
+				if [[ "${RULE_KIND[i]}" == RECONCILE ]]; then
+					printf '  %-10s %s  %s  target: %s\n' "${RULE_KIND[i]}" "${RULE_SOURCE[i]}" "${RULE_TEXT[i]}" "${RULE_TARGET[i]}"
+				else
+					printf '  %-10s %s  %s\n' "${RULE_KIND[i]}" "${RULE_SOURCE[i]}" "${RULE_TEXT[i]}"
+				fi
 				matches=1
 			fi
 		done

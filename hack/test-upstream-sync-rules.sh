@@ -80,16 +80,26 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 done < "$FIXTURES_FILE"
 
 # Malformed rules files must be rejected, not silently ignored.
-rejection_tmp=$(mktemp)
-trap 'rm -f "$rejection_tmp"' EXIT
+rules_tmp=$(mktemp)
+trap 'rm -f "$rules_tmp"' EXIT
 
 expect_rejection() {
 	local label=$1 content=$2
-	printf '%s\n' "$content" > "$rejection_tmp"
-	if ( load_rules "$rejection_tmp" ) >/dev/null 2>&1; then
+	printf '%s\n' "$content" > "$rules_tmp"
+	if ( load_rules "$rules_tmp" ) >/dev/null 2>&1; then
 		note_failure "parser accepted $label"
 	else
 		pass=$((pass + 1))
+	fi
+}
+
+expect_acceptance() {
+	local label=$1 content=$2
+	printf '%s\n' "$content" > "$rules_tmp"
+	if ( load_rules "$rules_tmp" ) >/dev/null 2>&1; then
+		pass=$((pass + 1))
+	else
+		note_failure "parser rejected $label"
 	fi
 }
 
@@ -98,6 +108,39 @@ expect_rejection "an empty pattern" $'GENERATED|'
 expect_rejection "an unanchored pattern" $'GENERATED|go\\.sum'
 expect_rejection "a missing separator" $'GENERATED ^go\\.sum$'
 expect_rejection "an invalid regex" $'GENERATED|^[unclosed$'
+
+# RECONCILE rules carry a required make target as their third field.
+expect_acceptance "a RECONCILE rule with a target" $'RECONCILE|^go\\.mod$|reconcile-go-mod'
+expect_rejection "a RECONCILE rule without a target" $'RECONCILE|^go\\.mod$'
+expect_rejection "a RECONCILE rule with an invalid target" $'RECONCILE|^go\\.mod$|Not A Target'
+expect_rejection "a third field on a GENERATED rule" $'GENERATED|^go\\.sum$|reconcile-go-mod'
+expect_rejection "a third field on a STAGE rule" $'STAGE|^go\\.sum$|reconcile-go-mod'
+
+# The target must be recorded for reconcile_conflicts to run it, and
+# non-RECONCILE rules must record an empty target.
+printf '%s\n' 'RECONCILE|^go\.mod$|reconcile-go-mod' > "$rules_tmp"
+load_rules "$rules_tmp"
+if [[ "${RULE_TARGET[0]}" == "reconcile-go-mod" ]]; then
+	pass=$((pass + 1))
+else
+	note_failure "RECONCILE make target was not recorded"
+fi
+printf '%s\n' 'GENERATED|^go\.sum$' > "$rules_tmp"
+load_rules "$rules_tmp"
+if [[ "${RULE_TARGET[0]}" == "" ]]; then
+	pass=$((pass + 1))
+else
+	note_failure "GENERATED rule recorded an unexpected make target"
+fi
+
+# explain output must surface RECONCILE rules together with their targets.
+load_rules
+explain_output=$(explain_paths go.mod)
+if [[ "$explain_output" == *"RECONCILE"* && "$explain_output" == *"target: reconcile-go-mod"* ]]; then
+	pass=$((pass + 1))
+else
+	note_failure "explain go.mod does not show the rule and its target"
+fi
 
 printf '%s: %d passed, %d failed\n' "${0##*/}" "$pass" "$failed"
 (( failed == 0 ))
