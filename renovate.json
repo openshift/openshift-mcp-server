@@ -23,9 +23,9 @@
       "recreateWhen": "auto"
     },
     {
-      "description": "npm deps in test/browser/basic-host are managed upstream by dependabot and arrive via sync",
+      "description": "npm deps in test/browser are managed upstream by dependabot and arrive via sync",
       "matchManagers": ["npm"],
-      "matchFileNames": ["test/browser/basic-host/**"],
+      "matchFileNames": ["test/browser/**"],
       "enabled": false
     }
   ],
