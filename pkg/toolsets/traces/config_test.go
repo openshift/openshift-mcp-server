@@ -54,3 +54,14 @@ func TestValidateInstallsResolver(t *testing.T) {
 	_, ok := cfg.Resolver.(*openshift.RouteClient)
 	require.True(t, ok)
 }
+
+func TestRejectInsecureTLS(t *testing.T) {
+	cfg := &Config{Insecure: true, UseRoute: true}
+	require.ErrorContains(t, cfg.Validate(), "insecure=true is no longer supported")
+	require.Nil(t, cfg.Resolver)
+	_, err := serverconfig.ReadToml(t.Context(), []byte(`
+[toolset_configs."observability/traces"]
+insecure = true
+`), serverconfig.WithBaseDefault())
+	require.ErrorContains(t, err, "insecure=true is no longer supported")
+}
