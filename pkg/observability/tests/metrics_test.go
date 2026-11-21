@@ -3,7 +3,6 @@
 package observability
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
@@ -17,14 +16,14 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-// MetricsE2ESuite tests observability/metrics against a live OpenShift cluster.
+// MetricsE2ESuite hosts OpenShift-only metrics checks that TestObs* does not cover
+// (Route-backed URLs + CMO metric). Shared tool smoke tests live in test/e2e TestObs*.
 type MetricsE2ESuite struct {
 	suite.Suite
 	*test.McpClient
 	server          *mcpserver.Server
 	prometheusURL   string
 	alertmanagerURL string
-	testMetric      string
 }
 
 func (s *MetricsE2ESuite) SetupSuite() {
@@ -48,69 +47,6 @@ func (s *MetricsE2ESuite) SetupSuite() {
 	}
 	s.T().Logf("Prometheus URL: %s", s.prometheusURL)
 	s.T().Logf("Alertmanager URL: %s", s.alertmanagerURL)
-
-	// Discover a real metric from the cluster for use in query tests.
-	// This also warms up the Thanos Querier label cache so that
-	// ValidateMetricsExist (which lists all metric names) succeeds
-	// reliably in subsequent per-test calls.
-	s.testMetric = s.discoverTestMetric()
-	s.Require().NotEmpty(s.testMetric, "could not discover any metric from Prometheus")
-	s.T().Logf("Test metric: %s", s.testMetric)
-}
-
-// discoverTestMetric lists CPU metrics and returns the first with a nonempty
-// instant-query vector. Also pre-warms the Thanos label cache.
-func (s *MetricsE2ESuite) discoverTestMetric() string {
-	cfg := s.buildConfig()
-
-	provider, err := internalk8s.NewProvider(s.T().Context(), cfg)
-	if err != nil {
-		s.T().Logf("Could not create provider for metric discovery: %v", err)
-		return ""
-	}
-
-	server, err := mcpserver.NewServer(s.T().Context(), mcpserver.Configuration{Config: cfg}, provider)
-	if err != nil {
-		s.T().Logf("Could not create server for metric discovery: %v", err)
-		return ""
-	}
-	defer server.Close()
-
-	client := test.NewMcpClient(s.T(), server.ServeHTTP(), mcpAuthOptions()...)
-	defer client.Close()
-
-	result, err := client.CallTool("list_metrics", map[string]any{"name_regex": ".*cpu.*"})
-	if err != nil || result.IsError {
-		s.T().Logf("list_metrics failed during discovery: err=%v isError=%v body=%s",
-			err, result != nil && result.IsError, textContent(result))
-		return ""
-	}
-
-	var output listMetricsOutput
-	if err := json.Unmarshal([]byte(textContent(result)), &output); err != nil || len(output.Metrics) == 0 {
-		return ""
-	}
-
-	const maxCandidates = 20
-	for i, metric := range output.Metrics {
-		if i >= maxCandidates {
-			break
-		}
-		instant, err := client.CallTool("execute_instant_query", map[string]any{"query": metric})
-		if err != nil || instant.IsError {
-			s.T().Logf("instant query for %q failed during discovery: err=%v isError=%v", metric, err, instant != nil && instant.IsError)
-			continue
-		}
-		var iq instantQueryOutput
-		if err := json.Unmarshal([]byte(textContent(instant)), &iq); err != nil {
-			continue
-		}
-		if iq.ResultType == "vector" && len(iq.Result) > 0 {
-			return metric
-		}
-		s.T().Logf("skipping %q: instant query returned empty/non-vector resultType=%q len=%d", metric, iq.ResultType, len(iq.Result))
-	}
-	return ""
 }
 
 // discoverRoutesViaResolver uses the production MetricsRouteResolver.
@@ -169,142 +105,6 @@ func (s *MetricsE2ESuite) TearDownTest() {
 	}
 }
 
-func (s *MetricsE2ESuite) TestExecuteInstantQuery() {
-	s.Run("executes an instant query", func() {
-		toolResult, err := s.CallTool("execute_instant_query", map[string]any{
-			"query": s.testMetric,
-		})
-		s.Require().NoError(err)
-		s.Require().False(toolResult.IsError, "tool returned error: %s", textContent(toolResult))
-
-		var output instantQueryOutput
-		s.Require().NoError(json.Unmarshal([]byte(textContent(toolResult)), &output))
-		s.Equal("vector", output.ResultType)
-		s.NotEmpty(output.Result, "expected at least one result")
-	})
-}
-
-func (s *MetricsE2ESuite) TestExecuteRangeQuery() {
-	s.Run("executes a range query with step", func() {
-		toolResult, err := s.CallTool("execute_range_query", map[string]any{
-			"query":    s.testMetric,
-			"step":     "1m",
-			"duration": "5m",
-		})
-		s.Require().NoError(err)
-		s.Require().False(toolResult.IsError, "tool returned error: %s", textContent(toolResult))
-
-		var output rangeQueryOutput
-		s.Require().NoError(json.Unmarshal([]byte(textContent(toolResult)), &output))
-		s.Equal("matrix", output.ResultType)
-	})
-}
-
-func (s *MetricsE2ESuite) TestShowTimeseries() {
-	s.Run("validates a range query for chart rendering", func() {
-		if !s.hasTool("show_timeseries") {
-			s.T().Skip("show_timeseries not registered (requires a Perses instance); skipping")
-		}
-		toolResult, err := s.CallTool("show_timeseries", map[string]any{
-			"query":    s.testMetric,
-			"step":     "1m",
-			"duration": "5m",
-			"title":    "Test Timeseries",
-		})
-		s.Require().NoError(err)
-		s.Require().False(toolResult.IsError, "tool returned error: %s", textContent(toolResult))
-	})
-}
-
-func (s *MetricsE2ESuite) hasTool(name string) bool {
-	tools, err := s.ListTools()
-	if err != nil || tools == nil {
-		return false
-	}
-	for _, tool := range tools.Tools {
-		if tool.Name == name {
-			return true
-		}
-	}
-	return false
-}
-
-func (s *MetricsE2ESuite) TestGetLabelNames() {
-	s.Run("retrieves label names for a metric", func() {
-		toolResult, err := s.CallTool("get_label_names", map[string]any{
-			"metric": s.testMetric,
-		})
-		s.Require().NoError(err)
-		s.Require().False(toolResult.IsError, "tool returned error: %s", textContent(toolResult))
-
-		var output labelNamesOutput
-		s.Require().NoError(json.Unmarshal([]byte(textContent(toolResult)), &output))
-		s.NotEmpty(output.Labels, "expected at least one label name")
-	})
-}
-
-func (s *MetricsE2ESuite) TestGetLabelValues() {
-	s.Run("retrieves label values for __name__ label", func() {
-		toolResult, err := s.CallTool("get_label_values", map[string]any{
-			"label":  "__name__",
-			"metric": s.testMetric,
-		})
-		s.Require().NoError(err)
-		s.Require().False(toolResult.IsError, "tool returned error: %s", textContent(toolResult))
-
-		var output labelValuesOutput
-		s.Require().NoError(json.Unmarshal([]byte(textContent(toolResult)), &output))
-		s.NotEmpty(output.Values, "expected at least one label value")
-	})
-}
-
-func (s *MetricsE2ESuite) TestGetSeries() {
-	s.Run("retrieves series for a metric", func() {
-		toolResult, err := s.CallTool("get_series", map[string]any{
-			"matches": fmt.Sprintf(`{__name__="%s"}`, s.testMetric),
-		})
-		s.Require().NoError(err)
-		s.Require().False(toolResult.IsError, "tool returned error: %s", textContent(toolResult))
-
-		var output seriesOutput
-		s.Require().NoError(json.Unmarshal([]byte(textContent(toolResult)), &output))
-		s.NotEmpty(output.Series, "expected at least one series")
-		s.Greater(output.Cardinality, 0)
-	})
-}
-
-func (s *MetricsE2ESuite) TestGetAlerts() {
-	if s.alertmanagerURL == "" {
-		s.T().Skip("Alertmanager URL not available, skipping alerts test")
-	}
-
-	s.Run("retrieves alerts from Alertmanager", func() {
-		toolResult, err := s.CallTool("get_alerts", map[string]any{})
-		s.Require().NoError(err)
-		s.Require().False(toolResult.IsError, "tool returned error: %s", textContent(toolResult))
-
-		var output alertsOutput
-		s.Require().NoError(json.Unmarshal([]byte(textContent(toolResult)), &output))
-		s.NotNil(output.Alerts, "expected alerts array")
-	})
-}
-
-func (s *MetricsE2ESuite) TestGetSilences() {
-	if s.alertmanagerURL == "" {
-		s.T().Skip("Alertmanager URL not available, skipping silences test")
-	}
-
-	s.Run("retrieves silences from Alertmanager", func() {
-		toolResult, err := s.CallTool("get_silences", map[string]any{})
-		s.Require().NoError(err)
-		s.Require().False(toolResult.IsError, "tool returned error: %s", textContent(toolResult))
-
-		var output silencesOutput
-		s.Require().NoError(json.Unmarshal([]byte(textContent(toolResult)), &output))
-		s.NotNil(output.Silences, "expected silences array")
-	})
-}
-
 func TestMetricsE2E(t *testing.T) {
 	suite.Run(t, new(MetricsE2ESuite))
 }
@@ -321,36 +121,4 @@ func textContent(result *mcpsdk.CallToolResult) string {
 
 type listMetricsOutput struct {
 	Metrics []string `json:"metrics"`
-}
-
-type instantQueryOutput struct {
-	ResultType string `json:"resultType"`
-	Result     []any  `json:"result"`
-}
-
-type rangeQueryOutput struct {
-	ResultType string `json:"resultType"`
-	Summary    []any  `json:"summary,omitempty"`
-	Result     []any  `json:"result,omitempty"`
-}
-
-type labelNamesOutput struct {
-	Labels []string `json:"labels"`
-}
-
-type labelValuesOutput struct {
-	Values []string `json:"values"`
-}
-
-type seriesOutput struct {
-	Series      []map[string]string `json:"series"`
-	Cardinality int                 `json:"cardinality"`
-}
-
-type alertsOutput struct {
-	Alerts []any `json:"alerts"`
-}
-
-type silencesOutput struct {
-	Silences []any `json:"silences"`
 }
