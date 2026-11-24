@@ -67,16 +67,16 @@ PR lookup is limited to the downstream repository's own sync branch targeting `m
 
 Every conflicted path must match a `GENERATED` rule in `hack/upstream-sync.rules`. Entries use `KIND|<regex>`, with Bash extended regular expressions anchored by `^` and `$`. Rules match the complete repository-relative path; absolute paths and parent traversal are rejected. The file is parsed once as data, never executed. Invalid or unanchored rules stop the sync.
 
-For example, `GENERATED|^vendor/.*$` includes nested vendor files, while `GENERATED|^pkg/mcp/testdata/[^/]*\.json$` matches JSON files directly in that directory. Escape literal dots with `\.`.
+For example, `GENERATED|^pkg/mcp/testdata/[^/]*\.json$` matches JSON files directly in that directory, but not nested files. Escape literal dots with `\.`.
 
 Rule kinds are tags with distinct semantics, and callers compose them:
 
 - `GENERATED` marks machine-written outputs. Conflicts in these paths may be resolved by regeneration, and the candidate must still verify clean before anything is published.
 - `STAGE` marks additional paths the sync may stage when the generators rewrite them, such as `go.mod` through `go mod tidy`. Conflicts in `STAGE`-only paths still stop the sync.
 
-The staging set is `GENERATED` plus `STAGE`: after the generators run, the script stages exactly the conflicted, changed, and new untracked paths matching either kind. Generator changes outside those rules are left unstaged and stop publishing. The current `GENERATED` rules cover `go.sum`, vendor files, snapshot JSON files, `README.md`, and `docs/configuration.md`; `STAGE` covers `go.mod`. Conflicts in other paths stop the sync.
+The staging set is `GENERATED` plus `STAGE`: after the generators run, the script stages exactly the conflicted, changed, and new untracked paths matching either kind. Generator changes outside those rules are left unstaged and stop publishing. The current `GENERATED` rules cover `go.sum`, snapshot JSON files, `README.md`, and `docs/configuration.md`; `STAGE` covers `go.mod`. Conflicts in other paths stop the sync.
 
-`make downstream-autogenerate-content` runs module tidy/vendor, documentation generation, and snapshot generation. Add regeneration steps to that target. It does not stage or commit files; the sync script does that in the temporary worktree.
+`make downstream-autogenerate-content` runs module tidy, documentation generation, and snapshot generation. Add regeneration steps to that target. It does not stage or commit files; the sync script does that in the temporary worktree.
 
 For `GENERATED` conflicts, generators run before the files are staged. The script rejects remaining conflict markers or unmerged index entries. README and configuration generators replace only their marked sections, so handwritten conflicts outside those sections remain unresolved. A `GENERATED` match permits regeneration; it does not guarantee resolution.
 
@@ -85,7 +85,7 @@ For `GENERATED` conflicts, generators run before the files are staged. The scrip
 `make check-upstream-sync-rules` parses the rules file and verifies the fixture expectations in `hack/upstream-sync.rules.fixtures`. A GitHub workflow runs it on pull requests that change the rules machinery, so a bad rule fails its own pull request instead of a scheduled sync weeks later. To see which rules cover particular paths:
 
 ```sh
-bash hack/sync-upstream.sh explain vendor/modules.txt go.mod
+bash hack/sync-upstream.sh explain go.sum go.mod
 ```
 
 `bash hack/sync-upstream.sh validate` parses and checks the rules file and reports the rule count per kind.

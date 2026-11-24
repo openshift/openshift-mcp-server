@@ -13,7 +13,6 @@
 
 # Machine-written outputs.
 GENERATED|^go\.sum$
-GENERATED|^vendor/.*$
 GENERATED|^pkg/mcp/testdata/[^/]*\.json$
 GENERATED|^README\.md$
 GENERATED|^docs/configuration\.md$
