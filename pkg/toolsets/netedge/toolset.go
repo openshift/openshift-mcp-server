@@ -22,16 +22,16 @@ func (t *Toolset) GetDescription() string {
 	return defaults.ToolsetDescription()
 }
 
-func (t *Toolset) GetTools(_ context.Context, _ api.ToolsetContext) []api.ServerTool {
+func (t *Toolset) GetTools(ctx context.Context, toolsetContext api.ToolsetContext) []api.ServerTool {
 	return slices.Concat(
-		InitQueryPrometheus(),
-		initCoreDNS(),
-		initEndpoints(),
+		InitQueryPrometheus(ctx, toolsetContext.Inspector),
+		initCoreDNS(ctx, toolsetContext.Inspector),
+		initEndpoints(ctx, toolsetContext.Inspector),
 		initProbeDNSLocal(),
 		initProbeHTTP(),
-		initRoutes(),
-		initExecDNSInPod(),
-		initRouter(),
+		initRoutes(ctx, toolsetContext.Inspector),
+		initExecDNSInPod(ctx, toolsetContext.Inspector),
+		initRouter(ctx, toolsetContext.Inspector),
 	)
 }
 
