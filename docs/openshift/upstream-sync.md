@@ -65,20 +65,23 @@ PR lookup is limited to the downstream repository's own sync branch targeting `m
 
 ## Generated conflicts
 
-Every conflicted path must match a `GENERATED` rule in `hack/upstream-sync.rules`. Entries use `KIND|<regex>`, with Bash extended regular expressions anchored by `^` and `$`. Rules match the complete repository-relative path; absolute paths and parent traversal are rejected. The file is parsed once as data, never executed. Invalid or unanchored rules stop the sync.
+Every conflicted path must match a `GENERATED` or `RECONCILE` rule in `hack/upstream-sync.rules`. Entries use `KIND|<regex>`, with Bash extended regular expressions anchored by `^` and `$`. Rules match the complete repository-relative path; absolute paths and parent traversal are rejected. The file is parsed once as data, never executed. Invalid or unanchored rules stop the sync.
 
 For example, `GENERATED|^vendor/.*$` includes nested vendor files, while `GENERATED|^pkg/mcp/testdata/[^/]*\.json$` matches JSON files directly in that directory. Escape literal dots with `\.`.
 
 Rule kinds are tags with distinct semantics, and callers compose them:
 
 - `GENERATED` marks machine-written outputs. Conflicts in these paths may be resolved by regeneration, and the candidate must still verify clean before anything is published.
-- `STAGE` marks additional paths the sync may stage when the generators rewrite them, such as `go.mod` through `go mod tidy`. Conflicts in `STAGE`-only paths still stop the sync.
+- `STAGE` marks additional paths the sync may stage when the generators rewrite them. Conflicts in `STAGE`-only paths still stop the sync.
+- `RECONCILE` marks hand-maintained files whose conflicts are resolved by taking the upstream side and then running the rule's make target to reconstruct downstream state. `RECONCILE` entries carry a required third field: `KIND|<regex>|<make-target>`. Conflicts in `RECONCILE` paths resolve before the generators run.
 
-The staging set is `GENERATED` plus `STAGE`: after the generators run, the script stages exactly the conflicted, changed, and new untracked paths matching either kind. Generator changes outside those rules are left unstaged and stop publishing. The current `GENERATED` rules cover `go.sum`, vendor files, snapshot JSON files, `README.md`, and `docs/configuration.md`; `STAGE` covers `go.mod`. Conflicts in other paths stop the sync.
+The staging set is `GENERATED` plus `STAGE` plus `RECONCILE`: after the generators run, the script stages exactly the conflicted, changed, and new untracked paths matching any of those kinds. Generator changes outside those rules are left unstaged and stop publishing. The current `GENERATED` rules cover `go.sum`, vendor files, snapshot JSON files, `README.md`, and `docs/configuration.md`; `RECONCILE` covers `go.mod`. Conflicts in other paths stop the sync, and the failure note lists them.
 
 `make downstream-autogenerate-content` runs module tidy/vendor, documentation generation, and snapshot generation. Add regeneration steps to that target. It does not stage or commit files; the sync script does that in the temporary worktree.
 
 For `GENERATED` conflicts, generators run before the files are staged. The script rejects remaining conflict markers or unmerged index entries. README and configuration generators replace only their marked sections, so handwritten conflicts outside those sections remain unresolved. A `GENERATED` match permits regeneration; it does not guarantee resolution.
+
+`go.mod` conflicts resolve through `RECONCILE|^go\.mod$|reconcile-go-mod`: the sync takes upstream's `go.mod` and runs `make reconcile-go-mod`, which reapplies the pinned dependency versions from `build/openshift/go.pins` with `go mod edit`, then tidies and vendors. The target finishes with `make verify-go-pins`, which fails unless `go.mod` requires every pinned module at its pinned version; that check is what keeps the automation fail-closed. Its tidy also rewrites `go.sum`, cleaning that `GENERATED` conflict. Update `go.pins` in the same pull request that intentionally moves a dependency.
 
 ## Checking the rules
 

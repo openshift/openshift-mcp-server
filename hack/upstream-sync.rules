@@ -1,15 +1,26 @@
 # Parsed as inert text by sync-upstream.sh; never sourced or evaluated.
 # KIND|regex matches a complete repository-relative path using Bash EREs.
 # Rules must start with ^ and end with $. Escape literal dots with \.
+# RECONCILE rules carry a required third field after a second separator:
+# the make target that reconstructs downstream state. Patterns must not
+# contain the | separator; use separate rules for alternatives.
 #
 # Rule kinds:
 #   GENERATED  Machine-written outputs. Merge conflicts in these paths may be
 #              resolved by running the generators; the candidate must still
 #              verify clean before anything is published.
 #   STAGE      Additional paths the sync may stage when the generators
-#              rewrite them (side effects on hand-maintained inputs such as
-#              go.mod via `go mod tidy`). Conflicts in STAGE-only paths still
-#              stop the sync. The staging set is GENERATED plus STAGE.
+#              rewrite them (side effects on hand-maintained inputs).
+#              Conflicts in STAGE-only paths still stop the sync. The
+#              staging set is GENERATED plus STAGE plus RECONCILE.
+#   RECONCILE  Hand-maintained files whose conflicts are resolved by taking
+#              the upstream side and then running the rule's named make
+#              target to reconstruct downstream state (for example, the
+#              pinned dependency versions in go.mod). RECONCILE rules carry
+#              a REQUIRED third field: the make target name. Conflicts in
+#              RECONCILE paths resolve before the generators run, and the
+#              reconcile target must leave the file free of conflict
+#              markers or the sync stops.
 
 # Machine-written outputs.
 GENERATED|^go\.sum$
@@ -18,5 +29,5 @@ GENERATED|^pkg/mcp/testdata/[^/]*\.json$
 GENERATED|^README\.md$
 GENERATED|^docs/configuration\.md$
 
-# Generator side effects on hand-maintained inputs.
-STAGE|^go\.mod$
+# Hand-maintained inputs reconstructed from the upstream side plus a make target.
+RECONCILE|^go\.mod$|reconcile-go-mod
