@@ -27,6 +27,12 @@
       "matchManagers": ["npm"],
       "matchFileNames": ["test/browser/**"],
       "enabled": false
+    },
+    {
+      "description": "Loki operator kustomize ref managed upstream, arrives via sync",
+      "matchManagers": ["kustomize"],
+      "matchFileNames": ["test/e2e/manifests/obs/loki/**"],
+      "enabled": false
     }
   ],
   "tekton": {
