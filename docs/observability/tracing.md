@@ -138,14 +138,14 @@ use_route = false
 |--------|------|---------|-------------|
 | `auth_mode` | string | `"header"` | Bearer token source: `"header"` or `"kubeconfig"` |
 | `tempo_url` | string | — | Tempo API endpoint URL (optional; use Tempo discovery if unset) |
-| `insecure` | bool | `false` | Skip TLS certificate verification |
+| `insecure` | bool | `false` | Must be false; true is rejected. Configure verified CA trust instead. |
 | `use_route` | bool | `false` | Use OpenShift `Route` resources for Tempo gateway/query URLs |
 
 ---
 
 ## Authentication and TLS
 
-Bearer token behavior matches the [metrics toolset](./metrics.md) (**Authentication and TLS** section): `auth_mode` chooses header vs kubeconfig, and TLS uses kubeconfig CA data, OpenShift service CA when in-cluster, then the system trust store. Set `insecure = true` only when you cannot install the correct CA (not recommended in production).
+Bearer token behavior matches the [metrics toolset](./metrics.md#authentication-and-tls): `auth_mode` chooses header vs kubeconfig. TLS combines system, OpenShift service CA (when present), and REST-config trust. Nonempty `CAData` takes precedence over `CAFile`, which is read only when `CAData` is empty; this changes the previous combined-file behavior. Valid `CAData` ignores missing, malformed, or conflicting `CAFile`; malformed `CAData` fails closed without file fallback. See the metrics documentation for the full compatibility details. `insecure = true` is rejected before token lookup or HTTP requests. Configure the endpoint's issuing CA instead; expiry and hostname checks remain required.
 
 ---
 

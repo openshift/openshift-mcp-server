@@ -61,12 +61,17 @@ max_metric_cardinality = 5000
 			wantErr: "max_metric_cardinality is set but",
 		},
 		{
+			name:    "insecure TLS is rejected",
+			toml:    `insecure = true`,
+			wantErr: "insecure=true is no longer supported",
+		},
+		{
 			name: "full valid config",
 			toml: `
 auth_mode = "kubeconfig"
 prometheus_url = "https://thanos.example.com"
 alertmanager_url = "https://alertmanager.example.com"
-insecure = true
+insecure = false
 guardrails = "all"
 max_metric_cardinality = 5000
 max_label_cardinality = 200

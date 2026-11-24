@@ -28,7 +28,8 @@ type Config struct {
 	// This field is optional. Example: "https://alertmanager-main-openshift-monitoring.apps.example.com"
 	AlertmanagerURL string `toml:"alertmanager_url,omitempty"`
 
-	// Insecure is retained for configuration compatibility but rejected when a client is created.
+	// Insecure is retained for configuration compatibility but true is rejected.
+	// Only false is supported (verify certificates).
 	// Configure a trusted CA instead of disabling certificate verification.
 	Insecure bool `toml:"insecure,omitempty"`
 
@@ -59,6 +60,9 @@ var _ serverconfig.ExtendedConfig = (*Config)(nil)
 
 // Validate checks that the configuration values are valid.
 func (c *Config) Validate() error {
+	if c.Insecure {
+		return fmt.Errorf("insecure=true is no longer supported; configure a trusted CA instead")
+	}
 	if c.AuthMode != "" && c.AuthMode != auth.AuthModeHeader && c.AuthMode != auth.AuthModeKubeConfig {
 		return fmt.Errorf("invalid auth_mode: %q (valid options: %q, %q)", c.AuthMode, auth.AuthModeHeader, auth.AuthModeKubeConfig)
 	}
