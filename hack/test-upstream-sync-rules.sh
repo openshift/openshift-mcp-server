@@ -99,5 +99,71 @@ expect_rejection "an unanchored pattern" $'GENERATED|go\\.sum'
 expect_rejection "a missing separator" $'GENERATED ^go\\.sum$'
 expect_rejection "an invalid regex" $'GENERATED|^[unclosed$'
 
+gomod_case_dir=$(mktemp -d)
+trap 'rm -f "$rejection_tmp"; rm -rf "$gomod_case_dir"' EXIT
+
+write_gomod() {
+	local path=$1
+	shift
+	{
+		printf 'module example.com/mod\n\ngo 1.22.0\n\nrequire (\n'
+		printf '\t%s\n' "$@"
+		printf ')\n'
+	} > "$path"
+}
+
+run_syncgomod() {
+	go -C "$TEST_ROOT/.." run -mod=readonly ./hack/syncgomod.go "$gomod_case_dir/down" "$gomod_case_dir/up" "$gomod_case_dir/out" 2>"$gomod_case_dir/err"
+}
+
+write_gomod "$gomod_case_dir/down" "example.com/common v1.2.0" "example.com/down-only v1.0.0"
+write_gomod "$gomod_case_dir/up" "example.com/common v1.3.0" "example.com/up-only v0.4.0 // indirect"
+if run_syncgomod \
+	&& grep -q 'example.com/common v1.3.0' "$gomod_case_dir/out" \
+	&& grep -q 'example.com/down-only v1.0.0' "$gomod_case_dir/out" \
+	&& ! grep -q 'up-only' "$gomod_case_dir/out"; then
+	pass=$((pass + 1))
+else
+	note_failure "resolve failed: $(cat "$gomod_case_dir/out" "$gomod_case_dir/err" 2>/dev/null || true)"
+fi
+
+write_gomod "$gomod_case_dir/down" "example.com/common v1.5.0"
+write_gomod "$gomod_case_dir/up" "example.com/common v1.4.0"
+if run_syncgomod; then
+	note_failure "downstream-newer module should stop the sync"
+else
+	case "$(cat "$gomod_case_dir/err")" in
+		*"example.com/common"*) pass=$((pass + 1)) ;;
+		*) note_failure "stop note was: $(cat "$gomod_case_dir/err" 2>/dev/null || true)" ;;
+	esac
+fi
+
+if command -v go >/dev/null 2>&1; then
+	repo=$(mktemp -d)
+	git -C "$repo" init -q -b main
+	write_gomod "$repo/go.mod" "example.com/common v1.0.0"
+	git -C "$repo" add go.mod
+	git -C "$repo" -c user.email=t@example.com -c user.name=t -c commit.gpgsign=false commit -qm base
+	write_gomod "$repo/go.mod" "example.com/common v1.2.0" "example.com/down-only v1.0.0"
+	git -C "$repo" add go.mod
+	git -C "$repo" -c user.email=t@example.com -c user.name=t -c commit.gpgsign=false commit -qm down
+	git -C "$repo" checkout -q -b upstream HEAD^
+	write_gomod "$repo/go.mod" "example.com/common v1.3.0" "example.com/up-only v0.4.0"
+	git -C "$repo" add go.mod
+	git -C "$repo" -c user.email=t@example.com -c user.name=t -c commit.gpgsign=false commit -qm up
+	git -C "$repo" checkout -q main
+	git -C "$repo" merge -q upstream >/dev/null 2>&1 || true
+	WORKTREE=$repo
+	TMP_DIR=$(mktemp -d)
+	if resolve_conflicted_go_mod && ! grep -q 'up-only' "$repo/go.mod" \
+		&& grep -q 'example.com/common v1.3.0' "$repo/go.mod" \
+		&& grep -q 'example.com/down-only v1.0.0' "$repo/go.mod"; then
+		pass=$((pass + 1))
+	else
+		note_failure "resolve_conflicted_go_mod produced: $(cat "$repo/go.mod" 2>/dev/null || true) ${INTEGRATION_NOTE:-}"
+	fi
+	rm -rf "$repo" "$TMP_DIR"
+fi
+
 printf '%s: %d passed, %d failed\n' "${0##*/}" "$pass" "$failed"
 (( failed == 0 ))

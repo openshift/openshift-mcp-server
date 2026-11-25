@@ -8,8 +8,10 @@
 #              verify clean before anything is published.
 #   STAGE      Additional paths the sync may stage when the generators
 #              rewrite them (side effects on hand-maintained inputs such as
-#              go.mod via `go mod tidy`). Conflicts in STAGE-only paths still
-#              stop the sync. The staging set is GENERATED plus STAGE.
+#              go.mod via `go mod tidy`). go.mod conflicts are rebuilt by
+#              sync-upstream.sh before those generators run. Any other
+#              STAGE conflict stops the sync. The staging set is GENERATED
+#              plus STAGE.
 
 # Machine-written outputs.
 GENERATED|^go\.sum$

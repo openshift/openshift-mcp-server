@@ -72,9 +72,11 @@ For example, `GENERATED|^vendor/.*$` includes nested vendor files, while `GENERA
 Rule kinds are tags with distinct semantics, and callers compose them:
 
 - `GENERATED` marks machine-written outputs. Conflicts in these paths may be resolved by regeneration, and the candidate must still verify clean before anything is published.
-- `STAGE` marks additional paths the sync may stage when the generators rewrite them, such as `go.mod` through `go mod tidy`. Conflicts in `STAGE`-only paths still stop the sync.
+- `STAGE` marks additional paths the sync may stage when the generators rewrite them, such as `go.mod` through `go mod tidy`. A `go.mod` conflict is rebuilt before the generators run. Any other `STAGE` conflict stops the sync.
 
 The staging set is `GENERATED` plus `STAGE`: after the generators run, the script stages exactly the conflicted, changed, and new untracked paths matching either kind. Generator changes outside those rules are left unstaged and stop publishing. The current `GENERATED` rules cover `go.sum`, vendor files, snapshot JSON files, `README.md`, and `docs/configuration.md`; `STAGE` covers `go.mod`. Conflicts in other paths stop the sync.
+
+A conflicted `go.mod` is not text-merged. `hack/syncgomod.go` raises shared modules to the upstream version when that version is newer, stops when downstream is newer, drops upstream-only requirements, and adds downstream-only requirements. Generation then continues, and `go mod tidy` may rewrite `go.mod` again.
 
 `make downstream-autogenerate-content` runs module tidy/vendor, documentation generation, and snapshot generation. Add regeneration steps to that target. It does not stage or commit files; the sync script does that in the temporary worktree.
 
