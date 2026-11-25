@@ -7,6 +7,7 @@ on:
       - hack/upstream-sync.rules
       - hack/upstream-sync.rules.fixtures
       - hack/sync-upstream.sh
+      - hack/syncgomod.go
       - hack/test-upstream-sync-rules.sh
       - build/openshift/sync-upstream.mk
 
@@ -28,5 +29,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
       - name: Validate rules and fixtures
         run: make check-upstream-sync-rules

@@ -198,13 +198,32 @@ rule_matches() {
 	return 1
 }
 
-all_conflicts_regenerable() {
+# go.mod is rebuilt below. Every other conflicted path must be GENERATED.
+conflicts_are_syncable() {
 	local path
 	[[ ${#CONFLICT_PATHS[@]} -gt 0 ]] || return 1
 	for path in "${CONFLICT_PATHS[@]}"; do
-		if ! rule_matches "$path" GENERATED; then return 1; fi
+		[[ "$path" == go.mod ]] && continue
+		rule_matches "$path" GENERATED || return 1
 	done
-	return 0
+}
+
+# Called only after git merge left go.mod unmerged. Generators, including
+# go mod tidy, run after this and may rewrite the file again.
+resolve_conflicted_go_mod() {
+	local down_file=$TMP_DIR/go.mod.down up_file=$TMP_DIR/go.mod.up out=$TMP_DIR/go.mod.out err
+	git -C "$WORKTREE" show :2:go.mod > "$down_file"
+	git -C "$WORKTREE" show :3:go.mod > "$up_file"
+	if ! err=$(go -C "$UPSTREAM_SYNC_ROOT/.." run -mod=readonly ./hack/syncgomod.go "$down_file" "$up_file" "$out" 2>&1); then
+		INTEGRATION_NOTE=$err
+		return 1
+	fi
+	cp -- "$out" "$WORKTREE/go.mod"
+	git -C "$WORKTREE" add -- go.mod
+	if git -C "$WORKTREE" ls-files -u -- go.sum | grep -q .; then
+		git -C "$WORKTREE" checkout --theirs -- go.sum
+		git -C "$WORKTREE" add -- go.sum
+	fi
 }
 
 load_unmerged_paths() {
@@ -412,11 +431,18 @@ merge_in_worktree() {
 			remove_worktree
 			return 2
 		fi
-		if ! all_conflicts_regenerable; then
+		if ! conflicts_are_syncable; then
 			INTEGRATION_NOTE="Merge conflicts include paths without regeneration rules."
 			git -C "$WORKTREE" merge --abort >/dev/null 2>&1 || true
 			remove_worktree
 			return 2
+		fi
+		if printf '%s\n' "${CONFLICT_PATHS[@]}" | grep -qx 'go.mod'; then
+			if ! resolve_conflicted_go_mod; then
+				git -C "$WORKTREE" merge --abort >/dev/null 2>&1 || true
+				remove_worktree
+				return 2
+			fi
 		fi
 		has_conflicts=1
 	fi
