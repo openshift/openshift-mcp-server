@@ -12,7 +12,6 @@ export UPSTREAM_REPO UPSTREAM_REMOTE ORIGIN_REMOTE SYNC_BRANCH_NAME SYNC_BASE_BR
 .PHONY: downstream-autogenerate-content
 downstream-autogenerate-content: ## Regenerate generated content for downstream syncs
 	$(MAKE) tidy
-	go mod vendor
 	$(MAKE) update-readme-tools
 	$(MAKE) test-update-snapshots
 

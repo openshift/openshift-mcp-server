@@ -6,15 +6,12 @@
 
 go.sum|GENERATED
 go.mod|STAGE
-vendor/modules.txt|GENERATED
-vendor/k8s.io/apimachinery/pkg/util/runtime/runtime.go|GENERATED
 pkg/mcp/testdata/toolsets-core-tools.json|GENERATED
 README.md|GENERATED
 docs/configuration.md|GENERATED
 pkg/mcp/testdata/nested/toolsets-core-tools.json|-
 pkg/mcp/testdata/toolsets-core-tools.json.bak|-
 go.sum.bak|-
-vendorx/modules.txt|-
 cmd/kubernetes-mcp-server/main.go|-
 hack/sync-upstream.sh|-
 hack/upstream-sync.rules|-

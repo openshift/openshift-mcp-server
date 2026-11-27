@@ -4,6 +4,5 @@
 exclude:
   global:
     - internal/tools/update-readme/main.go
-    - vendor/**
     - "**/*_test.go"
     - python/**
